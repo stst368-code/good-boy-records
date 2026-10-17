@@ -1,4 +1,4 @@
-"""Execute frozen local jobs, with explicit attempts and atomic output bundles."""
+"""Execute frozen jobs, with explicit attempts and atomic output bundles."""
 from contextlib import closing
 from datetime import datetime, timezone
 import json
@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKER = ROOT / "_99_Tools" / "_workers_infdit"
 sys.path.insert(0, str(WORKER))
 sys.path.insert(0, str(ROOT / "_98_Database"))
-from gbr_worker.contract import PROTOCOL, file_sha, validate_job
+from gbr_worker.contract import PROTOCOL, execution_target, file_sha, validate_job
+from gbr_worker.runpod import RemotePending, RunpodClient
 
 
 def now():
@@ -45,7 +46,8 @@ def make_job(run, base, attempt_id, directory, revision=None):
            "model_revision": revision or run.get("model_revision"), "lyrics": document.values.get("lyrics", ""),
            "source_sha256": run["source_sha256"], "result_directory": str(directory),
            "cache_root": str(WORKER / "runtime" / "encodings")}
-    return validate_job(job)
+    execution_target(job["execution"])
+    return validate_job(job, require_local=False)
 
 
 def reserve_output(conn, run, output_root):
@@ -172,7 +174,8 @@ def publish_bundle(directory, run, state, result, source, attempt_id, timezone_n
     shutil.copyfile(audio, bundle / (stem + ".flac"))
     metadata = {**run["effective"], "song_id": run["song_id"], "variant_id": run["variant_id"], "title": run["title"],
                 "gbr_run_id": run["id"], "gbr_attempt_id": attempt_id, "gbr_source_sha256": run["source_sha256"],
-                "generation_timestamp": result["completed_at"], "generation_source": "gbr_native_local",
+                "generation_timestamp": result["completed_at"],
+                "generation_source": "gbr_native_" + execution_target(run["execution"])[0],
                 "genre": run["effective"].get("style"),
                 "model_revision": result["models"]["revision"], "hardware": result.get("hardware"),
                 "audio_duration_seconds": info.duration}
@@ -203,7 +206,7 @@ def record_output(conn, run, state, marker):
     conn.execute("UPDATE generation_runs SET status='succeeded',completed_at=? WHERE id=?", (marker["completed_at"], run["id"]))
 
 
-def recover(manifest_path, run_id):
+def recover(manifest_path, run_id, *, remote_stopped=False):
     """Explicitly recover after the operator has stopped the old controller/worker."""
     manifest = verify_plan(manifest_path)
     run = next((r for r in manifest["runs"] if r["id"] == run_id), None)
@@ -214,6 +217,8 @@ def recover(manifest_path, run_id):
         conn.execute("BEGIN IMMEDIATE")
         state = conn.execute("SELECT * FROM generation_execution_state WHERE run_id=?", (run_id,)).fetchone()
         active = conn.execute("SELECT * FROM generation_attempts WHERE run_id=? AND status='running'", (run_id,)).fetchall()
+        if any(a["execution_mode"] == "runpod_dedicated" for a in active) and not remote_stopped:
+            raise ValueError("Remote work may still be running. Use execute --resume-remote to collect it, or recover --remote-stopped only after stopping the pod worker")
         for attempt in active:
             work = Path(manifest_path).resolve().parent / "attempts" / attempt["id"]
             store_observations(conn, attempt["id"], run_id, read_events(work))
@@ -229,7 +234,8 @@ def recover(manifest_path, run_id):
         return {"run_id": run_id, "status": "failed", "retry": "execute --retry-failed"}
 
 
-def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, timezone_name="Europe/London", launcher=None):
+def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, timezone_name="Europe/London",
+            launcher=None, runpod_identity=None, resume_remote=False):
     from zoneinfo import ZoneInfo
     ZoneInfo(timezone_name)
     if type(limit) is not int or limit < 1:
@@ -238,11 +244,14 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
     manifest = verify_plan(manifest_path)
     # Resolving a venv's interpreter symlink would select its base environment on POSIX.
     python = Path(worker_python or default_python()).expanduser().absolute()
-    if not python.is_file():
-        raise FileNotFoundError("Worker Python is missing; install the local worker: " + str(python))
     # Validate every selected job before claiming any or starting inference.
     for run in manifest["runs"]:
         make_job(run, manifest_path.parent, "preflight", manifest_path.parent)
+        backend, address = execution_target(run["execution"])
+        if backend == "local" and not python.is_file():
+            raise FileNotFoundError("Worker Python is missing; install the local worker: " + str(python))
+        if backend == "runpod_dedicated":
+            RunpodClient(address, runpod_identity)
     attempts_root = manifest_path.parent / "attempts"
     output_root = manifest_path.parent / "outputs"
     results = []
@@ -253,31 +262,51 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                 break
             conn.execute("BEGIN IMMEDIATE")
             status = conn.execute("SELECT status FROM generation_runs WHERE id=?", (run["id"],)).fetchone()[0]
+            backend, address = execution_target(run["execution"])
             if status == "succeeded" or status == "failed" and not retry_failed:
                 conn.rollback()
                 continue
-            if status not in {"prepared", "failed"}:
+            resuming = status == "running" and resume_remote and backend == "runpod_dedicated"
+            if resume_remote and not resuming:
                 conn.rollback()
-                raise ValueError(f"Run {run['id']} is {status}; stop any old worker and use recover for an interrupted job")
+                continue
+            if status not in {"prepared", "failed"} and not resuming:
+                conn.rollback()
+                raise ValueError(f"Run {run['id']} is {status}; use --resume-remote for RunPod or recover for an interrupted local job")
             state = reserve_output(conn, run, output_root)
             if Path(state["output_directory"]).exists():
                 conn.rollback()
                 raise ValueError("A published bundle exists for this run; use recover to reconcile it without generating again")
-            attempt_id, started = uuid.uuid4().hex, now()
-            directory = attempts_root / attempt_id
-            directory.mkdir(parents=True)
-            job = make_job(run, manifest_path.parent, attempt_id, directory, state["model_revision"])
-            write_new(directory / "request.json", json_text(job).encode("utf-8"))
-            conn.execute("INSERT INTO generation_attempts VALUES(?,?,?,?,?,?,?,?,?,?)", (
-                attempt_id, run["id"], None, "full_generation", "running", "local", "{}", started, None, None))
-            conn.execute("INSERT INTO generation_timing_spans VALUES(?,?,?,?,?,?,?,?,?,?,?)", (
-                attempt_id + "-total", attempt_id, None, "total", started, None, None, None, None, None, 1))
-            conn.execute("UPDATE generation_runs SET status='running',started_at=? WHERE id=?", (started, run["id"]))
+            if resuming:
+                active = conn.execute("SELECT * FROM generation_attempts WHERE run_id=? AND status='running'", (run["id"],)).fetchall()
+                if len(active) != 1:
+                    raise ValueError("Expected exactly one active remote attempt")
+                attempt_id, started = active[0]["id"], active[0]["started_at"]
+                directory = attempts_root / attempt_id
+                job = json.loads((directory / "request.json").read_text(encoding="utf-8"))
+                expected = make_job(run, manifest_path.parent, attempt_id, directory, job.get("model_revision"))
+                if job != expected:
+                    raise ValueError("Saved remote request changed")
+            else:
+                attempt_id, started = uuid.uuid4().hex, now()
+                directory = attempts_root / attempt_id
+                directory.mkdir(parents=True)
+                job = make_job(run, manifest_path.parent, attempt_id, directory, state["model_revision"])
+                write_new(directory / "request.json", json_text(job).encode("utf-8"))
+                conn.execute("INSERT INTO generation_attempts VALUES(?,?,?,?,?,?,?,?,?,?)", (
+                    attempt_id, run["id"], None, "full_generation", "running", backend, "{}", started, None, None))
+                conn.execute("INSERT INTO generation_timing_spans VALUES(?,?,?,?,?,?,?,?,?,?,?)", (
+                    attempt_id + "-total", attempt_id, None, "total", started, None, None, None, None, None, 1))
+                conn.execute("UPDATE generation_runs SET status='running',started_at=? WHERE id=?", (started, run["id"]))
             conn.commit()
-            clock, error, marker = time.perf_counter(), None, None
+            clock, error, marker, pending = time.perf_counter(), None, None, False
             try:
                 if launcher:
                     launcher(python, directory / "request.json", directory)
+                elif backend == "runpod_dedicated":
+                    reference = json.loads((directory / "remote.json").read_text()) if resuming else {}
+                    client = RunpodClient(address, runpod_identity, release=reference.get("release"))
+                    client.run(job, directory, resume=resuming)
                 else:
                     with (directory / "stderr.log").open("x", encoding="utf-8") as log:
                         process = subprocess.Popen([str(python), "-u", str(WORKER / "worker.py"), "run", str(directory / "request.json")],
@@ -296,6 +325,8 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                                 process.kill()
                                 process.wait()
                             raise
+                        finally:
+                            process.stderr.close()
                         if return_code:
                             detail = ""
                             try:
@@ -317,20 +348,24 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             except BaseException as exc:
                 error = f"{type(exc).__name__}: {exc}"
                 marker = None
+                pending = backend == "runpod_dedicated" and isinstance(exc, (RemotePending, KeyboardInterrupt))
                 if isinstance(exc, KeyboardInterrupt):
-                    print("Local test interrupted; saving available telemetry.", file=sys.stderr)
+                    print("Controller interrupted; reconnect with --resume-remote. The pod continues working." if pending
+                          else "Local test interrupted; saving available telemetry.", file=sys.stderr)
             finally:
                 ended = now()
                 with conn:
                     store_observations(conn, attempt_id, run["id"], read_events(directory))
-                    conn.execute("UPDATE generation_timing_spans SET completed_at=?,duration_seconds=? WHERE id=?", (ended, time.perf_counter() - clock, attempt_id + "-total"))
+                    duration = (datetime.fromisoformat(ended) - datetime.fromisoformat(started)).total_seconds() if resuming else time.perf_counter() - clock
+                    conn.execute("UPDATE generation_timing_spans SET completed_at=?,duration_seconds=? WHERE id=?",
+                                 (None if pending else ended, None if pending else duration, attempt_id + "-total"))
                     conn.execute("UPDATE generation_attempts SET status=?,completed_at=?,error=? WHERE id=?", (
-                        "succeeded" if marker else "failed", ended, error, attempt_id))
-                    if not marker:
+                        "running" if pending else "succeeded" if marker else "failed", None if pending else ended, error, attempt_id))
+                    if not marker and not pending:
                         conn.execute("UPDATE generation_runs SET status='failed' WHERE id=?", (run["id"],))
-                results.append({"run_id": run["id"], "attempt_id": attempt_id, "status": "succeeded" if marker else "failed",
+                results.append({"run_id": run["id"], "attempt_id": attempt_id, "status": "running" if pending else "succeeded" if marker else "failed",
                                 "output": state["output_directory"] if marker else None, "error": error,
-                                "diagnostics": str(directory)})
+                                "diagnostics": str(directory), **({"resume": "execute --resume-remote"} if pending else {})})
             if error:
                 break
         with conn:
@@ -338,3 +373,4 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             batch_status = "succeeded" if all(s == "succeeded" for s in statuses) else "failed" if "failed" in statuses else "running" if "running" in statuses else "prepared"
             conn.execute("UPDATE generation_batches SET status=? WHERE id=?", (batch_status, manifest["batch_id"]))
     return {"batch_id": manifest["batch_id"], "status": batch_status, "attempts": results}
+

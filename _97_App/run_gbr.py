@@ -24,10 +24,10 @@ def main(argv=None):
     if argv and argv[0] in COMMANDS:
         try:
             return dispatch(argv)
-        except (OSError, ValueError, sqlite3.Error) as exc:
+        except (OSError, ValueError, RuntimeError, sqlite3.Error) as exc:
             raise SystemExit(str(exc)) from exc
     parser = argparse.ArgumentParser(description=__doc__, epilog=(
-        "Device commands: setup-generation, doctor-generation, test-generation, init-db, migrate, check-references. "
+        "Device commands: setup-generation, doctor-generation, setup-runpod, doctor-runpod, test-generation, init-db, migrate, check-references. "
         "Use COMMAND --help for options. init-db creates an empty DB; migrate imports existing history."))
     parser.add_argument("--config", type=Path, default=REVIEW_ROOT / "config.json")
     parser.add_argument("--database", type=Path, default=ROOT / "_98_Database" / "gbr.sqlite3")

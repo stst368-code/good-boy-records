@@ -1,12 +1,13 @@
 """One job per process. No configured worker names or model inventories."""
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 import traceback
 
-from gbr_worker.contract import PROTOCOL, canonical, validate_job
-from gbr_worker.hardware import check_install, discover, gpu_lock
+from gbr_worker.contract import PROTOCOL, canonical, execution_target, validate_job
+from gbr_worker.hardware import check_install, discover, gpu_lock, restore_pod_environment
 from gbr_worker.telemetry import Journal, now
 
 
@@ -35,6 +36,7 @@ def main(argv=None):
     run = sub.add_parser("run")
     run.add_argument("request", type=Path)
     args = parser.parse_args(argv)
+    restore_pod_environment()
     if args.command == "doctor":
         _, _, installed, hardware = probe(args.cuda_device)
         print(canonical({"protocol": PROTOCOL, "hardware": hardware, "versions": installed}))
@@ -44,7 +46,10 @@ def main(argv=None):
     journal = Journal(target / "events.ndjson")
     result = {"protocol": PROTOCOL, "run_id": job.get("run_id"), "attempt_id": job.get("attempt_id"), "started_at": now(), "status": "failed"}
     try:
-        validate_job(job)
+        backend, _ = execution_target(job["execution"])
+        validate_job(job, require_local=backend == "local")
+        if backend == "runpod_dedicated" and not os.environ.get("RUNPOD_POD_ID"):
+            raise RuntimeError("A RunPod request requires a RunPod pod; refusing a local fallback")
         torch, device, installed, hardware = probe(job["execution"].get("cuda_device", 0))
         journal.close()
         # Continue the same journal after CUDA discovery, retaining early failure evidence.
@@ -54,8 +59,9 @@ def main(argv=None):
         journal.emit("worker", hardware=hardware, versions=installed)
         with gpu_lock(hardware["gpu_uuid"] or hardware["address"]):
             with journal.span("hardware_check", gpu=False):
-                if hardware["free_vram_bytes_at_start"] < 8 * 1024**3:
-                    raise RuntimeError("Local native profile requires at least 8 GiB free VRAM; close other GPU workloads")
+                minimum = 24 if job["execution"].get("memory_profile") == "resident_stage" else 8
+                if hardware["free_vram_bytes_at_start"] < minimum * 1024**3:
+                    raise RuntimeError(f"This memory profile requires at least {minimum} GiB free VRAM")
             from gbr_worker.native import run as generate
             result.update(generate(job, torch, device, journal, installed, hardware, target / "audio.flac"))
         result["status"] = "succeeded"
@@ -72,3 +78,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

@@ -7,22 +7,42 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKER = ROOT / '_99_Tools' / '_workers_infdit'
-COMMANDS = {'setup-generation', 'doctor-generation', 'test-generation', 'migrate', 'init-db', 'check-references'}
+COMMANDS = {'setup-generation', 'doctor-generation', 'test-generation', 'setup-runpod', 'doctor-runpod',
+            'migrate', 'init-db', 'check-references'}
 
 
 def dispatch(arguments):
     command, *tail = arguments
+    if command in {'setup-runpod', 'doctor-runpod'}:
+        parser = argparse.ArgumentParser(description=('Install and verify' if command == 'setup-runpod' else 'Query') +
+            ' the native worker on an existing dedicated RunPod. Does not rent or stop pods.')
+        parser.add_argument('--address', required=True, help='SSH over exposed TCP: ssh://root@PUBLIC_IP:PORT')
+        parser.add_argument('--identity-file', type=Path, help='Local SSH private key path; otherwise uses SSH agent/config')
+        args = parser.parse_args(tail)
+        sys.path.insert(0, str(WORKER))
+        from gbr_worker.runpod import RunpodClient
+        client = RunpodClient(args.address, args.identity_file)
+        print(json.dumps(client.setup() if command == 'setup-runpod' else client.rpc('doctor'), indent=2))
+        return 0
     if command in {'setup-generation', 'doctor-generation', 'test-generation', 'migrate'}:
         if command == 'setup-generation':
             argparse.ArgumentParser(description='Install or repair the isolated native CUDA worker environment.').parse_args(tail)
             script, python, extra = WORKER / 'install_worker.py', sys.executable, []
         elif command == 'migrate':
             script, python, extra = ROOT / '_98_Database' / 'migrate_databases.py', sys.executable, []
+        elif command == 'test-generation':
+            # The controller needs YAML/FLAC libraries, not CUDA. Reuse the review environment
+            # on fresh devices so a cloud test does not install a second local GPU runtime.
+            environment = ROOT / '_03_Review' / '_Generation_Review' / '.venv'
+            candidate = environment / ('Scripts/python.exe' if sys.platform == 'win32' else 'bin/python')
+            installed_worker = WORKER / '.venv' / ('Scripts/python.exe' if sys.platform == 'win32' else 'bin/python')
+            python = candidate if candidate.is_file() else installed_worker if installed_worker.is_file() else sys.executable
+            script, extra = ROOT / '_02_Generation' / 'first_local_test.py', []
         else:
             python = WORKER / '.venv' / ('Scripts/python.exe' if sys.platform == 'win32' else 'bin/python')
             if not python.is_file():
                 raise ValueError('Install the native worker with: py -3.12 _97_App/run_gbr.py setup-generation')
-            script, extra = (WORKER / 'worker.py', ['doctor']) if command == 'doctor-generation' else (ROOT / '_02_Generation' / 'first_local_test.py', [])
+            script, extra = WORKER / 'worker.py', ['doctor']
         # Preserve a venv interpreter symlink; resolving it would select its base environment.
         return subprocess.call([str(python), str(script), *extra, *tail])
     if command == 'init-db':

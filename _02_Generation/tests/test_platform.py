@@ -76,6 +76,28 @@ class SharedReferenceTests(unittest.TestCase):
                 dispatch(['setup-generation', '--help'])
         self.assertEqual(result.exception.code, 0)
 
+    def test_runpod_setup_help_cannot_connect_or_install(self):
+        with redirect_stdout(io.StringIO()), patch('subprocess.run', side_effect=AssertionError('Must not connect')):
+            with self.assertRaises(SystemExit) as result:
+                dispatch(['setup-runpod', '--help'])
+        self.assertEqual(result.exception.code, 0)
+
+    def test_cloud_test_uses_controller_environment_without_requiring_local_cuda(self):
+        with patch('platform_commands.subprocess.call', return_value=0) as call:
+            self.assertEqual(dispatch(['test-generation', '--runpod', 'ssh://root@203.0.113.10:12345', '--help']), 0)
+        arguments = call.call_args[0][0]
+        self.assertEqual(Path(arguments[1]).name, 'first_local_test.py')
+        self.assertIn('--runpod', arguments)
+
+    def test_local_only_setup_reuses_the_installed_worker_libraries(self):
+        worker = self.root / '_99_Tools/_workers_infdit'
+        python = worker / '.venv' / ('Scripts/python.exe' if sys.platform == 'win32' else 'bin/python')
+        python.parent.mkdir(parents=True)
+        python.touch()
+        with patch('platform_commands.ROOT', self.root), patch('platform_commands.WORKER', worker), patch('platform_commands.subprocess.call', return_value=0) as call:
+            self.assertEqual(dispatch(['test-generation', '--help']), 0)
+        self.assertEqual(call.call_args[0][0][0], str(python))
+
 
 if __name__ == '__main__':
     unittest.main()

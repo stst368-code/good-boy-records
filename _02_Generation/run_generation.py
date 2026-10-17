@@ -37,24 +37,28 @@ def main(argv=None):
             p.add_argument("--on-error", choices=("cancel", "drop", "prompt"), default="prompt")
     p = sub.add_parser("verify")
     p.add_argument("manifest", type=Path)
-    p = sub.add_parser("execute", help="Run frozen jobs on the local native worker")
+    p = sub.add_parser("execute", help="Run frozen jobs locally or on a dedicated RunPod")
     p.add_argument("manifest", type=Path)
     p.add_argument("--worker-python", type=Path)
     p.add_argument("--limit", type=int, default=1, help="Maximum jobs in this invocation (default: 1)")
     p.add_argument("--retry-failed", action="store_true")
+    p.add_argument("--resume-remote", action="store_true", help="Collect the existing remote attempt without starting a new job")
+    p.add_argument("--identity-file", type=Path, help="Local SSH key path; default uses the SSH agent/config")
     p.add_argument("--timezone", default="Europe/London")
     p = sub.add_parser("recover", help="Recover an interrupted run after stopping its old processes")
     p.add_argument("manifest", type=Path)
     p.add_argument("--run-id", required=True)
+    p.add_argument("--remote-stopped", action="store_true", help="Explicitly confirm that the old remote worker has stopped before abandoning its attempt")
     args = parser.parse_args(argv)
     try:
         if args.command in {"execute", "recover"}:
             from gbr_generation.executor import execute, recover
             if args.command == "recover":
-                result = recover(args.manifest, args.run_id)
+                result = recover(args.manifest, args.run_id, remote_stopped=args.remote_stopped)
             else:
                 result = execute(args.manifest, worker_python=args.worker_python, limit=args.limit,
-                                 retry_failed=args.retry_failed, timezone_name=args.timezone)
+                                 retry_failed=args.retry_failed, timezone_name=args.timezone,
+                                 runpod_identity=args.identity_file, resume_remote=args.resume_remote)
             print(json_text(result))
             if result["status"] == "failed":
                 raise SystemExit(1)

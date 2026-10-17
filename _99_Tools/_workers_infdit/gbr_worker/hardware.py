@@ -6,11 +6,33 @@ import json
 import os
 from pathlib import Path
 import platform
+import shlex
 import socket
 import tempfile
 
 PACKAGES = ("torch", "diffusers", "transformers", "accelerate", "safetensors", "huggingface-hub",
             "tokenizers", "regex", "numpy", "soundfile", "mutagen", "psutil", "nvidia-ml-py")
+
+
+def restore_pod_environment(path=Path("/etc/rp_environment")):
+    """RunPod's SSH daemon may omit container variables. Read known values without sourcing shell code."""
+    allowed = {"RUNPOD_POD_ID", "RUNPOD_DC_ID", "RUNPOD_POD_HOSTNAME", "RUNPOD_GPU_COUNT", "RUNPOD_CPU_COUNT",
+               "RUNPOD_PUBLIC_IP", "RUNPOD_TCP_PORT_22", "RUNPOD_VOLUME_ID", "CUDA_VERSION", "CUDA_HOME",
+               "CUDA_PATH", "LD_LIBRARY_PATH", "PATH"}
+    try:
+        with Path(path).open(encoding="utf-8") as stream:
+            lines = stream.read(1024 * 1024).splitlines()
+    except FileNotFoundError:
+        return
+    for line in lines:
+        try:
+            parts = shlex.split(line, comments=True)
+        except ValueError:
+            continue
+        if len(parts) == 2 and parts[0] == "export":
+            key, separator, value = parts[1].partition("=")
+            if separator and key in allowed:
+                os.environ.setdefault(key, value)
 
 
 def versions():
@@ -25,12 +47,20 @@ def versions():
 
 def discover(torch, device):
     import psutil
+    restore_pod_environment()
     props = torch.cuda.get_device_properties(device)
     free, total = torch.cuda.mem_get_info(device)
     gpu_uuid = str(getattr(props, "uuid", "")) or None
     memory = psutil.virtual_memory()
-    return {"address": f"local://{socket.gethostname()}/{gpu_uuid or 'cuda-' + str(device.index)}",
-            "provider": "local", "provider_instance_id": None, "gpu_uuid": gpu_uuid,
+    pod = os.environ.get("RUNPOD_POD_ID") or None
+    identity = gpu_uuid or 'cuda-' + str(device.index)
+    # Deliberately allowlist runtime metadata: never record the pod-scoped API key or keys.
+    provider_details = {key: os.environ.get(key) or None for key in
+                        ("RUNPOD_DC_ID", "RUNPOD_POD_HOSTNAME", "RUNPOD_GPU_COUNT", "RUNPOD_CPU_COUNT",
+                         "RUNPOD_PUBLIC_IP", "RUNPOD_TCP_PORT_22", "RUNPOD_VOLUME_ID")} if pod else {}
+    return {"address": f"runpod://{pod}/{identity}" if pod else f"local://{socket.gethostname()}/{identity}",
+            "provider": "runpod" if pod else "local", "provider_instance_id": pod,
+            "provider_details": provider_details, "gpu_uuid": gpu_uuid,
             "gpu_name": props.name, "usable_vram_bytes": total, "free_vram_bytes_at_start": free,
             "compute_capability": [props.major, props.minor], "cuda_device": device.index,
             "cpu": platform.processor() or None, "cpu_physical_cores": psutil.cpu_count(logical=False),
@@ -82,3 +112,4 @@ def check_install():
     from diffusers.modular_pipelines.minimax_music3.decoders import MiniMaxMusic3VocoderDecodeStep
     from diffusers.hooks.group_offloading import apply_group_offloading
     return versions()
+

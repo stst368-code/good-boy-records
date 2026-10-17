@@ -4,12 +4,43 @@ import json
 import math
 from pathlib import Path
 import re
+from urllib.parse import urlsplit
 
 PROTOCOL = 1
 DIFFUSERS_REVISION = "b800f828f3951c4d206e154411bcbfa693cd322e"
 MODEL = "MiniMaxAI/MiniMax-Music3"
 SMOKE_MODEL_REVISION = "fbdf52fbaaca799592917417eb05f1899f1255ec"
 ADAPTER = "gbr-minimax-music3-v1"
+
+
+def ssh_endpoint(address):
+    """Only direct SSH endpoints: no passwords, options, paths or shell fragments."""
+    if not isinstance(address, str) or any(character.isspace() for character in address):
+        raise ValueError("Use a RunPod address such as ssh://root@203.0.113.1:12345")
+    try:
+        url = urlsplit(address)
+        port = 22 if url.port is None else url.port
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Use a RunPod address such as ssh://root@203.0.113.1:12345") from exc
+    if (url.scheme != "ssh" or url.password is not None or url.path or url.query or url.fragment
+            or not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", url.username or "")
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.:-]*", url.hostname or "")
+            or not 1 <= port <= 65535 or url.hostname == "ssh.runpod.io"):
+        raise ValueError("Use SSH over exposed TCP: ssh://USER@PUBLIC_IP:PORT (no passwords or proxy SSH)")
+    return url.username, url.hostname, port
+
+
+def execution_target(execution):
+    """The first remote adapter runs both GPU stages together on one dedicated pod."""
+    targets = [execution[stage] for stage in ("conditioning", "diffusion")]
+    if all(t["backend"] == "local" and not t.get("address") for t in targets):
+        return "local", None
+    if (all(t["backend"] == "runpod_dedicated" for t in targets)
+            and targets[0].get("address") == targets[1].get("address")):
+        address = targets[0].get("address")
+        ssh_endpoint(address)
+        return "runpod_dedicated", address
+    raise ValueError("RunPod transport requires both stages on the same dedicated SSH address; split/serverless execution is not installed")
 
 
 def canonical(value):
@@ -33,7 +64,7 @@ def validate_job(job, *, allow_unfrozen_seeds=False, require_local=True):
     for stage in ("conditioning", "diffusion"):
         target = execution[stage]
         if require_local and (target["backend"] != "local" or target.get("address")):
-            raise ValueError("This execution adapter supports local stages only; RunPod transport is not installed")
+            raise ValueError("A local worker cannot execute a remote target")
     for field in ("dit", "text_encoder"):
         if p.get(field) not in {"bf16", "fp32"}:
             raise ValueError(f"{field}: native worker supports explicit bf16 or fp32 precision")
@@ -82,3 +113,4 @@ def encoding_identity(job, revision, versions):
                 "model_revision": revision, "versions": versions, "lyrics": job["lyrics"],
                 "parameters": {key: p[key] for key in ("caption", "text_encoder", "encoder_cfg", "encoder_seed", "top_k", "duration")}}
     return hashlib.sha256(canonical(identity).encode("utf-8")).hexdigest(), identity
+
