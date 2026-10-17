@@ -6,6 +6,7 @@ import json
 import logging
 import secrets
 import socket
+import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -137,7 +138,7 @@ def create_app(config_path, start_worker=True, database_path=None):
         yield
         service.close()
 
-    app = FastAPI(title="GBR Review", version="1.3.0", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="GBR", version="1.4.0", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.service = service
     hosts = {"127.0.0.1", "localhost", "::1", socket.gethostname(), *config.values["allowed_hosts"]}
     host_addresses = {'127.0.0.1', '::1', 'testclient'}
@@ -340,23 +341,37 @@ def create_app(config_path, start_worker=True, database_path=None):
         service.skip(gid, reviewer_id=reviewer_id(request))
         return {"skipped": True}
 
+    def technical_checks(analysis):
+        from .triage import technical_triage, number
+        if not analysis:
+            return {"analysis_id": None, "measurements": {}, **technical_triage({})}
+        try:
+            metrics = json.loads(analysis["metrics_json"])
+        except (TypeError, ValueError):
+            metrics = {}
+        if not isinstance(metrics, dict):
+            metrics = {}
+        events = service.db.all("SELECT type,start,end FROM audio_events WHERE analysis_id=? ORDER BY start", (analysis["id"],))
+        measured = {key: number(metrics.get(key)) for key in ("integrated_lufs", "true_peak_dbtp_4x", "rms_dbfs", "clipped_fraction", "stereo_correlation", "channel_balance_db")}
+        return {"analysis_id": analysis["id"], "measurements": measured, **technical_triage(metrics, events)}
+
     def track_preview(gid):
         g = service.db.one("SELECT audio_id FROM generations WHERE id=?", (gid,))
         if not g:
             raise KeyError("Recording not found")
         analysis = service.db.one("SELECT * FROM analyses WHERE audio_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (g["audio_id"],))
+        checks = technical_checks(analysis)
         if not analysis:
-            return {"ready": False}
+            return {"ready": False, "technical_checks": checks}
         if not Path(analysis["preview_path"]).is_file() or not Path(analysis["spectrogram_path"]).is_file():
             service.db.execute("UPDATE audio SET analysis_state='pending' WHERE id=?", (g["audio_id"],))
-            return {"ready": False}
+            return {"ready": False, "technical_checks": checks}
         data = json.loads(Path(analysis["preview_path"]).read_text())
         markers = service.db.all("SELECT id,start,end FROM audio_events WHERE analysis_id=? ORDER BY start", (analysis["id"],))
-        # No type, severity, confidence or measurements are exposed during scoring.
         segments = service.db.all("SELECT id,mode,ordinal,start,end FROM segments WHERE analysis_id=? ORDER BY mode,ordinal", (analysis["id"],))
         points = service.db.all("SELECT id,start,end FROM audio_events WHERE analysis_id=? AND type='structural_transition' ORDER BY start", (analysis["id"],))
         return {"ready": True, "duration": data["duration"], "waveform": data["waveform"], "channels": data["channels"],
-                "markers": markers, "points": points, "segments": segments, "analysis_id": analysis["id"], "frequency_axis": data["frequency_axis"]}
+                "markers": markers, "points": points, "segments": segments, "analysis_id": analysis["id"], "frequency_axis": data["frequency_axis"], "technical_checks": checks}
 
     @app.get("/api/tracks/{gid}/preview")
     def preview(gid: str):
@@ -369,18 +384,6 @@ def create_app(config_path, start_worker=True, database_path=None):
             raise KeyError("Recording not found")
         latest = service.db.one("SELECT id FROM analyses WHERE audio_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (g["id"],))
         return {"state": g["analysis_state"], "analysis_id": latest["id"] if latest else None}
-
-    @app.get("/api/tracks/{gid}/triage")
-    def triage(gid: str):
-        from .triage import technical_triage
-        g = service.db.one("SELECT audio_id FROM generations WHERE id=?", (gid,))
-        if not g:
-            raise KeyError("Recording not found")
-        latest = service.db.one("SELECT id,metrics_json FROM analyses WHERE audio_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (g["audio_id"],))
-        if not latest:
-            return {"analysis_id": None, **technical_triage({})}
-        events = service.db.all("SELECT type,start,end FROM audio_events WHERE analysis_id=? ORDER BY start", (latest["id"],))
-        return {"analysis_id": latest["id"], **technical_triage(json.loads(latest["metrics_json"]), events)}
 
     @app.get("/api/tracks/{gid}/spectrogram")
     def spectrogram(gid: str):
@@ -578,6 +581,14 @@ def create_app(config_path, start_worker=True, database_path=None):
     def service_worker():
         return FileResponse(STATIC / "sw.js", media_type="application/javascript", headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
 
+    repo_root = Path(__file__).resolve().parents[3]
+    tool_root = repo_root / "_99_Tools" / "_YAML_Editor"
+    sys.path.insert(0, str(tool_root))
+    from gbr_yaml_editor.api import router as yaml_editor_router
+    editor_routes, editor = yaml_editor_router(repo_root, local)
+    app.include_router(editor_routes)
+    app.state.yaml_editor = editor
+    app.mount("/tools/yaml-editor", StaticFiles(directory=tool_root / "static"), name="yaml-editor")
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app
 

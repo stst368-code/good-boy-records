@@ -1,3 +1,4 @@
+import {initYamlEditor} from "/tools/yaml-editor/editor.js";
 const $=id=>document.getElementById(id);
 const audio=$('audio'), canvas=$('waveform');
 const DIMENSIONS=['audio_quality','composition','consistency','realism'];
@@ -29,7 +30,7 @@ function ratingButtons(){
 }
 function paintRatings(){
   $('changeUser').disabled=state.submitting||state.advancePending||state.flagSaving;
-  $('back').disabled=!state.canBack||state.submitting||state.advancePending;$('skip').disabled=!state.track||state.submitting||state.advancePending||state.reservationLost;$('queueButton').disabled=state.submitting||state.advancePending;$('selectionTab').disabled=state.submitting||state.advancePending;
+  $('back').disabled=!state.canBack||state.submitting||state.advancePending;$('skip').disabled=!state.track||state.submitting||state.advancePending||state.reservationLost;$('queueButton').disabled=state.submitting||state.advancePending;$('selectionTab').disabled=state.submitting||state.advancePending;$('yamlTab').disabled=state.submitting||state.advancePending;
   const complete=DIMENSIONS.every(d=>state.scores[d]!==undefined);$('submitReview').hidden=state.autoSubmit||state.selectionListen||!state.track;$('submitReview').disabled=!complete||state.submitting||state.advancePending||state.reservationLost||state.flagSaving;$('retryReview').hidden=!state.autoSubmit||!state.saveError||state.reservationLost||state.advancePending;$('retryReview').disabled=state.submitting;$('reason').disabled=state.submitting||state.advancePending;$('autoSubmit').disabled=state.submitting||state.advancePending;paintFlags();
   const missing=DIMENSIONS.findIndex(d=>state.scores[d]===undefined);if(missing>=0&&state.scores[DIMENSIONS[state.ratingIndex]]!==undefined)state.ratingIndex=missing;
   document.querySelectorAll('.rating').forEach((row,i)=>row.classList.toggle('keyboard-active',i===state.ratingIndex));
@@ -59,6 +60,7 @@ async function nextTrack(advance=false){
   if(advance&&$('autoplayNext').checked&&state.track&&!state.track.correction){try{await audio.play();}catch{toast('Tap Play to continue — the browser blocked automatic playback.');}}
 }
 async function loadTrack(track,selectionListen=false,initialPreview=null,wantedMode=preferredMode()){
+  renderTechnicalChecks(null);
   const sequence=++loadSequence;clearTimeout(prefetchTimer);audio.pause();audio.removeAttribute('src');audio.load();
   state.track=track;state.saveError=false;state.submissionId=newSubmissionId();state.flagSaving=false;state.flagError=false;state.flagWrite=Promise.resolve();state.flags=track?.flags||{distribution:false,bookmarked:false,publishing_status:'not_selected'};$('reason').value=track?.reason||'';$('reasonWrap').hidden=selectionListen;$('viewReviews').hidden=!(selectionListen||track?.correction);$('autoSubmitLabel').hidden=selectionListen;$('flagMessage').textContent='';$('retryFlags').hidden=true;$('refreshFlags').hidden=true;$('distributionFlag').checked=state.flags.distribution;$('bookmarkFlag').checked=state.flags.bookmarked;state.preview=null;state.scores=track?.scores?{...track.scores}:{};state.advancePending=false;state.reservationLost=false;$('resumeQueue').hidden=true;state.selection=null;state.selecting=false;state.context=null;state.ratingIndex=0;state.analysisIds=new Set();state.listened=new Set();state.heard=0;state.fullCompleted=false;state.fullIntervals=[];state.lastTime=0;state.selectionListen=selectionListen;
   $('playRange').hidden=true;$('selectRange').textContent='Select range';canvas.classList.remove('selecting');$('spectralWrap').hidden=true;$('spectralToggle').setAttribute('aria-expanded','false');
@@ -73,11 +75,30 @@ async function loadTrack(track,selectionListen=false,initialPreview=null,wantedM
 async function refreshPreview(sequence=loadSequence,initialPreview=null){
   if(!state.track)return;const gid=state.track.id;const preview=initialPreview||await api(`/tracks/${gid}/preview`);
   if(sequence!==loadSequence||state.track?.id!==gid)return;
-  const wasReady=state.preview?.ready;state.preview=preview;
+  const wasReady=state.preview?.ready;state.preview=preview;renderTechnicalChecks(preview.technical_checks);
   $('waveStatus').hidden=preview.ready;$('waveStatus').textContent=state.track.analysis_state==='failed'?'Waveform unavailable · full playback available':'Preparing waveform…';
   for(const button of document.querySelectorAll('[data-mode]'))button.disabled=!modeAvailable(button.dataset.mode);
   $('spectralToggle').disabled=!preview.ready;$('nextPoint').disabled=!preview.ready||!preview.markers.length;
   if(preview.ready){document.querySelector('.freq-top').textContent=`${Math.round(preview.frequency_axis.max_hz/1000)} kHz`;drawSnippets();drawWave();if(!wasReady&&!state.selectionListen&&audio.paused&&state.heard===0&&state.context){const wanted=preferredMode();if(modeAvailable(wanted)&&state.mode!==wanted)setMode(wanted,{},false);}prepareNext();}
+}
+function renderTechnicalChecks(checks){
+  const status=$('technicalStatus'), flags=$('technicalFlags');flags.replaceChildren();$('technicalMetrics').textContent='';
+  const assessed=checks&&checks.status!=='not_assessed';
+  status.textContent=!assessed?(state.track?.analysis_state==='failed'?'Analysis unavailable':'Not assessed yet'):checks.status==='flagged'?`${checks.flags.length} possible issue${checks.flags.length===1?'':'s'}`:'No strong technical flags';
+  status.classList.toggle('technical-warning',checks?.status==='flagged');
+  if(!assessed)return;
+  const m=checks.measurements||{},parts=[];
+  for(const [key,label,unit] of [['integrated_lufs','Loudness',' LUFS'],['true_peak_dbtp_4x','Peak estimate',' dBTP'],['rms_dbfs','RMS',' dBFS']])if(Number.isFinite(m[key]))parts.push(`${label} ${m[key].toFixed(1)}${unit}`);
+  if(Number.isFinite(m.clipped_fraction))parts.push(`Full-scale samples ${(m.clipped_fraction*100).toFixed(3)}%`);
+  $('technicalMetrics').textContent=parts.join(' · ');
+  const labels={near_silent_recording:'Almost silent recording',frequent_full_scale_samples:'Frequent full-scale samples',estimated_intersample_overs:'Possible intersample peaks',possible_mono_cancellation:'Possible mono cancellation',channel_imbalance:'Large channel imbalance',interior_quiet_gap:'Quiet gap'};
+  for(const flag of checks.flags||[]){
+    const timed=Number.isFinite(flag.start)&&Number.isFinite(flag.end),item=document.createElement(timed?'button':'span');item.className='technical-flag';
+    item.textContent=(labels[flag.code]||flag.code)+(timed?` · ${fmt(flag.start)}–${fmt(flag.end)} · Listen`:'');
+    item.title=Object.entries(flag.evidence||{}).map(([key,value])=>`${key}: ${value}`).join('\n');
+    if(timed){item.type='button';item.onclick=guarded(async()=>{setMode('range',{start:Math.max(0,flag.start-2),end:Math.min(state.track.duration,flag.end+2)});await audio.play();});}
+    flags.append(item);
+  }
 }
 function setMode(mode,extra={},remember=true){
   if(!state.track)return;
@@ -169,9 +190,11 @@ function mediaSession(){
   const actions={play:()=>audio.play(),pause:()=>audio.pause(),stop:()=>{audio.pause();audio.currentTime=0;},seekbackward:details=>audio.currentTime=Math.max(0,audio.currentTime-(details.seekOffset||10)),seekforward:details=>audio.currentTime=Math.min(audio.duration||0,audio.currentTime+(details.seekOffset||10)),seekto:details=>audio.currentTime=details.seekTime,nexttrack:()=>audio.currentTime=Math.min(audio.duration||0,audio.currentTime+10),previoustrack:()=>audio.currentTime=Math.max(0,audio.currentTime-10)};
   for(const [name,handler] of Object.entries(actions))try{navigator.mediaSession.setActionHandler(name,handler);}catch{}
 }
-function showView(view){state.view=view;$('reviewView').hidden=view!=='review';$('selectionView').hidden=view!=='selection';$('reviewTab').classList.toggle('active',view==='review');$('selectionTab').classList.toggle('active',view==='selection');if(view==='review')drawWave();}
+function showView(view){state.view=view;$('reviewView').hidden=view!=='review';$('selectionView').hidden=view!=='selection';$('yamlView').hidden=view!=='yaml';$('yamlTab').classList.toggle('active',view==='yaml');$('reviewTab').classList.toggle('active',view==='review');$('selectionTab').classList.toggle('active',view==='selection');if(view==='review')drawWave();}
 $('reviewTab').onclick=guarded(async()=>{showView('review');if(state.selectionListen)await nextTrack();else await refreshFlags();});
 $('selectionTab').onclick=guarded(async()=>{showView('selection');await loadCandidates();});
+const yamlEditor=initYamlEditor({api,toast,browse:async callback=>{await openDirectory(callback);}});
+$('yamlTab').onclick=guarded(async()=>{audio.pause();showView('yaml');await yamlEditor.open();});
 $('back').onclick=guarded(async()=>{const reviewerId=state.reviewerId,result=await api('/queue/back');if(reviewerId===state.reviewerId&&result.track)await loadTrack(result.track);});
 $('autoplayNext').checked=localStorage.getItem('gbr-autoplay-next')==='true';
 $('autoplayNext').onchange=()=>localStorage.setItem('gbr-autoplay-next',String($('autoplayNext').checked));
@@ -314,7 +337,7 @@ async function browseDirectory(path){
 async function openDirectory(target){directoryTarget=target;directoryChoice=null;$('directoryDialog').showModal();await browseDirectory();}
 $('browseInput').onclick=guarded(()=>openDirectory('input'));$('browseArchive').onclick=guarded(()=>openDirectory('archive'));
 $('directoryPathForm').onsubmit=event=>{event.preventDefault();browseDirectory($('directoryPath').value);};
-$('useDirectory').onclick=()=>{if(!directoryChoice)return;if(directoryTarget==='input'){const folders=$('inputFolders').value.split('\n').map(value=>value.trim()).filter(Boolean);if(!folders.includes(directoryChoice))folders.push(directoryChoice);$('inputFolders').value=folders.join('\n');}else $('archiveFolder').value=directoryChoice;$('directoryDialog').close();};
+$('useDirectory').onclick=()=>{if(!directoryChoice)return;if(typeof directoryTarget==='function'){directoryTarget(directoryChoice);}else if(directoryTarget==='input'){const folders=$('inputFolders').value.split('\n').map(value=>value.trim()).filter(Boolean);if(!folders.includes(directoryChoice))folders.push(directoryChoice);$('inputFolders').value=folders.join('\n');}else $('archiveFolder').value=directoryChoice;$('directoryDialog').close();};
 const humanBytes=bytes=>`${(bytes/1024**3).toFixed(2)} GiB`;
 async function cacheReport(){const report=await api('/playback-cache');$('cacheSummary').textContent=`${humanBytes(report.bytes)} in ${report.files} playback files · WAV: ${humanBytes(report.wav_bytes)} · ${report.untracked_files} older untracked files kept. Automatic cleanup is off.`;}
 $('cachePreview').onclick=guarded(async()=>{$('cacheResult').textContent='Checking cached files and original audio…';$('cacheClean').disabled=true;const result=await api('/playback-cache/cleanup',{older_than_days:Number($('cacheDays').value),dry_run:true});$('cacheResult').textContent=`Eligible: ${result.eligible_files} files (${humanBytes(result.eligible_bytes)}). Protected: ${result.protected_files}; unavailable/changed originals: ${result.unavailable_or_changed_source}; untracked files retained: ${result.untracked_files_retained}.`;$('cacheClean').disabled=result.eligible_files===0;});
@@ -325,3 +348,4 @@ ratingButtons();guarded(boot)();
 setInterval(async()=>{try{if($('loginDialog').open||$('reviewerDialog').open||!state.reviewer||state.reservationLost)return;if($('settingsDialog').open)await status();if(state.view==='review'&&!state.submitting){if(state.advancePending)await nextTrack(true);else if(!state.track)await nextTrack();else if(!state.preview?.ready)await refreshPreview();else if(state.waitForRetune||!modeAvailable('fast')){const result=await api(`/tracks/${state.track.id}/analysis-state`);if(result.analysis_id!==state.preview.analysis_id)await refreshPreview();state.waitForRetune=['pending','analysing','retune_pending','retuning'].includes(result.state);}}}catch{}},5000);
 
 setInterval(()=>{if(state.view==='review'&&state.track&&!state.submitting&&!state.advancePending&&!state.flagSaving&&!state.flagError&&!state.saveError&&!document.querySelector('dialog[open]'))refreshFlags(true).catch(()=>{});},5000);
+

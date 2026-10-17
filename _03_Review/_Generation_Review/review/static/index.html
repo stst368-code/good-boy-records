@@ -4,11 +4,11 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#11161b"><meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/static/manifest.webmanifest"><link rel="icon" href="/static/icon.svg" type="image/svg+xml">
-  <title>GBR Review</title><link rel="stylesheet" href="/static/style.css">
+  <title>GBR</title><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/tools/yaml-editor/editor.css">
 </head>
 <body>
 <header class="topbar"><a class="wordmark" href="#review" aria-label="Good Boy Records review"><span class="logo">GBR</span><span>GOOD BOY RECORDS<small>REVIEW ROOM</small></span></a>
-  <nav aria-label="Main"><button id="reviewTab" class="tab active">Review</button><button id="selectionTab" class="tab">Selection</button><button id="settingsButton" class="icon-button" aria-label="Settings" title="Settings">⚙</button></nav>
+  <nav aria-label="Main"><button id="reviewTab" class="tab active">Review</button><button id="selectionTab" class="tab">Selection</button><button id="yamlTab" class="tab">YAML editor</button><button id="settingsButton" class="icon-button" aria-label="Settings" title="Settings">⚙</button></nav>
 </header>
 <main>
   <div id="reviewerBar" class="reviewer-bar" hidden><span>Reviewing as <strong id="reviewerName"></strong></span><button id="changeUser" class="quiet-button">Change user</button></div>
@@ -26,6 +26,11 @@
         <div class="transport"><div class="transport-buttons"><button id="play" class="play-button" aria-label="Play">▶</button><button id="restart" class="icon-button" aria-label="Restart" title="Restart">↺</button></div><div class="progress"><input id="progress" type="range" min="0" max="1000" value="0" aria-label="Playback progress"><div class="time-line"><span id="elapsed">0:00</span><span id="duration">0:00</span></div></div></div>
         <div class="volume-line"><label class="autoplay-label"><input id="autoplayNext" type="checkbox"> Autoplay<span class="autoplay-extra"> next song</span></label><label>Volume <input id="volume" type="range" min="0" max="100" value="50" aria-label="Volume"></label><button id="compatibility" class="quiet-button" title="Use lossless WAV if this browser cannot play FLAC">Playback compatibility</button></div>
       </section>
+      <section id="technicalChecks" class="technical-checks" aria-label="Automatic technical checks">
+        <div class="technical-heading"><strong>Technical checks</strong><span id="technicalStatus" role="status">Waiting for analysis</span></div>
+        <p id="technicalMetrics" class="subtle small"></p><div id="technicalFlags" class="technical-flags"></div>
+        <p class="subtle small">Signal checks can flag intentional effects or rests. Listen and choose your own ratings.</p>
+      </section>
       <section id="reviewTools" class="review-tools" aria-label="Review context">
         <details id="trackFlagsMenu" class="track-flags"><summary>Track flags <span id="flagSummary" class="subtle"></span><span aria-hidden="true">⌄</span></summary><div class="flag-options"><label><input id="distributionFlag" type="checkbox"> Flag for distribution</label><label><input id="bookmarkFlag" type="checkbox"> Bookmark</label><p class="subtle small">Distribution is shared; bookmarks belong to your reviewer.</p><p id="flagMessage" class="small" role="status"></p><button id="retryFlags" type="button" class="quiet-button" hidden>Retry flags</button><button id="refreshFlags" type="button" class="quiet-button" hidden>Refresh flags</button></div></details>
         <label id="reasonWrap" class="reason-field">Reason <span class="subtle small">Optional · saved with this review</span><textarea id="reason" rows="3" maxlength="20000" placeholder="Why this rating or bookmark?" aria-label="Reason"></textarea></label>
@@ -42,6 +47,7 @@
     <footer class="review-footer"><label id="autoSubmitLabel" class="auto-submit-label"><input id="autoSubmit" type="checkbox" checked> Auto-submit</label><button id="submitReview" class="primary" hidden disabled>Submit review</button><button id="retryReview" class="secondary" hidden>Retry save</button><button id="back" class="secondary">← Back</button><button id="resumeQueue" class="secondary" hidden>Resume queue</button><span id="reviewMessage" role="status" aria-live="polite"></span><button id="skip" class="secondary">Skip →</button></footer>
   </section>
   <section id="selectionView" hidden aria-label="Publishing selection"><div class="section-heading"><div><p class="eyebrow">THE NEXT LISTEN</p><h1>Publishing selection</h1><p class="subtle">Keep the versions you want to publish. Selection leaves ratings unchanged.</p></div></div><div class="selection-filters"><label>Archive <select id="selectionBucket"><option value="5">Bucket 5</option><option value="4">Bucket 4</option><option value="3">Bucket 3</option><option value="2">Bucket 2</option><option value="1">Bucket 1</option><option value="0">Bucket 0</option><option value="">All flagged / reviewed</option></select></label><label>Status <select id="selectionStatus"><option value="">All</option><option value="selected">Flagged for distribution</option><option value="published">Published</option><option value="not_selected">Not selected</option><option value="passed">Passed</option><option value="withdrawn">Withdrawn</option></select></label><label>Bookmarks <select id="selectionBookmarks"><option value="">All</option><option value="only">Bookmarked by me</option></select></label><label class="flex">Song <input id="selectionSong" placeholder="Filter titles"></label></div><div class="selection-actions"><button id="compare" disabled>Compare two versions</button><a href="/api/publishing-manifest" target="_blank" rel="noopener" class="quiet-button">Selection manifest ↗</a></div><div id="candidateList" class="candidate-list"></div><div class="page-controls"><button id="previousPage" class="secondary" disabled>← Previous</button><button id="nextPage" class="secondary" disabled>Next →</button></div></section>
+<section id="yamlView" aria-label="YAML editor" hidden></section>
 </main>
 <audio id="audio" preload="metadata"></audio>
 <div id="toast" role="status" aria-live="polite" hidden></div>
@@ -54,3 +60,4 @@
 <dialog id="compareDialog"><div class="dialog-heading"><h2>Blind comparison</h2><button class="close" data-close="compareDialog" aria-label="Close">×</button></div><p id="compareTitle"></p><p class="subtle">Both versions use the same measured loudness and peak headroom.</p><div class="compare-buttons"><button id="playA">Play A</button><button id="playB">Play B</button><button id="comparePause" class="secondary">Pause</button></div><div class="compare-buttons"><button data-prefer="a">Prefer A</button><button data-prefer="tie" class="secondary">No preference</button><button data-prefer="b">Prefer B</button></div><p id="compareResult" role="status"></p></dialog>
 <script type="module" src="/static/app.js"></script>
 </body></html>
+
