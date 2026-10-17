@@ -26,6 +26,10 @@ class Preview(Body):
     expected: dict[str, str] = Field(default_factory=dict)
 
 
+class OrderTemplate(Body):
+    path: str | None = None
+
+
 class Apply(Body):
     token: str
     skip_errors: StrictBool = False
@@ -51,6 +55,10 @@ def router(repo_root, local):
     @routes.post('/file')
     def file(body: File):
         return editor.read(body.directory, body.path)
+
+    @routes.post('/order-template')
+    def order_template(body: OrderTemplate):
+        return editor.order_template(body.path)
 
     @routes.post('/preview')
     def preview(body: Preview):

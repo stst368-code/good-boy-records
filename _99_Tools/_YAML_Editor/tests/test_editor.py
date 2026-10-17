@@ -200,6 +200,78 @@ class ServiceTests(unittest.TestCase):
         p = self.editor.preview(self.root, ['a.yaml'], [{'kind':'catalogue_ids'}])
         self.assertEqual(p['errors'], 1)
 
+    def order_template(self, raw=b'song_id:\ntitle:\nlyrics: |\n'):
+        path=self.editor.default_order_template
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_bytes(raw)
+        return path
+
+    def test_reorder_defaults_to_the_project_yaml_template(self):
+        template=self.order_template()
+        original=b'lyrics: |-\n  one\n  two\nprivate_note: {x: yes} # keep\ntitle: Song\nsong_id: 1\n'
+        self.a.write_bytes(original)
+        preview=self.editor.preview(self.root,['a.yaml'],[{'kind':'reorder'}])
+        self.assertEqual(preview['ready'],1,preview)
+        self.assertEqual(preview['order_templates'][0]['keys'],['song_id','title','lyrics'])
+        self.editor.apply(preview['token'])
+        self.assertEqual(self.a.read_bytes(),b'song_id: 1\nprivate_note: {x: yes} # keep\ntitle: Song\nlyrics: |-\n  one\n  two\n')
+        self.assertEqual(template.read_bytes(),b'song_id:\ntitle:\nlyrics: |\n')
+
+    def test_custom_template_orders_only_fields_and_never_copies_values(self):
+        template=self.root/'my template.yml'
+        template.write_text('lyrics: Dummy lyrics\nsong_id: 999\ntitle: Different title\n')
+        original=b'title: Actual Song\ncustom: [1, 2] # unchanged\nsong_id: 7\nlyrics: |-\n  My lyrics\n'
+        self.a.write_bytes(original)
+        preview=self.editor.preview(self.root,['a.yaml'],[{'kind':'reorder','order_source':'template','template_path':str(template)}])
+        self.editor.apply(preview['token'])
+        self.assertEqual(self.a.read_bytes(),b'lyrics: |-\n  My lyrics\ncustom: [1, 2] # unchanged\nsong_id: 7\ntitle: Actual Song\n')
+        self.assertEqual(YamlDocument(self.a.read_bytes()).values,YamlDocument(original).values)
+
+    def test_template_missing_fields_are_not_added(self):
+        self.order_template()
+        self.a.write_bytes(b'lyrics: text\ntitle: Song\n')
+        preview=self.editor.preview(self.root,['a.yaml'],[{'kind':'reorder'}])
+        self.editor.apply(preview['token'])
+        self.assertEqual(self.a.read_bytes(),b'title: Song\nlyrics: text\n')
+        self.assertNotIn('song_id',YamlDocument(self.a.read_bytes()).values)
+
+    def test_invalid_or_missing_order_template_blocks_preview(self):
+        with self.assertRaisesRegex(ValueError,'unavailable'):
+            self.editor.preview(self.root,['a.yaml'],[{'kind':'reorder'}])
+        self.order_template(b'title:\ntitle:\n')
+        with self.assertRaisesRegex(ValueError,'Duplicate'):
+            self.editor.preview(self.root,['a.yaml'],[{'kind':'reorder'}])
+        self.assertEqual(self.a.read_bytes(),DocumentTests.RAW)
+
+    def test_template_order_is_frozen_with_preview_and_journal(self):
+        template=self.order_template(b'lyrics:\ncaption:\nsong_id:\n')
+        preview=self.editor.preview(self.root,['a.yaml'],[{'kind':'reorder'}])
+        checksum=preview['order_templates'][0]['sha256']
+        template.write_text('song_id:\ncaption:\nlyrics:\n')
+        result=self.editor.apply(preview['token'])
+        journal=json.loads((self.editor.backups/result['batch']/'journal.json').read_text())
+        self.assertEqual(journal['operations'][0]['template_sha256'],checksum)
+        self.assertEqual(journal['operations'][0]['keys'],['lyrics','caption','song_id'])
+        self.assertEqual(list(YamlDocument(self.a.read_bytes()).fields),['lyrics','caption','song_id'])
+
+    def test_manual_order_does_not_require_any_template(self):
+        preview=self.editor.preview(self.root,['a.yaml'],[{'kind':'reorder','order_source':'manual','keys':['lyrics','song_id']}])
+        self.assertEqual(preview['ready'],1,preview)
+        self.assertEqual(preview['order_templates'],[])
+
+    def test_template_mode_ignores_client_supplied_key_order(self):
+        self.order_template(b'lyrics:\ncaption:\nsong_id:\n')
+        preview=self.editor.preview(self.root,['a.yaml'],[{'kind':'reorder','order_source':'template','keys':['song_id','caption','lyrics']}])
+        self.editor.apply(preview['token'])
+        self.assertEqual(list(YamlDocument(self.a.read_bytes()).fields),['lyrics','caption','song_id'])
+
+    def test_same_template_is_read_once_per_preview(self):
+        self.order_template()
+        with patch.object(self.editor,'order_template',wraps=self.editor.order_template) as read:
+            preview=self.editor.preview(self.root,['a.yaml','b.yaml'],[{'kind':'reorder'},{'kind':'reorder'}])
+        self.assertEqual(read.call_count,1)
+        self.assertEqual(len(preview['order_templates']),1)
+
     def test_text_read_stale_hash_refused(self):
         file = self.editor.read(self.root, 'a.yaml')
         self.a.write_bytes(DocumentTests.RAW + b'new: 3\n')

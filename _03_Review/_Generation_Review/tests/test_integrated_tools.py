@@ -83,6 +83,24 @@ class IntegratedTests(unittest.TestCase):
         self.assertEqual(self.client.get('/tools/yaml-editor/editor.js').status_code,200)
         self.assertIn('yamlTab', self.client.get('/').text)
 
+    def test_order_template_endpoint_and_default_reorder(self):
+        template=self.root/'order-template.yaml'
+        template.write_text('lyrics:\ntitle:\nsong_id:\n')
+        self.app.state.yaml_editor.default_order_template=template
+        source=self.root/'track.yaml'
+        source.write_bytes(b'song_id: 13\ntitle: Actual title\nlyrics: |-\n  Keep this line\n')
+        info=self.client.post('/api/yaml-editor/order-template',headers=self.headers,json={})
+        self.assertEqual(info.status_code,200,info.text)
+        self.assertEqual(info.json()['keys'],['lyrics','title','song_id'])
+        scan=self.client.post('/api/yaml-editor/scan',headers=self.headers,json={'directory':str(self.root)})
+        self.assertEqual(scan.json()['default_order_template'],str(template))
+        preview=self.client.post('/api/yaml-editor/preview',headers=self.headers,json={'directory':str(self.root),'files':['track.yaml'],'operations':[{'kind':'reorder'}]})
+        self.assertEqual(preview.status_code,200,preview.text)
+        self.assertEqual(preview.json()['order_templates'][0]['sha256'],info.json()['sha256'])
+        saved=self.client.post('/api/yaml-editor/apply',headers=self.headers,json={'token':preview.json()['token']})
+        self.assertEqual(saved.status_code,200,saved.text)
+        self.assertEqual(source.read_bytes(),b'lyrics: |-\n  Keep this line\ntitle: Actual title\nsong_id: 13\n')
+
     def test_remote_clients_cannot_edit_host_files(self):
         from review.config import password_hash
         # Existing local-only security blocks unauthenticated remote clients first.

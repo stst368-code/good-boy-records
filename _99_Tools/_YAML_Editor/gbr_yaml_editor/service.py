@@ -47,6 +47,7 @@ class Editor:
     def __init__(self, repo_root, backup_root=None):
         self.repo = Path(repo_root).resolve()
         self.backups = Path(backup_root or self.repo / '_97_App/runtime/yaml_edits').resolve()
+        self.default_order_template = self.repo / '_01_Writing/_Built/track-template.yaml'
         self.previews = OrderedDict()
         self.lock = threading.RLock()
 
@@ -134,12 +135,57 @@ class Editor:
             if truncated:
                 break
         return {'root': str(root), 'files': files, 'truncated': truncated, 'warning': warning,
-                'max_files': MAX_FILES, 'backup_retention': RETENTION}
+                'max_files': MAX_FILES, 'backup_retention': RETENTION,
+                'default_order_template': str(self.default_order_template)}
 
     def read(self, directory, relative):
         root = self.root(directory)
         raw = self.path(root, relative).read_bytes()
         return {'path': relative, 'sha256': digest(raw), 'text': raw.decode('utf-8-sig')}
+
+    def order_template(self, filename=None):
+        path = Path(filename).expanduser() if filename else self.default_order_template
+        if not path.is_absolute():
+            path = self.repo / path
+        if path.suffix.lower() not in {'.yaml', '.yml'}:
+            raise ValueError('Choose a .yaml or .yml order template')
+        if path.is_symlink():
+            raise ValueError('Symbolic links cannot be used as order templates')
+        try:
+            path = path.resolve(strict=True)
+            if not path.is_file() or path.stat().st_size > MAX_FILE:
+                raise ValueError('Order template must be a YAML file smaller than 2 MiB')
+            raw = path.read_bytes()
+        except OSError as exc:
+            raise ValueError(f'Order template is unavailable: {path}. Choose another template YAML.') from exc
+        document = YamlDocument(raw)
+        # Read only the root key order. Template values and comments are never copied.
+        return {'path': str(path), 'sha256': digest(raw), 'keys': list(document.fields)}
+
+    def resolve_operations(self, operations):
+        resolved, templates, loaded = [], [], {}
+        for original in operations:
+            if not isinstance(original, dict):
+                raise ValueError('Each operation must be an object')
+            operation = dict(original)
+            if operation.get('kind') == 'reorder':
+                # Keep previously saved explicit key-list operations compatible.
+                mode = operation.get('order_source', 'manual' if 'keys' in operation else 'template')
+                if mode not in {'template', 'manual'}:
+                    raise ValueError('Order source must be template or manual')
+                operation['order_source'] = mode
+                if mode == 'template':
+                    requested = operation.get('template_path') or None
+                    if requested is not None and not isinstance(requested, str):
+                        raise ValueError('Template path must be text')
+                    if requested not in loaded:
+                        loaded[requested] = self.order_template(requested)
+                        templates.append(loaded[requested])
+                    template = loaded[requested]
+                    operation.update(keys=template['keys'], template_path=template['path'],
+                                     template_sha256=template['sha256'])
+            resolved.append(operation)
+        return resolved, templates
 
     def preview(self, directory, files, operations=None, text=None, expected=None):
         root = self.root(directory)
@@ -151,6 +197,7 @@ class Editor:
             raise ValueError('Add between 1 and 100 edit operations')
         if text is not None and not isinstance(text, str):
             raise ValueError('Text repair requires text')
+        operations, templates = self.resolve_operations(operations or [])
         catalogue, warning = self.catalogue(root) if any(o.get('kind') == 'catalogue_ids' for o in operations or []) else ({}, None)
         records, public, size = [], [], 0
         for relative in files:
@@ -179,7 +226,9 @@ class Editor:
             except (ValueError, OSError) as exc:
                 row['error'] = str(exc)
             public.append(row)
-        return self._remember(root, records, public, operations or [{'kind': 'text_repair'}])
+        result = self._remember(root, records, public, operations or [{'kind': 'text_repair'}])
+        result['order_templates'] = templates
+        return result
 
     def _remember(self, root, records, public, operations):
         with self.lock:
