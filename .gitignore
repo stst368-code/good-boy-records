@@ -209,3 +209,12 @@ cache/
 *backup/
 *backups/
 _Reviewed/
+
+# Shared platform runtime and database snapshots
+/_97_App/runtime/
+/_98_Database/*.sqlite*
+/_98_Database/*.db
+/_98_Database/backups/
+/_98_Database/gbr-migration-*/
+!/_98_Database/tests/
+!/_98_Database/tests/**

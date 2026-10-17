@@ -6,6 +6,7 @@ from .util import atomic_text, dumps
 
 DEFAULTS = {
     "input_directories": [], "archive_directory": "GBR_Reviewed", "data_directory": "data",
+    "database_path": "",
     "host": "127.0.0.1", "port": 8765, "scan_interval_seconds": 30,
     "fast_seconds": 10, "quick_seconds": 20, "standard_seconds": 50, "fade_ms": 35,
     "transition_sensitivity": "balanced",
@@ -38,6 +39,8 @@ class Config:
 
     def validate(self, allow_insecure_lan=False):
         v = self.values
+        if not isinstance(v["database_path"], str):
+            raise ValueError("database_path must be a path string or an empty string")
         if not allow_insecure_lan and v["host"] not in ("127.0.0.1", "localhost", "::1") and not v["password_hash"]:
             raise ValueError("LAN binding requires a password. Run: python run_review.py password")
         if not 1 <= int(v["port"]) <= 65535:
@@ -76,6 +79,15 @@ class Config:
         return self.resolve(self.values["data_directory"])
 
     @property
+    def database(self):
+        return self.resolve(self.values["database_path"]) if self.values["database_path"] else self.data / "review.sqlite"
+
+    @property
+    def database_lock(self):
+        # Different configurations opening the same database must share one lock.
+        return self.database.with_name(self.database.name + ".lock")
+
+    @property
     def archive(self):
         return self.resolve(self.values["archive_directory"])
 
@@ -89,3 +101,4 @@ class Config:
             self.path.chmod(0o600)
         except OSError:
             pass
+

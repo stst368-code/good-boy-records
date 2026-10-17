@@ -114,8 +114,11 @@ class PreferenceBody(StrictBody):
     preferred: Literal["a", "b", "tie"]
 
 
-def create_app(config_path, start_worker=True):
+def create_app(config_path, start_worker=True, database_path=None):
     config = Config(config_path)
+    if database_path is not None:
+        config.values["database_path"] = str(Path(database_path).resolve())
+        config.validate()
     service = Service(config)
     secret_path = config.data / "session.secret"
     if not secret_path.exists():
@@ -565,3 +568,4 @@ def create_app(config_path, start_worker=True):
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app
+

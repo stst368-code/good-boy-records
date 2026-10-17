@@ -6,6 +6,7 @@ from logging.handlers import RotatingFileHandler
 import os
 import sys
 import webbrowser
+from contextlib import ExitStack
 from pathlib import Path
 from .config import Config, password_hash
 from .db import Database
@@ -30,15 +31,16 @@ class ProcessLock:
                 fcntl.flock(self.file, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
             self.file.close()
-            raise SystemExit("GBR Review is already running for this data directory. Close it before starting another copy.")
+            raise SystemExit("GBR Review is already using this database or data directory. Close it before starting another copy.")
 
     def close(self):
         self.file.close()
 
 
-def main():
+def main(argv=None):
     p = argparse.ArgumentParser(description="Local GBR music review application")
     p.add_argument("--config", default="config.json", help="Configuration file (paths resolve relative to it)")
+    p.add_argument("--database", type=Path, help="Override the database path for this run")
     sub = p.add_subparsers(dest="command")
     serve = sub.add_parser("serve", help="Run the local application")
     serve.add_argument("--open", action="store_true", help="Open the browser")
@@ -55,8 +57,11 @@ def main():
     export.add_argument("--format", choices=("csv", "json", "parquet"), default="csv")
     export.add_argument("--output", default="")
     export.add_argument("--kind", choices=("generations", "reviews", "events", "segments", "analyses", "review_history", "reviewers", "publishing_history", "preferences", "bookmarks", "bookmark_history"), default="generations")
-    args = p.parse_args()
+    args = p.parse_args(argv)
     config = Config(args.config, allow_insecure_lan=args.command in ('setup','password','mobile'))
+    if args.database is not None:
+        config.values["database_path"] = str(args.database.resolve())
+        config.validate(allow_insecure_lan=args.command in ('setup','password','mobile'))
     if args.command == "setup":
         print("GBR Review setup. Enter input folders one per line; leave a line blank to finish.")
         directories = []
@@ -92,7 +97,7 @@ def main():
         print("Password saved. Restart the application; previous sessions will be invalidated.")
         return
     if args.command == "backup":
-        db = Database(config.data / "review.sqlite")
+        db = Database(config.database)
         path = config.data / "backups" / ("review-" + now().replace(":", "-") + ".sqlite")
         path.parent.mkdir(parents=True, exist_ok=True)
         db.backup(path)
@@ -101,17 +106,21 @@ def main():
     if args.command == "export":
         from .exports import dataset
         path = Path(args.output) if args.output else config.data / "exports" / ("review." + args.format)
-        print(dataset(Database(config.data / "review.sqlite"), path, args.format, args.kind))
+        print(dataset(Database(config.database), path, args.format, args.kind))
         return
-    lock = ProcessLock(config.data / "application.lock")
-    try:
+    with ExitStack() as locks:
+        # Protect shared caches/archive work as well as the database, even when
+        # two configuration files select different data directories or databases.
+        for path in (config.data / "application.lock", config.database_lock):
+            lock = ProcessLock(path)
+            locks.callback(lock.close)
         if args.command in (None, "serve", "mobile"):
             if args.command == "mobile":
                 from .mobile import enable_http
                 enable_http(config)
             import uvicorn
             from .app import create_app
-            app = create_app(config.path)
+            app = create_app(config.path, database_path=config.database)
             if app.state.service.db.migration_backup:
                 print("Database migration completed. Previous database: " + str(app.state.service.db.migration_backup))
             url = ("https" if config.values["ssl_certfile"] else "http") + f"://127.0.0.1:{config.values['port']}"
@@ -157,8 +166,6 @@ def main():
             elif args.command == "retune":
                 service.db.execute("UPDATE audio SET analysis_state='retune_pending'")
                 print("Zone retuning queued. Start the application to process cached features.")
-    finally:
-        lock.close()
 
 
 if __name__ == "__main__":

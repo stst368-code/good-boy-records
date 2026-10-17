@@ -22,7 +22,7 @@ LOG = logging.getLogger("gbr_review")
 class Service:
     def __init__(self, config):
         self.config = config
-        self.db = Database(config.data / "review.sqlite")
+        self.db = Database(config.database)
         self.archiver = Archiver(config, self.db)
         self.indexer = Indexer(config, self.db)
         self.analyzer = Analyzer(config, self.db, self.archiver)
@@ -294,3 +294,4 @@ class Service:
         self.comparisons[cid] = {"a": gs[0]["id"], "b": gs[1]["id"], "target": target, "created": time.monotonic()}
         self.comparisons = {k: v for k, v in self.comparisons.items() if time.monotonic() - v["created"] < 86400}
         return {"id": cid, "title": self.public_track(a)["title"]}
+
