@@ -1,0 +1,572 @@
+GBR Review: http://127.0.0.1:8765
+Stop with Ctrl+C. Your reviews and archive remain saved.
+INFO:     Started server process [90168]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8765 (Press CTRL+C to quit)
+INFO:     127.0.0.1:52555 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52555 - "GET /static/style.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54128 - "GET /static/app.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52555 - "GET /static/base.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64006 - "GET /static/manifest.webmanifest HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52555 - "GET /api/bootstrap HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54128 - "GET /static/icon.svg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49243 - "GET /static/icon-192.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52555 - "GET /api/queue/next HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52555 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52555 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:54128 - "GET /sw.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54128 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:49243 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49243 - "GET /api/bootstrap HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49243 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51337 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51337 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=wav HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50901 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57158 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57158 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57158 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57158 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:55984 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:61088 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:53425 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50967 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50967 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50967 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58940 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/diagnostics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "POST /api/reanalyse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58940 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:59381 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59381 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:59879 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58007 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58741 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:64723 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:51891 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57964 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:61872 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61872 - "GET /api/playback/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:61872 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58564 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58564 - "GET /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58564 - "POST /api/tracks/43533c9d43ff52da5b06a36e732ca2d67b041e971cbfea5e79b10baf4653a2fc/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58564 - "GET /api/queue/next HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58564 - "GET /api/tracks/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58564 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50477 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55440 - "GET /api/tracks/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55440 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55440 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:60967 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63269 - "GET /api/tracks/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63269 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63269 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:65305 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50243 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55987 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:49518 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:49518 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:54848 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63966 - "GET /api/tracks/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63966 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63266 - "GET /api/tracks/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63266 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57463 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58120 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:51358 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63142 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:49786 - "GET /api/tracks/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49786 - "GET /api/playback/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63210 - "POST /api/tracks/3df60f07f72386e1df832da0599590ed0b643b7a920c12c9c9631f87caef8b71/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63210 - "GET /api/queue/next HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63210 - "GET /api/tracks/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63210 - "GET /api/playback/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:54236 - "GET /api/playback/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58157 - "GET /api/tracks/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58157 - "GET /api/playback/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58157 - "GET /api/playback/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63081 - "GET /api/tracks/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63081 - "GET /api/tracks/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63081 - "GET /api/tracks/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63081 - "GET /api/playback/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:52060 - "GET /api/tracks/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52060 - "GET /api/playback/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:59039 - "GET /api/tracks/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59039 - "GET /api/playback/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58867 - "GET /api/tracks/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897/preview HTTP/1.1" 200 OK
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:58867 - "GET /api/playback/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58867 - "GET /api/tracks/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58867 - "GET /api/tracks/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58867 - "GET /api/playback/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50523 - "GET /api/playback/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:56145 - "GET /api/tracks/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56145 - "POST /api/tracks/fce238526b7832e09c8cb0ac6e11e6b48bd4605626523328b17f9a4151701897/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56145 - "GET /api/queue/next HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56145 - "GET /api/tracks/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56145 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:59387 - "GET /api/tracks/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59387 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:60655 - "GET /api/tracks/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60655 - "GET /api/tracks/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60655 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:60655 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:60655 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50241 - "GET /api/tracks/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50241 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:64941 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58330 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57770 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:53801 - "GET /api/tracks/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53801 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55195 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:49992 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:59296 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:50716 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63170 - "GET /api/tracks/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63170 - "GET /api/playback/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63170 - "GET /api/tracks/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63170 - "GET /api/tracks/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63170 - "POST /api/tracks/d4e5253b1d77d68f497e9db2a476b40ae0d93d904efa2f8cb9a3c9d4e6b83097/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63170 - "GET /api/queue/next HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63170 - "GET /api/tracks/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63170 - "GET /api/playback/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:52265 - "GET /api/playback/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55289 - "GET /api/tracks/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51938 - "GET /api/tracks/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51938 - "GET /api/tracks/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57127 - "GET /api/tracks/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57127 - "GET /api/tracks/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57127 - "GET /api/tracks/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57127 - "GET /api/playback/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57127 - "GET /api/playback/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57127 - "GET /api/playback/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50861 - "GET /api/tracks/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50861 - "GET /api/playback/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:51746 - "GET /api/playback/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50199 - "GET /api/tracks/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50199 - "POST /api/tracks/64f6956e6cc037d37004ac2d1b923ea9f439608b042173498f36027e156f0d54/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50199 - "GET /api/queue/next HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50199 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50199 - "GET /api/playback/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:62748 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62748 - "GET /api/playback/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:60485 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60485 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54577 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54577 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54577 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59802 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59802 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59828 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64122 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64122 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64122 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63975 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63975 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49995 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49995 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49995 - "GET /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49995 - "POST /api/tracks/6ba5ba8410000dfbde3efcc8c2b8e6eb84e79249ff0fabce5e59c3fb9a9c86e7/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49995 - "GET /api/queue/next HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49995 - "GET /api/tracks/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49995 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63392 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63573 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63573 - "GET /api/tracks/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63573 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:62948 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50336 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:52602 - "GET /api/tracks/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52602 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58297 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:65431 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:56769 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:51227 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:52268 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:56941 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57953 - "GET /api/tracks/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57953 - "GET /api/tracks/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57953 - "GET /api/tracks/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57953 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:52230 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50730 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:64258 - "GET /api/tracks/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64258 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:62001 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:58418 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:52401 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:51344 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:65159 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:61782 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:53221 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:56310 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:60519 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:52963 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:62435 - "GET /api/tracks/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62435 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:54291 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:51757 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:54916 - "GET /api/tracks/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50372 - "GET /api/playback/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:54916 - "GET /api/tracks/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54916 - "GET /api/tracks/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54916 - "POST /api/tracks/c1b322f63855b7db5907af03e6c7324fd01085256015365bf065d1430973b2a1/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54916 - "GET /api/queue/next HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54916 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54916 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:62666 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:54572 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64460 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64460 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61261 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61261 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61261 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61261 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61261 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50600 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50600 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54896 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54896 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50670 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50670 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50670 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50670 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:49644 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58576 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:60630 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:62379 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63645 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:53429 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:60510 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60510 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:59716 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:59619 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57311 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55860 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:55860 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:64080 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50255 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:52619 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:52872 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:56014 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:56561 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50163 - "GET /api/playback/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55549 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55549 - "GET /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55549 - "POST /api/tracks/f56b3349663e5970d5d93798f2b04e9f6e19f5834db4dbfc9b4a2ff908bbb482/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55549 - "GET /api/queue/next HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55549 - "GET /api/tracks/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55549 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:51152 - "GET /api/bootstrap HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51152 - "GET /api/tracks/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51152 - "GET /api/publishing?status=&song=&offset=0&limit=50&bucket=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58842 - "GET /api/tracks/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58842 - "GET /api/tracks/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58842 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57043 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57043 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57043 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:59218 - "GET /api/tracks/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59218 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:54753 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:64351 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63286 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:64587 - "GET /api/tracks/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64587 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:60299 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:55587 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57464 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:63569 - "GET /api/tracks/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63569 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:53309 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:49982 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:54337 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:54331 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:53029 - "GET /api/tracks/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53029 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:62296 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:57466 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:53590 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58507 - "GET /api/tracks/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58507 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:64313 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:59912 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:65419 - "GET /api/playback/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:65419 - "POST /api/tracks/cd3df8f9c735c2d1c770570205db48e95d0ba4af7d2ab182fc8f2b2352767747/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65419 - "GET /api/queue/next HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65419 - "GET /api/tracks/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65419 - "GET /api/playback/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:62190 - "GET /api/playback/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:53513 - "GET /api/playback/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:53513 - "GET /api/tracks/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53513 - "GET /api/tracks/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53513 - "GET /api/playback/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:49179 - "GET /api/playback/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:54453 - "GET /api/playback/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:52664 - "GET /api/tracks/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52664 - "GET /api/playback/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:64990 - "GET /api/playback/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:58383 - "GET /api/playback/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50531 - "GET /api/tracks/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50531 - "GET /api/playback/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36?mode=full&format=flac HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:50531 - "GET /api/tracks/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50531 - "POST /api/tracks/67ed103047e5aea921f49b1409f88eda5de79facad57a8a3d5fc4d7f30a14f36/review HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50531 - "GET /api/queue/next HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50531 - "GET /api/tracks/e8c981cd29dbca22e0967c139b9cdb5439e5e59735c5c968d37fe8c3b02798df/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50531 - "GET /api/playback/e8c981cd29dbca22e0967c139b9cdb5439e5e59735c5c968d37fe8c3b02798df?mode=full&format=flac HTTP/1.1" 206 Partial Content
+ERROR:asyncio:Exception in callback _ProactorBasePipeTransport._call_connection_lost()
+handle: <Handle _ProactorBasePipeTransport._call_connection_lost()>
+Traceback (most recent call last):
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Simon\AppData\Local\Programs\Python\Python313\Lib\asyncio\proactor_events.py", line 165, in _call_connection_lost
+    self._sock.shutdown(socket.SHUT_RDWR)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] An existing connection was forcibly closed by the remote host
+INFO:     127.0.0.1:56240 - "GET /api/tracks/e8c981cd29dbca22e0967c139b9cdb5439e5e59735c5c968d37fe8c3b02798df/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56240 - "GET /api/tracks/e8c981cd29dbca22e0967c139b9cdb5439e5e59735c5c968d37fe8c3b02798df/preview HTTP/1.1" 200 OK
+ERROR:gbr_review:Analysis failed
+Traceback (most recent call last):
+  File "E:\good-boy-records\_03_Review\_Generation_Review\review\service.py", line 83, in work
+    self.analyzer.run(a["id"])
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\good-boy-records\_03_Review\_Generation_Review\review\analysis.py", line 266, in run
+    metrics, events, preview = measure(path, folder)
+                               ~~~~~~~^^^^^^^^^^^^^^
+  File "E:\good-boy-records\_03_Review\_Generation_Review\review\analysis.py", line 104, in measure
+    flux = float(np.sum(np.maximum(shape - last_shape, 0))) if last_shape is not None else 0
+                                   ~~~~~~^~~~~~~~~~~~
+ValueError: operands could not be broadcast together with shapes (16385,) (32769,)
+INFO:     127.0.0.1:64363 - "GET /api/tracks/e8c981cd29dbca22e0967c139b9cdb5439e5e59735c5c968d37fe8c3b02798df/preview HTTP/1.1" 200 OK
+ERROR:gbr_review:Analysis failed
+Traceback (most recent call last):
+  File "E:\good-boy-records\_03_Review\_Generation_Review\review\service.py", line 83, in work
+    self.analyzer.run(a["id"])
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\good-boy-records\_03_Review\_Generation_Review\review\analysis.py", line 266, in run
+    metrics, events, preview = measure(path, folder)
+                               ~~~~~~~^^^^^^^^^^^^^^
+  File "E:\good-boy-records\_03_Review\_Generation_Review\review\analysis.py", line 104, in measure
+    flux = float(np.sum(np.maximum(shape - last_shape, 0))) if last_shape is not None else 0
+                                   ~~~~~~^~~~~~~~~~~~
+ValueError: operands could not be broadcast together with shapes (16385,) (32769,)
+INFO:     127.0.0.1:64363 - "GET /api/tracks/e8c981cd29dbca22e0967c139b9cdb5439e5e59735c5c968d37fe8c3b02798df/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64363 - "GET /api/tracks/e8c981cd29dbca22e0967c139b9cdb5439e5e59735c5c968d37fe8c3b02798df/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64363 - "GET /api/tracks/e8c981cd29dbca22e0967c139b9cdb5439e5e59735c5c968d37fe8c3b02798df/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64363 - "GET /api/tracks/e8c981cd29dbca22e0967c139b9cdb5439e5e59735c5c968d37fe8c3b02798df/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50921 - "GET /api/tracks/e8c981cd29dbca22e0967c139b9cdb5439e5e59735c5c968d37fe8c3b02798df/preview HTTP/1.1" 200 OK
+ERROR:gbr_review:Analysis failed
+Traceback (most recent call last):
+  File "E:\good-boy-records\_03_Review\_Generation_Review\review\service.py", line 83, in work
+    self.analyzer.run(a["id"])
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\good-boy-records\_03_Review\_Generation_Review\review\analysis.py", line 266, in run
+    metrics, events, preview = measure(path, folder)
+                               ~~~~~~~^^^^^^^^^^^^^^
+  File "E:\good-boy-records\_03_Review\_Generation_Review\review\analysis.py", line 104, in measure
+    flux = float(np.sum(np.maximum(shape - last_shape, 0))) if last_shape is not None else 0
+                                   ~~~~~~^~~~~~~~~~~~
+ValueError: operands could not be broadcast together with shapes (16385,) (32769,)
+INFO:     127.0.0.1:50921 - "GET /api/tracks/e8c981cd29dbca22e0967c139b9cdb5439e5e59735c5c968d37fe8c3b02798df/preview HTTP/1.1" 200 OK
+ERROR:gbr_review:Analysis failed
+Traceback (most recent call last):
+  File "E:\good-boy-records\_03_Review\_Generation_Review\review\service.py", line 83, in work
+    self.analyzer.run(a["id"])
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "E:\good-boy-records\_03_Review\_Generation_Review\review\analysis.py", line 266, in run
+    metrics, events, preview = measure(path, folder)
+                               ~~~~~~~^^^^^^^^^^^^^^
+  File "E:\good-boy-records\_03_Review\_Generation_Review\review\analysis.py", line 104, in measure
+    flux = float(np.sum(np.maximum(shape - last_shape, 0))) if last_shape is not None else 0
+                                   ~~~~~~^~~~~~~~~~~~
+ValueError: operands could not be broadcast together with shapes (16385,) (32769,)

@@ -1,0 +1,83 @@
+title: where-golden-flowers-grow
+cluster:
+version:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  [verse]
+  Come through the garden
+  The morning is blue
+  Sunlight is falling
+  In circles on you
+  Doja lies dreaming
+  Where yellow flowers grow
+  Bam hears a ball bounce
+  And suddenly goes
+  [verse]
+  Golden as daylight
+  Soft as the rain
+  One watches quietly
+  One runs again
+  Where are you going?
+  Nobody knows
+  Over the hillside
+  Where the warm river flows
+  [chorus]
+  Run through the colours
+  Run through the light
+  Follow the fields
+  Till they fall out of sight
+  I'll be beside you
+  Wherever you roam
+  Two golden shadows
+  Will always come home
+  [instrumental]
+  [verse]
+  Doja sees kingdoms
+  Inside every tree
+  Bam sees a tennis ball
+  Floating at sea
+  One asks the questions
+  One simply runs
+  Both disappear
+  In the afternoon sun
+  [bridge]
+  Maybe the garden
+  Goes on without end
+  Maybe the pathway
+  Comes round again
+  Maybe tomorrow
+  We'll wake up and find
+  Golden pawprints
+  All over the sky
+  [chorus]
+  Run through the colours
+  Run through the light
+  Follow the fields
+  Till they fall out of sight
+  I'll be beside you
+  Wherever you roam
+  Two golden shadows
+  Will always come home
+  [outro]
+  Doja in sunlight
+  Bam in the blue
+  Wherever this road goes
+  I'll follow you
+  Follow you...
+  Follow you...
+  Woof.

@@ -1,0 +1,86 @@
+title: self-rightous-gremelin
+cluster:
+version:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  "We're rolling Gremelin"
+  [verse]
+  Mama! (mama)
+  Grab a lead and put your little shoes on!
+  Hide your phone and forget about your makeup!
+  Why'd you leave the treats upon the table?
+  Here you go, create another fable!
+  You wanted to!
+  Grab a lead and put your little shoes on!
+  You wanted to!
+  Hide your phone and forget about your makeup!
+  You wanted to!
+  Why'd you leave the treats upon the table?
+  You wanted to!
+  [chorus]
+  I don't think you trust!
+  In!
+  my!
+  self-righteous gremelin!
+  I!
+  cry!
+  when BamBam deserve outside!
+  [instrumental]
+  [post-chorus]
+  I don't think you trust!
+  self-righteous gremelin!
+  [verse]
+  Rah, Mama! (mama)
+  Grab a lead and put your little shoes on! (The little ones)
+  Hide your phone and forget about your makeup!
+  Why'd you leave the treats upon the table?
+  Here you go, create another fable!
+  You wanted to!
+  Grab a lead and put your little shoes on!
+  You wanted to!
+  Hide your phone and forget about your makeup!
+  You wanted to!
+  Why'd you leave the treats upon the table?
+  You wanted to!
+  [chorus]
+  I don't think you trust!
+  In my self-righteous gremelin!
+  I cry when BamBam deserve outside!
+  In my self-righteous gremelin!
+  I cry when BamBam deserve outside!
+  [post-chorus]
+  I don't think you trust!
+  self-righteous gremelin!
+  [bridge]
+  Mother, (Mother), Mother, (Mother)
+  Mother,
+  into your hands I commend my spirit
+  Mother, into your hands
+  Why have you forsaken me?
+  In your eyes, forsaken me?
+  In your thoughts, forsaken me?
+  In your heart, forsaken me? Oh!
+  [chorus]
+  Trust!
+  In my self-righteous gremelin!
+  I cry when BamBam deserve outside!
+  In my self-righteous gremelin!
+  I cry when BamBam deserve outside!
+  [post-chorus]
+  I don't think you trust!
+  self-righteous gremelin!

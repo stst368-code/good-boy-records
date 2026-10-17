@@ -1,0 +1,77 @@
+title: dont-look
+album: weedkiller
+pos: 5
+version: musical
+model: minimax H3
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt: 
+story:
+caption:  |
+  Global Metadata
+  Basic Attributes: Late-Romantic / Expressionist Orchestral Horror. Tempo approximately 102–116 BPM, with unstable local pacing. Use a dark minor or Phrygian-inflected tonal centre with strong semitone gravity, tritone tension and occasional diminished harmony; avoid cheerful major-key release. This is orchestral horror: late-Romantic scale pushed into expressionist chromaticism and psychologically unstable pacing. Dramatic image: a grotesque courtroom opera in which accusation, self-justification and panic collide without warning. Core motif: a jagged tritone cell thrown between brass, strings and organ. Create menace with semitone friction, tritones, contrary chromatic lines, deceptive cadences and unresolved pedals. Use E-flat clarinet, bass trombone, col legno strings and organ pleno as recurring colour inside the full orchestra. Pipe organ appears only at irreversible escalations. Preserve extreme acoustic dynamics so exposed passages are truly quiet and tuttis genuinely frightening. No trailer drums, synthetic sub-bass, guitars, electronic percussion, synth textures or modern genre grooves.
+  Vocal Details
+  Singer A (Male), a highly flexible dramatic baritone-tenor capable of intimate recitative, lyrical legato and sudden forceful operatic attack. Preserve abrupt character changes in the text, but realise them through classical registration, dynamics and articulation rather than vocal distortion. Use male ensemble or mixed choir responses only at major structural confrontations. Keep recitative comparatively dry and forward; enlarge the acoustic perspective only at orchestral peaks, never through distorted or effect-led vocals.
+  Arrangement
+  Section Timeline: [intro] to [verse] to [chorus] to [verse] to [chorus] to [bridge] to [chorus]. Follow this lyric architecture closely, but make repeated sections evolve through registration, voicing and counterpoint rather than simple loudness. Intro: sul ponticello strings and isolated low woodwinds reveal an incomplete, unstable form of the motif. Verses: unstable chamber texture, tremolo violas, low woodwinds and irregular attacks, with deliberate silence around the voice. Choruses: erupt into brass clusters, aggressive strings, timpani and tam-tam, then open sudden gaps before the next vocal entry. Bridge: fracture time with free recitative, violent orchestral stabs, short fugato and hard silence. Use E-flat clarinet, bass trombone, col legno strings and organ pleno selectively as this song's identifying orchestral colour. When text becomes dense, thin the accompaniment and let recitative float across the pulse. Keep transitions motivically connected and acoustically plausible. Do not import rhythmic or production habits from the source genre. The result must stand on its own as a performable Gothic classical work for orchestra, voices and organ without amplification.
+lyrics: |
+ [Intro]
+  Don't look at it
+  [Verse 1]
+  All the girls at my party
+  Can she handle the pyrotechnics she started?
+  I want her germs, spitty swappin'
+  RIP my heart, dearly departed
+  [Pre-Chorus]
+  Call her ice 'cause she melt in my mouth
+  Butterfly, yeah, she migrating south
+  She's divine and I'm devout
+  La-la-da-da, yeah, oh
+  [Chorus]
+  Hold my body like a swordfish, she know she got a catch
+  Thong out my jeans, baby, don't look at my ass
+  Bo-bo-body like a swordfish, she know she got a catch
+  Thong out my jeans, baby, don't look at my ass
+  [Post-Chorus]
+  Don't look at it
+  I'm shy
+  Don't look at it
+  I'm shy
+  [Verse 2]
+  Gooey like a gusher
+  Tony Hawk, I'm doin' tricks until my tongue hurt
+  Ew-wee, in the gutter
+  I can't help that I want to be titty smothered
+  [Pre-Chorus]
+  Call her ice 'cause she melt in my mouth
+  Butterfly, yeah, she migrating south
+  She's divine and I'm devout
+  La-la-da-da, yeah, oh
+  [Chorus]
+  Hold my body like a swordfish, she know she got a catch
+  Thong out my jeans, baby, don't look at my ass
+  Bo-bo-body like a swordfish, she know she got a catch
+  Thong out my jeans, baby, don't look at my ass
+  [Post-Chorus]
+  Don't look at it
+  I'm shy
+  Don't look at it
+  I know you want to, don't you dare
+  Don't look at it
+  I'm shy
+  Don't look at it
+  I'm shy
+  [Outro]
+  Don't look at it
+  I'm shy
+  Don't look at it
+  Okay, go look at it

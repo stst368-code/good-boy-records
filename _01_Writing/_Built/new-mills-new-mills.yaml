@@ -1,0 +1,68 @@
+title: new-mills-new-mills
+cluster:
+version:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  [verse]
+  Start spreadin' the toys
+  I'm leavin' today
+  I want to be a part of it
+  New Mills, New Mills
+  [verse]
+  These vagabond paws
+  Are longin' to stray
+  Right through the very heart of it
+  New Mills, New Mills
+  [chorus]
+  I wanna wake up
+  In a town that's half a-sleep
+  And find I'm king of the hill
+  Top of the heap
+  [verse]
+  These little town blues
+  Are melting away
+  I'll make a brand new start of it
+  In old New Mills
+  [chorus]
+  If I can make it there
+  I'll make it anywhere
+  It's up to you
+  New Mills, New Mills
+  New Mills, New Mills
+  [verse]
+  I want to wake up
+  In a town that's half a-sleep
+  And find I'm A-number one
+  Top of the dogs
+  King of the hill
+  Ay-number one
+  [verse]
+  These little town blues
+  Are melting away
+  I'll make a brand new start of it
+  In old New Mills
+  [bridge]
+  [chorus]
+  Annddd-uh if I can make it there
+  I'm gonna make it anywhere
+  It's-up-to-you
+  New Millssss!
+  New Millssss!
+  New Mills!
+  [solo]
+  [outro]

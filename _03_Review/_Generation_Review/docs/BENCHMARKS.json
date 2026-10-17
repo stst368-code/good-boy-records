@@ -1,0 +1,27 @@
+{
+  "queue": [
+    {
+      "tracks": 1000,
+      "queue_median_ms": {
+        "before": 12.81,
+        "after": 3.33
+      },
+      "method": "7 measured selections after warmup; synthetic 4.2KB metadata; media availability stubbed; excludes network/audio IO"
+    },
+    {
+      "tracks": 6000,
+      "queue_median_ms": {
+        "before": 89.25,
+        "after": 20.05
+      },
+      "method": "7 measured selections after warmup; synthetic 4.2KB metadata; media availability stubbed; excludes network/audio IO"
+    }
+  ],
+  "retuning": {
+    "source": "synthetic 90-second 16kHz mono PCM24 FLAC",
+    "full_analysis_seconds": 0.425,
+    "cached_retune_median_seconds": 0.016,
+    "retune_samples": 3,
+    "platform": "Python 3.12/Linux; warm local storage; not user hardware; full analysis excludes indexing"
+  }
+}

@@ -1,0 +1,91 @@
+title: lie-by-the-fire
+cluster:
+version:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  [verse]
+  Lay down beside me
+  The daylight is done
+  Rest now your paws
+  By the fire, everyone
+  No need for kingdoms
+  No battles tonight
+  Only two goldens
+  Asleep by the light
+  [verse]
+  Doja, my lady
+  So watchful and wise
+  Firelight dancing
+  Like stars in your eyes
+  Bam Bam, brave hunter
+  Your quest is complete
+  The ball has been captured
+  Now rest at my feet
+  [verse]
+  Stay by the fire
+  Stay here awhile
+  Dream of the meadows
+  And morning's first mile
+  Wherever we wander
+  Whatever we see
+  Home is wherever
+  You both are with me
+  [instrumental]
+  [verse]
+  Tomorrow the pathway
+  Will call us once more
+  Bam will stand waiting
+  Beside the old door
+  Doja will linger
+  And judge us all first
+  Then follow behind us
+  When curiosity wins
+  [verse]
+  Stay by the fire
+  Stay here awhile
+  Dream of the meadows
+  And morning's first mile
+  Wherever we wander
+  Whatever we see
+  Home is wherever
+  You both are with me
+  [bridge]
+  No gold from the mountain
+  No jewel from the sea
+  Could purchase the hours
+  You've given to me
+  So sleep without worry
+  The watch I shall keep
+  While two golden guardians
+  Lie dreaming in sleep
+  [instrumental]
+  [verse]
+  Stay by the fire
+  Stay here awhile
+  Tomorrow we'll wander
+  Another good mile
+  Through forest and meadows
+  Wherever we roam
+  Two golden companions
+  Will always come home
+  [outro]
+  Rest now, Doja
+  Rest, Bam Bam
+  The fire burns low
+  And morning will come
+  Woof

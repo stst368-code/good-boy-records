@@ -1,0 +1,58 @@
+title: aerials
+album: soad
+pos: 2
+version:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  [verse]
+  Life is a waterfall
+  We're one in the river and one again after the fall
+  Swimming through the void, we hear the word
+  We lose ourselves, but we find it all
+  [pre-chorus]
+  'Cause we are the ones that wanna play
+  Always wanna go, but you never wanna stay
+  And we are the ones that wanna choose
+  Always wanna play, but you never wanna lose
+  [chorus]
+  Aerials in the sky
+  When you lose small mind, you free your life
+  [verse]
+  Life is a waterfall
+  We drink from the river, then we turn around and put up our walls
+  Swimming through the void, we hear the word
+  We lose ourselves, but we find it all
+  [pre-chorus]
+  'Cause we are the ones that wanna play
+  Always wanna go, but you never wanna stay
+  And we are the ones that wanna choose
+  Always wanna play, but you never wanna lose, oh
+  [chorus]
+  Aerials in the sky
+  When you lose small mind, you free your life
+  Aerials, so up high
+  When you free your eyes, eternal prize
+  Aerials in the sky
+  When you lose small mind, you free your life
+  Aerials, so up high
+  When you free your eyes, eternal prize
+  [outro]
+  Ah, ah
+  Ah
+  Ah, ah
+  Ah

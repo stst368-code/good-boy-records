@@ -1,0 +1,51 @@
+Review Tooling
+
+Requirements:
+- Load .flac audio files
+	- Configurable directory for loading files
+	- Recursive child folder searching
+- Playback .flac audio files
+	- Entire songs
+	- Auto sampling
+		- Algorithmic selection of song segments
+		- Selects high/low points within the audio
+		- Plays just these back as short snippets
+		- Provides a very quick sample of the complete song
+- Rating of audio
+	- Quick 0-5 scale ratings
+		- Audio clarity/quality : is the audio clear, static/noise free?
+		- Structure/composition : does it flow like a song of its genre?
+		- Consistency : does the song remain consistent throughout? Relevant to sampler/scheduler parameters mostly, as poor application of these often makes some parts of the track perform well, and others become pure noise
+		- Realism : How likely would it be for the average person to believe the song is produced/sung by a human
+	- Ratings logged within domain
+	- Linked by to specific .flac + its generation .yaml
+- Storage of reviewed media
+	- Songs that have been reviewed should be moved into specific storage directory
+	- Split by rating level
+	- .flac kept with .yaml
+	- Secured against potential duplicate file names
+- Queryable
+	- Enable querying of full dataset
+		- Used for analytic review of songs/genres/parameters/models
+
+General Parameters:
+	- Do not show the user the parameters
+		- Avoids biasing
+			- User might see parameters they think are better
+			- User might see higher weight models
+			- These could bias rating decisions, so we must not show this information
+	- Enable random track order, alpha order, date order sorting
+	- Automatic issue detection
+		- Primarily bad sampling
+		- Detected via sudden extreme spikes in waveform
+	- Visualisation of audio
+		- Wave form
+		- Spectral response
+		- Give the user the ability to see range of frequencies playing
+		- Give the user ability to view complete song as a graph, so they can manually select time positions that 'look' interesting
+		- Give the user information about stereo channels
+	- Local application, running on desktop where the files are located
+	- Optional access via LAN mobile application
+		- Enables review to continue whilst away from desktop, but at home
+		- So user can review hundreds/thousands of songs whilst doing other human activities
+	- Primary weighting is the 0-5 scoring system

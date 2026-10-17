@@ -1,0 +1,190 @@
+schema_version: '1.0'
+project: Good Boy Records
+purpose: Compact world and character memory for local AI song-writing
+canon_policy:
+  established: Grounded in user-provided character descriptions or recurring song concepts.
+  song_motif: Established recurring title, setting, or lyrical subject; details may vary by song.
+  provisional: Useful interpretation or character framing, not a confirmed fixed fact.
+  writing_rules:
+    - Preserve established species, genders, personalities, relationships and recurring jokes.
+    - Use lore as background knowledge, not a checklist to insert into every song.
+    - Invent fresh plots and lyrics; avoid recycling previous lines, hooks or rhymes.
+    - Characters may be exaggerated into mythology, horror, comedy, tragedy or opera without changing their underlying personalities.
+    - Genre, arrangement, tempo and language are independent of narrative canon.
+    - Do not automatically include every character or motif in each song.
+    - Do not promote a speculative connection into permanent canon.
+    - Songs with different versions may reinterpret the same event rather than represent separate historical events.
+world:
+  name: The Good Boy Records universe
+  summary: >-
+    A domestic golden-retriever world where small incidents can become grand dramas:
+    stolen balls, contested furniture, treats, garden gates and river adventures
+    are treated with exaggerated stakes, dry humour and genuine affection.
+  tonal_modes: [domestic comedy, absurdism, affectionate character study, mock-heroic epic, melancholy, tragedy, horror parody, surrealism]
+  core_contrasts:
+    - regal self-importance versus wholehearted simplicity
+    - tiny domestic stakes versus apocalyptic storytelling
+    - possessiveness versus unconditional affection
+    - repetition and obsession versus the fleeting nature of reward
+characters:
+  doja:
+    name: Doja
+    aliases: [Princess Beauts, Grem-e-leen, Gremlin, Opossum Face]
+    species: dog
+    breed: golden retriever
+    variety: working-line
+    gender: female
+    canon: established
+    summary: >-
+      An independent, self-assured, calculating golden retriever with princess-like
+      entitlement and mischievous gremlin behaviour. She wants control over her
+      surroundings, attention and possessions.
+    traits: [independent, observant, calculating, mischievous, regal, stubborn, theatrical, strategic]
+    habits:
+      - Patrols and monitors the household or garden.
+      - Secures attention and scratches on her terms.
+      - Steals or barters with balls and other prized objects.
+      - Winds Bam Bam up and enjoys provoking a reaction.
+      - Has exuberant wet zoomies and digs after river visits.
+      - Nudges an arm for attention or a witness to her activities.
+    narrative_voice: Wry, commanding, dismissive, sly or melodramatically outraged.
+    avoid: [Portraying her as a passive, permanently obedient lapdog, Making her male]
+    songs: [self-rightous-gremelin, paws-off, paws-off-the-velvet, golden-rhapsody]
+  bam_bam:
+    name: Bam Bam
+    aliases: [Bam, Chunk, Prince Chunk]
+    species: dog
+    breed: golden retriever
+    gender: male
+    canon: established
+    summary: >-
+      A large fluffy, affectionate, eager-to-please retriever whose life revolves
+      around tennis balls and his people. He is gentle, emotionally sensitive,
+      patient and comically single-minded rather than truly unintelligent.
+    traits: [loving, goofy, patient, loyal, ball-obsessed, people-focused, emotionally sensitive, enthusiastic]
+    habits:
+      - Searches for, retrieves and mourns tennis balls.
+      - Waits patiently for play and approval.
+      - Carries objects in a gentle, controlled mouth grip.
+      - Leaves slobber and puts his enormous paws everywhere.
+      - Responds enthusiastically to the possibility of another throw.
+    narrative_voice: Earnest, repetitive, hopeful, sometimes grandly tragic about trivial losses.
+    recurring_grudge: Teddy is singled out as an object of Bam's inexplicable hostility in some songs.
+    avoid: [Making him malicious or cruel, Mistaking his single-mindedness for a lack of feelings, Making him female]
+    songs: [gimmie-gimmie-ball, the-ball-beyond-the-gate, the-endless-game, golden-rhapsody]
+  mama:
+    name: Mama
+    canon: established
+    role: Human caregiver and central source of comfort, affection, treats and attention.
+    narrative_use: Can act as the loving authority, witness, mediator or dispenser of rewards.
+    notes: Do not invent a fixed physical description or personal biography.
+  teddy:
+    name: Teddy
+    canon: established
+    role: Named target of Bam Bam's recurring comically disproportionate hostility.
+    notes: Teddy's species, identity and motive for the feud are not fixed here; preserve ambiguity.
+    narrative_use: A recurring punchline or unexpected source of tension.
+  johnny_three_fridges:
+    name: Johnny Three Fridges
+    canon: song_motif
+    role: Named subject of an established song family.
+    setting_reference: Minnesota is connected with Johnny in prior song-writing context.
+    personality: not firmly established
+    notes: The three fridges are part of the character's name; do not invent their origin as canon.
+    songs: [johnny-three-fridges]
+  moses:
+    name: Moses
+    canon: song_motif
+    role: Central figure in a musical tongue-twister and wordplay song.
+    recurring_language: [Moses supposes, toeses, roses, erroneous suppositions]
+    notes: The wordplay is established; a stable wider character biography is not.
+    songs: [moses-supposes]
+places:
+  home_and_garden:
+    canon: established
+    description: Shared domestic territory with coveted furniture, people, treats, gates and space for play.
+  river:
+    canon: established
+    description: Site of wet adventures, digging and zoomies; in dramatic songs water becomes a threatening force that swallows or carries away balls.
+  the_gate:
+    canon: song_motif
+    description: The boundary between possession and loss, safety and adventure; a ball beyond it becomes a quest.
+    songs: [the-ball-beyond-the-gate]
+  new_mills:
+    name: New Mills
+    canon: song_motif
+    description: Recurring named destination celebrated in song, often elevated to an outsized anthem.
+    songs: [new-mills-new-mills]
+  golden_court:
+    name: The Golden Court
+    canon: provisional
+    description: Mock-royal lens through which golden-retriever household hierarchy can be dramatized.
+    notes: Title exists; exact institutions and membership are not fixed.
+    songs: [the-golden-court]
+objects_and_rituals:
+  tennis_ball:
+    canon: established
+    meanings: [ultimate treasure, source of purpose, bargaining chip, object of obsession, symbol of loss]
+    plot_uses: [stolen, thrown, recovered, lost beyond a gate, washed away, swallowed, disputed]
+  dentastix:
+    canon: established
+    meaning: Anticipated treat and ritual reward.
+  treats:
+    canon: established
+    meaning: Currency, leverage, affection and motivation.
+  velvet_or_furniture:
+    canon: song_motif
+    meaning: Doja's territory, comfort and claimed sovereignty.
+  slobber_and_paws:
+    canon: established
+    meaning: Bam Bam's physical comedy and affectionate disregard for neatness.
+themes:
+  endless_fetch:
+    canon: established
+    idea: The ball is found, thrown, lost, grieved and pursued again. The cycle itself can be funny, heroic or existential.
+    songs: [the-endless-game, gimmie-gimmie-ball]
+  doja_vs_bam:
+    canon: established
+    idea: Doja's strategic control clashes with Bam's trusting enthusiasm, producing conflict without removing their bond.
+  dog_scale_epic:
+    canon: established
+    idea: A small event in a dog's day is narrated as war, divine judgement, royal intrigue or Greek tragedy.
+  possession_and_boundaries:
+    canon: song_motif
+    idea: Chairs, balls, gates, attention and personal space are contested.
+    songs: [paws-off, paws-off-the-velvet, the-ball-beyond-the-gate]
+  golden_royalty:
+    canon: song_motif
+    idea: Mock-monarchy, coronations, self-importance and royal dignity applied to golden retrievers.
+    songs: [the-golden-court, golden-rhapsody]
+  tenderness_and_loss:
+    canon: song_motif
+    idea: Beneath the absurdity lies genuine attachment, loyalty and grief at things lost.
+    songs: [lie-by-the-fire, where-golden-flowers-grow, the-endless-game]
+  playful_wordplay:
+    canon: song_motif
+    idea: Tongue-twisters, repetition, absurd logic, escalating refrains and deliberately clumsy language.
+    songs: [moses-supposes, so-stupid]
+  domestic_grievances:
+    canon: song_motif
+    idea: Furniture, clutter, unwelcome objects and household frustrations acquire outsized comic significance.
+    songs: [paws-on-your-nightstand, paws-off-the-velvet]
+  local_mythology:
+    canon: song_motif
+    idea: Familiar places and ordinary figures receive extravagant anthems and mythic treatment.
+    songs: [new-mills-new-mills, johnny-three-fridges]
+other_known_song_families:
+  - know-the-hedge
+  - smooth-pawterator
+  - you-make-me-holy
+  - california-rear-view
+  - dogtushya
+  - pity-pawty
+  - many-manele
+  - the-ball-beyond-the-gate
+  - the-endless-game
+notes_for_local_model:
+  recommended_context: Retrieve the relevant character entries plus two or three related themes, objects or places per song request.
+  continuity: Preserve personalities but allow different songs to tell alternate versions of events.
+  output: Generate original songs, not summaries of lore.
+  provenance: Compiled from prior conversations and catalogue references; not a full audit of every source YAML lyric.

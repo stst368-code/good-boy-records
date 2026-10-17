@@ -1,0 +1,21 @@
+{
+  "input_directories": [
+    "C:/GBR/Generated"
+  ],
+  "archive_directory": "C:/GBR/GBR_Reviewed",
+  "data_directory": "data",
+  "host": "127.0.0.1",
+  "port": 8765,
+  "scan_interval_seconds": 30,
+  "quick_seconds": 20,
+  "standard_seconds": 50,
+  "fade_ms": 35,
+  "password_hash": "",
+  "allowed_hosts": [],
+  "ssl_certfile": "",
+  "ssl_keyfile": "",
+  "fast_seconds": 10,
+  "transition_sensitivity": "balanced",
+  "reservation_queue_ahead": 2,
+  "reservation_seconds": 180
+}

@@ -1,0 +1,71 @@
+title: jennys-tale
+cluster:
+version:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  [instrumental]
+  [verse]
+  It was a quiet, dark night in an empty street somewhere in London City
+  Jenny walked alone, she was dragging her feet, she was heading back home to sleep
+  Well, she knew this town, she knew this floor
+  Because she'd walked it about a thousand times before
+  She wanted to escape
+  Can you blame?
+  [verse]
+  Well on the very same night, in a different place
+  There walked this hooded blonde youth by the name of James
+  He was 14 years old and out of his brain
+  He'd been smoking ganja with the boys
+  James, he grew up to be a kid of the street
+  His mates called him Screech, he was quick on his feet
+  He was a liar, a thief at fourteen years old
+  The devil had set his sights on his soul
+  [verse]
+  As Jenny walked home all alone, she felt scared
+  Usually she was alright but it was like there was something in the air
+  A divine intervention telling her to beware?
+  Or maybe intuition bugging her and making her so scared?
+  Sirens sound in the distance to the beat of Jenny's feet
+  A symphony of the night that echoes crime on London's streets
+  Jenny turns a corner, their eyes, they meet
+  Our poor girl Jenny, a boy named Screech
+  [verse]
+  "Give me all your money, bitch, give it to me
+  If you co-operate, then you'll soon be free
+  I want your purse, your phone, don't fucking look at me
+  I mean it, bitch, are you listening to me?"
+  Jenny freezes, statue like, a lady shaped stalactite
+  Fear like liquid nitrogen in the dark night
+  She tried to find strength to move
+  But stayed as still as a statue in high heeled shoes
+  [verse]
+  "What the hell you playing at? You playing games with me?
+  I swear to fucking god, I'll slice the rosy off your cheeks
+  You think I don't mean it, girl? You don't know me
+  The last thing you see will be a boy called-"
+  Screech reached for the sheath of the blade with the teeth
+  That could bite through steel and slice concrete
+  And he swung possessed, with the devil in his chest
+  And the statue that she was, turned to butter in a breath
+  [verse]
+  It was a quiet dark night on an empty street, somewhere in London city
+  Jenny laid still on the cold concrete, she's found somewhere to sleep
+  Well, she knew this town, she knew this floor
+  'Cause she'd walked it about a thousand times before
+  I guess that she escaped
+  It's such a shame

@@ -1,0 +1,972 @@
+# GBR Review Tooling
+
+## Purpose
+
+- Local application for reviewing, rating, analysing and archiving generated GBR music.
+- Designed for reviewing hundreds or thousands of generated tracks efficiently.
+- Primary purpose:
+  - Rapid human assessment of generated audio.
+  - Consistent 0–5 quality ratings.
+  - Centralised storage of reviewed FLAC/YAML pairs.
+  - Automatic detection of potential audio defects.
+  - Collection of structured data for aggregate analytics.
+  - Identification of tracks desired for eventual publishing.
+- Independent of the generation pipeline and publishing system.
+- Human ratings are the primary measure of quality.
+- Automated analysis supplements human reviews but does not influence or override ratings.
+
+## 1. File Discovery and Loading
+
+### Requirements
+
+- Load `.flac` audio files.
+- Configurable input directory or directories.
+- Recursive searching of child folders.
+- Support files scattered across multiple locations.
+- Automatically discover newly generated files.
+- Associate each FLAC with its corresponding generation YAML.
+- Extract generation metadata from YAML.
+- Where available, recover metadata embedded within FLAC files.
+- Handle missing, invalid or incomplete YAMLs.
+- Exclude already reviewed files from the normal review queue.
+- Avoid duplicate indexing and repeated review of identical audio.
+- Allow manual directory rescanning.
+
+### Identification
+
+- Generate SHA-256 hashes for FLAC files.
+- Generate hashes for associated YAML files.
+- Assign unique generation identifiers.
+- Use audio hashes to identify identical recordings.
+- Preserve separate generation records where identical audio has different generation metadata.
+- Do not use filenames as primary identifiers.
+- Retain original file paths and filenames in the database.
+
+## 2. Audio Playback
+
+### Full Playback
+
+- Play complete FLAC recordings.
+- Play, pause, resume, restart and seek.
+- Volume control.
+- Playback progress and duration.
+- Clickable waveform for seeking.
+- Optional playback-speed adjustment.
+- Keyboard shortcuts on desktop.
+- Large touch-friendly playback controls on mobile.
+- Continue playback when navigating supported interface elements.
+
+### Automatic Sampling
+
+- Automatically select short, informative segments from each song.
+- Provide a rapid overview without requiring full-track listening.
+- Algorithmically identify:
+  - Opening passage.
+  - High-energy sections.
+  - Low-energy sections.
+  - Significant transitions.
+  - Unusual or potentially defective sections.
+  - Ending passage.
+- Use audio analysis rather than fixed time intervals alone.
+- Avoid selecting multiple overlapping or nearly identical segments.
+- Preserve sufficient context around each selected section.
+- Apply short fades where needed to avoid artificial clicks.
+- Play snippets sequentially as one listening session.
+- Allow the reviewer to replay individual snippets.
+- Allow switching between automatic sampling and full playback.
+
+### Sampling Modes
+
+- Quick:
+  - Approximately 15–25 seconds.
+  - Focus on representative passages and potential anomalies.
+- Standard:
+  - Approximately 40–65 seconds.
+  - Broader coverage of musical structure and consistency.
+- Full:
+  - Complete recording.
+  - Manual seeking and section navigation.
+
+Sampling durations configurable.
+
+## 3. Human Rating System
+
+### Four Rating Dimensions
+
+Each dimension receives an independent integer score between 0 and 5.
+
+**Audio Quality**
+- Overall technical audio quality.
+- Clarity and intelligibility.
+- Unwanted noise, static or distortion.
+- Digital artefacts.
+- Clipping and other generation defects.
+- Intentional musical distortion should not be penalised.
+
+**Structure / Composition**
+- Does the recording flow like a coherent song?
+- Does it follow the intended genre?
+- Does the arrangement make musical sense?
+- Are the sections appropriately structured?
+- Does the song develop and progress naturally?
+- Does it sound complete?
+
+**Consistency**
+- Does the recording maintain its quality throughout?
+- Does musical identity remain coherent?
+- Are there sections that deteriorate into noise?
+- Are there sudden unexplained changes in performance?
+- Does the generation remain stable from beginning to end?
+- Particular interest in failures associated with sampler/scheduler behaviour.
+
+**Realism**
+- Would an average listener believe the recording was produced by humans?
+- Applies to all genres, including electronic, synthetic and chiptune music.
+- Does not require natural instruments or human-sounding vocals.
+- Evaluates the credibility of the overall production.
+- Penalises recognisable AI-generation artefacts and unnatural execution.
+
+### Rating Behaviour
+
+- Six selectable values: 0, 1, 2, 3, 4, 5.
+- One selection required for each dimension.
+- No mandatory written notes.
+- No separate submit button.
+- Automatically submit when all four ratings have been entered.
+- Automatically advance to the next review.
+- Back button to revisit and correct the previous rating.
+- Skip button to move past a track without rating or archiving it.
+- Skipped tracks remain available for later review.
+- Preserve review corrections and history.
+- Allow repeated reviews where explicitly requested.
+- Record whether the assessment used snippets or complete playback.
+
+### Score Calculation
+
+- Four scores have equal weighting.
+- Arithmetic mean calculated automatically.
+- Preserve all four original scores.
+- Preserve the unrounded average.
+- Round the average to the nearest whole number.
+- Use conventional half-up rounding:
+  - 0.00–0.49 → 0
+  - 0.50–1.49 → 1
+  - 1.50–2.49 → 2
+  - 2.50–3.49 → 3
+  - 3.50–4.49 → 4
+  - 4.50–5.00 → 5
+- Rounded result determines the archive directory.
+- Do not display the calculated average or rounded result during initial reviewing.
+- Individual scores remain the authoritative assessment data.
+
+## 4. Review Interface
+
+### Design
+
+- Extremely simple interface.
+- Desktop and mobile compatible.
+- Optimised for rapid repeated reviewing.
+- No unnecessary statistics or technical information.
+- Minimal navigation.
+- Large, clearly separated controls.
+- Responsive design for different screen sizes.
+
+### Displayed Information
+
+- Song title.
+- Intended genre.
+- Audio playback controls.
+- Waveform.
+- Optional spectral visualisation.
+- Automatic sampling controls.
+- Four rating categories.
+- Six rating buttons per category.
+- Back button.
+- Skip button.
+
+### Rating Buttons
+
+- Display values 0–5 horizontally.
+- Wide buttons, occupying available screen width.
+- Large touch targets for mobile.
+- Minimum target height approximately 48–52 pixels.
+- Clear indication of selected value.
+- Avoid accidental neighbouring selections.
+- No scrolling required between rating dimensions where screen size permits.
+
+### Hidden Information
+
+Do not display:
+- Model names.
+- Model weights or precision.
+- Sampler.
+- Scheduler.
+- CFG.
+- Seeds.
+- Steps.
+- Encoder settings.
+- Generation hardware.
+- Generation duration.
+- Previous scores.
+- Calculated average.
+- Archive destination.
+- Automated defect severity.
+- Other information likely to bias a human review.
+
+Song title and intended genre are mandatory because they provide necessary context for evaluating composition and genre accuracy.
+
+No separate technical-inspection mode is required.
+
+Generation parameters remain accessible through the database for subsequent aggregate analytics in GBR.
+
+## 5. Audio Visualisation
+
+### Waveform
+
+- Display the complete recording as a waveform.
+- Support zooming.
+- Support horizontal scrolling.
+- Click/tap to seek.
+- Show playback position.
+- Identify interesting sections.
+- Display selected automatic-sampling regions.
+- Allow manual selection of time ranges.
+- Allow playback of manually selected ranges.
+
+### Spectral Visualisation
+
+- Display frequency content over time.
+- Spectrogram view.
+- Show low, middle and high-frequency activity.
+- Allow users to identify unusual regions visually.
+- Synchronise with playback position.
+- Support manual seeking within visualisations.
+
+### Stereo Information
+
+- Separate left/right channel waveforms where useful.
+- Channel balance.
+- Stereo width.
+- Channel correlation.
+- Phase irregularities.
+- Mono compatibility indicators.
+
+### Performance
+
+- Precompute waveform and spectral previews.
+- Cache analysis results.
+- Avoid decoding entire FLAC files repeatedly.
+- Generate lightweight visualisation data for mobile devices.
+- Load detailed data only when needed.
+
+## 6. Automatic Audio Analysis
+
+### Purpose
+
+- Identify potential generation defects.
+- Locate interesting listening segments.
+- Support automatic sampling.
+- Store objective technical measurements.
+- Enable later correlation between generation parameters and defects.
+- Never automatically change human review scores.
+
+### Analysis Categories
+
+**Clipping and Peak Detection**
+- Sample peak.
+- True peak.
+- Clipped samples.
+- Sudden extreme waveform spikes.
+- Abrupt transient irregularities.
+
+**Loudness and Energy**
+- RMS.
+- Integrated LUFS.
+- Short-term loudness.
+- Loudness range.
+- Sudden energy changes.
+- Unexpected volume collapse.
+
+**Spectral Analysis**
+- Spectral centroid.
+- Spectral flatness.
+- Spectral flux.
+- Frequency distribution.
+- Broadband noise changes.
+- Unusual high-frequency activity.
+- Abrupt changes in spectral characteristics.
+
+**Silence and Dropouts**
+- Unexpected silence.
+- Sudden signal loss.
+- Extremely quiet sections.
+- Abrupt starts or endings.
+- Incomplete or truncated recordings.
+
+**Stereo Analysis**
+- Left/right channel balance.
+- Stereo correlation.
+- Phase behaviour.
+- Sudden stereo collapse.
+- Unusual channel divergence.
+
+**Structural Analysis**
+- Significant transitions.
+- Repeated sections.
+- Changes in energy.
+- Section similarity.
+- Changes in musical texture.
+- Potential structural discontinuities.
+
+**Generation Consistency**
+- Analyse overlapping time windows.
+- Compare neighbouring sections.
+- Detect unexpected changes in spectral behaviour.
+- Identify sustained noise-like degradation.
+- Identify sections that diverge significantly from the remainder of the track.
+- Detect possible sampler/scheduler-related instability.
+- Distinguish potential anomalies from normal musical variation where possible.
+
+### Detection Output
+
+Each detected event records:
+- Event identifier.
+- Audio identifier.
+- Detection type.
+- Start timestamp.
+- End timestamp.
+- Severity score.
+- Confidence score.
+- Supporting measurements.
+- Detection algorithm/version.
+
+Detection is probabilistic. Unusual audio is not automatically defective.
+
+### Reviewer Communication
+
+- Display neutral points-of-interest markers on the waveform.
+- Markers may represent:
+  - Energy peaks.
+  - Quiet passages.
+  - Structural changes.
+  - Possible defects.
+- Use a consistent visual treatment.
+- Do not explicitly label passages as defective before review completion.
+- Allow clicking a marker to play the associated segment.
+- Automatically incorporate useful markers into snippet selection.
+- Keep detailed analysis findings hidden during initial scoring.
+
+### Analysis Storage
+
+- Store analysis separately from human reviews.
+- Link results using audio hashes and internal identifiers.
+- Preserve detection versions.
+- Allow reanalysis when algorithms improve.
+- Retain historical analysis if needed.
+- Make results queryable independently and alongside human scores.
+
+## 7. Review Queue
+
+### Track Ordering
+
+- Random order.
+- Alphabetical order.
+- Date order.
+- Optional oldest/newest direction.
+
+### Queue Behaviour
+
+- Default to unreviewed tracks.
+- Automatically advance following completed ratings.
+- Skip without removing files from the queue permanently.
+- Avoid presenting identical audio repeatedly.
+- Remember queue position.
+- Remember previous review for Back functionality.
+- Allow reviewing specific directories.
+- Allow filtering by song or intended genre.
+- Refresh discovered tracks without restarting the application.
+
+### Review History
+
+- Record completed reviews.
+- Record rating corrections.
+- Record skipped items.
+- Track review timestamps.
+- Track full playback versus sampled playback.
+- Support deliberate reassessment.
+- Do not overwrite previous review history when scores are revised.
+
+## 8. Centralised Archive
+
+### Purpose
+
+- Move reviewed media out of scattered generation directories.
+- Keep reviewed files in one central location.
+- Organise files by assessed quality.
+- Preserve FLAC/YAML associations.
+- Keep the archive simple to browse manually.
+
+### Archive Structure
+
+```text
+GBR_Reviewed/
+├── 0/
+├── 1/
+├── 2/
+├── 3/
+├── 4/
+└── 5/
+```
+
+### Classification
+
+- Automatically calculate the rounded average when reviewing completes.
+- Move FLAC/YAML pair into corresponding `0–5` directory.
+- Files remain together in the same directory.
+- No mandatory per-song or per-generation subdirectories.
+- High-scoring generations can coexist in the same directory.
+- Identical scores do not require a forced winner.
+
+### Naming
+
+- Retain readable song names.
+- Append unique identifiers to prevent collisions.
+- Use a short audio hash where possible.
+- Extend identifiers if a collision occurs.
+- Use matching identifiers for FLAC and YAML.
+- Never overwrite unrelated files.
+
+Example:
+
+```text
+5/
+├── the-endless-game__a91f42b8.flac
+├── the-endless-game__a91f42b8.yaml
+├── the-endless-game__e27c6501.flac
+└── the-endless-game__e27c6501.yaml
+```
+
+For identical audio with different generation provenance, retain separate generation records and preserve the associated YAML information without duplicating or losing metadata.
+
+### File Movement
+
+- Automatically initiate archiving after completed review.
+- Record review in SQLite before starting file operations.
+- Support movement between different drives.
+- Verify copied files before deleting originals.
+- Prevent accidental overwriting.
+- Handle missing files.
+- Handle missing or malformed YAMLs.
+- Recover from interrupted moves.
+- Maintain a record of original and destination paths.
+- Retry failed operations.
+- Reconcile database state against the filesystem after unexpected shutdown.
+- Never discard a completed review because a move failed.
+
+### Rating Corrections
+
+- Allow correction of previously completed reviews.
+- Recalculate archive bucket.
+- Automatically relocate files if their bucket changes.
+- Preserve original review history.
+- Update database paths and classifications.
+
+## 9. Duplicate Detection and Comparison
+
+### Duplicate Identification
+
+- Detect identical FLAC audio using SHA-256.
+- Detect duplicate generation records.
+- Distinguish identical audio from separate recordings of the same song.
+- Avoid unnecessary repeat reviews.
+- Preserve differing YAML provenance even for identical audio.
+
+### Equal Scores
+
+- Allow multiple generations to receive identical scores.
+- Do not artificially demote a generation because another scored equally.
+- Unique filenames prevent Windows filesystem collisions.
+- Equal-scoring files may coexist in the same archive directory.
+
+### Optional A/B Review
+
+- Allow comparison of multiple generations of the same song.
+- Blind comparison where possible.
+- Match playback loudness for fair comparisons.
+- Select preferred generation.
+- Preserve original 0–5 ratings.
+- Store relative preference separately.
+- Particularly useful when choosing between multiple high-scoring generations.
+- Never force A/B comparison as a prerequisite for archiving.
+
+## 10. Publishing Flag
+
+### Scope
+
+- Publishing is a completely separate system.
+- GBR Review does not:
+  - Generate album artwork.
+  - Process lyrics.
+  - Generate lighting controls.
+  - Format publishing assets.
+  - Upload media.
+  - Publish songs.
+  - Execute publishing workflows.
+
+### Purpose
+
+- Identify reviewed tracks desired for eventual GBR publication.
+- Keep publishing intent separate from numerical quality ratings.
+- Allow selection of a preferred generation when multiple high-quality versions exist.
+
+### Eligibility
+
+- Primary publishing candidates are tracks archived in directory `5`.
+- Provide a secondary selection pass for high-scoring generations.
+- Allow listening and comparison before selection.
+- Allow multiple tracks to be selected where appropriate.
+- Flagging a track does not change its quality ratings or archive directory.
+
+### Publishing Metadata
+
+Store publishing state within the SQLite database rather than modifying the generation YAML.
+
+Suggested states:
+- `not_selected`
+- `selected`
+- `published`
+
+Additional optional states:
+- `passed`
+- `withdrawn`
+
+### Functionality
+
+- Filter archive bucket `5`.
+- Review candidates.
+- Mark desired tracks as `selected`.
+- Remove selection if desired.
+- Mark selected tracks as `published` later.
+- Preserve dates of selection and publication.
+- Preserve status-change history.
+- Record optional external publishing references.
+- Make publishing state queryable by external systems.
+
+### External Integration
+
+- Separate publishing system reads selected tracks from the database or an exported manifest.
+- Expose audio location, generation YAML location, identifiers and publishing state.
+- Publishing system controls its own processing and workflow.
+- Review application only maintains the selection/status information.
+- No automatic publishing trigger is required.
+
+## 11. Database
+
+### Technology
+
+- SQLite.
+- Local database storage.
+- WAL mode for concurrent access.
+- Suitable for large numbers of generation and review records.
+- Indexed for fast searching and querying.
+
+### Core Tables
+
+**Songs**
+- Canonical song identifier.
+- Title.
+- Intended genre.
+- Genre cluster where available.
+
+**Generations**
+- Unique generation ID.
+- Song ID.
+- Generation timestamp.
+- Original filename.
+- Original directory.
+- Generation source.
+- Associated workflow identifier where available.
+
+**Media Files**
+- File ID.
+- SHA-256.
+- File path.
+- File size.
+- Duration.
+- Sample rate.
+- Bit depth.
+- Channel count.
+- Current storage state.
+
+**Generation Metadata**
+- Generation ID.
+- YAML hash.
+- Original YAML.
+- Parsed metadata.
+- Model information.
+- Conditioning parameters.
+- Sampler parameters.
+- Scheduler parameters.
+- Seeds.
+- CFG values.
+- Steps.
+- Other available settings.
+
+**Reviews**
+- Review ID.
+- Generation/audio ID.
+- Audio-quality score.
+- Composition score.
+- Consistency score.
+- Realism score.
+- Unrounded average.
+- Rounded archive bucket.
+- Review timestamp.
+- Playback/review mode.
+- Review revision.
+
+**Audio Analysis**
+- Audio ID.
+- Analysis version.
+- Technical measurements.
+- Aggregate anomaly metrics.
+- Processing timestamp.
+
+**Audio Events / Segments**
+- Audio ID.
+- Event type.
+- Start/end positions.
+- Severity.
+- Confidence.
+- Algorithm version.
+- Segment-selection metadata.
+
+**Archive Operations**
+- Generation ID.
+- Source paths.
+- Destination paths.
+- Operation type.
+- Operation status.
+- Verification results.
+- Timestamps.
+- Error/retry information.
+
+**Publishing Selection**
+- Generation ID.
+- Publishing status.
+- Selection timestamp.
+- Publication timestamp.
+- Optional external reference.
+
+**Review History**
+- Review changes.
+- Previous scores.
+- Revised scores.
+- Skips.
+- Reassessments.
+- Relevant timestamps.
+
+### Database Principles
+
+- Audio hash links records to exact recordings.
+- Generation ID links files to generation-specific metadata.
+- Store full original generation metadata.
+- Retain source and destination paths.
+- Do not depend on filenames for relationships.
+- Do not lose reviews if files are moved.
+- Preserve historical changes.
+- Provide efficient indexes for analytics.
+
+## 12. Analytics and Querying
+
+### Purpose
+
+- Produce a structured dataset for GBR's existing aggregate analytics.
+- Identify successful and unsuccessful generation configurations.
+- Compare performance across songs, genres, models and parameters.
+- Analyse relationships between subjective ratings and technical defects.
+
+### Queryable Dimensions
+
+- Song.
+- Genre.
+- Genre cluster.
+- Model.
+- Diffusion-transformer model/precision.
+- Text-encoder model/precision.
+- Encoder CFG.
+- Encoder seed.
+- Sampler.
+- Scheduler.
+- Sampler CFG.
+- Sampler seed.
+- Sampler steps.
+- Top-k.
+- Generation date.
+- Generation duration.
+- Compute hardware.
+- Workflow.
+- Audio duration.
+- Individual review dimensions.
+- Rounded archive bucket.
+- Automatic defect metrics.
+- Publishing status.
+
+### Example Analysis Questions
+
+- Which sampler/scheduler combinations produce the highest consistency scores?
+- Which model combinations produce the highest audio-quality ratings?
+- Which configurations are associated with sudden spectral degradation?
+- Are certain genres more vulnerable to generation failures?
+- How does sampler CFG affect consistency?
+- Does increasing sampler steps improve assessed quality?
+- Which songs show the greatest variation between generations?
+- How often do automatic defect warnings correspond to poor human ratings?
+- What proportion of generated tracks reach archive bucket 5?
+- Which configurations produce the most high-quality outputs relative to compute time?
+- What distinguishes selected publishing candidates from other bucket-5 generations?
+
+### Analytics Principles
+
+- Analytics primarily conducted through GBR's existing analytics system.
+- No requirement for a full analytics dashboard inside the review application.
+- Preserve raw individual scores.
+- Preserve unrounded averages.
+- Compare like-for-like generation groups where possible.
+- Avoid misleading conclusions from differing genre or song distributions.
+- Maintain traceability between analytics and source generations.
+
+### Data Access
+
+- Direct SQLite queries.
+- Read-only analytics access where appropriate.
+- CSV exports.
+- Parquet exports.
+- Optional API endpoints.
+- Support Python/Polars analysis.
+- Publishing selection available to external systems.
+
+## 13. Application Architecture
+
+### General
+
+- Standalone local application.
+- Runs on the desktop where generated audio is stored.
+- No cloud dependency.
+- Optional LAN access from mobile devices.
+- Single underlying database and archive.
+- Independent of GBR generation and publishing services.
+
+### Proposed Technology
+
+**Backend**
+- Python.
+- FastAPI.
+- SQLite.
+- Background indexing and analysis worker.
+
+**Frontend**
+- Browser-based interface.
+- Responsive desktop/mobile layout.
+- React/TypeScript or equivalent lightweight frontend.
+- Waveform visualisation.
+- Spectrogram visualisation.
+- Touch-friendly rating controls.
+
+**Audio Processing**
+- NumPy.
+- SciPy.
+- librosa.
+- soundfile.
+- Mutagen.
+- Optional FFmpeg for playback-format compatibility.
+
+### Background Processing
+
+- Recursive file scanning.
+- Hashing.
+- YAML parsing.
+- Metadata extraction.
+- Waveform preview generation.
+- Spectrogram generation.
+- Audio defect analysis.
+- Automatic segment selection.
+- Cache management.
+- Archive reconciliation.
+
+These tasks should not block the review interface.
+
+### Playback
+
+- Stream audio locally to the browser.
+- Support seeking.
+- Support full-track playback.
+- Support automatic snippet playback.
+- Use browser-compatible FLAC playback where supported.
+- Optional server-side transcoding for incompatible clients.
+- Avoid unnecessary audio conversion or quality loss.
+
+## 14. Mobile / LAN Support
+
+### Requirements
+
+- Access application from devices on the same LAN.
+- No remote cloud service required.
+- Desktop remains the host.
+- Mobile browser or installable PWA.
+- Same review queue and database.
+- Large rating buttons.
+- Minimal screen clutter.
+- Responsive waveform/player.
+- Quick review while undertaking other activities.
+
+### Playback Integration
+
+- Media Session API.
+- Bluetooth headphone controls.
+- Lock-screen playback controls.
+- Resume/pause from external media buttons.
+- Continue audio when the screen locks where supported.
+- Test behaviour across mobile browsers and operating systems.
+- Support background playback subject to platform restrictions.
+
+### Security
+
+- Configurable LAN binding.
+- Authentication for LAN access.
+- Restrict database and file-management operations to authorised clients.
+- Do not expose unrestricted filesystem access.
+- No public internet exposure by default.
+
+## 15. Reliability and Data Integrity
+
+- Never overwrite unrelated media.
+- Preserve exact source audio.
+- Do not modify original generation YAML values when rating.
+- Use collision-safe filenames.
+- Verify cross-drive transfers.
+- Recover interrupted archive operations.
+- Record failed operations.
+- Support retrying failures.
+- Keep completed reviews even when archiving fails.
+- Prevent duplicate simultaneous processing.
+- Use database transactions for state changes.
+- Support database backup.
+- Support archive/database reconciliation.
+- Handle corrupt FLACs gracefully.
+- Handle invalid YAMLs gracefully.
+- Handle missing files without application crashes.
+- Avoid blocking UI during indexing or analysis.
+- Preserve historical review and publication-status changes.
+
+## 16. Primary Workflow
+
+1. User configures one or more generation input directories.
+2. Application recursively discovers FLAC files.
+3. Corresponding generation YAML is located and parsed.
+4. Files are identified and hashed.
+5. Metadata is indexed in SQLite.
+6. Audio-analysis worker calculates technical metrics.
+7. Waveforms, spectrograms and sample segments are cached.
+8. Unreviewed tracks enter the review queue.
+9. Reviewer selects random, alphabetical or date ordering.
+10. Application displays song title, intended genre and simple playback interface.
+11. Reviewer listens to full audio or algorithmically selected snippets.
+12. Reviewer assigns four 0–5 scores.
+13. Selecting the fourth score automatically completes the review.
+14. Individual scores and the calculated average are stored.
+15. Average is rounded to an archive bucket between 0 and 5.
+16. FLAC/YAML pair is moved into the appropriate central archive directory.
+17. Destination files are verified and database paths updated.
+18. Application advances to the next track.
+19. Reviewer may go Back to correct the previous assessment.
+20. Tracks in archive bucket 5 become available for optional publishing selection.
+21. Reviewer can flag selected generations as desired for publication.
+22. Publishing status is retained in the database for consumption by a separate system.
+23. Complete human rating and machine-analysis datasets remain available to GBR analytics.
+
+## 17. Secondary Publishing Selection Workflow
+
+1. User opens the publishing-selection view.
+2. Application lists reviewed tracks from archive bucket 5.
+3. Reviewer listens to candidate tracks.
+4. Optional A/B comparison between generations of the same song.
+5. Reviewer flags desired items as `selected`.
+6. Selection is saved in SQLite.
+7. No media movement or publication occurs.
+8. External publishing system can retrieve selected items.
+9. Publishing status can subsequently be changed to `published`.
+10. Original ratings, metadata and archive locations remain unchanged.
+
+## 18. Implementation Priorities
+
+### Phase 1 — Core Review
+
+- Directory configuration.
+- Recursive FLAC/YAML indexing.
+- Audio hashing.
+- SQLite storage.
+- Full audio playback.
+- Basic waveform.
+- Title and genre display.
+- Four 0–5 rating controls.
+- Automatic submission.
+- Back/skip.
+- Review queue and ordering.
+- Six-directory central archive.
+- Safe file movement and collision handling.
+
+### Phase 2 — Automated Listening and Analysis
+
+- Signal analysis.
+- Defect detection.
+- Waveform point-of-interest markers.
+- Spectrograms.
+- Stereo information.
+- Automatic snippet selection.
+- Quick/Standard/Full sampling.
+- Cached analysis.
+- Persistent event/segment data.
+
+### Phase 3 — Mobile and Publishing Selection
+
+- Responsive mobile interface.
+- LAN access.
+- Authentication.
+- PWA support.
+- Media Session integration.
+- Background playback support where available.
+- Bucket-5 publishing selection.
+- Publishing-status tracking.
+- Optional A/B comparison.
+
+### Phase 4 — Analytics Integration
+
+- Expose review data to GBR analytics.
+- Export CSV/Parquet.
+- Parameter-level querying.
+- Defect/rating correlations.
+- Generation efficiency analysis.
+- Review consistency measurements.
+- Dataset validation and reporting.
+
+## 19. Core Design Rules
+
+- **Keep reviewing simple.**
+- **0–5 human ratings are the primary measure of quality.**
+- Always display song title and intended genre.
+- Never expose generation parameters during initial reviewing.
+- Do not display calculated averages during reviewing.
+- Automatically submit when all four ratings are populated.
+- Use large mobile-friendly rating buttons.
+- Automatic defect detection assists listening but does not determine ratings.
+- Keep human scores and machine measurements separate.
+- Archive reviewed FLAC/YAML pairs centrally by rounded average.
+- Never force different scores merely to resolve duplicate filenames.
+- Use hashing and unique identifiers for provenance and filename safety.
+- Preserve generation metadata, review history and analysis results.
+- Keep detailed analytics outside the review interface.
+- Publishing selection is a simple database flag/status.
+- Publishing itself is outside the application's scope.
+- Maintain reliable, recoverable file operations.
+- Optimise the complete workflow for reviewing large numbers of tracks with minimal interaction.

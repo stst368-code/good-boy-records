@@ -1,0 +1,9 @@
+1) Install llama.cpp: 
+	a) Determine CUDA version
+		i) open CMD
+		ii) nvidia-smi
+		iii) CUDA version printed top right
+	b) Go to GitHub repo: https://github.com/ggml-org/llama.cpp/releases
+	c) Find relevant release version
+	d) Download package
+	e) Extract package to this dir, within a folder named _llama_cpp

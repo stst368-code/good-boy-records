@@ -1,0 +1,47 @@
+title: white-light
+album: demon-days
+pos: 10
+version:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [chorus]
+  White light
+  White light
+  White light
+  Alcohol, alcohol, alcohol, white light
+  White light
+  White light
+  White light
+  Alcohol, alcohol, alcohol, white light
+  White light
+  White light
+  White light
+  Alcohol, alcohol, alcohol, white light
+  White light
+  White light
+  White light
+  Alcohol, alcohol, alcohol, white light
+  White light
+  White light
+  White light
+  Alcohol, alcohol, alcohol, white light
+  [instrumental]
+  [chorus]
+  White light
+  White light
+  White light
+  Alcohol, alcohol, alcohol, white light
