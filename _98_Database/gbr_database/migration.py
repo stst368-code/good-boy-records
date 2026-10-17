@@ -107,9 +107,11 @@ def validate_sources(generation, review):
     check_integrity(review)
     if generation.execute("SELECT COUNT(*) FROM timings t LEFT JOIN jobs j ON j.job_id=t.job_id WHERE j.job_id IS NULL").fetchone()[0]:
         raise ValueError("Generation timing records reference missing jobs")
-    if generation.execute("SELECT COUNT(*) FROM jobs WHERE params_json IS NULL OR NOT json_valid(params_json)").fetchone()[0]:
+def validate_selected_parameters(generation):
+    selected = "job_id IN (SELECT job_id FROM temp.gbr_selected_jobs)"
+    if generation.execute("SELECT COUNT(*) FROM jobs WHERE (params_json IS NULL OR NOT json_valid(params_json)) AND " + selected).fetchone()[0]:
         raise ValueError("Generation database contains invalid params_json; repair before importing")
-    if generation.execute("SELECT COUNT(*) FROM jobs WHERE json_type(params_json)!='object'").fetchone()[0]:
+    if generation.execute("SELECT COUNT(*) FROM jobs WHERE json_type(CASE WHEN json_valid(params_json) THEN params_json ELSE '{}' END)!='object' AND " + selected).fetchone()[0]:
         raise ValueError("Generation params_json must contain objects; repair before importing")
 
 
@@ -124,7 +126,7 @@ def _json_object(text):
 def output_candidates(generation, review):
     """Return evidence, never assert audio identity using filenames alone."""
     by_stem = defaultdict(list)
-    for row in generation.execute("SELECT job_id,output_stem,params_json,status FROM jobs WHERE output_stem IS NOT NULL"):
+    for row in generation.execute("SELECT job_id,output_stem,params_json,status FROM jobs WHERE output_stem IS NOT NULL AND COALESCE(status,'')!='withdrawn'"):
         by_stem[row["output_stem"].casefold()].append(row)
     for record in review.execute("""SELECT g.id,g.original_filename,m.parsed_json
         FROM generations g JOIN generation_metadata m ON m.generation_id=g.id"""):
@@ -154,13 +156,34 @@ def output_candidates(generation, review):
             }
 
 
+def select_history(generation, review):
+    """Keep unambiguous filename/parameter matches; never import withdrawn jobs."""
+    links = [row for row in output_candidates(generation, review)
+             if row[2] in {"parameters_match", "filename_only"}]
+    generation.execute("CREATE TEMP TABLE IF NOT EXISTS gbr_selected_jobs(job_id TEXT PRIMARY KEY)")
+    generation.execute("DELETE FROM temp.gbr_selected_jobs")
+    generation.executemany("INSERT OR IGNORE INTO temp.gbr_selected_jobs VALUES(?)", ((r[0],) for r in links))
+    return links
+
+
+def legacy_query(name):
+    where = " WHERE job_id IN (SELECT job_id FROM temp.gbr_selected_jobs)" if name in {"jobs", "timings"} else ""
+    return "SELECT * FROM " + quoted(name) + where + " ORDER BY rowid"
+
+
 def inspect_connections(generation, review):
     links = list(output_candidates(generation, review))
     levels = Counter(item[2] for item in links)
     linked_review_ids = {item[1] for item in links}
     gc, rc = counts(generation), counts(review)
+    kept = {name: generation.execute("SELECT COUNT(*) FROM (" + legacy_query(name) + ")").fetchone()[0] for name in LEGACY}
+    withdrawn = generation.execute("SELECT COUNT(*) FROM jobs WHERE status='withdrawn'").fetchone()[0]
     return {
         "generation_tables": gc, "review_tables": rc,
+        "history_policy": "drop_withdrawn_and_unmatched_legacy_jobs; preserve_review_records",
+        "imported_legacy_tables": kept,
+        "excluded_legacy_jobs": {"withdrawn": withdrawn, "without_usable_review_match": gc["jobs"] - kept["jobs"] - withdrawn},
+        "excluded_legacy_timing_events": gc["timings"] - kept["timings"],
         "legacy_statuses": dict(generation.execute("SELECT status,COUNT(*) FROM jobs GROUP BY status")),
         "timing_stages": dict(generation.execute("SELECT stage,COUNT(*) FROM timings GROUP BY stage")),
         "review_link_evidence": dict(levels),
@@ -177,6 +200,8 @@ def inspect_sources(generation_path, review_path):
         generation.execute("BEGIN")
         review.execute("BEGIN")
         validate_sources(generation, review)
+        select_history(generation, review)
+        validate_selected_parameters(generation)
         return inspect_connections(generation, review)
 
 
@@ -209,7 +234,7 @@ def copy_legacy(conn, source, source_id, original_path, snapshot_sha):
         conn.execute(ddl)
         placeholders = ",".join("?" for _ in range(len(columns) + 1))
         sql = "INSERT INTO " + quoted(destination) + " VALUES(" + placeholders + ")"
-        cursor = source.execute("SELECT * FROM " + quoted(name) + " ORDER BY rowid")
+        cursor = source.execute(legacy_query(name))
         while rows := cursor.fetchmany(500):
             conn.executemany(sql, ((source_id, *tuple(row)) for row in rows))
     conn.execute("CREATE INDEX idx_legacy_job_status ON legacy_generation_jobs(source_id,status)")
@@ -271,16 +296,18 @@ def migrate(generation_path, review_path, output_path, source_id="minimax-main",
             target.execute("PRAGMA journal_mode=DELETE")
             notify("Validating snapshots and fingerprinting original review tables")
             validate_sources(generation, target)
+            selected_links = select_history(generation, target)
+            validate_selected_parameters(generation)
             baseline_counts = counts(target)
             baseline = {name: table_fingerprint(target, name) for name in baseline_counts}
             report = inspect_connections(generation, target)
             install_schema(target)
-            notify("Importing every legacy job, timing event and naming counter")
+            notify("Importing matched legacy history; excluding withdrawn and unmatched jobs")
             with target:
                 copy_legacy(target, generation, source_id, generation_path, source_hash)
                 target.executemany("INSERT INTO legacy_output_links VALUES(?,?,?,?,?)", (
                     (source_id, job, review_id, level, json.dumps(evidence, ensure_ascii=False))
-                    for job, review_id, level, evidence in output_candidates(generation, target)))
+                    for job, review_id, level, evidence in selected_links))
             install_views(target)
             notify("Reconciling imported rows and unchanged review data")
             for name in baseline_counts:
@@ -291,7 +318,7 @@ def migrate(generation_path, review_path, output_path, source_id="minimax-main",
             legacy_fingerprints = {}
             for name in LEGACY:
                 imported = "legacy_generation_" + name
-                source_rows = generation.execute("SELECT COUNT(*) FROM " + quoted(name)).fetchone()[0]
+                source_rows = report["imported_legacy_tables"][name]
                 if target.execute("SELECT COUNT(*) FROM " + quoted(imported)).fetchone()[0] != source_rows:
                     raise ValueError("Legacy row count mismatch: " + name)
                 # The imported table adds one source_id column. Compare typed values
@@ -299,14 +326,14 @@ def migrate(generation_path, review_path, output_path, source_id="minimax-main",
                 source_columns = [r["name"] for r in generation.execute("PRAGMA table_info(" + quoted(name) + ")")]
                 projection = ",".join(quoted(x) for x in source_columns)
                 target.execute("CREATE TEMP VIEW imported_values AS SELECT rowid AS import_rowid," + projection + " FROM " + quoted(imported))
-                original_hash = table_fingerprint(generation, name)
+                original_hash = _projected_fingerprint(generation, legacy_query(name))
                 imported_hash = _projected_fingerprint(target, "SELECT " + projection + " FROM imported_values ORDER BY import_rowid")
                 target.execute("DROP VIEW imported_values")
                 if imported_hash != original_hash:
                     raise ValueError("Legacy values changed: " + name)
                 legacy_fingerprints[name] = original_hash
             check_integrity(target)
-            report.update({"format_version": 1, "created_at": utc_now(), "source_id": source_id,
+            report.update({"format_version": 2, "created_at": utc_now(), "source_id": source_id,
                            "generation_snapshot_sha256": source_hash, "review_snapshot_sha256": review_hash,
                            "preserved_review_fingerprints": baseline, "legacy_fingerprints": legacy_fingerprints,
                            "database_integrity": "ok", "foreign_key_errors": 0,

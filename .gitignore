@@ -217,4 +217,7 @@ _Reviewed/
 /_98_Database/backups/
 /_98_Database/gbr-migration-*/
 !/_98_Database/tests/
-!/_98_Database/tests/**
+!/_98_Database/tests/test_*.py
+/_02_Generation/runtime/
+!/_02_Generation/tests/
+!/_02_Generation/tests/test_*.py

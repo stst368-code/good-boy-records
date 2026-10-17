@@ -15,26 +15,26 @@ image rather than a raw filesystem copy.
 
 ## Records preserved
 
-| Data | Count |
-| --- | ---: |
-| Legacy jobs | 121,475 |
-| Legacy timing events | 17,219 |
-| Naming counters | 1,970 |
-| Review audio identities | 2,005 |
-| Review generation/metadata records | 3,398 each |
-| Reviewers | 2 |
-| Assessments | 1,287 |
-| Reviews | 1,295 |
-| Review history events | 1,316 |
-| Bookmarks | 3 |
-| Publishing selections | 35 |
-| Analysis records | 3,300 |
-| Audio events | 178,919 |
-| Segments | 46,365 |
+| Data | Source | Imported |
+| --- | ---: | ---: |
+| Legacy jobs | 121,475 | 1,860 |
+| Legacy timing events | 17,219 | 5,788 |
+| Naming counters | 1,970 | 1,970 |
+| Review audio identities | 2,005 | 2,005 |
+| Review generation/metadata records | 3,398 each | 3,398 each |
+| Reviewers | 2 | 2 |
+| Assessments | 1,287 | 1,287 |
+| Reviews | 1,295 | 1,295 |
+| Review history events | 1,316 | 1,316 |
+| Bookmarks | 3 | 3 |
+| Publishing selections | 35 | 35 |
+| Analysis records | 3,300 | 3,300 |
+| Audio events | 178,919 | 178,919 |
+| Segments | 46,365 | 46,365 |
 
 All 25 original review tables were reconciled using row counts and typed-value
 fingerprints, including unchanged raw YAML byte fields. Every original column
-and value in the three legacy generation tables was reconciled as well. The
+and value of the retained legacy rows was reconciled as well. The
 shared output passed integrity and foreign-key checks. No native runs were
 created and no source YAML or audio was changed.
 
@@ -44,11 +44,12 @@ records, and all 25 original review table fingerprints still matched afterward.
 
 ## Issues and interpretation
 
-The legacy queue contains 3,507 completed, 18 planned, 2 sampling and 117,948
-withdrawn jobs. All are history in the new database. In particular, importing the
-two sampling rows does not authorize replaying them on a different backend.
-The large number of withdrawn records and repeated prompt content explains much
-of the generation database size; this migration deliberately does no cleanup.
+The source queue contains 3,507 completed, 18 planned, 2 sampling and 117,948
+withdrawn jobs. The revised import excludes all 117,948 withdrawn jobs and 1,667
+other jobs without a usable review association, along with 11,431 timing events.
+All 1,860 retained jobs are completed history, not runnable requests. The resulting
+database is 848,007,168 bytes, down from 1,926,299,648 bytes in the original full
+history trial. Both source files remain unchanged.
 
 There are 2,952 review-generation records with a unique legacy filename match and
 agreement on all eight recorded generation parameters. Another seven match the
@@ -56,6 +57,10 @@ filename but have incomplete parameter evidence. The remaining 439 have no
 filename candidate. No conflicting or ambiguous candidates were found in these
 snapshots. These are metadata associations, not audio hash verification, and do
 not collapse distinct review or audio identities.
+
+The 439 unmatched review generations include 160 saved reviews covering 159
+audio identities. They are retained under the selected cleanup policy; deleting
+unlinked runner jobs is distinct from deleting saved review data.
 
 The populated timings contain 2,566 `full_generation_total` events, in addition
 to 1,019 conditioning totals and 1,019 sampling totals. The old summary omitted
@@ -65,6 +70,22 @@ Worker labels alone do not identify hardware reliably, so GPU model remains a
 separate grouping field. Historical VRAM measurements are unavailable and remain
 unknown. Historical timestamp strings are retained without assigning a guessed
 timezone.
+
+## Writing input trial
+
+The new catalogue preflight selected 84 catalogue entries: 83 master tracks and
+one variant. It found the missing `cheerleader.yaml`, a duplicate `title` in
+`incredible.yaml`, a master title/filename disagreement in `sixteen-balls.yaml`,
+162 missing/invalid identity fields, 79 missing captions and 82 inputs with
+unresolved generation settings. Existing legacy `version` values were reported
+without converting them to styles. The variant may legitimately retain its
+master song title despite a different filename.
+
+A separate sandbox copy of a song, with explicit test IDs and parameters, was
+prepared against the populated shared trial database using a real caption
+template from the repository. Snapshot and request hashes verified; lyric bytes
+were identical. This created one prepared test request and no inference attempt.
+It did not edit the writing catalogue or its source YAMLs.
 
 Existing stored Windows paths include an older `C:` location, while the supplied
 directory listing ends at an `E:` repository location. That is a relocation issue

@@ -103,8 +103,9 @@ class MigrationTests(unittest.TestCase):
         report = migrate(self.generation, self.review, self.output)
         self.assertEqual(before, {path: file_hash(path) for path in before})
         self.assertEqual(report["review_link_evidence"], {
-            "parameters_match": 1, "filename_only": 1, "conflict": 1, "ambiguous": 2})
-        self.assertEqual(report["review_generations_without_filename_candidate"], 1)
+            "parameters_match": 1, "filename_only": 1, "conflict": 1})
+        self.assertEqual(report["review_generations_without_filename_candidate"], 2)
+        self.assertEqual(report["excluded_legacy_jobs"], {"withdrawn": 2, "without_usable_review_match": 2})
         with closing(connect_readonly(self.output)) as conn:
             self.assertEqual(conn.execute("SELECT raw_yaml_bytes FROM generation_metadata LIMIT 1").fetchone()[0], RAW_YAML)
             self.assertEqual(tuple(conn.execute("SELECT id,reason FROM reviews").fetchone()), ("review", "Keep\nthis reason"))
@@ -112,7 +113,8 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(conn.execute("SELECT status FROM publishing_selection").fetchone()[0], "selected")
             self.assertEqual(conn.execute("SELECT future_blob FROM legacy_generation_jobs LIMIT 1").fetchone()[0], b"\x00\xff\n")
             self.assertEqual(dict(conn.execute("SELECT status,COUNT(*) FROM legacy_generation_jobs GROUP BY status")),
-                             {"completed": 2, "planned": 1, "sampling": 1, "withdrawn": 2})
+                             {"completed": 1, "planned": 1})
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM generations").fetchone()[0], 5)
             for table in ("generation_runs", "generation_batches", "generation_attempts", "generation_resource_measurements"):
                 self.assertEqual(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0], 0)
             self.assertEqual(conn.execute("PRAGMA integrity_check").fetchone()[0], "ok")
@@ -147,6 +149,17 @@ class MigrationTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             migrate(self.generation, self.review, self.output)
         self.assertEqual(self.output.read_bytes(), b"keep existing")
+
+    def test_withdrawn_jobs_and_their_timings_are_excluded_even_with_bad_parameters(self):
+        with closing(sqlite3.connect(self.generation)) as conn:
+            conn.execute("UPDATE jobs SET params_json='invalid-json' WHERE status='withdrawn'")
+            conn.execute("INSERT INTO timings VALUES('withdrawn-timing','j3','old','GPU','sampling_total',1,12,1,0.5,'USD')")
+            conn.commit()
+        report = migrate(self.generation, self.review, self.output)
+        self.assertEqual(report['excluded_legacy_timing_events'], 1)
+        with closing(connect_readonly(self.output)) as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM legacy_generation_jobs WHERE status='withdrawn'").fetchone()[0], 0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM legacy_generation_timings").fetchone()[0], 4)
 
     def test_source_cannot_be_destination(self):
         before = file_hash(self.review)

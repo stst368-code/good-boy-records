@@ -2,11 +2,11 @@
 
 This directory owns the shared SQLite database. `_97_App` launches the platform;
 `_03_Review` retains its existing review interface and services. The generation
-controller will live in `_02_Generation`, with execution workers in `_99_Tools`.
+controller lives in `_02_Generation`, with execution workers planned in `_99_Tools`.
 
-The initial migration is implemented. Generation scheduling, native MiniMax
-execution, worker telemetry collection and the YAML editor are subsequent work.
-Their tables are scaffolding, not an enabled queue or inference service.
+Migration, input preflight and frozen batch preparation are implemented. Native
+MiniMax execution, worker telemetry collection and the YAML editor remain
+subsequent work. Prepared requests are not an enabled inference queue.
 
 ## Inspect and migrate
 
@@ -40,20 +40,28 @@ Use consistent SQLite backups for copying to cloud storage.
 
 - Review starts as an SQLite backup. Existing IDs, tables, relationships, raw
   YAML bytes, reasons, flags, bookmarks and analysis data remain intact.
-- Every original generation job, timing event and naming counter is imported,
-  including withdrawn, planned and interrupted jobs. All original columns are
-  retained in `legacy_generation_jobs`, `legacy_generation_timings` and
-  `legacy_generation_counters`, namespaced by import `source_id`.
+- Withdrawn jobs and legacy jobs without a usable review match are excluded,
+  together with their timing events. A usable association requires an unambiguous
+  filename match without conflicting parameters; incomplete parameter evidence
+  stays labelled. Every column of the retained jobs/events is preserved in
+  `legacy_generation_jobs` and `legacy_generation_timings`. Naming counters remain
+  intact to avoid reusing old output numbers. Import `source_id` namespaces them.
 - Native `generation_runs`, batches and attempts start empty. No import starts
   inference, retries a job, scans audio or moves files.
-- Counts and typed-value SHA-256 fingerprints of all review and legacy tables
-  are reconciled before publication. Integrity and foreign-key checks must pass.
+- Counts and typed-value SHA-256 fingerprints of every review table and all
+  retained legacy rows are reconciled before publication. Integrity and foreign-key checks must pass.
   The result is also stored in `platform_migration_report`.
 - Original Windows paths and timestamp strings remain unchanged. A historical
   path on another computer is not treated as proof that a file is missing.
 - Output associations record filename and parameter evidence. `parameters_match`
   means the filename and all eight recorded parameters agree; it does not prove
-  PCM identity. Incomplete, conflicting and ambiguous candidates remain labelled.
+  PCM identity. Incomplete evidence stays labelled; conflicting and ambiguous
+  candidates are reported and their jobs excluded from the import.
+
+Unmatched review records are retained: 439 lack a legacy filename candidate, and
+160 saved reviews depend on that group. Excluding unlinked runner history does
+not silently erase those ratings. The report records the cleanup policy and
+counts of omitted jobs and timing events. Original source databases are untouched.
 
 The initial importer accepts the current reviewer/bookmark review schema and the
 attached runner's jobs/timings/counters schema. Older review databases should be
@@ -84,7 +92,7 @@ py -3 -m unittest discover -s _98_Database/tests -v
 ```
 
 Tests exercise the existing review schema, review attribution, exact YAML bytes,
-future legacy columns, large seeds, evidence levels, live WAL snapshots, invalid
+future legacy columns, large seeds, evidence levels, cleanup exclusions, live WAL snapshots, invalid
 inputs, source/output protection, separated currencies and null costs.
 
 See [AUDIT.md](AUDIT.md) for results from the supplied populated databases.
