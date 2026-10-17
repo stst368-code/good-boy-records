@@ -223,7 +223,7 @@ class Editor:
                 with zipfile.ZipFile(folder/'before.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
                     for record in records:
                         archive.writestr(record['path'], record['before'])
-                with (folder/'before.zip').open('rb') as backup:
+                with (folder/'before.zip').open('r+b') as backup:
                     os.fsync(backup.fileno())
                 self._journal(folder, journal)
                 for record in records:

@@ -113,6 +113,27 @@ class ServiceTests(unittest.TestCase):
         new_editor.apply(restore['token'])
         self.assertEqual(self.a.read_bytes(), DocumentTests.RAW)
 
+    def test_backup_flush_uses_a_write_capable_descriptor_on_windows(self):
+        import os
+        opened = {}
+        original_open, original_fsync = Path.open, os.fsync
+        def track_open(path, mode='r', *args, **kwargs):
+            handle = original_open(path, mode, *args, **kwargs)
+            if path.name == 'before.zip':
+                opened[handle.fileno()] = (handle, mode)
+            return handle
+        def windows_commit(descriptor):
+            entry = opened.get(descriptor)
+            if entry and not entry[0].closed and not any(flag in entry[1] for flag in ('+', 'w', 'a', 'x')):
+                raise OSError(9, 'Bad file descriptor')
+            return original_fsync(descriptor)
+        preview = self.editor.preview(self.root, ['a.yaml'], self.ops)
+        with patch.object(Path, 'open', track_open), patch('gbr_yaml_editor.service.os.fsync', side_effect=windows_commit):
+            result = self.editor.apply(preview['token'])
+        self.assertEqual(result['saved'], 1)
+        self.assertTrue(any('+' in mode for _, mode in opened.values()))
+        self.assertEqual(self.editor.history()[0]['state'], 'committed')
+
     def test_stale_file_blocks_entire_batch(self):
         p = self.editor.preview(self.root, ['a.yaml', 'b.yaml'], self.ops)
         self.b.write_bytes(b'other: change\n')
