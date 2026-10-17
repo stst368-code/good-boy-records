@@ -1,0 +1,15 @@
+# Native source revision is intentional: stable wheels do not include these verified modular blocks.
+diffusers @ https://github.com/huggingface/diffusers/archive/b800f828f3951c4d206e154411bcbfa693cd322e.zip
+transformers==5.20.1
+accelerate==1.15.0
+huggingface-hub==2.2.0
+safetensors==0.8.0
+numpy==2.3.5
+tokenizers==0.23.3
+regex==2026.9.29
+soundfile==0.13.1
+mutagen==1.47.0
+psutil==7.2.2
+nvidia-ml-py==13.615.71
+PyYAML==6.0.3
+tzdata==2026.5

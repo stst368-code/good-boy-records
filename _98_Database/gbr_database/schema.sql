@@ -87,3 +87,12 @@ CREATE INDEX IF NOT EXISTS idx_runs_catalogue ON generation_runs(song_id,variant
 CREATE INDEX IF NOT EXISTS idx_attempts_run ON generation_attempts(run_id);
 CREATE INDEX IF NOT EXISTS idx_resources_attempt ON generation_resource_measurements(attempt_id);
 CREATE INDEX IF NOT EXISTS idx_legacy_links_review ON legacy_output_links(review_generation_id);
+-- Native execution state is separate from frozen requests and existing review identities.
+CREATE TABLE IF NOT EXISTS generation_execution_state (
+    run_id TEXT PRIMARY KEY REFERENCES generation_runs(id),
+    model_revision TEXT, output_stem TEXT NOT NULL UNIQUE,
+    output_directory TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS generation_output_counters (
+    title_key TEXT PRIMARY KEY, last_value INTEGER NOT NULL
+);

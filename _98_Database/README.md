@@ -2,11 +2,13 @@
 
 This directory owns the shared SQLite database. `_97_App` launches the platform;
 `_03_Review` retains its existing review interface and services. The generation
-controller lives in `_02_Generation`, with execution workers planned in `_99_Tools`.
+controller lives in `_02_Generation`, with native execution workers in `_99_Tools`.
 
-Migration, input preflight and frozen batch preparation are implemented. Native
-MiniMax execution, worker telemetry collection and the YAML editor remain
-subsequent work. Prepared requests are not an enabled inference queue.
+Migration, input preflight, frozen batch preparation, local native MiniMax
+execution and worker telemetry collection are implemented. RunPod transports
+and the YAML editor remain subsequent work. Prepared requests require explicit
+execution; migration never starts inference. The [local hardware test](../_02_Generation/LOCAL_TEST.md)
+uses its own empty platform database and leaves the production migration separate.
 
 ## Inspect and migrate
 
@@ -77,13 +79,19 @@ includes conditioning, sampling and `full_generation_total` records, separating
 worker address, GPU model, stage and currency. Stage durations are not additive
 when spans overlap; successful duration averages exclude failed attempts.
 
-Future records distinguish source documents, batches, runs, attempts, timing
+Native records distinguish source documents, batches, runs, attempts, timing
 spans, artifacts and review links. Worker sessions record a discovered hardware
 snapshot for an address, rather than a manually maintained worker name or model
 list. Resource measurements distinguish PyTorch allocated/reserved peaks from a
 sampled device usage peak, with sampling coverage and execution mode recorded.
 Missing historical hardware, VRAM and prices remain null. No telemetry values
 are inferred from a GPU's advertised capacity.
+
+Platform schema version 2 adds only native execution reservations and output
+counters; existing version 1 databases are upgraded when local execution starts.
+Review tables, IDs and legacy imports are not rewritten. Empty test databases
+are created through the same canonical review schema and verified migration
+path, with empty legacy sources. This bootstrap is not an import of history.
 
 ## Verification
 

@@ -127,7 +127,7 @@ class Indexer:
         if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
             raise ValueError("File is still being written; will retry on next scan")
         title = str(first(meta, "title", "song", "song_title") or re.sub(r"[-_]\d{4,}$", "", path.stem))
-        genre = str(first(meta, "genre", "intended_genre", "cluster") or "Genre unspecified")
+        genre = str(first(meta, "style", "genre", "intended_genre", "cluster") or "Genre unspecified")
         cluster = as_text(meta.get("cluster"))
         song_id = hashlib.sha256(str(first(meta, "song_id", "canonical_song_id") or title.casefold()).encode()).hexdigest()
         generation_id = hashlib.sha256((audio_id + key).encode()).hexdigest()
@@ -165,6 +165,13 @@ class Indexer:
                 c.execute("INSERT INTO generation_sources(generation_id,media_id,yaml_path,original_yaml_path) VALUES(?,?,?,?)",
                           (generation_id, media_id, str(sidecar) if sidecar else None, str(sidecar) if sidecar else None))
             c.execute("DELETE FROM scan_errors WHERE path=?", (str(path),))
+            # Native provenance is joined only by run ID AND the final tagged-file hash.
+            # Standalone review databases do not have platform tables.
+            run_id = meta.get("gbr_run_id")
+            if isinstance(run_id, str) and c.execute("SELECT 1 FROM sqlite_master WHERE name='generation_output_links'").fetchone():
+                artifact = c.execute("SELECT id FROM generation_artifacts WHERE run_id=? AND kind='audio' AND sha256=?", (run_id, file_hash)).fetchone()
+                if artifact:
+                    c.execute("INSERT OR IGNORE INTO generation_output_links VALUES(?,?,?)", (run_id, generation_id, artifact["id"]))
             # A new duplicate of reviewed audio is automatically brought into its existing bucket.
             review = c.execute("SELECT * FROM latest_reviews WHERE audio_id=?", (audio_id,)).fetchone()
             pending = c.execute("SELECT 1 FROM archive_operations WHERE audio_id=? AND status IN ('pending','running','failed')", (audio_id,)).fetchone()
@@ -198,3 +205,4 @@ class Indexer:
     def error(self, path, error):
         self.db.execute("INSERT INTO scan_errors VALUES(?,?,?) ON CONFLICT(path) DO UPDATE SET error=excluded.error,created_at=excluded.created_at",
                         (path, error, now()))
+

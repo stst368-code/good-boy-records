@@ -5,6 +5,11 @@ to `_98_Database/gbr.sqlite3`. It does not yet add generation or bulk YAML scree
 The shared platform belongs here; reusable worker and editing tools belong in
 `_99_Tools`.
 
+The native generation controller is available separately for the
+[first local PC test](../_02_Generation/LOCAL_TEST.md). Successful FLACs carry
+native run provenance and link back to generation telemetry when the existing
+review app indexes them against the same database.
+
 After the verified migration, run `Start-Windows.bat`. It reuses the existing
 review virtual environment and `config.json`, including input/archive paths,
 authentication, TLS, browser opening and logging. Start only after closing the

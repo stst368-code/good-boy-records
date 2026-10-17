@@ -16,12 +16,25 @@ REQUIRED = {"model", "dit", "text_encoder", "encoder_cfg", "top_k", "sampler", "
 
 def execution_options(specification):
     options = specification.get("execution", {})
-    if not isinstance(options, dict) or set(options) - {"encoding_cache", "conditioning", "diffusion"}:
+    if not isinstance(options, dict) or set(options) - {"encoding_cache", "conditioning", "diffusion", "memory_profile", "cuda_device", "vram_sample_interval_ms", "offline"}:
         raise ValueError("execution requires encoding_cache and optional conditioning/diffusion targets")
     cache = options.get("encoding_cache", "prefer")
     if cache not in {"prefer", "require", "disabled"}:
         raise ValueError("encoding_cache must be prefer, require or disabled")
-    result = {"encoding_cache": cache}
+    profile = options.get("memory_profile", "low_vram")
+    device = options.get("cuda_device", 0)
+    interval = options.get("vram_sample_interval_ms", 100)
+    offline = options.get("offline", False)
+    if profile not in {"low_vram", "resident_stage"}:
+        raise ValueError("memory_profile must be low_vram or resident_stage")
+    if type(device) is not int or device < 0:
+        raise ValueError("cuda_device must be a nonnegative integer")
+    if type(interval) is not int or not 50 <= interval <= 5000:
+        raise ValueError("vram_sample_interval_ms must be an integer from 50 to 5000")
+    if type(offline) is not bool:
+        raise ValueError("offline must be true or false")
+    result = {"encoding_cache": cache, "memory_profile": profile, "cuda_device": device,
+              "vram_sample_interval_ms": interval, "offline": offline}
     for stage in ("conditioning", "diffusion"):
         target = options.get(stage, {})
         if not isinstance(target, dict) or set(target) - {"backend", "address"}:
@@ -36,11 +49,14 @@ def execution_options(specification):
 
 
 def resolve(document, specification, template=None, freeze=False):
-    allowed = set(SOURCES) | {"precedence", "field_precedence", "template_id", "parent_review_generation_id", "request_id", "execution"}
+    allowed = set(SOURCES) | {"precedence", "field_precedence", "template_id", "parent_review_generation_id", "request_id", "execution", "model_revision"}
     unknown = set(specification) - allowed
     if unknown or "yaml" in specification or "template" in specification:
         raise ValueError(f"Unsupported parameter specification keys: {sorted(unknown | (set(specification) & {'yaml','template'}))}")
     execution_options(specification)
+    revision = specification.get("model_revision")
+    if revision is not None and (not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision)):
+        raise ValueError("model_revision must be a full 40-character commit SHA")
     sources = {name: specification.get(name, {}) for name in SOURCES}
     if any(not isinstance(value, dict) for value in sources.values()):
         raise ValueError("Parameter sources must be JSON objects")

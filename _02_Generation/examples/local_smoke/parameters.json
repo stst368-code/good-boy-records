@@ -1,0 +1,11 @@
+{
+  "model_revision": "fbdf52fbaaca799592917417eb05f1899f1255ec",
+  "execution": {
+    "encoding_cache": "prefer",
+    "memory_profile": "low_vram",
+    "cuda_device": 0,
+    "vram_sample_interval_ms": 100,
+    "conditioning": {"backend": "local"},
+    "diffusion": {"backend": "local"}
+  }
+}

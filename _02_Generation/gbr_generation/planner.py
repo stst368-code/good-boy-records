@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import secrets
 import sqlite3
+import sys
 import tempfile
 import uuid
 from zoneinfo import ZoneInfo
@@ -16,6 +17,9 @@ from zoneinfo import ZoneInfo
 from .catalogue import Issue, inspect_input
 from .parameters import SEEDS, execution_options, missing_parameters, output_changes, resolve
 from .yaml_document import YamlDocument
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_99_Tools" / "_workers_infdit"))
+from gbr_worker.contract import MODEL as NATIVE_MODEL, validate_job
 
 
 def json_text(value):
@@ -104,6 +108,11 @@ def preflight(inputs, specification, styles=None, template_root=None, require_pa
                     issues.append(Issue("missing_caption", "Provide a caption or select a unique cluster/style template"))
                 if require_parameters and missing_parameters(values):
                     issues.append(Issue("unresolved_parameters", "Choose values for: " + ", ".join(missing_parameters(values))))
+                if values.get("model") == NATIVE_MODEL and not missing_parameters(values) and values.get("caption"):
+                    validate_job({"protocol": 1, "run_id": "preflight", "parameters": values,
+                        "lyrics": document.values.get("lyrics", ""), "execution": execution_options(specification),
+                        "model_revision": specification.get("model_revision")},
+                        allow_unfrozen_seeds=True, require_local=False)
                 document.with_generation_values(output_changes(document, {k: v for k, v in values.items() if v != "auto"}))
             except (ValueError, OSError, UnicodeError) as exc:
                 issues.append(Issue("invalid_request", str(exc)))
@@ -203,6 +212,7 @@ def prepare_batch(checked, specification, workspace, database, *, input_root, er
                     "song_id": record.item.song_id, "variant_id": record.item.variant_id,
                     "title": record.document.values["title"], "effective": effective, "provenance": summary["provenance"],
                     "execution": execution_options(specification),
+                    "model_revision": specification.get("model_revision"),
                     "template": record.template, "parent_review_generation_id": parent, "request_id": request_id})
             rendered = json_text(manifest).encode("utf-8")
             write_new(staging / "manifest.json", rendered)

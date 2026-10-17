@@ -3,8 +3,10 @@
 The controller now selects inputs, validates catalogue identity and YAML syntax,
 resolves parameter provenance, and freezes requests in the shared database.
 It includes exact source snapshots, narrow output patches and successful-output
-timestamp support. Worker dispatch, MiniMax inference, cache compatibility checks,
-GPU discovery/measurement and the generation web interface are not yet enabled.
+timestamps. Local native MiniMax execution, compatible conditioning caches,
+automatic hardware discovery and stage/memory telemetry are implemented.
+Start with [the first local test](LOCAL_TEST.md). RunPod transports and the
+generation web interface remain subsequent work.
 
 ## Run the implemented planner
 
@@ -17,6 +19,7 @@ py -3 _02_Generation/run_generation.py inspect --song moses-supposes --song new-
 py -3 _02_Generation/run_generation.py plan --album "Album name" --order album --parameters my-parameters.json --on-error cancel
 py -3 _02_Generation/run_generation.py plan --all --parameters my-parameters.json --on-error drop
 py -3 _02_Generation/run_generation.py verify _02_Generation/runtime/BATCH_ID/manifest.json
+_99_Tools/_workers_infdit/.venv/Scripts/python.exe _02_Generation/run_generation.py execute _02_Generation/runtime/BATCH_ID/manifest.json --limit 1
 ```
 
 `--song` accepts a song ID (including its variants) or exact filename stem.
@@ -74,9 +77,15 @@ Example override structure (the preset/input must supply the remaining controls)
 
 Cache policies are `prefer`, `require`, and `disabled`. Conditioning and diffusion
 can independently target `local`, `runpod_dedicated`, or `runpod_serverless`, with
-an optional worker address. These choices are frozen requests; this increment
-does not contact workers or validate an existing encoding cache. Model selection
-belongs to the job, not to the worker configuration.
+an optional worker address. These choices are frozen requests. The local
+executor currently accepts local stages with automatically discovered addresses
+only; it refuses RunPod or explicit endpoint targets before starting inference.
+Model selection belongs to the job, not to the worker configuration. Optional
+root `model_revision` pins the native model to a full commit SHA. Otherwise it
+is resolved at job start and retained for retries. Execution options also include
+`memory_profile` (`low_vram` or `resident_stage`), `cuda_device`,
+`vram_sample_interval_ms` (50–5,000), and `offline`. Offline execution requires
+an explicit/resolved revision and already cached native model components.
 
 A caption already in the source YAML is retained. With an empty caption, supply
 a cluster/style pair; exactly one CSV template must match, or select a specific
@@ -113,11 +122,12 @@ The generation path never renames or deletes fields or edits writing originals.
 Bulk source repairs belong to the separate YAML editor.
 
 ```powershell
-py -3 -m unittest discover -s _02_Generation/tests -v
+_99_Tools/_workers_infdit/.venv/Scripts/python.exe -m unittest discover -s _02_Generation/tests -v
 ```
 
 The following sections describe the complete target design, including later
-worker execution and UI work.
+cloud transport and UI work. The supported native controls and current local
+memory/measurement behaviour are documented under `_99_Tools/_workers_infdit`.
 
 ## Import and preflight
 
