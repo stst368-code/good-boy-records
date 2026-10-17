@@ -370,6 +370,18 @@ def create_app(config_path, start_worker=True, database_path=None):
         latest = service.db.one("SELECT id FROM analyses WHERE audio_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (g["id"],))
         return {"state": g["analysis_state"], "analysis_id": latest["id"] if latest else None}
 
+    @app.get("/api/tracks/{gid}/triage")
+    def triage(gid: str):
+        from .triage import technical_triage
+        g = service.db.one("SELECT audio_id FROM generations WHERE id=?", (gid,))
+        if not g:
+            raise KeyError("Recording not found")
+        latest = service.db.one("SELECT id,metrics_json FROM analyses WHERE audio_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (g["audio_id"],))
+        if not latest:
+            return {"analysis_id": None, **technical_triage({})}
+        events = service.db.all("SELECT type,start,end FROM audio_events WHERE analysis_id=? ORDER BY start", (latest["id"],))
+        return {"analysis_id": latest["id"], **technical_triage(json.loads(latest["metrics_json"]), events)}
+
     @app.get("/api/tracks/{gid}/spectrogram")
     def spectrogram(gid: str):
         row = service.db.one("SELECT an.spectrogram_path FROM generations g JOIN analyses an ON an.audio_id=g.audio_id WHERE g.id=? ORDER BY an.created_at DESC,an.rowid DESC LIMIT 1", (gid,))
@@ -568,4 +580,5 @@ def create_app(config_path, start_worker=True, database_path=None):
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app
+
 

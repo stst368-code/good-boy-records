@@ -1,0 +1,81 @@
+"""Shared caption provenance and fresh-device database selection."""
+from contextlib import redirect_stdout
+import csv
+import importlib.util
+import io
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / '_02_Generation'))
+sys.path.insert(0, str(ROOT / '_97_App'))
+from gbr_generation.catalogue import Styles, validate_template_format
+from platform_commands import dispatch
+from first_local_test import test_database
+
+
+class SharedReferenceTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+
+    def catalogue(self, source='custom', template='_custom_templates/demo.txt'):
+        rows = [dict(ID='demo', cluster='Rock', style_primary='Punk', template=template, template_source=source)]
+        with (self.root / 'styles.csv').open('w', newline='', encoding='utf-8-sig') as handle:
+            writer = csv.DictWriter(handle, fieldnames=rows[0])
+            writer.writeheader(); writer.writerows(rows)
+        return Styles(self.root / 'styles.csv')
+
+    def test_custom_row_is_selectable_and_preserves_its_provenance(self):
+        catalogue = self.catalogue()
+        self.assertEqual(catalogue.choose('Rock', 'Punk', 'demo')['template_source'], 'custom')
+
+    def test_origin_and_path_must_agree(self):
+        for source, path in [('custom', '_minimax_templates/demo.txt'), ('unknown', '_custom_templates/demo.txt'),
+                             ('custom', '../_custom_templates/demo.txt'), ('custom', '_custom_templates/demo.yaml')]:
+            with self.subTest(source=source, path=path), self.assertRaises(ValueError):
+                self.catalogue(source, path)
+
+    def test_check_references_reports_missing_templates_and_passes_real_ones(self):
+        self.catalogue()
+        with redirect_stdout(io.StringIO()) as missing:
+            self.assertEqual(dispatch(['check-references', '--root', str(self.root)]), 2)
+        self.assertIn('Template missing', missing.getvalue())
+        (self.root / '_custom_templates').mkdir()
+        (self.root / '_custom_templates/demo.txt').write_text('Global Metadata\nA custom caption\nVocal Details\nArrangement\n')
+        with redirect_stdout(io.StringIO()) as success:
+            self.assertEqual(dispatch(['check-references', '--root', str(self.root)]), 0)
+        self.assertIn('"custom": 1', success.getvalue())
+
+    def test_shared_catalogue_has_one_thousand_originals_without_duplicate_ids(self):
+        catalogue = Styles(ROOT / '_01_Writing/_references/styles.csv')
+        self.assertEqual(len(catalogue.rows), 1000)
+        self.assertEqual({row['template_source'] for row in catalogue.rows}, {'minimax'})
+        self.assertEqual(len(catalogue.by_id), 1000)
+
+    def test_custom_caption_requires_the_shared_heading_format_in_order(self):
+        validate_template_format('Global Metadata\nVocal Details\nArrangement\n', 'custom')
+        for text in ['A free-form caption', 'Arrangement\nVocal Details\nGlobal Metadata\n']:
+            with self.assertRaises(ValueError):
+                validate_template_format(text, 'custom')
+
+    def test_test_runs_use_one_shared_database_and_isolation_is_explicit(self):
+        self.assertEqual(test_database(self.root), ROOT / '_98_Database/gbr.sqlite3')
+        self.assertEqual(test_database(self.root, isolated=True), self.root / 'local-test.sqlite3')
+        self.assertEqual(test_database(self.root, database=self.root / 'chosen.sqlite3'), self.root / 'chosen.sqlite3')
+        with self.assertRaises(ValueError):
+            test_database(self.root, isolated=True, database=self.root / 'chosen.sqlite3')
+
+    def test_setup_help_cannot_start_an_install(self):
+        with redirect_stdout(io.StringIO()), patch('platform_commands.subprocess.call', side_effect=AssertionError('Must not install')):
+            with self.assertRaises(SystemExit) as result:
+                dispatch(['setup-generation', '--help'])
+        self.assertEqual(result.exception.code, 0)
+
+
+if __name__ == '__main__':
+    unittest.main()

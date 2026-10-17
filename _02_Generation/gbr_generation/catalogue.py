@@ -163,6 +163,14 @@ class Styles:
         for row in self.rows:
             if not row["ID"] or row["ID"] in self.by_id:
                 raise ValueError("styles.csv contains a missing or duplicate template ID")
+            source = row.get("template_source")
+            if source is not None:
+                if source not in {"minimax", "custom"}:
+                    raise ValueError(f"{row['ID']}: template_source must be minimax or custom")
+                prefix = "_minimax_templates" if source == "minimax" else "_custom_templates"
+                relative = Path(row["template"].replace("\\", "/"))
+                if relative.is_absolute() or ".." in relative.parts or not relative.parts or relative.parts[0] != prefix or relative.suffix.lower() != ".txt":
+                    raise ValueError(f"{row['ID']}: {source} templates must be .txt files under {prefix}/")
             self.by_id[row["ID"]] = row
 
     def candidates(self, cluster, style):
@@ -176,6 +184,18 @@ class Styles:
         if len(matches) != 1:
             raise ValueError(f"Choose one template ID for ({cluster!r}, {style!r}); candidates: {[r['ID'] for r in matches]}")
         return matches[0]
+
+
+def validate_template_format(caption, source):
+    if source != "custom":
+        return
+    headings = [line.strip().lstrip("#").strip().removesuffix(":").strip() for line in caption.splitlines()]
+    expected = ["Global Metadata", "Vocal Details", "Arrangement"]
+    if any(heading not in headings for heading in expected):
+        raise ValueError("Custom captions require Global Metadata, Vocal Details and Arrangement headings")
+    positions = [headings.index(heading) for heading in expected]
+    if positions != sorted(positions):
+        raise ValueError("Custom caption headings must follow Global Metadata, Vocal Details, Arrangement order")
 
 
 def inspect_input(item):
@@ -205,3 +225,4 @@ def inspect_input(item):
     if values.get("version") not in (None, "") and not values.get("style"):
         issues.append(Issue("legacy_version", "version was preserved and was not interpreted as style", "warning"))
     return document, issues
+

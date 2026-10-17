@@ -25,10 +25,10 @@ Follow these stages in order:
 
 1. Build a private Music Brief from the inputs.
 2. Resolve explicit constraints and section-local directives.
-3. Read [references/genre-router.md](references/genre-router.md).
-4. Read one primary family index and, only when useful, one secondary family index.
+3. Read [genre-router.md](genre-router.md).
+4. Read the relevant rows in [the shared style catalogue](../_references/styles.csv), matching cluster and style_primary. The catalogue replaces the absent family-index files.
 5. Select up to three references with distinct roles.
-6. Read only the complete template files named by those cards, templates are in [references/templates/](references/templates/), stored as .txt files
+6. Read only the complete template files named by those cards, templates are stored as .txt files under [MiniMax templates](../_references/_minimax_templates/) or [custom templates](../_references/_custom_templates/). Resolve each catalogue template path relative to ../_references/; template_source identifies minimax or custom
 7. Design a coherent section-by-section timeline.
 8. Render and validate the new caption.
 
@@ -79,7 +79,7 @@ Read the genre router first. Choose:
 
 Use genre, groove, instrumentation, and cultural context as stronger routing signals than generic adjectives such as `emotional`, `epic`, `dark`, or `modern`.
 
-Read only the family indexes selected by the router. Do not inspect every family index, reconstruct a global catalog, or scan every template filename.
+Filter the shared CSV by the selected cluster/style family, then read only the chosen complete template files. Do not scan every template file. Treat template_source as provenance; an explicit user choice takes precedence.
 
 ## Select References
 
@@ -176,10 +176,10 @@ Revise once when any check fails, then return only the corrected result.
 
 Keep the library entirely text-based. When adding a template:
 
-1. Add one complete Caption file under `templates/`.
-2. Add one compact card to exactly one family index linked from the genre router.
-3. Record compatible secondary families in that card instead of duplicating it.
-4. Confirm that the card ID matches the template filename and that its path exists.
-5. Update the family count in that index.
+1. Add one complete caption file under `../_references/_custom_templates/`, following the existing Global Metadata, Vocal Details and Arrangement format.
+2. Add one row to `../_references/styles.csv` with a globally unique ID, cluster, style_primary, template_source=custom and template=_custom_templates/FILENAME.txt. Keep the remaining catalogue columns in the same format.
+3. Keep MiniMax-provided captions under `_minimax_templates/` with template_source=minimax.
+4. Confirm the ID, source and relative template path agree. Several rows may share a cluster/style pair; choose a specific ID when needed.
 
 Do not add scripts, generated catalogs, embeddings, vector stores, databases, or external service configuration.
+

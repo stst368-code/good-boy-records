@@ -1,4 +1,4 @@
-"""Prepare and run one real native GPU test, using an isolated empty test database."""
+"""Prepare one native GPU test in the shared database; isolation is explicit."""
 import argparse
 import json
 from pathlib import Path
@@ -13,15 +13,24 @@ from gbr_generation.executor import WORKER, default_python, execute
 from gbr_generation.planner import json_text, preflight, prepare_batch
 
 
+def test_database(runtime, *, database=None, isolated=False):
+    if database is not None and isolated:
+        raise ValueError("Choose --database or --isolated, not both")
+    return Path(database or (runtime / "local-test.sqlite3" if isolated else ROOT / "_98_Database" / "gbr.sqlite3")).resolve()
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepare-only", action="store_true", help="Create an inspectable test plan without invoking CUDA")
     parser.add_argument("--retry", action="store_true", help="Reuse the latest frozen test with the same seeds")
     parser.add_argument("--worker-python", type=Path, default=default_python())
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--database", type=Path, help="Use an existing shared database; default: _98_Database/gbr.sqlite3")
+    group.add_argument("--isolated", action="store_true", help="Explicitly use one separate local-test.sqlite3 for diagnostics")
     args = parser.parse_args(argv)
     runtime = ROOT / "_02_Generation" / "runtime" / "local_test"
     runtime.mkdir(parents=True, exist_ok=True)
-    database = runtime / "local-test.sqlite3"
+    database = test_database(runtime, database=args.database, isolated=args.isolated)
     latest = runtime / "latest.json"
     if not args.prepare_only:
         # Doctor does not download model weights. Show GPU and RAM before the real run.
@@ -48,3 +57,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

@@ -24,9 +24,9 @@ def main(argv=None):
         p.add_argument("--file", action="append", default=[])
         p.add_argument("--order", choices=("selection", "filename", "album"), default="selection")
         p.add_argument("--parameters", type=Path, help="JSON source values, overrides and precedence policy")
-        p.add_argument("--styles", type=Path, default=ROOT / "_01_Writing" / "_Caption_Rewriter" / "styles.csv")
+        p.add_argument("--styles", type=Path, default=ROOT / "_01_Writing" / "_references" / "styles.csv")
         p.add_argument("--styles-encoding", default="utf-8-sig")
-        p.add_argument("--template-root", type=Path, default=ROOT / "_01_Writing" / "_Caption_Rewriter" / "references")
+        p.add_argument("--template-root", type=Path, default=ROOT / "_01_Writing" / "_references")
         p.add_argument("--database", type=Path, default=ROOT / "_98_Database" / "gbr.sqlite3")
         p.add_argument("--below-rating", type=float, help="Include only tracks with mean latest rating at or below this value")
         p.add_argument("--reviewer", help="Reviewer ID; default includes all reviewers")
@@ -121,3 +121,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
+

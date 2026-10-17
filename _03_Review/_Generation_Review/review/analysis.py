@@ -9,9 +9,10 @@ import soundfile as sf
 from scipy.signal import lfilter, resample_poly
 from PIL import Image
 from .transitions import structural_transitions
+from .triage import technical_triage
 from .util import atomic_text, dumps, now
 
-VERSION = "gbr-signal-1.1.0"
+VERSION = "gbr-signal-1.2.0"
 EPS = 1e-12
 
 
@@ -301,6 +302,7 @@ class Analyzer:
         return self.store(audio_id, metrics, events, preview, previous["preview_path"], previous["spectrogram_path"])
 
     def store(self, audio_id, metrics, events, preview, preview_path, spectrogram_path):
+        metrics = {**metrics, "technical_triage": technical_triage(metrics, events)}
         analysis_id = uuid.uuid4().hex
         with self.db.transaction() as c:
             c.execute("INSERT INTO analyses VALUES(?,?,?,?,?,?,?)", (analysis_id, audio_id, VERSION, now(), dumps(metrics), str(preview_path), str(spectrogram_path)))
@@ -311,3 +313,4 @@ class Analyzer:
                     c.execute("INSERT INTO segments VALUES(?,?,?,?,?,?,?,?)", (uuid.uuid4().hex, analysis_id, audio_id, mode, i, segment["start"], segment["end"], dumps({"reason": segment["reason"], "target_seconds": self.config.values[mode + "_seconds"]})))
             c.execute("UPDATE audio SET analysis_state='ready' WHERE id=?", (audio_id,))
         return analysis_id
+

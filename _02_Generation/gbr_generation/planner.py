@@ -14,7 +14,7 @@ import tempfile
 import uuid
 from zoneinfo import ZoneInfo
 
-from .catalogue import Issue, inspect_input
+from .catalogue import Issue, inspect_input, validate_template_format
 from .parameters import SEEDS, execution_options, missing_parameters, output_changes, resolve
 from .yaml_document import YamlDocument
 
@@ -98,7 +98,9 @@ def preflight(inputs, specification, styles=None, template_root=None, require_pa
                     caption = raw.decode("utf-8-sig").replace("\r\n", "\n")
                     if not caption.strip():
                         raise ValueError("The selected caption template is empty")
-                    template = {"id": row["ID"], "sha256": sha(raw), "path": str(path)}
+                    validate_template_format(caption, row.get("template_source"))
+                    template = {"id": row["ID"], "sha256": sha(raw), "path": str(path),
+                                "source": row.get("template_source")}
                     values, provenance = resolve(document, specification, {
                         "cluster": row["cluster"], "style": row["style_primary"], "caption": caption})
                     # A source caption winning precedence was not produced by this template.
@@ -281,3 +283,4 @@ def write_completed_yaml(source_raw, actual_values, destination, *, succeeded, c
     result = document.with_generation_values(changes)
     publish_new_file(destination, result)
     return sha(result)
+

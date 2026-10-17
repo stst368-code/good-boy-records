@@ -222,3 +222,5 @@ _Reviewed/
 !/_02_Generation/tests/
 !/_02_Generation/tests/test_*.py
 /_99_Tools/_workers_infdit/runtime/
+!/_03_Review/_Generation_Review/tests/
+!/_03_Review/_Generation_Review/tests/test_*.py

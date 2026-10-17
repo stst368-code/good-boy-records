@@ -19,7 +19,16 @@ def validate_database(path):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+    from platform_commands import COMMANDS, dispatch
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in COMMANDS:
+        try:
+            return dispatch(argv)
+        except (OSError, ValueError, sqlite3.Error) as exc:
+            raise SystemExit(str(exc)) from exc
+    parser = argparse.ArgumentParser(description=__doc__, epilog=(
+        "Device commands: setup-generation, doctor-generation, test-generation, init-db, migrate, check-references. "
+        "Use COMMAND --help for options. init-db creates an empty DB; migrate imports existing history."))
     parser.add_argument("--config", type=Path, default=REVIEW_ROOT / "config.json")
     parser.add_argument("--database", type=Path, default=ROOT / "_98_Database" / "gbr.sqlite3")
     parser.add_argument("--open", action="store_true")
@@ -39,4 +48,5 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
+
