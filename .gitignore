@@ -188,9 +188,14 @@ cython_debug/
 # Misc
 *.exe
 /_99_Tools/_llama_cpp/
-/_01_Writing/_Caption_Rewriter/references/templates/*.txt
+#/_01_Writing/_Caption_Rewriter/references/templates/*.txt
 *test/
 *tests/
+*.lock
+*config.json
+*code.txt
+/_03_Review/_Generation_Review/config.json
+/_03_Review/_Generation_Review/data/
 
 # Database/Archive
 
