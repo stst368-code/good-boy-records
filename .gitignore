@@ -187,15 +187,15 @@ cython_debug/
 
 # Misc
 *.exe
-/_99_Tools/_llama_cpp/
-#/_01_Writing/_Caption_Rewriter/references/templates/*.txt
+/_99_tools/_llama_cpp/
+#/_01_writing/_caption_rewriter/references/templates/*.txt
 *test/
 *tests/
 *.lock
 *config.json
 *code.txt
-/_03_Review/_Generation_Review/config.json
-/_03_Review/_Generation_Review/data/
+/_03_review/_generation_review/config.json
+/_03_review/_generation_review/_data/
 
 # Database/Archive
 
@@ -211,21 +211,21 @@ cache/
 _Reviewed/
 
 # Shared platform runtime and database snapshots
-/_97_App/runtime/
-/_98_Database/*.sqlite*
-/_98_Database/*.db
-/_98_Database/backups/
-/_98_Database/gbr-migration-*/
-!/_98_Database/tests/
-!/_98_Database/tests/test_*.py
-/_02_Generation/runtime/
-/_02_Generation/generated/
-!/_02_Generation/tests/
-!/_02_Generation/tests/test_*.py
-/_99_Tools/_workers_infdit/runtime/
-!/_03_Review/_Generation_Review/tests/
-!/_03_Review/_Generation_Review/tests/test_*.py
-!/_03_Review/_Generation_Review/tests/ui_*.py
-!/_03_Review/_Generation_Review/tests/conftest.py
-!/_99_Tools/_YAML_Editor/tests/
-!/_99_Tools/_YAML_Editor/tests/test_*.py
+/_97_app/_runtime/
+/_98_database/*.sqlite*
+/_98_database/*.db
+/_98_database/backups/
+/_98_database/gbr-migration-*/
+!/_98_database/_tests/
+!/_98_database/_tests/test_*.py
+/_02_generation/_runtime/
+/_02_generation/_generated/
+!/_02_generation/_tests/
+!/_02_generation/_tests/test_*.py
+/_99_tools/_workers_infdit/runtime/
+!/_03_review/_generation_review/_tests/
+!/_03_review/_generation_review/_tests/test_*.py
+!/_03_review/_generation_review/_tests/ui_*.py
+!/_03_review/_generation_review/_tests/conftest.py
+!/_99_tools/_yaml_editor/_tests/
+!/_99_tools/_yaml_editor/_tests/test_*.py
