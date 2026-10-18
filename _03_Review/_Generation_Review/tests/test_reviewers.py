@@ -7,9 +7,9 @@ import threading
 from fastapi.testclient import TestClient
 import pytest
 
-from gbr_review.app import create_app
-from gbr_review.db import Database, SCHEMA
-from gbr_review.exports import dataset
+from review.app import create_app
+from review.db import Database, SCHEMA
+from review.exports import dataset
 from conftest import track
 
 WRITE = {"X-GBR-Request": "1"}
@@ -319,7 +319,7 @@ def test_legacy_migration_is_backed_up_transactional_and_preserves_data(tmp_path
 
 
 def test_migration_failure_rolls_back_every_attribution_change(tmp_path, monkeypatch):
-    import gbr_review.db as module
+    import review.db as module
     path=tmp_path/'review.sqlite'; before=make_legacy(path)
     monkeypatch.setattr(module,'ANALYTICS_SQL','INVALID SQL')
     with pytest.raises(sqlite3.OperationalError):Database(path)

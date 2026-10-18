@@ -187,6 +187,8 @@ class Indexer:
                 self.error(str(root), "Input directory unavailable")
                 continue
             for path in root.rglob("*"):
+                if any(part.startswith('.gbr-') for part in path.relative_to(root).parts):
+                    continue
                 if path.suffix.lower() != ".flac" or not path.is_file() or path.is_symlink():
                     continue
                 resolved = path.resolve()
@@ -205,4 +207,5 @@ class Indexer:
     def error(self, path, error):
         self.db.execute("INSERT INTO scan_errors VALUES(?,?,?) ON CONFLICT(path) DO UPDATE SET error=excluded.error,created_at=excluded.created_at",
                         (path, error, now()))
+
 

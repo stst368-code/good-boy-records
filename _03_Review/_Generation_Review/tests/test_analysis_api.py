@@ -5,10 +5,10 @@ import pytest
 import soundfile as sf
 import pyloudnorm as pyln
 from fastapi.testclient import TestClient
-from gbr_review.app import create_app
-from gbr_review.config import password_hash
-from gbr_review.analysis import measure,select_segments
-from gbr_review.exports import dataset,publishing_manifest,validation
+from review.app import create_app
+from review.config import password_hash
+from review.analysis import measure,select_segments
+from review.exports import dataset,publishing_manifest,validation
 from conftest import track,complete,archive_all
 
 
@@ -94,7 +94,7 @@ def test_api_no_bias_data_and_range_requests(client):
     assert back['scores']['realism']==5 and 'average' not in back
     analysis=s.db.one('SELECT * FROM analyses WHERE audio_id=?',(aid,))
     Path(analysis['preview_path']).unlink()
-    assert c.get(f'/api/tracks/{gid}/preview').json()=={'ready':False}
+    assert c.get(f'/api/tracks/{gid}/preview').json()['ready'] is False
     assert s.db.one('SELECT analysis_state FROM audio WHERE id=?',(aid,))['analysis_state']=='pending'
 
 

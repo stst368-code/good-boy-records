@@ -18,9 +18,26 @@ def validate_database(path):
     return path
 
 
+def prepare_configuration(root, path):
+    from review.config import Config
+    config = Config(path)
+    generated = (Path(root) / '_02_Generation/generated').resolve()
+    generated.mkdir(parents=True, exist_ok=True)
+    if generated not in config.inputs:
+        config.values['input_directories'].append(str(generated))
+        config.validate()
+        config.save()
+    return config
+
+
 def main(argv=None):
     from platform_commands import COMMANDS, dispatch
     argv = list(sys.argv[1:] if argv is None else argv)
+    if (not argv or argv[0] not in COMMANDS or argv[0] == 'test-generation') and '--help' not in argv and '-h' not in argv:
+        from dependencies import bootstrap
+        delegated = bootstrap(ROOT, argv)
+        if delegated is not None:
+            return delegated
     if argv and argv[0] in COMMANDS:
         try:
             return dispatch(argv)
@@ -33,13 +50,12 @@ def main(argv=None):
     parser.add_argument("--database", type=Path, default=ROOT / "_98_Database" / "gbr.sqlite3")
     parser.add_argument("--open", action="store_true")
     args = parser.parse_args(argv)
+    sys.path.insert(0, str(REVIEW_ROOT))
     try:
         database = validate_database(args.database)
-        if not args.config.is_file():
-            raise ValueError("Review configuration was not found. Run the existing review setup first, or pass --config.")
+        prepare_configuration(ROOT, args.config)
     except (OSError, ValueError, sqlite3.Error) as exc:
-        parser.exit(1, f"Cannot start GBR: {exc}\nRun _98_Database/migrate_databases.py before shared-platform startup.\n")
-    sys.path.insert(0, str(REVIEW_ROOT))
+        parser.exit(1, f"Cannot start GBR: {exc}\nFor a new installation use run_gbr.py init-db; to import existing history use run_gbr.py migrate --help.\n")
     from review.__main__ import main as review_main
     arguments = ["--config", str(args.config.resolve()), "--database", str(database), "serve"]
     if args.open:

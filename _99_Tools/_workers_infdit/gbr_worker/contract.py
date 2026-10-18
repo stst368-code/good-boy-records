@@ -31,7 +31,7 @@ def ssh_endpoint(address):
 
 
 def execution_target(execution):
-    """The first remote adapter runs both GPU stages together on one dedicated pod."""
+    """Conditioning and diffusion share one local GPU, dedicated pod or serverless endpoint."""
     targets = [execution[stage] for stage in ("conditioning", "diffusion")]
     if all(t["backend"] == "local" and not t.get("address") for t in targets):
         return "local", None
@@ -40,7 +40,12 @@ def execution_target(execution):
         address = targets[0].get("address")
         ssh_endpoint(address)
         return "runpod_dedicated", address
-    raise ValueError("RunPod transport requires both stages on the same dedicated SSH address; split/serverless execution is not installed")
+    if all(t['backend'] == 'runpod_serverless' for t in targets) and targets[0].get('address') == targets[1].get('address'):
+        address = targets[0].get('address')
+        if not isinstance(address, str) or not re.fullmatch(r'[A-Za-z0-9_-]{3,100}', address):
+            raise ValueError('RunPod Serverless requires an endpoint ID, without API keys or query parameters')
+        return 'runpod_serverless', address
+    raise ValueError("RunPod transport requires both stages on the same dedicated SSH address or serverless endpoint; split execution is not installed")
 
 
 def canonical(value):

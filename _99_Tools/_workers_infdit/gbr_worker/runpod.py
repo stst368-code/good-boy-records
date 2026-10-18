@@ -50,7 +50,17 @@ for name in ("python3.12","python3.11","python3"):
         break
 if python is None: raise RuntimeError("Choose a pod template with Python 3.11 or 3.12 installed")
 env=dict(os.environ,HF_HOME=str(root/"runtime"/"huggingface"))
-subprocess.run([python,str(release/"install_worker.py"),"--environment",str(root/".venv"),"--runtime",str(root/"runtime")],env=env,stdout=sys.stderr,check=True)
+profile=hashlib.sha256((files["requirements.txt"]+"torch==2.10.0+cu128").encode()).hexdigest()
+marker=root/"runtime"/"dependency-profile.sha256"
+installed=root/".venv"/"bin"/"python"
+reuse=installed.is_file() and marker.is_file() and marker.read_text().strip()==profile
+if reuse:
+    reuse=subprocess.call([str(installed),str(release/"worker.py"),"doctor"],env=env,stdout=sys.stderr,stderr=sys.stderr)==0
+if not reuse:
+    subprocess.run([python,str(release/"install_worker.py"),"--environment",str(root/".venv"),"--runtime",str(root/"runtime")],env=env,stdout=sys.stderr,check=True)
+    marker.parent.mkdir(parents=True,exist_ok=True)
+    marker.write_text(profile)
+else: print("Existing worker dependencies and GPU check passed; reusing environment.",file=sys.stderr)
 print(json.dumps({"release":digest,"remote_root":str(root)}))
 '''
 
@@ -98,6 +108,8 @@ class RunpodClient:
         if result.returncode:
             message = (result.stderr or b"").decode("utf-8", errors="replace")[-8000:]
             if result.returncode == 255:
+                if 'Permission denied' in message:
+                    raise RemotePending('SSH authentication failed. Select the private key registered with RunPod; encrypted keys also need an unlocked SSH agent.')
                 raise RemotePending("SSH connection failed; the pod may still be running. " + message)
             raise RuntimeError(f"RunPod worker command failed (exit {result.returncode}): " + (message or "see installer output above"))
         if output is None:
@@ -109,10 +121,22 @@ class RunpodClient:
     def rpc(self, operation, body=None, **kwargs):
         return self.invoke(["python3", f"{REMOTE_ROOT}/releases/{self.release}/pod_agent.py", operation], body or {}, **kwargs)
 
+    def check_connection(self):
+        # Works on a fresh pod without loading CUDA or requiring our worker release.
+        script = ('import json,pathlib,platform,shutil\n'
+            + f'root=pathlib.Path({REMOTE_ROOT!r})\n'
+            + f'release=root/"releases"/{self.release!r}\n'
+            + 'ready=(root/".venv/bin/python").is_file() and (release/"worker.py").is_file()\n'
+            + 'print(json.dumps({"connected":True,"python":platform.python_version(),"worker_installed":ready,'
+              '"message":"SSH connected. Worker is installed." if ready else '
+              '"SSH connected. Generate with automatic setup enabled to prepare this worker."}))\n')
+        return self.invoke(['python3', '-c', script], {}, timeout=30)
+
     def setup(self):
         bundle = source_bundle()
         if bundle["release"] != self.release:
             raise ValueError("Cannot install an older worker release from this checkout")
+        self.check_connection()
         self.invoke(["python3", "-c", BOOTSTRAP], bundle, timeout=3600, progress=True)
         return self.rpc("doctor")
 
@@ -138,6 +162,13 @@ class RunpodClient:
         code = json.loads((directory / "exit.json").read_text())["returncode"]
         if not (directory / "result.json").is_file():
             raise RuntimeError(f"Remote worker exited {code} without a result; see {directory / 'stderr.log'}")
+        (directory / 'remote-output.json').write_text(canonical(outputs), encoding='utf-8')
+
+    def acknowledge(self, job, directory):
+        outputs = json.loads((directory / 'remote-output.json').read_text())
+        self.rpc('acknowledge', {'attempt_id': job['attempt_id'],
+                                'audio_sha256': outputs.get('audio.flac', {}).get('sha256'),
+                                'result_sha256': outputs['result.json']['sha256']})
 
     def run(self, job, directory, *, resume=False, poll_seconds=10):
         backend, address = execution_target(job["execution"])

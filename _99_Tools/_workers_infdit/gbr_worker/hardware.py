@@ -53,13 +53,15 @@ def discover(torch, device):
     gpu_uuid = str(getattr(props, "uuid", "")) or None
     memory = psutil.virtual_memory()
     pod = os.environ.get("RUNPOD_POD_ID") or None
+    serverless = os.environ.get('GBR_SERVERLESS_WORKER') == '1'
     identity = gpu_uuid or 'cuda-' + str(device.index)
     # Deliberately allowlist runtime metadata: never record the pod-scoped API key or keys.
     provider_details = {key: os.environ.get(key) or None for key in
                         ("RUNPOD_DC_ID", "RUNPOD_POD_HOSTNAME", "RUNPOD_GPU_COUNT", "RUNPOD_CPU_COUNT",
                          "RUNPOD_PUBLIC_IP", "RUNPOD_TCP_PORT_22", "RUNPOD_VOLUME_ID")} if pod else {}
-    return {"address": f"runpod://{pod}/{identity}" if pod else f"local://{socket.gethostname()}/{identity}",
-            "provider": "runpod" if pod else "local", "provider_instance_id": pod,
+    address = f"runpod-serverless://{os.environ.get('GBR_ENDPOINT_ID', 'unknown')}/{pod or socket.gethostname()}/{identity}" if serverless else f"runpod://{pod}/{identity}" if pod else f"local://{socket.gethostname()}/{identity}"
+    return {"address": address, 'execution_mode': 'runpod_serverless' if serverless else 'runpod_dedicated' if pod else 'local',
+            "provider": "runpod" if pod or serverless else "local", "provider_instance_id": pod,
             "provider_details": provider_details, "gpu_uuid": gpu_uuid,
             "gpu_name": props.name, "usable_vram_bytes": total, "free_vram_bytes_at_start": free,
             "compute_capability": [props.major, props.minor], "cuda_device": device.index,

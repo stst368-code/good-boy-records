@@ -1,8 +1,9 @@
 import {initYamlEditor} from "/tools/yaml-editor/editor.js";
+import {initGeneration} from "/tools/generation/generation.js";
 const $=id=>document.getElementById(id);
 const audio=$('audio'), canvas=$('waveform');
 const DIMENSIONS=['audio_quality','composition','consistency','realism'];
-const state={track:null,preview:null,scores:{},view:'review',mode:'quick',context:null,format:localStorage.getItem('gbr-format')||'flac',durations:{fast:10,quick:20,standard:50},ratingIndex:0,lastSampleMode:'quick',waitForRetune:false,analysisIds:new Set(),submitting:false,advancePending:false,autoSubmit:localStorage.getItem('gbr-auto-submit')!=='false',saveError:false,flagSaving:false,flagError:false,flags:null,flagWrite:Promise.resolve(),submissionId:'',reservationLost:false,reviewerId:localStorage.getItem('gbr-reviewer-id')||'',reviewer:null,selection:null,selecting:false,canBack:false,canConfigure:false,listened:new Set(),heard:0,fullCompleted:false,fullIntervals:[],lastTime:0,comparison:null,candidates:[],chosen:[],offset:0,queue:{order:'random',direction:'asc',song:'',genre:'',directory:''}};
+const state={track:null,preview:null,scores:{},view:'review',mode:'quick',context:null,format:localStorage.getItem('gbr-format')||'flac',durations:{fast:10,quick:20,standard:50},ratingIndex:0,lastSampleMode:'quick',waitForRetune:false,analysisIds:new Set(),submitting:false,advancePending:false,autoSubmit:localStorage.getItem('gbr-auto-submit')!=='false',saveError:false,flagSaving:false,flagError:false,flags:null,draftFlags:{distribution:false,bookmarked:false,rejected:false},flagWrite:Promise.resolve(),submissionId:'',reservationLost:false,reviewerId:localStorage.getItem('gbr-reviewer-id')||'',reviewer:null,selection:null,selecting:false,canBack:false,canConfigure:false,listened:new Set(),heard:0,fullCompleted:false,fullIntervals:[],lastTime:0,comparison:null,candidates:[],chosen:[],offset:0,queue:{order:'random',direction:'asc',song:'',genre:'',directory:''}};
 let toastTimer, loadSequence=0, prefetchTimer, heartbeatTimer, reviewerChanging=false;
 const fmt=t=>{t=Math.max(0,Number(t)||0);return `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;};
 function toast(message){$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,5500);}
@@ -30,7 +31,7 @@ function ratingButtons(){
 }
 function paintRatings(){
   $('changeUser').disabled=state.submitting||state.advancePending||state.flagSaving;
-  $('back').disabled=!state.canBack||state.submitting||state.advancePending;$('skip').disabled=!state.track||state.submitting||state.advancePending||state.reservationLost;$('queueButton').disabled=state.submitting||state.advancePending;$('selectionTab').disabled=state.submitting||state.advancePending;$('yamlTab').disabled=state.submitting||state.advancePending;
+  $('back').disabled=!state.canBack||state.submitting||state.advancePending;$('skip').disabled=!state.track||state.submitting||state.advancePending||state.reservationLost;$('queueButton').disabled=state.submitting||state.advancePending;$('selectionTab').disabled=state.submitting||state.advancePending;$('yamlTab').disabled=state.submitting||state.advancePending;$('generationTab').disabled=state.submitting||state.advancePending;
   const complete=DIMENSIONS.every(d=>state.scores[d]!==undefined);$('submitReview').hidden=state.autoSubmit||state.selectionListen||!state.track;$('submitReview').disabled=!complete||state.submitting||state.advancePending||state.reservationLost||state.flagSaving;$('retryReview').hidden=!state.autoSubmit||!state.saveError||state.reservationLost||state.advancePending;$('retryReview').disabled=state.submitting;$('reason').disabled=state.submitting||state.advancePending;$('autoSubmit').disabled=state.submitting||state.advancePending;paintFlags();
   const missing=DIMENSIONS.findIndex(d=>state.scores[d]===undefined);if(missing>=0&&state.scores[DIMENSIONS[state.ratingIndex]]!==undefined)state.ratingIndex=missing;
   document.querySelectorAll('.rating').forEach((row,i)=>row.classList.toggle('keyboard-active',i===state.ratingIndex));
@@ -42,7 +43,7 @@ async function submitReview(){
   try{
     const modes=[...state.listened];const mode=modes.length>1?'mixed':modes[0]||state.track.previous_mode||state.mode;
     await state.flagWrite.catch(()=>{});
-    await api(`/tracks/${gid}/review`,{...state.scores,mode,reason:$('reason').value,distribution:$('distributionFlag').checked,bookmarked:$('bookmarkFlag').checked,expected_publishing_status:state.flags?.publishing_status||'not_selected',submission_id:state.submissionId,expected_review_id:state.track.review_id||null,reassessment:Boolean(state.track.reassessment),listening:{modes_played:modes,played_seconds:Math.round(state.heard*10)/10,complete_full_playback:state.fullCompleted,analysis_id:state.context?.analysis_id||state.preview?.analysis_id||null,analyses_played:[...state.analysisIds],selected_range:state.selection,playback_speed:audio.playbackRate}});
+    await api(`/tracks/${gid}/review`,{...state.scores,mode,reason:$('reason').value,distribution:state.draftFlags.distribution,bookmarked:state.draftFlags.bookmarked,rejected:Boolean(state.draftFlags.rejected),expected_publishing_status:state.flags?.publishing_status||'not_selected',submission_id:state.submissionId,expected_review_id:state.track.review_id||null,reassessment:Boolean(state.track.reassessment),listening:{modes_played:modes,played_seconds:Math.round(state.heard*10)/10,complete_full_playback:state.fullCompleted,analysis_id:state.context?.analysis_id||state.preview?.analysis_id||null,analyses_played:[...state.analysisIds],selected_range:state.selection,playback_speed:audio.playbackRate}});
     saved=true;audio.pause();$('reviewMessage').textContent='Saved';await nextTrack(true);state.submitting=false;paintRatings();
   }catch(error){state.submitting=false;state.advancePending=saved;state.saveError=!saved;if(error.code==='flags_changed')$('refreshFlags').hidden=false;if(error.code==='submission_saved'){state.canBack=true;$('back').disabled=false;state.saveError=false;}if(['reservation_lost','already_reviewed','other_reviewer'].includes(error.code))loseReservation(error.message);paintRatings();$('reviewMessage').textContent=saved?'Review saved. Retrying the next track…':state.reservationLost?error.message:`Not saved: ${error.message} Your entries are retained. ${error.code==='flags_changed'?'Refresh flags, then retry.':error.code==='submission_saved'?'Use Back to open the saved review.':'Retry save or choose a rating again.'}`;if(saved)throw new Error('Review saved; retrying the next track.');throw error;}
 }
@@ -55,14 +56,14 @@ function prepareNext(){
 }
 async function nextTrack(advance=false){
   const previousMode=preferredMode(),reviewerId=state.reviewerId;
-  const n=await api('/queue/next?include_preview=true');if(reviewerId!==state.reviewerId)return;state.emptyReason=n.reason;state.canBack=n.can_back;$('returnSkipped').hidden=!n.has_skips;
+  const n=await api('/queue/next?include_preview=true');if(reviewerId!==state.reviewerId)return;paintCounts(n.counts);state.emptyReason=n.reason;state.canBack=n.can_back;$('returnSkipped').hidden=!n.has_skips;
   await loadTrack(n.track,false,n.preview,advance?previousMode:preferredMode());
   if(advance&&$('autoplayNext').checked&&state.track&&!state.track.correction){try{await audio.play();}catch{toast('Tap Play to continue — the browser blocked automatic playback.');}}
 }
 async function loadTrack(track,selectionListen=false,initialPreview=null,wantedMode=preferredMode()){
   renderTechnicalChecks(null);
   const sequence=++loadSequence;clearTimeout(prefetchTimer);audio.pause();audio.removeAttribute('src');audio.load();
-  state.track=track;state.saveError=false;state.submissionId=newSubmissionId();state.flagSaving=false;state.flagError=false;state.flagWrite=Promise.resolve();state.flags=track?.flags||{distribution:false,bookmarked:false,publishing_status:'not_selected'};$('reason').value=track?.reason||'';$('reasonWrap').hidden=selectionListen;$('viewReviews').hidden=!(selectionListen||track?.correction);$('autoSubmitLabel').hidden=selectionListen;$('flagMessage').textContent='';$('retryFlags').hidden=true;$('refreshFlags').hidden=true;$('distributionFlag').checked=state.flags.distribution;$('bookmarkFlag').checked=state.flags.bookmarked;state.preview=null;state.scores=track?.scores?{...track.scores}:{};state.advancePending=false;state.reservationLost=false;$('resumeQueue').hidden=true;state.selection=null;state.selecting=false;state.context=null;state.ratingIndex=0;state.analysisIds=new Set();state.listened=new Set();state.heard=0;state.fullCompleted=false;state.fullIntervals=[];state.lastTime=0;state.selectionListen=selectionListen;
+  state.track=track;state.saveError=false;state.submissionId=newSubmissionId();state.flagSaving=false;state.flagError=false;state.flagWrite=Promise.resolve();state.flags=track?.flags||{distribution:false,bookmarked:false,publishing_status:'not_selected'};state.draftFlags={...state.flags};$('reason').value=track?.reason||'';$('reasonWrap').hidden=selectionListen;$('viewReviews').hidden=!(selectionListen||track?.correction);$('autoSubmitLabel').hidden=selectionListen;$('flagMessage').textContent='';$('retryFlags').hidden=true;$('refreshFlags').hidden=true;state.draftFlags.distribution=state.flags.distribution;state.draftFlags.bookmarked=state.flags.bookmarked;state.preview=null;state.scores=track?.scores?{...track.scores}:{};state.advancePending=false;state.reservationLost=false;$('resumeQueue').hidden=true;state.selection=null;state.selecting=false;state.context=null;state.ratingIndex=0;state.analysisIds=new Set();state.listened=new Set();state.heard=0;state.fullCompleted=false;state.fullIntervals=[];state.lastTime=0;state.selectionListen=selectionListen;
   $('playRange').hidden=true;$('selectRange').textContent='Select range';canvas.classList.remove('selecting');$('spectralWrap').hidden=true;$('spectralToggle').setAttribute('aria-expanded','false');
   $('reviewCard').hidden=!track;$('empty').hidden=Boolean(track);$('ratings').hidden=selectionListen;$('skip').disabled=!track;$('back').disabled=!state.canBack;
   $('skip').textContent=track?.correction?'Return →':'Skip →';$('correctionBadge').hidden=!track?.correction;paintRatings();$('reviewMessage').textContent=track?.correction?'Change a rating to save a correction.':'';
@@ -190,10 +191,12 @@ function mediaSession(){
   const actions={play:()=>audio.play(),pause:()=>audio.pause(),stop:()=>{audio.pause();audio.currentTime=0;},seekbackward:details=>audio.currentTime=Math.max(0,audio.currentTime-(details.seekOffset||10)),seekforward:details=>audio.currentTime=Math.min(audio.duration||0,audio.currentTime+(details.seekOffset||10)),seekto:details=>audio.currentTime=details.seekTime,nexttrack:()=>audio.currentTime=Math.min(audio.duration||0,audio.currentTime+10),previoustrack:()=>audio.currentTime=Math.max(0,audio.currentTime-10)};
   for(const [name,handler] of Object.entries(actions))try{navigator.mediaSession.setActionHandler(name,handler);}catch{}
 }
-function showView(view){state.view=view;$('reviewView').hidden=view!=='review';$('selectionView').hidden=view!=='selection';$('yamlView').hidden=view!=='yaml';$('yamlTab').classList.toggle('active',view==='yaml');$('reviewTab').classList.toggle('active',view==='review');$('selectionTab').classList.toggle('active',view==='selection');if(view==='review')drawWave();}
-$('reviewTab').onclick=guarded(async()=>{showView('review');if(state.selectionListen)await nextTrack();else await refreshFlags();});
+function showView(view){state.view=view;for(const name of ['review','selection','yaml','generation']){$(name+'View').hidden=view!==name;$(name+'Tab').classList.toggle('active',view===name);}if(view==='review')drawWave();}
+$('reviewTab').onclick=guarded(async()=>{showView('review');if(state.selectionListen||!state.track)await nextTrack();else await refreshFlags();});
 $('selectionTab').onclick=guarded(async()=>{showView('selection');await loadCandidates();});
 const yamlEditor=initYamlEditor({api,toast,browse:async callback=>{await openDirectory(callback);}});
+const generation=initGeneration({api,toast,browse:async callback=>{await openDirectory(callback);}});
+$('generationTab').onclick=guarded(async()=>{audio.pause();showView('generation');await generation.open();});
 $('yamlTab').onclick=guarded(async()=>{audio.pause();showView('yaml');await yamlEditor.open();});
 $('back').onclick=guarded(async()=>{const reviewerId=state.reviewerId,result=await api('/queue/back');if(reviewerId===state.reviewerId&&result.track)await loadTrack(result.track);});
 $('autoplayNext').checked=localStorage.getItem('gbr-autoplay-next')==='true';
@@ -202,7 +205,7 @@ $('skip').onclick=guarded(async()=>{if(state.track&&!state.track.correction&&!st
 for(const button of document.querySelectorAll('[data-close]'))button.onclick=()=>$(button.dataset.close).close();
 $('queueButton').onclick=guarded(async()=>{
   $('order').value=state.queue.order;$('direction').value=state.queue.direction;$('filterSong').value=state.queue.song;$('filterGenre').value=state.queue.genre;
-  $('filterDirectory').replaceChildren(new Option('All input folders',''));const b=await api('/bootstrap');for(const directory of b.queue_directories||b.input_directories||[])$('filterDirectory').append(new Option(directory,directory));$('filterDirectory').value=state.queue.directory;$('queueDialog').showModal();
+  $('filterDirectory').replaceChildren(new Option('All input folders',''));const b=await api('/bootstrap');for(const directory of b.queue_directories||b.input_directories||[])$('filterDirectory').append(new Option(directory,directory));$('filterDirectory').value=state.queue.directory;$('queueDialog').showModal();await previewQueueCounts();
 });
 async function applyQueue(returnSkipped=false){state.queue={order:$('order').value,direction:$('direction').value,song:$('filterSong').value,genre:$('filterGenre').value,directory:$('filterDirectory').value};await api('/queue',{...state.queue,return_skipped:returnSkipped});$('queueDialog').close();await nextTrack();}
 $('queueForm').onsubmit=guarded(async event=>{event.preventDefault();await applyQueue();});$('resetSkipped').onclick=guarded(()=>applyQueue(true));$('returnSkipped').onclick=guarded(async()=>{await api('/queue',{...state.queue,return_skipped:true});await nextTrack();});
@@ -229,7 +232,7 @@ async function loadCandidates(){
     const actions=document.createElement('div');actions.className='candidate-actions';
     const listen=document.createElement('button');listen.textContent='Listen';listen.onclick=guarded(async()=>{showView('review');await loadTrack(await api(`/tracks/${item.generation_id}`),true);$('reviewMessage').textContent='Selection listening · use View saved reviews for reasons.';});
     const reassess=document.createElement('button');reassess.className='secondary';reassess.textContent=item.can_review?'Review':'Reassess';reassess.hidden=!item.can_review&&!item.can_reassess;reassess.onclick=guarded(async()=>{if(item.can_review){const result=await api('/queue/open',{generation_id:item.generation_id});state.canBack=result.can_back;showView('review');await loadTrack(result.track);}else{showView('review');await loadTrack(await api(`/tracks/${item.generation_id}?reassess=true`));}});
-    const select=document.createElement('select');select.setAttribute('aria-label',`Publishing state for ${item.title}`);for(const [value,label] of [['not_selected','Not selected'],['selected','Flagged for distribution'],['published','Published'],['passed','Passed'],['withdrawn','Withdrawn']]){const option=new Option(label,value);option.disabled=!item.review_id&&!['not_selected','selected'].includes(value);select.append(option);}select.value=item.publishing_status;
+    const select=document.createElement('select');select.setAttribute('aria-label',`Publishing state for ${item.title}`);for(const [value,label] of [['not_selected','Not selected'],['selected','Flagged for distribution'],['published','Published'],['passed','Passed'],['rejected','Rejected'],['withdrawn','Withdrawn']]){const option=new Option(label,value);option.disabled=!item.review_id&&!['not_selected','selected','rejected'].includes(value);select.append(option);}select.value=item.publishing_status;
     select.onchange=guarded(async()=>{try{await api(`/publishing/${item.generation_id}`,{status:select.value});item.publishing_status=select.value;item.flags.publishing_status=select.value;item.flags.distribution=['selected','published'].includes(select.value);if(state.track?.id===item.generation_id)await refreshFlags();toast('Distribution state saved.');}catch(error){select.value=item.publishing_status;throw error;}});
     const bookmark=document.createElement('button');bookmark.className='quiet-button candidate-bookmark';const paintBookmark=()=>{bookmark.textContent=item.flags.bookmarked?'★ Bookmarked':'☆ Bookmark';bookmark.setAttribute('aria-pressed',String(item.flags.bookmarked));};paintBookmark();bookmark.onclick=guarded(async()=>{bookmark.disabled=true;try{item.flags=await api(`/tracks/${item.generation_id}/flags`,{bookmarked:!item.flags.bookmarked});paintBookmark();if(state.track?.id===item.generation_id)await refreshFlags();if($('selectionBookmarks').value==='only'&&!item.flags.bookmarked)await loadCandidates();}finally{bookmark.disabled=false;}});
     const details=document.createElement('button');details.className='quiet-button';details.textContent='Reviews / Reason';details.hidden=!item.review_id;details.onclick=guarded(()=>showReviews(item.generation_id));
@@ -272,7 +275,7 @@ function loseReservation(message='Your reservation expired. Resume your queue be
 async function heartbeat(){
   if(!state.reviewer||$('reviewerDialog').open||$('loginDialog').open||state.submitting)return;
   const current=state.track&&!state.track.correction&&!state.selectionListen?state.track.id:null;
-  const result=await api('/reviewer/heartbeat',{current_id:current});if(current&&!result.valid_current&&!state.advancePending)loseReservation();
+  const result=await api('/reviewer/heartbeat',{current_id:current});paintCounts(result.counts);if(current&&!result.valid_current&&!state.advancePending)loseReservation();
 }
 async function chooseReviewer(name){
   if(state.submitting||state.advancePending||state.flagSaving||reviewerChanging)return;
@@ -293,38 +296,47 @@ $('resumeQueue').onclick=guarded(()=>nextTrack(false));
 window.addEventListener('focus',()=>heartbeat().catch(()=>{}));
 async function boot(){
   const b=await api('/bootstrap');if(!b.authenticated){if(!$('loginDialog').open)$('loginDialog').showModal();return;}
-  state.canConfigure=b.can_configure;state.reviewer=b.reviewer;if(!b.reviewer){state.reviewerId='';localStorage.removeItem('gbr-reviewer-id');await showReviewerDialog(b.reviewers);return;}$('reviewerBar').hidden=false;$('reviewerName').textContent=b.reviewer.display_name;clearInterval(heartbeatTimer);heartbeatTimer=setInterval(()=>heartbeat().catch(()=>{}),b.heartbeat_seconds*1000);state.durations=b.durations;if(b.queue){state.queue={song:'',genre:'',directory:'',order:b.queue.order_by,direction:b.queue.direction,...JSON.parse(b.queue.filters_json)};}
+  state.canConfigure=b.can_configure;$('generationTab').hidden=!state.canConfigure;state.reviewer=b.reviewer;if(!b.reviewer){state.reviewerId='';localStorage.removeItem('gbr-reviewer-id');await showReviewerDialog(b.reviewers);return;}$('reviewerBar').hidden=false;$('reviewerName').textContent=b.reviewer.display_name;clearInterval(heartbeatTimer);heartbeatTimer=setInterval(()=>heartbeat().catch(()=>{}),b.heartbeat_seconds*1000);state.durations=b.durations;if(b.queue){state.queue={song:'',genre:'',directory:'',order:b.queue.order_by,direction:b.queue.direction,...JSON.parse(b.queue.filters_json)};}
   audio.volume=Number(localStorage.getItem('gbr-volume')||50)/100;$('volume').value=audio.volume*100;
   await nextTrack();if('serviceWorker' in navigator&&isSecureContext)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 }
 function newSubmissionId(){return globalThis.crypto?.randomUUID?.()||Array.from(globalThis.crypto.getRandomValues(new Uint32Array(4)),value=>value.toString(16)).join('-');}
 function paintFlags(){
   const busy=state.submitting||state.advancePending||state.flagSaving;
-  $('distributionFlag').disabled=busy||state.flags?.publishing_status==='published';$('bookmarkFlag').disabled=busy;
-  $('flagSummary').textContent=[$('distributionFlag').checked?'Distribution':'',$('bookmarkFlag').checked?'Bookmarked':''].filter(Boolean).join(' · ')||'None';
+  const autoReject=!state.draftFlags.distribution&&!state.draftFlags.bookmarked&&Object.values(state.scores).some(score=>score<=3);
+  for(const [id,key] of [['distributionFlag','distribution'],['bookmarkFlag','bookmarked'],['rejectFlag','rejected']]){
+    $(id).disabled=busy||!state.track||(id!=='bookmarkFlag'&&state.flags?.publishing_status==='published');
+    $(id).setAttribute('aria-pressed',String(Boolean(state.draftFlags[key]||(key==='rejected'&&autoReject))));
+  }
+  $('flagSummary').textContent=autoReject?(state.flags?.rejected?'Rejected · score 3 or below':'Will reject on save · score 3 or below'):state.draftFlags.distribution||state.draftFlags.bookmarked?'Protected from automatic rejection':'';
 }
 async function saveFlags(){
   if(!state.track||state.submitting||state.advancePending||state.flagSaving)return;
   const gid=state.track.id,rid=state.reviewerId,sequence=loadSequence;
-  const body={distribution:$('distributionFlag').checked,bookmarked:$('bookmarkFlag').checked,expected_publishing_status:state.flags?.publishing_status||'not_selected'};
+  const body={distribution:state.draftFlags.distribution,bookmarked:state.draftFlags.bookmarked,rejected:Boolean(state.draftFlags.rejected),expected_publishing_status:state.flags?.publishing_status||'not_selected'};
   state.flagSaving=true;paintRatings();$('flagMessage').textContent='Saving flags…';$('retryFlags').hidden=true;
-  const task=(async()=>{try{const flags=await api(`/tracks/${gid}/flags`,body);if(sequence!==loadSequence||rid!==state.reviewerId)return;state.flagError=false;state.flags=flags;state.track.flags=flags;$('flagMessage').textContent='Flags saved. Your review is not submitted.';$('refreshFlags').hidden=true;}catch(error){if(sequence===loadSequence){state.flagError=true;$('flagMessage').textContent=`Flags not saved: ${error.message} Your choices are retained; retry flags or submit the review.`;$('retryFlags').hidden=false;$('refreshFlags').hidden=error.code!=='flags_changed';}throw error;}finally{if(sequence===loadSequence){state.flagSaving=false;paintRatings();}}})();
+  const task=(async()=>{try{const flags=await api(`/tracks/${gid}/flags`,body);if(sequence!==loadSequence||rid!==state.reviewerId)return;state.flagError=false;state.flags=flags;state.draftFlags={...flags};state.track.flags=flags;$('flagMessage').textContent='Flags saved. Your review is not submitted.';$('refreshFlags').hidden=true;}catch(error){if(sequence===loadSequence){state.flagError=true;$('flagMessage').textContent=`Flags not saved: ${error.message} Your choices are retained; retry flags or submit the review.`;$('retryFlags').hidden=false;$('refreshFlags').hidden=error.code!=='flags_changed';}throw error;}finally{if(sequence===loadSequence){state.flagSaving=false;paintRatings();}}})();
   state.flagWrite=task;return task;
 }
 async function refreshFlags(quiet=false){
   if(!state.track||state.submitting||state.flagSaving)return;
   const gid=state.track.id,rid=state.reviewerId,sequence=loadSequence;
   const flags=await api(`/tracks/${gid}/flags`);if(sequence!==loadSequence||rid!==state.reviewerId)return;
-  state.flagError=false;state.flags=flags;state.track.flags=flags;$('distributionFlag').checked=flags.distribution;$('bookmarkFlag').checked=flags.bookmarked;$('refreshFlags').hidden=true;$('retryFlags').hidden=true;if(!quiet)$('flagMessage').textContent='Current track flags loaded.';paintFlags();
+  state.flagError=false;state.flags=flags;state.draftFlags={...flags};state.track.flags=flags;$('refreshFlags').hidden=true;$('retryFlags').hidden=true;if(!quiet)$('flagMessage').textContent='Current track flags loaded.';paintFlags();
 }
-$('distributionFlag').onchange=guarded(saveFlags);$('bookmarkFlag').onchange=guarded(saveFlags);$('retryFlags').onclick=guarded(saveFlags);$('refreshFlags').onclick=guarded(refreshFlags);
+for(const [id,key] of [['distributionFlag','distribution'],['bookmarkFlag','bookmarked'],['rejectFlag','rejected']])$(id).onclick=guarded(async()=>{
+  if(state.flagSaving||state.submitting||!state.track)return;
+  state.draftFlags[key]=!state.draftFlags[key];
+  if(state.draftFlags[key]){if(key==='rejected'){state.draftFlags.distribution=false;state.draftFlags.bookmarked=false;}else state.draftFlags.rejected=false;}
+  paintFlags();await saveFlags();
+});$('retryFlags').onclick=guarded(saveFlags);$('refreshFlags').onclick=guarded(refreshFlags);
 $('autoSubmit').checked=state.autoSubmit;
 $('autoSubmit').onchange=()=>{state.autoSubmit=$('autoSubmit').checked;localStorage.setItem('gbr-auto-submit',String(state.autoSubmit));paintRatings();if(state.autoSubmit&&state.track&&!state.selectionListen&&!state.track.correction&&DIMENSIONS.every(d=>state.scores[d]!==undefined))guarded(submitReview)();};
 $('submitReview').onclick=guarded(submitReview);$('retryReview').onclick=guarded(submitReview);
 async function showReviews(gid){
   const result=await api(`/tracks/${gid}/reviews`);$('reviewDetails').replaceChildren();
   if(!result.reviews.length){const p=document.createElement('p');p.textContent='This recording has no saved review yet.';$('reviewDetails').append(p);}
-  for(const review of result.reviews){const section=document.createElement('section');section.className='review-details-entry';const heading=document.createElement('h3');heading.textContent=`${review.reviewer_name} · revision ${review.assessment_revision}`;const date=document.createElement('p');date.className='subtle small';date.textContent=`${new Date(review.created_at).toLocaleString()} · version ${review.generation_id.slice(0,6)} · ${review.mode}`;const scores=document.createElement('p');scores.textContent=`Audio Quality ${review.audio_quality} · Composition ${review.composition} · Consistency ${review.consistency} · Realism ${review.realism}`;const label=document.createElement('strong');label.textContent='Reason';const reason=document.createElement('p');reason.className='saved-reason';reason.textContent=review.reason||'No reason supplied';const flags=document.createElement('p');flags.className='subtle small';const snapshot=JSON.parse(review.flags_json||'{}');flags.textContent=Object.keys(snapshot).length?`At submission: ${snapshot.distribution?'flagged for distribution':'not flagged for distribution'} · ${snapshot.bookmarked?'bookmarked':'not bookmarked'}`:'Flags were not recorded for this historical review.';section.append(heading,date,scores,label,reason,flags);$('reviewDetails').append(section);}
+  for(const review of result.reviews){const section=document.createElement('section');section.className='review-details-entry';const heading=document.createElement('h3');heading.textContent=`${review.reviewer_name} · revision ${review.assessment_revision}`;const date=document.createElement('p');date.className='subtle small';date.textContent=`${new Date(review.created_at).toLocaleString()} · version ${review.generation_id.slice(0,6)} · ${review.mode}`;const scores=document.createElement('p');scores.textContent=`Audio Quality ${review.audio_quality} · Composition ${review.composition} · Consistency ${review.consistency} · Realism ${review.realism}`;const label=document.createElement('strong');label.textContent='Reason';const reason=document.createElement('p');reason.className='saved-reason';reason.textContent=review.reason||'No reason supplied';const flags=document.createElement('p');flags.className='subtle small';const snapshot=JSON.parse(review.flags_json||'{}');flags.textContent=Object.keys(snapshot).length?`At submission: ${snapshot.distribution?'flagged for distribution':'not flagged for distribution'} · ${snapshot.bookmarked?'bookmarked':snapshot.rejected?'rejected':'not bookmarked'}`:'Flags were not recorded for this historical review.';section.append(heading,date,scores,label,reason,flags);$('reviewDetails').append(section);}
   $('reviewsDialog').showModal();
 }
 $('viewReviews').onclick=guarded(()=>showReviews(state.track.id));
@@ -349,3 +361,14 @@ setInterval(async()=>{try{if($('loginDialog').open||$('reviewerDialog').open||!s
 
 setInterval(()=>{if(state.view==='review'&&state.track&&!state.submitting&&!state.advancePending&&!state.flagSaving&&!state.flagError&&!state.saveError&&!document.querySelector('dialog[open]'))refreshFlags(true).catch(()=>{});},5000);
 
+
+function paintCounts(counts,target='queueCount'){
+  if(!counts)return;
+  $(target).textContent=`${counts.remaining.toLocaleString()} left · ${counts.reviewed.toLocaleString()} / ${counts.total.toLocaleString()} reviewed${counts.skipped?' · '+counts.skipped+' skipped':''}`;
+}
+async function previewQueueCounts(){
+  const query=new URLSearchParams({directory:$('filterDirectory').value,song:$('filterSong').value,genre:$('filterGenre').value});
+  paintCounts(await api('/queue/counts?'+query),'queuePreviewCount');
+}
+$('filterDirectory').onchange=guarded(previewQueueCounts);
+let countTimer;for(const id of ['filterSong','filterGenre'])$(id).oninput=()=>{clearTimeout(countTimer);countTimer=setTimeout(guarded(previewQueueCounts),250);};

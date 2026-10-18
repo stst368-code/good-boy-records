@@ -50,6 +50,8 @@ def main(argv=None):
         validate_job(job, require_local=backend == "local")
         if backend == "runpod_dedicated" and not os.environ.get("RUNPOD_POD_ID"):
             raise RuntimeError("A RunPod request requires a RunPod pod; refusing a local fallback")
+        if backend == 'runpod_serverless' and os.environ.get('GBR_SERVERLESS_WORKER') != '1':
+            raise RuntimeError('A serverless request requires the GBR serverless handler; refusing a local fallback')
         torch, device, installed, hardware = probe(job["execution"].get("cuda_device", 0))
         journal.close()
         # Continue the same journal after CUDA discovery, retaining early failure evidence.

@@ -152,7 +152,8 @@ def open_database(path):
     return conn
 
 
-def prepare_batch(checked, specification, workspace, database, *, input_root, error_policy="cancel", selection=None):
+def prepare_batch(checked, specification, workspace, database, *, input_root, error_policy="cancel", selection=None,
+                  output_root=None, output_layout='single'):
     if error_policy not in {"cancel", "drop"}:
         raise ValueError("error_policy must be cancel or drop")
     invalid = [i for i in checked if not i.ready]
@@ -166,6 +167,12 @@ def prepare_batch(checked, specification, workspace, database, *, input_root, er
     workspace = Path(workspace).resolve()
     if workspace.is_relative_to(Path(input_root).resolve()):
         raise ValueError("Batch workspace cannot be inside the source writing directory")
+    if output_layout not in {'single', 'track', 'album'}:
+        raise ValueError('Output layout must be single, track or album')
+    if output_root is not None:
+        output_root = Path(output_root).resolve()
+        if output_root.is_relative_to(Path(input_root).resolve()):
+            raise ValueError('Generated outputs cannot be inside the source writing directory')
     # Detect edits after preflight before creating files or recording a plan.
     for record in ready:
         if missing_parameters(record.effective):
@@ -191,6 +198,8 @@ def prepare_batch(checked, specification, workspace, database, *, input_root, er
             manifest = {"format_version": 1, "batch_id": batch_id, "status": "prepared", "created_at": created,
                         "database": str(Path(database).resolve()), "error_policy": error_policy,
                         "selection": selection or {}, "specification": specification, "inputs": [], "runs": []}
+            if output_root is not None:
+                manifest.update(output_root=str(output_root), output_layout=output_layout)
             for index, record in enumerate(checked):
                 summary = record.summary()
                 summary.update({"input_id": str(index), "status": "ready" if record.ready else "excluded"})
@@ -213,6 +222,7 @@ def prepare_batch(checked, specification, workspace, database, *, input_root, er
                     "source_sha256": record.document.sha256, "request_yaml": request_name, "request_yaml_sha256": sha(working),
                     "song_id": record.item.song_id, "variant_id": record.item.variant_id,
                     "title": record.document.values["title"], "effective": effective, "provenance": summary["provenance"],
+                    'album': record.item.metadata.get('album_name') or '',
                     "execution": execution_options(specification),
                     "model_revision": specification.get("model_revision"),
                     "template": record.template, "parent_review_generation_id": parent, "request_id": request_id})

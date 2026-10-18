@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 from .indexer import audio_identity
 from .util import digest, now, dumps, slug, inside
+from .native_archive import extend_plan, commit_paths, remove_empty_bundles
 
 
 def verified_copy(source, destination, expected, operation_id):
@@ -121,8 +122,8 @@ class Archiver:
             for row in self.db.all("SELECT * FROM generation_sources WHERE generation_id=?", (g["id"],)):
                 if row["yaml_path"]:
                     originals.append({"kind": "yaml", "source": row["yaml_path"], "sha256": g["yaml_sha256"]})
-        return {"stem": stem, "audio_destination": str(target), "items": items,
-                "generation_yamls": generation_yamls, "originals": originals}
+        return extend_plan(self.db, {"stem": stem, "audio_destination": str(target), "items": items,
+                "generation_yamls": generation_yamls, "originals": originals}, gs, folder, stem)
 
     def process(self, op):
         latest = self.db.one("SELECT * FROM latest_reviews WHERE audio_id=?", (op["audio_id"],))
@@ -147,6 +148,7 @@ class Archiver:
                           (plan["audio_destination"], plan["stem"], op["bucket"], op["audio_id"]))
                 for gid, yp in plan["generation_yamls"].items():
                     c.execute("UPDATE generation_metadata SET yaml_archive_path=? WHERE generation_id=?", (yp, gid))
+                commit_paths(c, plan)
                 c.execute("UPDATE archive_operations SET verification_json=?,updated_at=? WHERE id=?", (dumps(verification), now(), op["id"]))
             destinations = {i["destination"] for i in plan["items"]}
             # Only remove sources whose exact bytes still match the indexed version.
@@ -164,6 +166,7 @@ class Archiver:
                     if shared:
                         continue
                 source.unlink()
+            remove_empty_bundles(plan)
             with self.db.transaction() as c:
                 for m in c.execute("SELECT id,path FROM media_files WHERE audio_id=? AND storage_state IN ('input','archived')", (op["audio_id"],)).fetchall():
                     if m["path"] != plan["audio_destination"]:
@@ -182,7 +185,9 @@ class Archiver:
 
     def retry(self):
         # Re-plan failed destinations to recover safely from external collisions.
-        self.db.execute("UPDATE archive_operations SET status='pending',plan_json='{}',error=NULL,updated_at=? WHERE status='failed'", (now(),))
+        self.db.execute("""UPDATE archive_operations SET status='pending',
+                        plan_json=CASE WHEN verification_json='{}' THEN '{}' ELSE plan_json END,
+                        error=NULL,updated_at=? WHERE status='failed'""", (now(),))
 
     def reconcile(self):
         self.db.execute("UPDATE archive_operations SET status='pending' WHERE status='running'")
@@ -199,3 +204,4 @@ class Archiver:
         for m in self.db.all("SELECT id,path,storage_state FROM media_files WHERE storage_state IN ('input','archived')"):
             if not Path(m["path"]).is_file():
                 self.db.execute("UPDATE media_files SET storage_state='missing' WHERE id=?", (m["id"],))
+

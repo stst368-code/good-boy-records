@@ -134,7 +134,8 @@ def main(argv=None):
             if not database.exists():
                 initialize(database)
             manifest = prepare_batch(checked, spec, runtime / "batches", database,
-                                     input_root=input_root, selection=selection)
+                                     input_root=input_root, selection=selection,
+                                     output_root=ROOT / '_02_Generation' / 'generated', output_layout='single')
             latest.write_text(json_text({"manifest": str(manifest)}), encoding="utf-8")
         print("Frozen test manifest: " + str(manifest), flush=True)
         if args.prepare_only:

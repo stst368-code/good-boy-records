@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from gbr_review.analysis import VERSION, measure, select_segments
-from gbr_review.app import create_app
-from gbr_review.mobile import access_code, enable_http
-from gbr_review.config import password_hash, password_ok
+from review.analysis import VERSION, measure, select_segments
+from review.app import create_app
+from review.mobile import access_code, enable_http
+from review.config import password_hash, password_ok
 from conftest import track, complete
 
 

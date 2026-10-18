@@ -6,9 +6,9 @@ import time
 from fastapi.testclient import TestClient
 import pytest
 
-from gbr_review.app import create_app
-from gbr_review.db import Database
-from gbr_review.exports import dataset, publishing_manifest
+from review.app import create_app
+from review.db import Database
+from review.exports import dataset, publishing_manifest
 from conftest import track, complete, archive_all
 
 WRITE = {'X-GBR-Request': '1'}
@@ -54,7 +54,7 @@ def test_flags_and_reason_commit_with_specific_revision_and_no_track_leak(servic
     correction = c.get('/api/queue/back').json()['track']; assert correction['reason'] == body['reason']
     second = c.get('/api/queue/next').json()['track']
     assert second['id'] != first['id'] and 'reason' not in second
-    assert second['flags'] == {'distribution': False, 'bookmarked': False, 'publishing_status': 'not_selected'}
+    assert second['flags'] == {'distribution': False, 'bookmarked': False, 'rejected': False, 'publishing_status': 'not_selected'}
     assert c.post(f"/api/tracks/{second['id']}/review", json={**SCORES, 'reason': ''}, headers=WRITE).status_code == 200
     assert s.db.one('SELECT reason FROM reviews WHERE generation_id=?', (second['id'],))['reason'] == ''
     changed = c.post(f"/api/tracks/{first['id']}/review", json={**SCORES, 'reason': 'Revised explanation', 'expected_review_id': r['id'], 'reassessment': True}, headers=WRITE)
@@ -131,7 +131,7 @@ def test_directory_picker_and_settings_archive_guard(service, tmp_path):
 
 
 def test_same_host_lan_address_can_configure_but_other_device_cannot(service, monkeypatch):
-    import gbr_review.app as module
+    import review.app as module
     monkeypatch.setattr(module.socket,'gethostbyname_ex',lambda name:(name,[],['192.0.2.55']))
     app=create_app(service.config.path,False)
     host=TestClient(app,base_url='http://192.0.2.55',client=('192.0.2.55',1234))
@@ -164,7 +164,7 @@ def test_cache_full_wav_key_is_stable_and_cleanup_preserves_untracked_and_active
 def test_existing_full_wav_is_reused_without_rewriting(service):
     import hashlib
     import soundfile as sf
-    from gbr_review.util import dumps
+    from review.util import dumps
     path, aid, gid=track(service,seconds=8)
     service.analyzer.run(aid)
     analysis=service.db.one('SELECT id FROM analyses WHERE audio_id=?',(aid,))['id']
@@ -190,9 +190,9 @@ def test_cache_keeps_assets_when_original_changed_or_missing(service, missing):
 
 
 def test_feature_migration_failure_is_transactional(tmp_path,monkeypatch):
-    import gbr_review.db as module
+    import review.db as module
     from test_reviewers import make_legacy
-    from gbr_review.migration import migrate
+    from review.migration import migrate
     path=tmp_path/'old.sqlite';make_legacy(path)
     with sqlite3.connect(path) as c:migrate(c,module.ANALYTICS_SQL)
     with sqlite3.connect(path) as c:before=list(c.execute('SELECT * FROM reviews'))

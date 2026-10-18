@@ -1,18 +1,15 @@
 import json
 from pathlib import Path
-import importlib
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-if not (ROOT / "gbr_review").is_dir() and (ROOT / "review").is_dir():
-    sys.modules["gbr_review"] = importlib.import_module("review")
 
 import numpy as np
 import pytest
 import soundfile as sf
-from gbr_review.config import Config
-from gbr_review.service import Service
+from review.config import Config
+from review.service import Service
 
 
 @pytest.fixture

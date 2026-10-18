@@ -42,6 +42,7 @@ class ReviewBody(StrictBody):
     reason: str | None = Field(default=None, max_length=20000)
     distribution: StrictBool | None = None
     bookmarked: StrictBool | None = None
+    rejected: StrictBool | None = None
     expected_publishing_status: str | None = None
     submission_id: str | None = Field(default=None, min_length=1, max_length=100)
 
@@ -49,6 +50,7 @@ class ReviewBody(StrictBody):
 class FlagsBody(StrictBody):
     distribution: StrictBool | None = None
     bookmarked: StrictBool | None = None
+    rejected: StrictBool | None = None
     expected_publishing_status: str | None = None
 
 
@@ -102,7 +104,7 @@ class LoginBody(StrictBody):
 
 
 class PublishingBody(StrictBody):
-    status: Literal["not_selected", "selected", "published", "passed", "withdrawn"]
+    status: Literal["not_selected", "selected", "published", "passed", "withdrawn", "rejected"]
     external_reference: str | None = Field(default=None, max_length=2000)
 
 
@@ -138,7 +140,7 @@ def create_app(config_path, start_worker=True, database_path=None):
         yield
         service.close()
 
-    app = FastAPI(title="GBR", version="1.4.0", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="GBR", version="1.5.0", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.service = service
     hosts = {"127.0.0.1", "localhost", "::1", socket.gethostname(), *config.values["allowed_hosts"]}
     host_addresses = {'127.0.0.1', '::1', 'testclient'}
@@ -225,8 +227,16 @@ def create_app(config_path, start_worker=True, database_path=None):
         reviewer = service.queues.identity(request.headers.get("x-gbr-reviewer")) if authenticated(request) else None
         session = service.db.one("SELECT order_by,direction,filters_json FROM sessions WHERE reviewer_id=?", (reviewer["id"],)) if reviewer else None
         directories = [str(p) for p in config.inputs]
-        queue_directories = directories + [r['original_directory'] for r in service.db.all('SELECT DISTINCT original_directory FROM generations ORDER BY original_directory')
-                                           if r['original_directory'] not in directories and any(inside(r['original_directory'], p) for p in config.inputs)] if authenticated(request) else []
+        queue_directories = set(directories) if authenticated(request) else set()
+        if authenticated(request):
+            for row in service.db.all('SELECT DISTINCT original_directory FROM generations'):
+                folder = Path(row['original_directory']).resolve()
+                for root in config.inputs:
+                    if folder.is_relative_to(root):
+                        while folder != root:
+                            queue_directories.add(str(folder))
+                            folder = folder.parent
+        queue_directories = sorted(queue_directories)
         return {"authenticated": authenticated(request), "can_configure": local(request), "queue": session,
                 "reviewer": reviewer, "reviewers": service.queues.names() if authenticated(request) else [],
                 "heartbeat_seconds": min(10, config.values["reservation_seconds"] // 3),
@@ -297,6 +307,13 @@ def create_app(config_path, start_worker=True, database_path=None):
         service.queue_settings(body.order, body.direction, {"song": body.song, "genre": body.genre, "directory": body.directory}, body.return_skipped, reviewer_id=reviewer_id(request))
         return {"saved": True}
 
+    @app.get('/api/queue/counts')
+    def queue_counts(request: Request, directory: str | None = None, song: str | None = None, genre: str | None = None):
+        if directory and not any(inside(directory, p) for p in config.inputs):
+            raise ValueError('Directory must be within a configured input directory')
+        overrides = {k: v for k, v in {'directory': directory, 'song': song, 'genre': genre}.items() if v is not None}
+        return service.queues.counts(reviewer_id(request), overrides)
+
     @app.get("/api/queue/back")
     def previous_track(request: Request):
         rid = reviewer_id(request)
@@ -314,7 +331,7 @@ def create_app(config_path, start_worker=True, database_path=None):
 
     @app.post("/api/tracks/{gid}/review")
     def review(gid: str, body: ReviewBody, request: Request):
-        return service.review(gid, {k: getattr(body, k) for k in ("audio_quality", "composition", "consistency", "realism")}, body.mode, body.expected_review_id, body.listening, body.reassessment, reviewer_id=reviewer_id(request), reason=body.reason, distribution=body.distribution, bookmarked=body.bookmarked, expected_publishing_status=body.expected_publishing_status, submission_id=body.submission_id)
+        return service.review(gid, {k: getattr(body, k) for k in ("audio_quality", "composition", "consistency", "realism")}, body.mode, body.expected_review_id, body.listening, body.reassessment, reviewer_id=reviewer_id(request), reason=body.reason, distribution=body.distribution, bookmarked=body.bookmarked, rejected=body.rejected, expected_publishing_status=body.expected_publishing_status, submission_id=body.submission_id)
 
     @app.get('/api/tracks/{gid}/flags')
     def flags(gid: str, request: Request):
@@ -322,7 +339,7 @@ def create_app(config_path, start_worker=True, database_path=None):
 
     @app.post('/api/tracks/{gid}/flags')
     def save_flags(gid: str, body: FlagsBody, request: Request):
-        return service.set_flags(gid, reviewer_id(request), body.distribution, body.bookmarked, body.expected_publishing_status)
+        return service.set_flags(gid, reviewer_id(request), body.distribution, body.bookmarked, body.expected_publishing_status, rejected=body.rejected)
 
     @app.post('/api/queue/open')
     def open_track(body: OpenBody, request: Request):
@@ -589,6 +606,13 @@ def create_app(config_path, start_worker=True, database_path=None):
     app.include_router(editor_routes)
     app.state.yaml_editor = editor
     app.mount("/tools/yaml-editor", StaticFiles(directory=tool_root / "static"), name="yaml-editor")
+    generation_root = repo_root / '_02_Generation'
+    sys.path.insert(0, str(generation_root))
+    from gbr_generation.web_api import router as generation_router
+    generation_routes, generation = generation_router(repo_root, service, local)
+    app.include_router(generation_routes)
+    app.state.generation = generation
+    app.mount('/tools/generation', StaticFiles(directory=generation_root / 'static'), name='generation')
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app
 
