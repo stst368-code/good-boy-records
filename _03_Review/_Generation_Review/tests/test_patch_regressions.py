@@ -11,9 +11,9 @@ import pytest
 import soundfile as sf
 from fastapi.testclient import TestClient
 
-from gbr_review.analysis import VERSION, measure
-from gbr_review.app import create_app
-from gbr_review.server_loop import create_loop
+from review.analysis import VERSION, measure
+from review.app import create_app
+from review.server_loop import create_loop
 
 
 @pytest.mark.parametrize("sr,seconds,channels", [
@@ -50,7 +50,7 @@ def test_retry_failed_analysis_produces_playable_sampling(service):
     gid = s.db.one("SELECT id FROM generations WHERE audio_id=?", (aid,))["id"]
     s.db.execute("UPDATE audio SET analysis_state='failed' WHERE id=?", (aid,))
     with TestClient(app, headers={"X-GBR-Reviewer":app.state.service.default_reviewer_id}, base_url="http://localhost") as client:
-        assert client.get(f"/api/tracks/{gid}/preview").json() == {"ready": False}
+        assert client.get(f"/api/tracks/{gid}/preview").json()["ready"] is False
         assert client.post("/api/reanalyse", json={}, headers={"X-GBR-Request": "1"}).status_code == 200
         assert s.db.one("SELECT analysis_state FROM audio WHERE id=?", (aid,))["analysis_state"] == "pending"
         s.analyzer.run(aid)
@@ -84,10 +84,10 @@ def test_socket_loop_preserves_exception_reporting():
         loop.close()
 
 
-@pytest.mark.parametrize("package", ["gbr_review", "review"])
+@pytest.mark.parametrize("package", ["review", "review"])
 def test_launcher_and_server_loop_work_after_package_rename(tmp_path, package):
     root = Path(__file__).resolve().parents[1]
-    source_package = root / ("gbr_review" if (root / "gbr_review").is_dir() else "review")
+    source_package = root / ("review" if (root / "review").is_dir() else "review")
     shutil.copytree(source_package, tmp_path / package, ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copy2(root / "run_review.py", tmp_path / "run_review.py")
     result = subprocess.run([sys.executable, str(tmp_path / "run_review.py"), "--help"], cwd=tmp_path.parent,

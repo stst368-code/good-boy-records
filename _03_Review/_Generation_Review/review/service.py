@@ -134,7 +134,7 @@ class Service:
             self.prefetched_id = result["track"]["id"] if peek and result["track"] else None
         return result
 
-    def review(self, gid, scores, mode, expected_review_id=None, listening=None, reassessment=False, reviewer_id=None, reason=None, distribution=None, bookmarked=None, expected_publishing_status=None, submission_id=None):
+    def review(self, gid, scores, mode, expected_review_id=None, listening=None, reassessment=False, reviewer_id=None, reason=None, distribution=None, bookmarked=None, expected_publishing_status=None, submission_id=None, rejected=None):
         reviewer_id = reviewer_id or self.default_reviewer_id
         with self.db.transaction() as c:
             g = c.execute("SELECT * FROM generations WHERE id=?", (gid,)).fetchone()
@@ -144,7 +144,7 @@ class Service:
                 saved = c.execute('SELECT * FROM reviews WHERE reviewer_id=? AND submission_id=?', (reviewer_id, submission_id)).fetchone()
                 if saved:
                     flags = json.loads(saved['flags_json'])
-                    if saved['generation_id'] != gid or any(saved[k] != value for k, value in scores.items()) or (reason is not None and saved['reason'] != reason) or (distribution is not None and flags.get('distribution') != distribution) or (bookmarked is not None and flags.get('bookmarked') != bookmarked):
+                    if saved['generation_id'] != gid or any(saved[k] != value for k, value in scores.items()) or (reason is not None and saved['reason'] != reason) or (distribution is not None and flags.get('distribution') != distribution) or (bookmarked is not None and flags.get('bookmarked') != bookmarked) or (rejected is not None and flags.get('requested_rejected', flags.get('rejected')) != rejected):
                         raise Conflict('The earlier submission was saved. Use Back to edit that review; your current entries have not been submitted.', 'submission_saved')
                     return {'saved': True, 'review_id': saved['id'], 'already_saved': True}
             session = self.queues.session(c, reviewer_id)
@@ -162,7 +162,12 @@ class Service:
                     raise Conflict("There is no earlier review by you to correct", "other_reviewer")
                 self.queues.require_current(c, reviewer_id, gid, g["audio_id"])
             reason = previous['reason'] if previous and reason is None else reason or ''
-            flags = self._apply_flags(c, gid, reviewer_id, distribution, bookmarked, expected_publishing_status)
+            flags = self._apply_flags(c, gid, reviewer_id, distribution, bookmarked, expected_publishing_status, rejected)
+            automatic_rejection = min(scores.values()) <= 3 and not (flags['distribution'] or flags['bookmarked'])
+            if automatic_rejection:
+                self._publishing(c, gid, 'rejected')
+                flags = self._flags(c, gid, reviewer_id)
+            flags.update(automatic_rejection=automatic_rejection, requested_rejected=rejected)
             average = sum(scores.values()) / 4
             bucket = math.floor(average + .5)
             maximum = c.execute("SELECT COALESCE(MAX(revision),0) FROM reviews WHERE audio_id=?", (g["audio_id"],)).fetchone()[0]
@@ -220,7 +225,7 @@ class Service:
         row = c.execute("SELECT g.id,r.id AS review_id FROM generations g LEFT JOIN latest_reviews r ON r.audio_id=g.audio_id WHERE g.id=?", (gid,)).fetchone()
         if not row:
             raise KeyError('Recording not found')
-        if not row['review_id'] and status not in ('selected', 'not_selected'):
+        if not row['review_id'] and status not in ('selected', 'not_selected', 'rejected'):
             raise ValueError("Complete a human review first")
         old = c.execute("SELECT * FROM publishing_selection WHERE generation_id=?", (gid,)).fetchone()
         if old and old['status'] == status and (reference is None or reference == old['external_reference']):
@@ -244,6 +249,7 @@ class Service:
         status = c.execute('SELECT status FROM publishing_selection WHERE generation_id=?', (gid,)).fetchone()
         status = status[0] if status else 'not_selected'
         return {'distribution': status in ('selected', 'published'), 'publishing_status': status,
+                'rejected': status == 'rejected',
                 'bookmarked': bool(c.execute('SELECT 1 FROM bookmarks WHERE generation_id=? AND reviewer_id=?', (gid, rid)).fetchone())}
 
     def track_flags(self, gid, rid):
@@ -253,8 +259,13 @@ class Service:
                 raise KeyError('Recording not found')
             return self._flags(c, gid, rid)
 
-    def _apply_flags(self, c, gid, rid, distribution=None, bookmarked=None, expected_status=None):
+    def _apply_flags(self, c, gid, rid, distribution=None, bookmarked=None, expected_status=None, rejected=None):
         before = self._flags(c, gid, rid)
+        protective = (before['distribution'] if distribution is None else distribution) or (before['bookmarked'] if bookmarked is None else bookmarked)
+        if rejected is True and protective:
+            raise ValueError('Turn off Publish and Bookmark before marking Reject')
+        if rejected is not None and rejected != before['rejected'] and expected_status is not None and before['publishing_status'] != expected_status:
+            raise Conflict('Track status changed in another view. Refresh flags before trying again.', 'flags_changed')
         if distribution is not None and distribution != before['distribution']:
             if expected_status is not None and before['publishing_status'] != expected_status:
                 raise Conflict('Distribution status changed in another view. Refresh track flags and try again.', 'flags_changed')
@@ -268,14 +279,27 @@ class Service:
             else:
                 c.execute('DELETE FROM bookmarks WHERE generation_id=? AND reviewer_id=?', (gid, rid))
             c.execute('INSERT INTO bookmark_history(generation_id,reviewer_id,action,created_at) VALUES(?,?,?,?)', (gid, rid, 'bookmarked' if bookmarked else 'removed', timestamp))
+        current = self._flags(c, gid, rid)
+        if rejected is True and not current['rejected']:
+            if current['publishing_status'] == 'published':
+                raise Conflict('This track is published. Change its publishing state in Selection.', 'flags_changed')
+            self._publishing(c, gid, 'rejected')
+        elif current['rejected'] and (rejected is False or current['distribution'] or current['bookmarked']):
+            self._publishing(c, gid, 'not_selected')
         return self._flags(c, gid, rid)
 
-    def set_flags(self, gid, rid, distribution=None, bookmarked=None, expected_status=None):
+    def set_flags(self, gid, rid, distribution=None, bookmarked=None, expected_status=None, rejected=None):
         with self.db.transaction() as c:
             self.queues.session(c, rid)
             if not c.execute('SELECT 1 FROM generations WHERE id=?', (gid,)).fetchone():
                 raise KeyError('Recording not found')
-            return self._apply_flags(c, gid, rid, distribution, bookmarked, expected_status)
+            flags = self._apply_flags(c, gid, rid, distribution, bookmarked, expected_status, rejected)
+            reviewed = c.execute('''SELECT r.audio_quality,r.composition,r.consistency,r.realism
+                FROM latest_reviews r JOIN generations g ON g.audio_id=r.audio_id WHERE g.id=?''', (gid,)).fetchone()
+            if reviewed and min(reviewed) <= 3 and not (flags['distribution'] or flags['bookmarked']):
+                self._publishing(c, gid, 'rejected')
+                flags = self._flags(c, gid, rid)
+            return flags
 
     def comparison(self, a, b):
         gs = [self.db.one("SELECT * FROM generations WHERE id=?", (gid,)) for gid in (a, b)]
@@ -294,4 +318,5 @@ class Service:
         self.comparisons[cid] = {"a": gs[0]["id"], "b": gs[1]["id"], "target": target, "created": time.monotonic()}
         self.comparisons = {k: v for k, v in self.comparisons.items() if time.monotonic() - v["created"] < 86400}
         return {"id": cid, "title": self.public_track(a)["title"]}
+
 

@@ -13,6 +13,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--environment", type=Path, default=ROOT / ".venv")
     parser.add_argument("--runtime", type=Path, default=ROOT / "runtime")
+    parser.add_argument('--skip-cuda-check', action='store_true', help='Container build only; CUDA is still checked at every job start')
     args = parser.parse_args()
     if sys.version_info[:2] not in {(3, 11), (3, 12)}:
         raise SystemExit("Use 64-bit Python 3.12 or 3.11 for this verified worker profile")
@@ -32,6 +33,10 @@ def main():
     runtime.mkdir(parents=True, exist_ok=True)
     freeze = subprocess.check_output([str(python), "-m", "pip", "freeze"], text=True, encoding="utf-8")
     (runtime / "installed-packages.txt").write_text(freeze, encoding="utf-8")
+    if args.skip_cuda_check:
+        subprocess.run([str(python), '-c', 'from gbr_worker.hardware import check_install; check_install()'], cwd=ROOT, check=True)
+        print('Worker dependencies installed; runtime GPU check will run at job start.')
+        return
     report = subprocess.check_output([str(python), str(ROOT / "worker.py"), "doctor"], text=True, encoding="utf-8")
     json.loads(report)
     (runtime / "hardware-check.json").write_text(report, encoding="utf-8")

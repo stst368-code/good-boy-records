@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import sqlite3
 import sys
 import tempfile
@@ -108,7 +109,9 @@ class RunpodTransportTests(unittest.TestCase):
             path.write_text(content)
         python = self.remote / ".venv/bin/python"
         python.parent.mkdir(parents=True)
-        python.symlink_to(sys.executable)
+        # A symlink under another .venv loses the controller's installed test dependencies.
+        python.write_text('#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' "$@"\n')
+        python.chmod(0o700)
         # This fixture exercises the process/output contract, not native generation quality.
         (release / "worker.py").write_text('''import json,sys,time
 from pathlib import Path
@@ -178,6 +181,10 @@ print("remote boundary fixture completed",flush=True)
         tags = FLAC(next(output.glob("*.flac")))
         self.assertEqual(json.loads(tags["GBR_METADATA"][0])["generation_source"], "gbr_native_runpod_dedicated")
         self.assertEqual(self.rows("PRAGMA foreign_key_check"), [])
+        directory = Path(result['attempts'][0]['diagnostics'])
+        self.assertFalse((directory / 'audio.flac').exists())
+        self.assertFalse(list((self.remote / 'runtime/attempts').glob('*/audio.flac')))
+        self.assertTrue(list((self.remote / 'runtime/attempts').glob('*/collected.json')))
 
     def test_disconnect_keeps_attempt_running_and_resume_collects_without_relaunch(self):
         disconnected = False
@@ -219,9 +226,12 @@ print("remote boundary fixture completed",flush=True)
         self.assertEqual(len((self.remote / "runtime/launches").read_text().splitlines()), 1)
 
     def test_corrupt_download_cannot_replace_a_verified_file(self):
-        result = self.execute()
+        # A deferred acknowledgement leaves the remote result available for recollection.
+        with patch.object(RunpodClient, 'acknowledge', side_effect=OSError('temporary SSH failure')):
+            result = self.execute()
         directory = Path(result["attempts"][0]["diagnostics"])
         attempt = result["attempts"][0]["attempt_id"]
+        shutil.copyfile(self.remote / 'runtime/attempts' / attempt / 'audio.flac', directory / 'audio.flac')
         original = (directory / "audio.flac").read_bytes()
         client = self.client()
         rpc = client.rpc
@@ -236,6 +246,26 @@ print("remote boundary fixture completed",flush=True)
         self.assertEqual((directory / "audio.flac").read_bytes(), original)
         self.assertFalse(list(directory.glob("*.download")))
 
+    def test_cleanup_retries_acknowledgement_without_generating_and_checks_final_files(self):
+        from gbr_generation.executor import cleanup_outputs
+        with patch.object(RunpodClient, 'acknowledge', side_effect=OSError('temporary SSH failure')):
+            result = self.execute()
+        with patch('gbr_generation.executor.RunpodClient', side_effect=self.client):
+            cleaned = cleanup_outputs(self.manifest)
+        self.assertEqual(cleaned['cleaned_attempts'], [result['attempts'][0]['attempt_id']])
+        self.assertEqual(len((self.remote / 'runtime/launches').read_text().splitlines()), 1)
+        self.assertFalse(list(self.remote.glob('runtime/attempts/*/audio.flac')))
+        self.assertFalse(list(self.manifest.parent.glob('attempts/*/cleanup-pending.json')))
+
+    def test_cleanup_keeps_remote_output_if_the_published_copy_changed(self):
+        from gbr_generation.executor import cleanup_outputs
+        with patch.object(RunpodClient, 'acknowledge', side_effect=OSError('temporary SSH failure')):
+            result = self.execute()
+        (Path(result['attempts'][0]['output']) / 'source.yaml').write_text('changed')
+        with patch('gbr_generation.executor.RunpodClient', side_effect=self.client), self.assertRaisesRegex(ValueError, 'do not verify'):
+            cleanup_outputs(self.manifest)
+        self.assertTrue(list(self.remote.glob('runtime/attempts/*/audio.flac')))
+
     def test_resume_missing_remote_attempt_does_not_launch_it(self):
         result = self.execute()
         directory = Path(result["attempts"][0]["diagnostics"])
@@ -248,16 +278,26 @@ print("remote boundary fixture completed",flush=True)
     def test_setup_uploads_verified_sources_and_queries_doctor_without_copying_database(self):
         # Replace only the installer and doctor for a CPU test of the real bootstrap protocol.
         bundle = source_bundle()
-        bundle["files"]["install_worker.py"] = 'print("installer fixture", flush=True)\n'
+        bundle["files"]["install_worker.py"] = ('from pathlib import Path\n'
+            'p=Path(__file__).resolve().parents[2]/"fixture-installs"\n'
+            'p.write_text(str((int(p.read_text()) if p.exists() else 0)+1))\n')
         bundle["files"]["worker.py"] = 'import json\nprint(json.dumps({"protocol":1,"hardware":{"provider":"runpod"}}))\n'
         bundle["release"] = hashlib.sha256(canonical(bundle["files"]).encode()).hexdigest()
         with patch("gbr_worker.runpod.source_bundle", return_value=bundle):
             client = self.client(release=bundle["release"])
             result = client.setup()
+            client.setup()
         self.assertEqual(result["hardware"]["provider"], "runpod")
         path = self.remote / "releases" / bundle["release"] / "requirements.txt"
         self.assertEqual(path.read_text(), bundle["files"]["requirements.txt"])
         self.assertFalse(list(self.remote.rglob("*.sqlite3")))
+        self.assertEqual((self.remote / 'fixture-installs').read_text(), '1')
+
+    def test_ssh_check_works_before_a_worker_release_is_installed(self):
+        result = self.client(release='f' * 64).check_connection()
+        self.assertTrue(result['connected'])
+        self.assertFalse(result['worker_installed'])
+        self.assertIn('automatic setup', result['message'])
 
     def test_setup_refuses_to_change_environment_of_an_unfinished_attempt(self):
         attempt = self.remote / "runtime/attempts" / ("a" * 32)

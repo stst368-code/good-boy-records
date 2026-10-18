@@ -3,6 +3,7 @@ import json
 import random
 import time
 import uuid
+from contextlib import closing
 from datetime import datetime
 from .util import now, dumps, inside
 
@@ -89,6 +90,35 @@ class ReviewerQueues:
                 seen.add(r["audio_id"])
         return result
 
+    def count_scope(self, c, session, overrides=None):
+        filters = {**json.loads(session['filters_json']), **(overrides or {})}
+        rows = c.execute('''SELECT g.audio_id,g.original_directory,s.title,
+            COALESCE(NULLIF(json_extract(m.parsed_json,'$.genre'),''),NULLIF(json_extract(m.parsed_json,'$.intended_genre'),''),NULLIF(json_extract(m.parsed_json,'$.cluster'),''),s.genre) AS genre,
+            EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id) AS reviewed,
+            EXISTS(SELECT 1 FROM queue_skips k WHERE k.audio_id=g.audio_id AND k.session_id=?) AS skipped
+            FROM generations g JOIN songs s ON s.id=g.song_id LEFT JOIN generation_metadata m ON m.generation_id=g.id''', (session['id'],))
+        seen, reviewed, skipped = set(), set(), set()
+        for row in rows:
+            if (filters.get('directory') and not inside(row['original_directory'], filters['directory'])
+                    or filters.get('song') and filters['song'].casefold() not in row['title'].casefold()
+                    or filters.get('genre') and filters['genre'].casefold() not in str(row['genre']).casefold()):
+                continue
+            aid = row['audio_id']
+            seen.add(aid)
+            if row['reviewed']:
+                reviewed.add(aid)
+            elif row['skipped']:
+                skipped.add(aid)
+        remaining = seen - reviewed
+        reserved = {r[0] for r in c.execute('SELECT audio_id FROM queue_reservations WHERE reviewer_id<>? AND expires_at>?', (session['reviewer_id'], self.clock()))}
+        return {'total': len(seen), 'reviewed': len(reviewed), 'remaining': len(remaining),
+                'skipped': len(skipped), 'reserved_elsewhere': len(remaining & reserved),
+                'in_queue': len(remaining - skipped - reserved), 'directory': filters.get('directory', '')}
+
+    def counts(self, rid, overrides=None):
+        with self.db.transaction() as c:
+            return self.count_scope(c, self.session(c, rid), overrides)
+
     def open(self, rid, gid):
         with self.db.transaction() as c:
             self.sweep(c)
@@ -159,7 +189,8 @@ class ReviewerQueues:
             skips = bool(c.execute("SELECT 1 FROM queue_skips WHERE session_id=? LIMIT 1", (session["id"],)).fetchone())
             reason = "ready" if chosen else "first_pass_complete" if total and not remaining else "reserved" if reserved_elsewhere else "all_skipped" if skips and not candidates else "no_match" if json.loads(session["filters_json"]) and not candidates else "no_tracks"
             result = {"track_id": chosen, "reason": reason, "can_back": bool(session["previous_generation_id"]), "has_skips": skips,
-                      "reservation_expires_at": expiry if leases else None, "reserved_ahead": max(0, len(leases)-1)}
+                      "reservation_expires_at": expiry if leases else None, "reserved_ahead": max(0, len(leases)-1),
+                      'counts': self.count_scope(c, session)}
         result["track"] = self.service.public_track(chosen, reviewer_id=rid) if chosen else None
         result.pop("track_id")
         return result
@@ -182,4 +213,5 @@ class ReviewerQueues:
             # An expired lease cannot be renewed over someone else's claim.
             expiry = self.clock() + self.service.config.values["reservation_seconds"]
             c.execute("UPDATE queue_reservations SET expires_at=? WHERE reviewer_id=?", (expiry, rid))
-            return {"valid_current": bool(valid), "reservation_expires_at": expiry}
+            return {"valid_current": bool(valid), "reservation_expires_at": expiry, 'counts': self.count_scope(c, session)}
+

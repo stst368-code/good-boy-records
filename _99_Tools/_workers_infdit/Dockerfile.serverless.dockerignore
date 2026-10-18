@@ -1,0 +1,10 @@
+**
+!_99_Tools/
+_99_Tools/**
+!_99_Tools/_workers_infdit/
+_99_Tools/_workers_infdit/**
+!_99_Tools/_workers_infdit/*.py
+!_99_Tools/_workers_infdit/requirements.txt
+!_99_Tools/_workers_infdit/gbr_worker/
+_99_Tools/_workers_infdit/gbr_worker/**
+!_99_Tools/_workers_infdit/gbr_worker/*.py

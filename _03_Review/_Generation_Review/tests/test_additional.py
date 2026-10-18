@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 import soundfile as sf
 from fastapi.testclient import TestClient
-from gbr_review.app import create_app
-from gbr_review.config import Config, password_hash
-from gbr_review.analysis import measure
-from gbr_review.exports import dataset
+from review.app import create_app
+from review.config import Config, password_hash
+from review.analysis import measure
+from review.exports import dataset
 from conftest import track,complete,archive_all
 
 
@@ -78,7 +78,7 @@ def test_duplicate_added_after_review_is_archived_without_review(service):
 def test_journal_resume_after_source_deleted(service):
     path,aid,gid=track(service);complete(service,gid)
     op=service.db.one('SELECT * FROM archive_operations');plan=service.archiver.plan(op)
-    from gbr_review.archive import verified_copy
+    from review.archive import verified_copy
     for item in plan['items']:verified_copy(item['source'],item['destination'],item['sha256'],op['id'])
     path.unlink();path.with_suffix('.yaml').unlink()
     service.db.execute("UPDATE archive_operations SET status='running',plan_json=? WHERE id=?",(json.dumps(plan),op['id']))
@@ -100,12 +100,12 @@ def test_event_and_review_history_exports(service,tmp_path):
 
 
 def test_process_lock_prevents_second_worker(service):
-    from gbr_review.__main__ import ProcessLock
+    from review.__main__ import ProcessLock
     path=service.config.data/'application.lock';lock=ProcessLock(path)
     try:
-        package = 'gbr_review' if (Path(__file__).resolve().parents[1] / 'gbr_review').is_dir() else 'review'
+        package = 'review'
         code='from '+package+'.__main__ import ProcessLock;from pathlib import Path;ProcessLock(Path('+repr(str(path))+'))'
-        p=subprocess.run([sys.executable,'-c',code],capture_output=True,text=True)
-        assert p.returncode!=0 and 'already running' in p.stderr
+        p=subprocess.run([sys.executable,'-c',code],capture_output=True,text=True,cwd=Path(__file__).resolve().parents[1])
+        assert p.returncode!=0 and 'already using this database or data directory' in p.stderr
     finally:lock.close()
     second=ProcessLock(path);second.close()

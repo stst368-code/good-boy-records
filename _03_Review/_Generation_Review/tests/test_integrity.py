@@ -5,10 +5,10 @@ import numpy as np
 import pytest
 import soundfile as sf
 from mutagen.flac import FLAC
-from gbr_review.archive import verified_copy
-from gbr_review.config import Config, password_hash, password_ok
-from gbr_review.service import Service, Conflict
-from gbr_review.util import digest, dumps, now
+from review.archive import verified_copy
+from review.config import Config, password_hash, password_ok
+from review.service import Service, Conflict
+from review.util import digest, dumps, now
 from conftest import track, complete, archive_all
 
 
@@ -117,7 +117,7 @@ def test_collision_preserves_unrelated_media(service):
 
 
 def test_failed_move_keeps_review_and_retry_recovers(service,monkeypatch):
-    import gbr_review.archive as ar
+    import review.archive as ar
     path,aid,gid=track(service);complete(service,gid)
     copy=ar.verified_copy
     monkeypatch.setattr(ar,'verified_copy',lambda *args: (_ for _ in ()).throw(OSError('drive disconnected')))

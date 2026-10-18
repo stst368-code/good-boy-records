@@ -1,6 +1,5 @@
 """Review flags/reasons/manual submit/directory editing in desktop and phone Chromium."""
 import argparse
-import importlib
 import json
 from pathlib import Path
 import sys
@@ -14,8 +13,7 @@ import uvicorn
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-if not (Path(__file__).resolve().parents[1]/'gbr_review').is_dir():sys.modules['gbr_review']=importlib.import_module('review')
-from gbr_review.app import create_app
+from review.app import create_app
 
 
 def ready(page):
@@ -40,7 +38,7 @@ def main():
             path=inp/f'track-{i}.flac';sf.write(path,.1*np.sin(2*np.pi*(210+i*37)*t),sr,subtype='PCM_24');path.with_suffix('.yaml').write_text(f'title: Track {i}\ngenre: Chiptune\ncluster: Electronic\n')
         config=root/'config.json';config.write_text(json.dumps({'input_directories':[str(inp)],'port':18768}))
         app=create_app(config,start_worker=True);s=app.state.service
-        server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=18768,log_level='error',loop='gbr_review.server_loop:create_loop'))
+        server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=18768,log_level='error',loop='review.server_loop:create_loop'))
         thread=threading.Thread(target=server.run,daemon=True);thread.start()
         try:
             deadline=time.monotonic()+40
@@ -56,14 +54,14 @@ def main():
                 first=current(s);reason='A strong chorus.\nWorth returning to. 012345 N B F'
                 page.locator('#reason').fill(reason);page.locator('#reason').press('End');page.keyboard.type(' 5432');assert s.db.one('SELECT COUNT(*) AS n FROM reviews')['n']==0
                 assert page.locator('.rating-values [aria-pressed=true]').count()==0
-                page.locator('#trackFlagsMenu summary').click();page.locator('#distributionFlag').check();page.wait_for_function("()=>!document.getElementById('bookmarkFlag').disabled")
-                page.locator('#bookmarkFlag').check();page.wait_for_function("()=>!document.getElementById('bookmarkFlag').disabled")
+                page.locator('#distributionFlag').click();page.wait_for_function("()=>!document.getElementById('bookmarkFlag').disabled")
+                page.locator('#bookmarkFlag').click();page.wait_for_function("()=>!document.getElementById('bookmarkFlag').disabled")
                 assert s.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(first,))['status']=='selected'
                 assert s.db.one('SELECT COUNT(*) AS n FROM bookmarks')['n']==1
-                page.locator('#trackFlagsMenu summary').click();page.locator('#selectionTab').click();page.locator('#selectionStatus').select_option('selected');page.wait_for_selector('.candidate');assert page.locator('#selectionBucket').input_value()=='';page.locator('#selectionBookmarks').select_option('only');page.wait_for_selector('.candidate')
+                page.locator('#selectionTab').click();page.locator('#selectionStatus').select_option('selected');page.wait_for_selector('.candidate');assert page.locator('#selectionBucket').input_value()=='';page.locator('#selectionBookmarks').select_option('only');page.wait_for_selector('.candidate')
                 card=page.locator(f'.candidate[data-generation-id="{first}"]');assert card.locator('select').input_value()=='selected'
                 card.locator('select').select_option('not_selected');page.wait_for_timeout(150);page.locator('#reviewTab').click()
-                page.locator('#trackFlagsMenu summary').click();page.wait_for_function("()=>!document.getElementById('distributionFlag').checked");assert page.locator('#bookmarkFlag').is_checked();page.locator('#trackFlagsMenu summary').click()
+                page.wait_for_function("()=>document.getElementById('distributionFlag').getAttribute('aria-pressed')==='false'");assert (page.locator('#bookmarkFlag').get_attribute('aria-pressed')=='true');
                 assert page.locator('#reason').input_value()==reason+' 5432'
                 page.locator('#autoplayNext').check();page.locator('#play').click();page.wait_for_function("()=>!document.getElementById('audio').paused")
                 score(page);page.wait_for_function("()=>document.querySelectorAll('.rating-values [aria-pressed=true]').length===0");ready(page)
@@ -71,10 +69,10 @@ def main():
                 review=s.db.one('SELECT * FROM reviews');assert review['generation_id']==first and review['reason']==reason+' 5432'
                 assert json.loads(review['flags_json'])['bookmarked'] and not json.loads(review['flags_json'])['distribution']
                 second=current(s);assert second!=first and page.locator('#reason').input_value()==''
-                assert not page.locator('#distributionFlag').is_checked() and not page.locator('#bookmarkFlag').is_checked()
+                assert not (page.locator('#distributionFlag').get_attribute('aria-pressed')=='true') and not (page.locator('#bookmarkFlag').get_attribute('aria-pressed')=='true')
                 # Manual mode works at phone width and persists on reload.
                 page.set_viewport_size({'width':390,'height':844});page.locator('#autoSubmit').uncheck();assert page.locator('#submitReview').is_visible() and page.locator('#submitReview').is_disabled()
-                page.locator('#reason').fill('Manual review\nReady to save');page.locator('#trackFlagsMenu summary').click();page.locator('#distributionFlag').check();page.wait_for_function("()=>!document.getElementById('bookmarkFlag').disabled");page.locator('#bookmarkFlag').check();page.wait_for_function("()=>!document.getElementById('bookmarkFlag').disabled");page.locator('#trackFlagsMenu summary').click();score(page,'4444');assert s.db.one('SELECT COUNT(*) AS n FROM reviews')['n']==1
+                page.locator('#reason').fill('Manual review\nReady to save');page.locator('#distributionFlag').click();page.wait_for_function("()=>!document.getElementById('bookmarkFlag').disabled");page.locator('#bookmarkFlag').click();page.wait_for_function("()=>!document.getElementById('bookmarkFlag').disabled");score(page,'4444');assert s.db.one('SELECT COUNT(*) AS n FROM reviews')['n']==1
                 assert page.locator('#submitReview').is_enabled()
                 if args.screenshots:
                     out=Path(args.screenshots);out.mkdir(parents=True,exist_ok=True);page.screenshot(path=str(out/'phone-manual-review.png'),full_page=True)
@@ -87,11 +85,11 @@ def main():
                 page.route('**/api/tracks/*/review',fail_review);page.locator('#submitReview').click();page.wait_for_function("()=>document.getElementById('reviewMessage').textContent.includes('entries are retained')")
                 assert page.locator('#reason').input_value()=='Manual review\nReady to save' and page.locator('.rating-values [aria-pressed=true]').count()==4
                 assert s.db.one('SELECT COUNT(*) AS n FROM reviews')['n']==1
-                assert page.locator('#distributionFlag').is_checked() and page.locator('#bookmarkFlag').is_checked()
+                assert (page.locator('#distributionFlag').get_attribute('aria-pressed')=='true') and (page.locator('#bookmarkFlag').get_attribute('aria-pressed')=='true')
                 page.locator('#submitReview').click();page.wait_for_function("()=>document.querySelectorAll('.rating-values [aria-pressed=true]').length===0");ready(page)
                 assert s.db.one('SELECT reason FROM reviews WHERE generation_id=?',(second,))['reason']=='Manual review\nReady to save'
                 assert page.locator('#reason').input_value()==''
-                assert not page.locator('#distributionFlag').is_checked() and not page.locator('#bookmarkFlag').is_checked()
+                assert not (page.locator('#distributionFlag').get_attribute('aria-pressed')=='true') and not (page.locator('#bookmarkFlag').get_attribute('aria-pressed')=='true')
                 page.unroute('**/api/tracks/*/review');page.reload();ready(page);assert not page.locator('#autoSubmit').is_checked()
                 # Saved reason is loaded with Back, and blank corrections are valid.
                 page.locator('#back').click();page.wait_for_selector('#correctionBadge:not([hidden])');assert page.locator('#reason').input_value()=='Manual review\nReady to save'

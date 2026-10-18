@@ -20,6 +20,7 @@ sys.path.insert(0, str(WORKER))
 sys.path.insert(0, str(ROOT / "_98_Database"))
 from gbr_worker.contract import PROTOCOL, execution_target, file_sha, validate_job
 from gbr_worker.runpod import RemotePending, RunpodClient
+from gbr_worker.serverless import ServerlessClient
 
 
 def now():
@@ -50,10 +51,10 @@ def make_job(run, base, attempt_id, directory, revision=None):
     return validate_job(job, require_local=False)
 
 
-def reserve_output(conn, run, output_root):
+def reserve_output(conn, run, output_root, layout='legacy'):
     row = conn.execute("SELECT * FROM generation_execution_state WHERE run_id=?", (run["id"],)).fetchone()
     if row:
-        if Path(row["output_directory"]).parent != output_root:
+        if not Path(row["output_directory"]).resolve().is_relative_to(output_root.resolve()):
             raise ValueError("This run already reserved a different output directory")
         return dict(row)
     prefix = re.sub(r"[^a-z0-9]+", "-", (run["title"] + "-" + run["effective"].get("style", "music")).casefold()).strip("-") or "track"
@@ -69,7 +70,13 @@ def reserve_output(conn, run, output_root):
     conn.execute("UPDATE generation_output_counters SET last_value=MAX(last_value,?)+1 WHERE title_key=?", (prior, prefix))
     number = conn.execute("SELECT last_value FROM generation_output_counters WHERE title_key=?", (prefix,)).fetchone()[0]
     stem = f"{prefix}-{number:04d}"
-    directory = output_root / run["id"]
+    directory = output_root / run['id']
+    if layout != 'legacy':
+        group = run['title'] if layout == 'track' else run.get('album') or 'no-album' if layout == 'album' else None
+        if group:
+            group = re.sub(r'[^a-z0-9]+', '-', group.casefold()).strip('-')[:100] or 'untitled'
+            output_root = output_root / group
+        directory = output_root / (stem + '--' + run['id'][:8])
     conn.execute("INSERT INTO generation_execution_state VALUES(?,?,?,?)", (run["id"], run.get("model_revision"), stem, str(directory)))
     return {"run_id": run["id"], "model_revision": run.get("model_revision"), "output_stem": stem, "output_directory": str(directory)}
 
@@ -164,7 +171,8 @@ def publish_bundle(directory, run, state, result, source, attempt_id, timezone_n
         for block in handle.blocks(blocksize=65536, dtype="float32"):
             if not np.isfinite(block).all():
                 raise ValueError("Worker FLAC failed decode verification")
-    bundle = directory / "bundle"
+    final.parent.mkdir(parents=True, exist_ok=True)
+    bundle = final.parent / ('.gbr-' + attempt_id)
     bundle.mkdir()
     stem = state["output_stem"]
     completed_at = datetime.fromisoformat(result["completed_at"])
@@ -187,9 +195,10 @@ def publish_bundle(directory, run, state, result, source, attempt_id, timezone_n
     marker = {"format_version": 1, "run_id": run["id"], "attempt_id": attempt_id,
               "source_sha256": run["source_sha256"], "completed_at": result["completed_at"],
               "files": files, "worker_result": result, "yaml_timezone": timezone_name}
+    marker['worker_audio_sha256'] = file_sha(audio)
     write_new(bundle / "generation.json", json_text(marker).encode("utf-8"))
     final.parent.mkdir(parents=True, exist_ok=True)
-    # Bundle creation and destination share a filesystem (both below the batch workspace).
+    # Stage in the destination parent so publication is atomic across output-drive choices.
     # Windows/POSIX rename refuses replacement of a nonempty published bundle.
     bundle.rename(final)
     return validate_bundle(final, run, state)
@@ -215,9 +224,13 @@ def recover(manifest_path, run_id, *, remote_stopped=False):
     with closing(open_database(manifest["database"])) as conn, conn:
         upgrade_database(conn)
         conn.execute("BEGIN IMMEDIATE")
+        if conn.execute('SELECT status FROM generation_runs WHERE id=?', (run_id,)).fetchone()[0] == 'succeeded':
+            artifacts = conn.execute('SELECT uri,sha256 FROM generation_artifacts WHERE run_id=?', (run_id,)).fetchall()
+            if artifacts and all(Path(a['uri']).is_file() and file_sha(a['uri']) == a['sha256'] for a in artifacts):
+                return {'run_id': run_id, 'status': 'succeeded', 'output': str(Path(artifacts[0]['uri']).parent)}
         state = conn.execute("SELECT * FROM generation_execution_state WHERE run_id=?", (run_id,)).fetchone()
         active = conn.execute("SELECT * FROM generation_attempts WHERE run_id=? AND status='running'", (run_id,)).fetchall()
-        if any(a["execution_mode"] == "runpod_dedicated" for a in active) and not remote_stopped:
+        if any(a["execution_mode"] in {'runpod_dedicated', 'runpod_serverless'} for a in active) and not remote_stopped:
             raise ValueError("Remote work may still be running. Use execute --resume-remote to collect it, or recover --remote-stopped only after stopping the pod worker")
         for attempt in active:
             work = Path(manifest_path).resolve().parent / "attempts" / attempt["id"]
@@ -232,6 +245,38 @@ def recover(manifest_path, run_id, *, remote_stopped=False):
             raise ValueError("Only an interrupted running job requires recovery")
         conn.execute("UPDATE generation_runs SET status='failed' WHERE id=?", (run_id,))
         return {"run_id": run_id, "status": "failed", "retry": "execute --retry-failed"}
+
+
+def cleanup_outputs(manifest_path, *, runpod_identity=None):
+    """Retry acknowledgement only after all published artifacts still verify, including after archive."""
+    manifest_path = Path(manifest_path).resolve(strict=True)
+    manifest = verify_plan(manifest_path)
+    runs = {run['id']: run for run in manifest['runs']}
+    cleaned = []
+    with closing(open_database(manifest['database'])) as conn:
+        for pending in manifest_path.parent.glob('attempts/*/cleanup-pending.json'):
+            directory = pending.parent
+            job = json.loads((directory / 'request.json').read_text())
+            run = runs.get(job['run_id'])
+            if not run or job['attempt_id'] != directory.name:
+                raise ValueError('Cleanup reference differs from the frozen attempt')
+            state = conn.execute('SELECT status FROM generation_runs WHERE id=?', (run['id'],)).fetchone()
+            artifacts = conn.execute('SELECT uri,sha256 FROM generation_artifacts WHERE run_id=?', (run['id'],)).fetchall()
+            if not state or state['status'] != 'succeeded' or len(artifacts) < 4 or not all(
+                    Path(a['uri']).is_file() and file_sha(a['uri']) == a['sha256'] for a in artifacts):
+                raise ValueError('Published files do not verify; remote output retained')
+            backend, address = execution_target(run['execution'])
+            if backend == 'runpod_dedicated':
+                reference = json.loads((directory / 'remote.json').read_text())
+                client = RunpodClient(address, runpod_identity, release=reference.get('release'))
+            elif backend == 'runpod_serverless':
+                client = ServerlessClient(address)
+            else:
+                raise ValueError('Local output has no remote cleanup')
+            client.acknowledge(job, directory)
+            pending.unlink()
+            cleaned.append(job['attempt_id'])
+    return {'cleaned_attempts': cleaned}
 
 
 def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, timezone_name="Europe/London",
@@ -252,8 +297,10 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             raise FileNotFoundError("Worker Python is missing; install the local worker: " + str(python))
         if backend == "runpod_dedicated":
             RunpodClient(address, runpod_identity)
+        elif backend == 'runpod_serverless':
+            ServerlessClient(address)
     attempts_root = manifest_path.parent / "attempts"
-    output_root = manifest_path.parent / "outputs"
+    output_root = Path(manifest.get('output_root') or manifest_path.parent / 'outputs')
     results = []
     with closing(open_database(manifest["database"])) as conn:
         upgrade_database(conn)
@@ -266,14 +313,14 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             if status == "succeeded" or status == "failed" and not retry_failed:
                 conn.rollback()
                 continue
-            resuming = status == "running" and resume_remote and backend == "runpod_dedicated"
+            resuming = status == "running" and resume_remote and backend in {'runpod_dedicated', 'runpod_serverless'}
             if resume_remote and not resuming:
                 conn.rollback()
                 continue
             if status not in {"prepared", "failed"} and not resuming:
                 conn.rollback()
                 raise ValueError(f"Run {run['id']} is {status}; use --resume-remote for RunPod or recover for an interrupted local job")
-            state = reserve_output(conn, run, output_root)
+            state = reserve_output(conn, run, output_root, manifest.get('output_layout', 'legacy'))
             if Path(state["output_directory"]).exists():
                 conn.rollback()
                 raise ValueError("A published bundle exists for this run; use recover to reconcile it without generating again")
@@ -306,6 +353,9 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                 elif backend == "runpod_dedicated":
                     reference = json.loads((directory / "remote.json").read_text()) if resuming else {}
                     client = RunpodClient(address, runpod_identity, release=reference.get("release"))
+                    client.run(job, directory, resume=resuming)
+                elif backend == 'runpod_serverless':
+                    client = ServerlessClient(address)
                     client.run(job, directory, resume=resuming)
                 else:
                     with (directory / "stderr.log").open("x", encoding="utf-8") as log:
@@ -345,10 +395,20 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                 marker = publish_bundle(directory, run, state, result, (manifest_path.parent / run["snapshot"]).read_bytes(), attempt_id, timezone_name)
                 with conn:
                     record_output(conn, run, state, marker)
+                audio = directory / 'audio.flac'
+                if audio.is_file() and file_sha(audio) == marker.get('worker_audio_sha256'):
+                    audio.unlink()
+                if not launcher and backend != 'local':
+                    try:
+                        client.acknowledge(job, directory)
+                        (directory / 'cleanup-pending.json').unlink(missing_ok=True)
+                    except Exception:
+                        (directory / 'cleanup-pending.json').write_text(json_text({'run_id': run['id'], 'attempt_id': attempt_id}))
+                        print('Output saved. Remote artifact cleanup needs a retry from Generation.', file=sys.stderr)
             except BaseException as exc:
                 error = f"{type(exc).__name__}: {exc}"
                 marker = None
-                pending = backend == "runpod_dedicated" and isinstance(exc, (RemotePending, KeyboardInterrupt))
+                pending = backend in {'runpod_dedicated', 'runpod_serverless'} and isinstance(exc, (RemotePending, KeyboardInterrupt))
                 if isinstance(exc, KeyboardInterrupt):
                     print("Controller interrupted; reconnect with --resume-remote. The pod continues working." if pending
                           else "Local test interrupted; saving available telemetry.", file=sys.stderr)

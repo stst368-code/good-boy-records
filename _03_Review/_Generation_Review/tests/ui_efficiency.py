@@ -3,7 +3,6 @@
 Uses synthetic media and a temporary database, never a real installation.
 """
 import argparse
-import importlib
 import json
 from pathlib import Path
 import sys
@@ -17,11 +16,9 @@ import uvicorn
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-if not (Path(__file__).resolve().parents[1] / 'gbr_review').is_dir():
-    sys.modules['gbr_review'] = importlib.import_module('review')
-from gbr_review.app import create_app
-from gbr_review.config import Config
-from gbr_review.mobile import enable_http
+from review.app import create_app
+from review.config import Config
+from review.mobile import enable_http
 
 
 def main():
@@ -45,7 +42,7 @@ def main():
         code = enable_http(Config(config))
         app = create_app(config, start_worker=True)
         service = app.state.service
-        server = uvicorn.Server(uvicorn.Config(app, host='0.0.0.0', port=18766, log_level='error', loop='gbr_review.server_loop:create_loop'))
+        server = uvicorn.Server(uvicorn.Config(app, host='0.0.0.0', port=18766, log_level='error', loop='review.server_loop:create_loop'))
         thread = threading.Thread(target=server.run, daemon=True)
         thread.start()
         try:

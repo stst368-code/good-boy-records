@@ -35,6 +35,8 @@ def main(argv=None):
         if command == "plan":
             p.add_argument("--workspace", type=Path, default=ROOT / "_02_Generation" / "runtime")
             p.add_argument("--on-error", choices=("cancel", "drop", "prompt"), default="prompt")
+            p.add_argument('--outputs', type=Path, default=ROOT / '_02_Generation' / 'generated')
+            p.add_argument('--layout', choices=('single', 'track', 'album'), default='single')
     p = sub.add_parser("verify")
     p.add_argument("manifest", type=Path)
     p = sub.add_parser("execute", help="Run frozen jobs locally or on a dedicated RunPod")
@@ -114,7 +116,7 @@ def main(argv=None):
                 answer = input("Drop invalid inputs and prepare the rest? Enter drop; anything else cancels: ").strip()
                 policy = "drop" if answer.casefold() == "drop" else "cancel"
         path = prepare_batch(checked, specification, args.workspace, args.database, input_root=catalogue.root,
-                             error_policy=policy, selection=selection)
+                             error_policy=policy, selection=selection, output_root=args.outputs, output_layout=args.layout)
         print(json_text({"manifest": str(path), "prepared": sum(i.ready for i in checked), "excluded": sum(not i.ready for i in checked)}))
     except BatchRejected as exc:
         print(json_text({"error": str(exc), "inputs": exc.report}), file=sys.stderr)

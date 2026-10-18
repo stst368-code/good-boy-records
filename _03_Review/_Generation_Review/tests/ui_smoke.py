@@ -3,7 +3,6 @@ Run: python tests/ui_smoke.py [--browser /path/to/chromium]
 Requires requirements-dev.txt and `python -m playwright install chromium`.
 """
 import argparse
-import importlib
 import json
 import sys
 import tempfile
@@ -16,9 +15,7 @@ import uvicorn
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-if not (Path(__file__).resolve().parents[1] / 'gbr_review').is_dir():
-    sys.modules['gbr_review'] = importlib.import_module('review')
-from gbr_review.app import create_app
+from review.app import create_app
 
 
 def main():
@@ -30,7 +27,7 @@ def main():
             p.with_suffix('.yaml').write_text(f'title: The Endless Game\ngenre: Chiptune\nsampler_steps: {30+i}\n',encoding='utf-8')
         config=root/'config.json';config.write_text(json.dumps({'input_directories':[str(inp)],'port':18765}))
         app=create_app(config,start_worker=True);service=app.state.service
-        server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=18765,log_level='error',loop='gbr_review.server_loop:create_loop'))
+        server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=18765,log_level='error',loop='review.server_loop:create_loop'))
         thread=threading.Thread(target=server.run,daemon=True);thread.start()
         deadline=time.time()+25
         while time.time()<deadline:

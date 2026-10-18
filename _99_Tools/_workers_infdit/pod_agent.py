@@ -132,6 +132,16 @@ def main():
                 for block in iter(lambda: stream.read(1024 * 1024), b""):
                     sys.stdout.buffer.write(block)
             return 0
+        elif operation == 'acknowledge':
+            if status(directory)['state'] != 'finished' or file_sha(directory / 'result.json') != body['result_sha256']:
+                raise ValueError('Remote result changed; retained on the pod')
+            audio = directory / 'audio.flac'
+            if audio.is_file():
+                if file_sha(audio) != body['audio_sha256']:
+                    raise ValueError('Remote audio changed; retained on the pod')
+                audio.unlink()
+            write_json(directory / 'collected.json', {'audio_sha256': body['audio_sha256'], 'result_sha256': body['result_sha256']})
+            result = {'collected': True}
         else:
             raise ValueError("Unknown pod operation")
     print(canonical(result))

@@ -12,9 +12,11 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / '_02_Generation'))
 sys.path.insert(0, str(ROOT / '_97_App'))
+sys.path.insert(0, str(ROOT / '_03_Review/_Generation_Review'))
 from gbr_generation.catalogue import Styles, validate_template_format
 from platform_commands import dispatch
-from first_local_test import test_database
+from first_local_test import test_database as database_for_test
+from run_gbr import prepare_configuration
 
 
 class SharedReferenceTests(unittest.TestCase):
@@ -29,6 +31,18 @@ class SharedReferenceTests(unittest.TestCase):
             writer = csv.DictWriter(handle, fieldnames=rows[0])
             writer.writeheader(); writer.writerows(rows)
         return Styles(self.root / 'styles.csv')
+
+    def test_fresh_app_watches_generated_inbox_without_creating_an_extra_database(self):
+        path = self.root / 'config.json'
+        config = prepare_configuration(self.root, path)
+        generated = self.root / '_02_Generation/generated'
+        self.assertEqual(config.inputs, [generated])
+        self.assertTrue(generated.is_dir())
+        self.assertFalse(list(self.root.rglob('*.sqlite*')))
+        config.values['input_directories'].insert(0, str(self.root / 'existing-review-inputs'))
+        config.save()
+        again = prepare_configuration(self.root, path)
+        self.assertEqual(again.inputs, [self.root / 'existing-review-inputs', generated])
 
     def test_custom_row_is_selectable_and_preserves_its_provenance(self):
         catalogue = self.catalogue()
@@ -64,11 +78,11 @@ class SharedReferenceTests(unittest.TestCase):
                 validate_template_format(text, 'custom')
 
     def test_test_runs_use_one_shared_database_and_isolation_is_explicit(self):
-        self.assertEqual(test_database(self.root), ROOT / '_98_Database/gbr.sqlite3')
-        self.assertEqual(test_database(self.root, isolated=True), self.root / 'local-test.sqlite3')
-        self.assertEqual(test_database(self.root, database=self.root / 'chosen.sqlite3'), self.root / 'chosen.sqlite3')
+        self.assertEqual(database_for_test(self.root), ROOT / '_98_Database/gbr.sqlite3')
+        self.assertEqual(database_for_test(self.root, isolated=True), self.root / 'local-test.sqlite3')
+        self.assertEqual(database_for_test(self.root, database=self.root / 'chosen.sqlite3'), self.root / 'chosen.sqlite3')
         with self.assertRaises(ValueError):
-            test_database(self.root, isolated=True, database=self.root / 'chosen.sqlite3')
+            database_for_test(self.root, isolated=True, database=self.root / 'chosen.sqlite3')
 
     def test_setup_help_cannot_start_an_install(self):
         with redirect_stdout(io.StringIO()), patch('platform_commands.subprocess.call', side_effect=AssertionError('Must not install')):

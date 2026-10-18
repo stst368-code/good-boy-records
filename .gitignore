@@ -219,10 +219,13 @@ _Reviewed/
 !/_98_Database/tests/
 !/_98_Database/tests/test_*.py
 /_02_Generation/runtime/
+/_02_Generation/generated/
 !/_02_Generation/tests/
 !/_02_Generation/tests/test_*.py
 /_99_Tools/_workers_infdit/runtime/
 !/_03_Review/_Generation_Review/tests/
 !/_03_Review/_Generation_Review/tests/test_*.py
+!/_03_Review/_Generation_Review/tests/ui_*.py
+!/_03_Review/_Generation_Review/tests/conftest.py
 !/_99_Tools/_YAML_Editor/tests/
 !/_99_Tools/_YAML_Editor/tests/test_*.py
