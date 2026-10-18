@@ -15,11 +15,6 @@ from gbr_generation.yaml_document import YamlDocument
 from gbr_worker.contract import execution_target, ssh_endpoint
 from gbr_worker.runpod import RunpodClient
 
-# These are the controls of the tested local example, not a worker's model list.
-LOCAL_CONTROLS = ("model", "dit", "text_encoder", "encoder_cfg", "top_k",
-                  "sampler", "scheduler", "sampler_cfg", "sampler_steps")
-
-
 def test_database(runtime, *, database=None, isolated=False):
     if database is not None and isolated:
         raise ValueError("Choose --database or --isolated, not both")
@@ -45,11 +40,10 @@ def prepare_inputs(*, filename=None, built=None, template_id=None, duration=None
             raise ValueError("Choose exactly one catalogue YAML; use a relative path if the filename is ambiguous")
         template_root = ROOT / "_01_Writing" / "_references"
         styles = Styles(template_root / "styles.csv")
-        example = YamlDocument((examples / "_yaml" / "gbr-local-smoke.yaml").read_bytes())
-        specification["batch"] = {key: example.values[key] for key in LOCAL_CONTROLS}
-        specification["batch"]["duration"] = 360 if duration is None else duration
+        # A full-track test uses the input YAML generation fields; only duration is overridden.
+        specification["batch"] = {"duration": 360 if duration is None else duration}
         selection = {"purpose": "local_full_track_test", "files": [str(filename)],
-                     "controls": "local_smoke_profile", "template_selection": None}
+                     "controls": "yaml_parameters", "template_selection": None}
         # A catalogue template is an explicit catalogue mapping, never an interpretation
         # of the legacy YAML version field. Invalid/missing IDs are still preflight errors.
         try:
@@ -89,7 +83,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, epilog=(
         "Full track: --file moses-supposes-punk.yaml --duration 360. "
         "Add --runpod ssh://root@PUBLIC_IP:PORT for GPU-resident execution on a dedicated pod. "
-        "Uses the same smoke controls; seeds come from the YAML or are frozen automatically. "
+        "Full-track generation uses YAML controls; blank values use configured defaults. "
         "Blank captions use the catalogue's original_style template ID. "
         "Duration is an upper bound; the model may finish earlier."))
     parser.add_argument("--prepare-only", action="store_true", help="Freeze an inspectable plan without invoking CUDA")

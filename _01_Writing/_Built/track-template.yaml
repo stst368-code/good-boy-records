@@ -3,6 +3,8 @@ variant_id:
 title:
 cluster:
 version:
+explicit:
+duration:
 model:
 dit:
 text_encoder:

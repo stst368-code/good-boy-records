@@ -3,21 +3,35 @@ variant_id: 2
 title: moses-supposes
 cluster:
 version: post-punk-indie-rock_0001
-model:
-dit:
-text_encoder:
-encoder_cfg:
+model: MiniMaxAI/MiniMax-Music3
+dit: bf16
+text_encoder: bf16
+encoder_cfg: 1.5
 encoder_seed:
-top_k:
-sampler:
-scheduler:
-sampler_cfg:
+top_k: 50
+sampler: euler
+scheduler: flow_match_euler
+sampler_cfg: 1.6
 sampler_seed:
-sampler_steps:
+sampler_steps: 35
 inspiration:
 inspirationyt:
 story:
 caption: |
+  Global Metadata
+  Basic Attributes: roughly 210–240 BPM. Raw Second-Wave Black Metal / Extreme Black Metal. Relentless, primitive, hostile and violently fast from the first second to the final cutoff. The defining feature is an almost uninterrupted barrage of rapid double-kick bass drums and blast beats, with no breakdowns, no half-time sections, no slow passages and no atmospheric respite. Tremolo-picked guitars should remain thin, abrasive and vicious rather than thick modern death-metal chugging. Harmony is cold, dissonant and minor-key, with repeating malignant riff shapes and rapid chord movement rather than technical showcase playing.
+  Global Emotional Progression: Begin at maximum hostility and remain there. Verses, choruses and bridge should change through riff shape, vocal phrasing and cymbal pattern rather than through reduced intensity. Every section should feel like another stage of the same uncontrolled attack. The final section becomes even more frantic through denser blasting, harsher tremolo movement and increasingly desperate vocals before ending abruptly.
+  Application Scenarios & Imagery: A tiny underground venue, concrete walls, deafening amplifiers, sweat, feedback and a band performing with almost reckless physical intensity.
+  Sonics & Production Profile: Raw, abrasive and close. Guitars are sharp and grainy, bass is dirty but audible, drums are fast and physical, and the kick remains clearly perceptible beneath the blast beats. Avoid polished modern metal production, cinematic layers, orchestration, electronic elements and spacious atmospheric passages.
+  Vocal Details
+  Vocal Gender & Timbre: Singer A (Female), an extremely harsh female black-metal vocalist with piercing upper-register screams, torn rasps and occasional deeper throat-driven shrieks.
+  Vocal Style: Continuous extreme screaming with no clean singing, whispering or melodic relief. Verses use frantic clipped phrases and savage sustained screams. Choruses become wider and more hysterical through doubled screams rather than melodic hooks. The bridge remains equally fast and violent, with prolonged desperate screams layered over uninterrupted blasting. The final passage should sound physically exhausted but increasingly ferocious.
+  Harmony/Backing Vocals: Sparse doubled screams and occasional distant shriek layers only. No sung harmony or choir.
+  Vocal FX: Minimal processing. Short dirty room reverb, light saturation and occasional raw doubling. Keep the voice painfully close and human.
+  Arrangement
+  Instrument Lifecycle: Tremolo-picked distorted guitars, distorted bass and full-speed acoustic drums enter almost immediately and remain active throughout. Do not remove the drums, guitars or bass for transitions.
+  Groove & Foundation Progression: Maintain continuous high-speed double-kick and blast-beat propulsion across intro, verses, choruses, bridge and outro. Never drop into half-time. Never introduce a breakdown. Never reduce the pulse for dramatic contrast. Section changes come from alternating blast-beat patterns, snare emphasis, ride or crash changes, tremolo riff substitutions and short fills while preserving maximum forward momentum.
+  Embellishments, Textures & Spatial FX: Brief amplifier feedback and cymbal wash may mark transitions, but never interrupt the attack. Avoid solos, clean guitar, acoustic passages, ambient interludes and extended instrumental pauses. Finish with either an instantaneous full-band cutoff or a final violent chord struck directly out of the ongoing blast.
 lyrics: |
   [intro]
   moses... supposes... 
@@ -100,8 +114,8 @@ lyrics: |
   five fat frogs flipped fast from five flat logs
   six slick snakes slipped straight through six small slots
   while seven shocked sheep shouted stop!
-  i ate eight, or eighty eight, eight past eight, getting late
-  but nine nine nine never navigated nine niggling numbered narratives
+  i ate eight, or i ate eighty eight, eight past eight, i ate late
+  but nine nine nine never navigated nine niggling numbered nar-ra-tives
   (ha-ha-ha-ha)
   [verse]
   red lorry, yellow lorry
@@ -124,11 +138,11 @@ lyrics: |
   hooptie doodie doodle doodle doodie hooptie
   doodle doodle doodie hooptie hooptie hoo
   doodle doodle fuck you
-  (mwah)
+  (mwwwwah!)
   [bridge]
   Very well, very well, very well... where were we?
   the wrist watch witch casts a wicked spell
-  a hiccup in the pick up of the pickled pepper smell
+  a hiccup in the pick up of the pickled prepper smell
   but is a hiccup in a tea cup a hiccup you can pick up (cup)
   if you pick up a hiccup in a tea cup
   that tea cup is now a hiccup cup, a pickup hiccup cup
@@ -138,26 +152,26 @@ lyrics: |
   (you better listen this time...)
   peter piper's preppers were buried in the woods
   those wood chucking woodchucks could tell you more
-  but don't go asking questions down by the sea shore
+  but don't go asking questions of that sea shore whore
   the sharks, skeletons and the sea-shell seller don't know more
   so think of that itty bitty city kitty, always hungry for more
   you can search under five fat frogs and five flat logs
   while the six slick snakes leave seven sleepy sheep shocked
-  you can search the forest faster riding one one who won one
+  you can search the forest faster, riding one one who won one
   or two two who won one too, pick and choose, its up to you
   think about it, thought about it, i thought you thought about
   i'm thinking you thought i thought you thought about it
   but they dont know that i know that they know that i know that they know too
   carrying on.... if you find peter pipers preppers
-  load a red leather yellow lorry, a yellow leather red lorry
+  load a red leather yellow lorry or a yellow leather red lorry
   failing finding pickled preppers the ragged rascal likely ate the lot
   around the ragged rock, he drove his rugged flock, in a little leather frock
   be careful two witches will be watching two wrist watches
   they're there, but they won't help you with your hiccup
-  no pickup hiccup cup or pickle pepper pickup truck
+  no pickup hiccup cup or pickle prepper pickup truck
   but most importantly of all, there is
   no moses, no roses, or no toses to be seen
-  hey!
+  hey! hey! hey!
   [outro]
   a mose a rose a tose
   a rose a tose a mose
