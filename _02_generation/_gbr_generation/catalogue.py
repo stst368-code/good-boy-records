@@ -56,6 +56,11 @@ class Catalogue:
     def __init__(self, root):
         self.root = Path(root).resolve(strict=True)
         self.inputs = []
+        catalogues = []
+        # Fail on a missing/malformed catalogue before recursively scanning YAMLs.
+        for name, variant in (("track_list.csv", False), ("variant_list.csv", True)):
+            required = {"song_id", "filename"} | ({"variant_id"} if variant else set())
+            catalogues.append((name, variant, read_csv(self.root / name, required)))
         files = [p.resolve() for p in self.root.rglob("*")
                  if p.is_file() and p.suffix.lower() in {".yaml", ".yml"} and p.name != "track-template.yaml"
                  and p.resolve().is_relative_to(self.root)]
@@ -63,9 +68,8 @@ class Catalogue:
         for path in files:
             if path.is_relative_to(self.root):
                 by_name.setdefault(path.name.casefold(), []).append(path)
-        for name, variant in (("track_list.csv", False), ("variant_list.csv", True)):
-            required = {"song_id", "filename"} | ({"variant_id"} if variant else set())
-            for number, row in enumerate(read_csv(self.root / name, required), 2):
+        for name, variant, rows in catalogues:
+            for number, row in enumerate(rows, 2):
                 problems = []
                 ids = []
                 for field_name, value in (("song_id", row["song_id"]), ("variant_id", row.get("variant_id", "1"))):

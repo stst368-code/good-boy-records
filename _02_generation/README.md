@@ -138,6 +138,14 @@ duplicate or missing IDs, missing files, duplicate YAML keys, invalid types,
 catalogue disagreements and unsupported generation controls. Do not silently
 repair source YAMLs or guess missing identities.
 
+The app resolves a blank catalogue path, the repository folder or `_01_writing`
+to `_01_writing/_built` when that container has no catalogue of its own. Relative
+paths resolve from the repository, and legacy directory spellings remain usable.
+Loading, saved preferences and batch checks use the same resolved directory;
+Load displays that directory in the path field. Changing the folder clears the
+previous track selection. Explicit custom catalogue folders stay supported;
+an invalid custom folder reports its error instead of selecting another library.
+
 Show errors per input before GPU work. The user can exclude specified invalid
 inputs and run the remainder, or cancel the batch, fix inputs, and revalidate.
 Record exclusions and their reasons with the frozen selection. Review-based

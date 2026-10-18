@@ -45,6 +45,26 @@ class GenerationService:
         return bool(self.review.db.one("SELECT 1 FROM sqlite_master WHERE name='platform_migration_report'")
                     and self.review.db.one('SELECT 1 FROM platform_migration_report WHERE id=1'))
 
+    def catalogue_root(self, value=None):
+        """Use the same writing location for preferences, loading and previewing.
+
+        Blank paths and the repository/writing containers mean the standard
+        catalogue. Explicit custom catalogues stay explicit, including errors.
+        """
+        repository = self.root.resolve()
+        default = repository / '_01_writing' / '_built'
+        text = str(value or '').strip()
+        if not text:
+            return default.resolve()
+        candidate = Path(relocated_path(text, root=repository)).expanduser()
+        if not candidate.is_absolute():
+            candidate = repository / candidate
+        candidate = candidate.resolve()
+        has_catalogue = any((candidate / name).is_file() for name in ('track_list.csv', 'variant_list.csv'))
+        if candidate in {repository, default.parent} and not has_catalogue:
+            return default.resolve()
+        return candidate
+
     def preferences(self):
         saved = deepcopy(self.review.config.values.get('generation', {}))
         keys = key_candidates()
@@ -61,7 +81,7 @@ class GenerationService:
             except (OSError, ValueError, KeyError):
                 pass
         return {'connections': connections, 'key_candidates': keys, 'parameters': saved.get('parameters', DEFAULT_PARAMETERS),
-                'input_root': relocated_path(saved.get('input_root', str(self.root / '_01_writing/_built'))),
+                'input_root': str(self.catalogue_root(saved.get('input_root'))),
                 'output_root': str(self.generated), 'layout': saved.get('layout', 'single'),
                 'storage_endpoint': saved.get('storage_endpoint', os.environ.get('GBR_S3_ENDPOINT', '')),
                 'storage_bucket': saved.get('storage_bucket', os.environ.get('GBR_S3_BUCKET', '')),
@@ -76,7 +96,8 @@ class GenerationService:
             saved = deepcopy(self.review.config.values.get('generation', {}))
             connections = [c for c in saved.get('connections', []) if connection_key(c) != connection_key(connection)]
             saved['connections'] = [*connections, connection]
-            for key in ('input_root', 'parameters', 'layout', 'storage_endpoint', 'storage_bucket', 'storage_region'):
+            saved['input_root'] = str(self.catalogue_root(data.get('input_root', saved.get('input_root'))))
+            for key in ('parameters', 'layout', 'storage_endpoint', 'storage_bucket', 'storage_region'):
                 if key in data:
                     saved[key] = data[key]
             for key, value in data.get('secrets', {}).items():
@@ -93,7 +114,7 @@ class GenerationService:
         return root, Styles(root / 'styles.csv')
 
     def catalogue(self, root=None):
-        catalogue = Catalogue(root or self.root / '_01_writing/_built')
+        catalogue = Catalogue(self.catalogue_root(root))
         rows = []
         for item in catalogue.inputs:
             try:
@@ -111,7 +132,7 @@ class GenerationService:
         if not self.shared_ready():
             raise ValueError('Open GBR through _97_app with the migrated shared database before generating')
         connection = normalize(data['connection'])
-        catalogue = Catalogue(relocated_path(data['input_root']))
+        catalogue = Catalogue(self.catalogue_root(data.get('input_root')))
         selected = catalogue.select(all_inputs=data.get('all_inputs', False), songs=data.get('songs', []),
             albums=data.get('albums', []), files=data.get('files', []), order=data.get('order', 'selection'))
         rating_filter = data.get('rating_filter')
