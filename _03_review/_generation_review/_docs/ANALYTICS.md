@@ -1,6 +1,8 @@
 # Data access and GBR analytics integration
 
-The review tool writes its own `data/review.sqlite`. It does not overwrite GBR’s existing `data/analytics.sqlite`. Existing GBR analytics can read this database or import exports. No existing GBR repository or importer was supplied for this build, so a repository-specific merge has not been tested.
+The platform launcher uses the shared `_98_database/gbr.sqlite3`. Standalone
+review can select another database through configuration or `--database`.
+Analytics can read the selected database or consume its CSV, JSON and Parquet exports.
 
 ## Identifiers and units
 
@@ -132,3 +134,57 @@ Queue, Back, scoring, skip, reassessment and candidate APIs now require `X-GBR-R
 ## Version 1.3 review context
 
 Reason and flag snapshots belong to individual review revisions; exports have JSON schema version 3. `bookmarks`/`bookmark_history` are reviewer-specific datasets. See [REVIEW_CONTEXT.md](REVIEW_CONTEXT.md) for fields/endpoints. Unreviewed distribution intentions are excluded from the publishing manifest until reviewed.
+
+## Version 1.6 observations (JSON schema 4)
+
+`review_dataset` and `review_history_dataset` add `tags_json` and
+`tags_recorded`; generation analytics add `review_tags_json` and
+`tags_recorded`. Tabular tag lists are JSON strings containing stable IDs,
+polarity and current readable labels/categories, including disabled tags.
+`tags_recorded=0` means an older client/review did not supply tag data; 1 with an
+empty list means no observations were selected. Neither case expresses approval
+or criticism. Existing reasons remain separate and unchanged.
+
+Additional CSV/JSON/Parquet dataset kinds:
+
+| Kind | Contents |
+| --- | --- |
+| `review_tags` | One row per selected tag/review revision, with reviewer, recording, generation settings, genre/cluster and four scores. |
+| `tag_definitions` | Stable vocabulary IDs, current labels, ordering and active status. |
+| `tag_summary` | Positive/negative counts over latest revisions per reviewer/recording, distinct recordings, denominator and score averages. |
+
+`review_tag_dataset` retains every revision and identifies
+`is_current_review` (latest per reviewer/assessment) and
+`is_latest_recording_review` (latest across reviewers). It joins the generation
+actually reviewed, so inherited YAML provenance rows cannot multiply counts.
+For historical revision analyses select explicitly; ordinary frequency reports
+use `is_current_review=1`.
+
+`GET /api/review-tags/analytics?group_by=text_encoder,dit,sampler,scheduler`
+returns separate population and observed-tag tables. Other grouping fields are
+`reviewer_id`, `encoder_cfg`, `top_k`, `sampler_cfg`, `sampler_steps`, `song_id`,
+`genre`, and `cluster`. An optional `reviewer=<id>` scopes both tables. Unknown
+hardware/settings remain NULL groups. Population rows distinguish reviewed
+recordings, current reviews, reviews supplying tag data and tagged recordings.
+Observation rows include four score averages and
+`recording_frequency=recordings/reviewed_recordings`. Missing selections do not
+create positive/negative rows. Multiple reviewers may give opposite observations
+for one recording: report reviewer counts alongside distinct recording counts;
+do not sum polarity counts as though they were disjoint recordings.
+
+For direct SQL, for example:
+
+```sql
+SELECT text_encoder,dit,sampler,scheduler,tag_id,polarity,
+       COUNT(DISTINCT audio_id) AS recordings,
+       COUNT(DISTINCT review_id) AS reviews,
+       AVG(audio_quality),AVG(composition),AVG(consistency),AVG(realism)
+FROM review_tag_dataset
+WHERE is_current_review=1
+GROUP BY text_encoder,dit,sampler,scheduler,tag_id,polarity;
+```
+
+Review JSON exports also include vocabulary, reviewer/assessment records and
+review history for lossless reimport. See REVIEW_CONTEXT.md for the import
+identity checks and migration behaviour. JSON's new schema version is 4; older
+top-level dataset names and existing fields remain available.

@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import sys
 import uuid
 
 DIRECTORIES = {
@@ -114,6 +115,48 @@ def _sha(path):
     return h.digest()
 
 
+def _native_created(pid):
+    """Check a saved controller identity before psutil has been installed.
+
+    PID existence alone is insufficient: Windows regularly reuses old PIDs.
+    """
+    if os.name == 'nt':
+        import ctypes
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        handle = kernel.OpenProcess(0x1000, False, pid)
+        if not handle:
+            if ctypes.get_last_error() == 5:
+                raise RuntimeError('Cannot inspect saved controller process ' + str(pid) + '; close that GBR controller before migrating directories.')
+            return None
+        kernel.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+        kernel.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        times = [wintypes.FILETIME() for _ in range(4)]
+        try:
+            exit_code = wintypes.DWORD()
+            if not kernel.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                raise RuntimeError('Cannot read controller process state: ' + str(pid))
+            if exit_code.value != 259:  # STILL_ACTIVE
+                return None
+            if not kernel.GetProcessTimes(handle, *(ctypes.byref(t) for t in times)):
+                raise RuntimeError('Cannot read controller process creation time: ' + str(pid))
+            return ((times[0].dwHighDateTime << 32) | times[0].dwLowDateTime) / 10_000_000 - 11644473600
+        finally:
+            kernel.CloseHandle(handle)
+    try:
+        stat = Path('/proc', str(pid), 'stat').read_text().rpartition(')')[2].split()
+        if stat[0] == 'Z':
+            return None
+        boot = int(next(line.split()[1] for line in Path('/proc/stat').read_text().splitlines() if line.startswith('btime ')))
+        return boot + int(stat[19]) / os.sysconf('SC_CLK_TCK')
+    except (FileNotFoundError, ProcessLookupError):
+        return None
+    except (OSError, StopIteration, ValueError, IndexError) as exc:
+        raise RuntimeError('Cannot inspect saved controller process ' + str(pid)) from exc
+
+
 def _running(root):
     try:
         import psutil
@@ -122,23 +165,54 @@ def _running(root):
     scripts = {'run_gbr.py', 'run_review.py', 'run_generation.py', 'first_local_test.py', 'app_jobs.py', 'worker.py', 'install_worker.py'}
     prefix = str(root).replace('\\', '/').rstrip('/').casefold() + '/'
     commands = []
+    ancestors = set()
     if psutil is not None:
-        for process in psutil.process_iter(['pid', 'cmdline']):
+        try:
+            ancestors = {p.pid for p in psutil.Process().parents()}
+        except psutil.Error:
+            pass
+        for process in psutil.process_iter(['pid', 'cmdline', 'cwd']):
             try:
-                commands.append((process.info['pid'], process.info['cmdline'] or []))
+                commands.append((process.info['pid'], process.info['cmdline'] or [], process.info.get('cwd')))
             except psutil.Error:
                 continue
     elif os.name != 'nt':
         for process in Path('/proc').iterdir():
             if process.name.isdigit():
                 try:
-                    commands.append((int(process.name), (process / 'cmdline').read_text().split('\0')))
+                    commands.append((int(process.name), (process / 'cmdline').read_text().split('\0'), str((process / 'cwd').resolve())))
                 except OSError:
                     pass
-    for pid, args in commands:
-        if pid != os.getpid() and any(arg.replace('\\', '/').casefold().startswith(prefix)
-                                     and (Path(arg.replace('\\', '/')).name in scripts
-                                          or '/.venv/' in arg.replace('\\', '/').casefold()) for arg in args):
+        parent = os.getppid()
+        while parent > 1 and parent not in ancestors:
+            ancestors.add(parent)
+            try:
+                parent = int(next(line.split()[1] for line in Path('/proc', str(parent), 'status').read_text().splitlines() if line.startswith('PPid:')))
+            except (OSError, StopIteration, ValueError):
+                break
+    for pid, args, cwd in commands:
+        if pid == os.getpid():
+            continue
+        matched = False
+        for index, arg in enumerate(args):
+            normalized = arg.replace('\\', '/')
+            if not normalized.startswith('/') and ':' not in normalized and cwd:
+                normalized = str(Path(cwd) / normalized).replace('\\', '/')
+            if normalized.casefold().startswith(prefix) and Path(normalized).name.casefold() in scripts:
+                # py.exe/base Python wait for the venv child. That *same invocation*
+                # is part of this startup, not a second application. Controllers
+                # and unrelated launcher processes still block directory moves.
+                same_startup = (pid in ancestors and Path(normalized).name.casefold() == 'run_gbr.py'
+                                and Path(sys.argv[0].replace('\\', '/')).name.casefold() == 'run_gbr.py'
+                                and args[index+1:] == sys.argv[1:])
+                matched = not same_startup
+                break
+        modules = {'_review', '_review.__main__', 'review', 'review.__main__', '_gbr_generation.app_jobs', 'gbr_generation.app_jobs'}
+        if '-m' in args:
+            index = args.index('-m')
+            in_repo = bool(cwd and (str(cwd).replace('\\', '/').rstrip('/') + '/').casefold().startswith(prefix))
+            matched |= in_repo and index + 1 < len(args) and args[index + 1] in modules
+        if matched:
             raise RuntimeError('Close the running GBR application or generation controller before updating directory names. Process: ' + str(pid))
     locations = {root / p for p in ALIASES if p.endswith('/runtime') or p.endswith('/_runtime')}
     locations |= {root / DIRECTORIES[p] for p in DIRECTORIES if p.endswith('/runtime')}
@@ -147,30 +221,14 @@ def _running(root):
             try:
                 saved = json.loads(path.read_text())
                 if psutil is None:
-                    if os.name == 'nt':
-                        import ctypes
-                        from ctypes import wintypes
-                        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
-                        kernel.OpenProcess.restype = wintypes.HANDLE
-                        handle = kernel.OpenProcess(0x1000, False, saved['pid'])
-                        active = bool(handle) or ctypes.get_last_error() == 5
-                        if handle:
-                            kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-                            kernel.CloseHandle(handle)
-                    else:
-                        try:
-                            os.kill(saved['pid'], 0)
-                            active = True
-                        except ProcessLookupError:
-                            active = False
-                        except PermissionError:
-                            active = True
+                    created = _native_created(saved['pid'])
+                    active = created is not None and abs(created - saved['created']) < .02
                 else:
                     process = psutil.Process(saved['pid'])
-                    active = process.is_running() and abs(process.create_time() - saved['created']) < .01
+                    active = process.is_running() and process.status() != psutil.STATUS_ZOMBIE and abs(process.create_time() - saved['created']) < .01
                 if active:
                     raise RuntimeError('Finish or pause generation and close the app before updating directory names. Active controller: ' + str(path.parent))
-            except (OSError, ValueError, KeyError):
+            except (OSError, ValueError, KeyError, TypeError):
                 continue
             except Exception as exc:
                 if psutil is not None and isinstance(exc, psutil.Error):

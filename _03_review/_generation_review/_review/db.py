@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 from contextlib import closing, contextmanager
 from pathlib import Path
-from . import migration, features_migration
+from . import migration, features_migration, tags
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_version(version INTEGER PRIMARY KEY);
@@ -129,10 +129,12 @@ class Database:
         self.migration_backup = None
         with closing(self.connect()) as conn:
             reviewers_needed = migration.required(conn)
-            if reviewers_needed or features_migration.required(conn):
+            features_needed = features_migration.required(conn)
+            tags_needed = tags.required(conn)
+            if reviewers_needed or features_needed or tags_needed:
                 folder = self.path.parent / "backups"
                 folder.mkdir(parents=True, exist_ok=True)
-                self.migration_backup = folder / (("before-reviewers-" if reviewers_needed else "before-review-features-") + uuid.uuid4().hex + ".sqlite")
+                self.migration_backup = folder / (("before-reviewers-" if reviewers_needed else "before-review-features-" if features_needed else "before-review-tags-") + uuid.uuid4().hex + ".sqlite")
                 with closing(sqlite3.connect(self.migration_backup)) as snapshot:
                     conn.backup(snapshot)
                     if snapshot.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
@@ -141,6 +143,7 @@ class Database:
             conn.executescript(SCHEMA)
             migration.migrate(conn, ANALYTICS_SQL)
             features_migration.migrate(conn, FEATURE_ANALYTICS_SQL)
+            tags.migrate(conn, FEATURE_ANALYTICS_SQL)
 
     def connect(self):
         c = sqlite3.connect(self.path, timeout=30)

@@ -6,11 +6,12 @@ import sqlite3
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from _gbr_layout import migrate, manifest_paths, relocated_path, task_paths
+from _gbr_layout import migrate, manifest_paths, relocated_path, task_paths, _running, _native_created
 
 
 class DirectoryLayoutTests(unittest.TestCase):
@@ -73,10 +74,77 @@ class DirectoryLayoutTests(unittest.TestCase):
         import psutil
         process = self.root / '_02_Generation/runtime/app_jobs/task/process.json'
         process.parent.mkdir(parents=True)
-        process.write_text(json.dumps({'pid': os.getpid(), 'created': 0}))
-        with patch.dict(sys.modules, {'psutil': None}), self.assertRaisesRegex(RuntimeError, 'Active controller'):
+        process.write_text(json.dumps({'pid': os.getpid(), 'created': 12345.0}))
+        with patch.dict(sys.modules, {'psutil': None}), patch('_gbr_layout._native_created', return_value=12345.0), self.assertRaisesRegex(RuntimeError, 'Active controller'):
             migrate(self.root)
         self.assertTrue(process.exists())
+
+    def fake_processes(self, commands, parents=()):
+        class ProcessError(Exception):
+            pass
+        return SimpleNamespace(Error=ProcessError,
+            Process=lambda: SimpleNamespace(parents=lambda: [SimpleNamespace(pid=pid) for pid in parents]),
+            process_iter=lambda attrs: [SimpleNamespace(info={'pid': pid, 'cmdline': args, 'cwd': str(self.root)}) for pid, args in commands])
+
+    def test_bootstrap_ancestor_is_not_a_second_app_but_another_launcher_is(self):
+        args = ['python', str(self.root / '_97_App/run_gbr.py'), '--open']
+        fake = self.fake_processes([(24092, args)], parents=[24092])
+        with patch.dict(sys.modules, {'psutil': fake}), patch.object(sys, 'argv', [args[1], '--open']):
+            _running(self.root)
+        fake = self.fake_processes([(24092, args)], parents=[])
+        with patch.dict(sys.modules, {'psutil': fake}), patch.object(sys, 'argv', [args[1], '--open']), self.assertRaisesRegex(RuntimeError, '24092'):
+            _running(self.root)
+
+    def test_unrelated_python_in_same_environment_does_not_block_startup(self):
+        fake = self.fake_processes([(24092, [str(self.root / '_03_review/_generation_review/.venv/Scripts/python.exe'), '-m', 'pip', '--version'])])
+        with patch.dict(sys.modules, {'psutil': fake}):
+            _running(self.root)
+
+    def test_relative_controllers_and_module_servers_still_block(self):
+        for args in [['python', '_02_generation/_gbr_generation/app_jobs.py'], ['python', '-m', '_review']]:
+            with self.subTest(args=args):
+                fake = self.fake_processes([(24092, args)], parents=[24092])
+                with patch.dict(sys.modules, {'psutil': fake}), self.assertRaisesRegex(RuntimeError, '24092'):
+                    _running(self.root)
+
+    def test_reused_saved_pid_does_not_block_before_dependencies_are_available(self):
+        process = self.root / '_02_Generation/runtime/app_jobs/task/process.json'
+        process.parent.mkdir(parents=True)
+        process.write_text(json.dumps({'pid': os.getpid(), 'created': 0}))
+        with patch.dict(sys.modules, {'psutil': None}):
+            migrate(self.root)
+        self.assertFalse(process.exists())
+
+    def test_windows_native_identity_uses_creation_time_and_checks_exit_status(self):
+        import ctypes
+        kernel = Mock()
+        kernel.OpenProcess.return_value = 123
+        def exit_status(handle, code):
+            code._obj.value = 259
+            return 1
+        kernel.GetExitCodeProcess.side_effect = exit_status
+        epoch = 1792350000.25
+        def times(handle, created, exited, system, user):
+            value = round((epoch + 11644473600) * 10_000_000)
+            created._obj.dwLowDateTime = value & 0xffffffff
+            created._obj.dwHighDateTime = value >> 32
+            return 1
+        kernel.GetProcessTimes.side_effect = times
+        with patch('_gbr_layout.os.name', 'nt'), patch.object(ctypes, 'WinDLL', return_value=kernel, create=True):
+            self.assertAlmostEqual(_native_created(24092), epoch, places=4)
+            def finished(handle, code):
+                code._obj.value = 0
+                return 1
+            kernel.GetExitCodeProcess.side_effect = finished
+            self.assertIsNone(_native_created(24092))
+        self.assertEqual(kernel.CloseHandle.call_count, 2)
+
+    def test_windows_denied_process_inspection_does_not_assume_an_active_controller_is_dead(self):
+        import ctypes
+        kernel = Mock(); kernel.OpenProcess.return_value = 0
+        with patch('_gbr_layout.os.name', 'nt'), patch.object(ctypes, 'WinDLL', return_value=kernel, create=True), patch.object(ctypes, 'get_last_error', return_value=5, create=True):
+            with self.assertRaisesRegex(RuntimeError, 'Cannot inspect'):
+                _native_created(24092)
 
     def test_foreign_paths_and_caption_content_are_not_rewritten(self):
         self.assertEqual(relocated_path('/somewhere/else/_01_Writing/song.yaml', self.root), '/somewhere/else/_01_Writing/song.yaml')

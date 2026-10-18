@@ -34,3 +34,26 @@
 @media(max-width:649px){.topbar{flex-wrap:wrap;gap:4px}nav{width:100%;justify-content:space-between}.tab{padding:6px 8px;font-size:12px}.queue-count{font-size:10px}.queue-toolbar{gap:6px}.reason-field>span{display:inline;margin-left:5px}.review-tools{margin-top:8px}.rating-values button{min-height:46px}.review-footer{gap:6px}.review-footer #reviewMessage{min-width:0}.flag-buttons{gap:5px}}
 @media(min-width:1100px){.reviewer-bar{width:43%;height:36px;margin-bottom:-36px;position:relative;z-index:1}.queue-toolbar{border-top:0;padding-top:0;min-height:36px;margin-bottom:10px}.rating-anchors{font-size:10px;line-height:1.2;--rating-gap:7px}.rating-bracket{height:5px;margin-bottom:3px}.rating-anchor.single{padding-top:8px}.rating-guidance .intended-genre{display:inline;margin-left:4px}.rating{margin-bottom:8px}.technical-heading{display:flex;justify-content:space-between;align-items:center}.technical-heading span{display:inline}.technical-details{font-size:11px}.wave-tools .quiet-button{min-height:30px}.review-footer{margin-top:8px;padding-top:8px}.reason-field>span{display:inline;margin-left:5px}}
 @media(max-width:649px){.rating-values button{min-height:48px}.topbar nav{gap:2px}.topbar nav .tab{padding-left:5px;padding-right:5px;font-size:11px}}
+
+/* Optional observations: each polarity is a direct choice and never submits. */
+.review-tags{grid-column:1/-1;margin:12px 0 2px;border-top:1px solid var(--line);padding-top:8px}
+.tags-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px;font-size:12px}
+.tags-heading strong{font-weight:500}.tags-heading .subtle{font-weight:400;margin-left:7px;font-size:10px}
+.tags-heading .quiet-button{min-height:32px;font-size:11px;padding:4px 8px}
+.tag-groups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 14px}
+.tag-category{min-width:0}.tag-category h3{margin:0 0 5px;color:var(--muted);font-size:10px;font-weight:500;letter-spacing:.04em}
+.review-tag{display:grid;grid-template-columns:32px minmax(0,1fr) 32px;margin-bottom:5px;min-height:32px;border:1px solid #35404a;border-radius:6px;overflow:hidden;background:#141a20}
+.review-tag-label{display:flex;align-items:center;justify-content:center;text-align:center;min-width:0;padding:3px 4px;font-size:11px;line-height:1.15;color:#c2cbd2}
+.review-tag button{border:0;border-radius:0;background:#1c242c;color:#84919b;padding:2px;min-height:32px;font-size:17px;line-height:1}
+.review-tag button:first-child{border-right:1px solid #35404a}.review-tag button:last-child{border-left:1px solid #35404a}
+.review-tag button[data-polarity=negative][aria-pressed=true]{background:#4d2326;color:#ffc2bc;box-shadow:inset 0 0 9px #e65d5d38;text-shadow:0 0 6px #ff7268}
+.review-tag button[data-polarity=positive][aria-pressed=true]{background:#173e30;color:#b7f2ce;box-shadow:inset 0 0 9px #49cf8538;text-shadow:0 0 6px #57dc96}
+.review-tag button:focus-visible{outline:2px solid var(--gold);outline-offset:-3px}.review-tag button:disabled{opacity:.55}
+.tag-timing-hint{margin:0 0 5px;font-size:10px;color:var(--gold)}
+.saved-tags{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.saved-tag{font-size:11px;border:1px solid #44535d;border-radius:5px;padding:3px 6px}.saved-tag.positive{color:#b7f2ce;border-color:#347454}.saved-tag.negative{color:#ffc2bc;border-color:#92554f}
+@media(min-width:1100px){.review-tags{grid-row:5}.tag-groups{grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.review-tag{grid-template-columns:30px minmax(0,1fr) 30px}.review-tag-label{font-size:10px}}
+@media(max-width:649px){.tag-groups{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.review-tag{grid-template-columns:34px minmax(0,1fr) 34px;min-height:38px}.review-tag button{min-height:38px}.tags-heading .subtle{display:block;margin-left:0}.tag-timing-hint{grid-column:1/-1}}
+@media(max-width:359px){.tag-groups{grid-template-columns:1fr}.review-tag{grid-template-columns:44px minmax(0,1fr) 44px}}
+@media(min-width:650px) and (max-width:1099px){.tag-timing-hint{grid-column:1/-1}}
+/* Keep one-click targets stationary when the Reason field loses focus. */
+.reason-field textarea:focus{min-height:44px}

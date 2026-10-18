@@ -109,7 +109,7 @@ def test_exports_include_reason_and_bookmark_dataset(service, tmp_path):
     _, _, gid = track(service);service.set_flags(gid, service.default_reviewer_id, bookmarked=True);complete(service, gid)
     for kind in ('reviews', 'generations', 'bookmarks', 'bookmark_history'):
         output=dataset(service.db, tmp_path/(kind+'.json'), 'json', kind);export=json.loads(output.read_text())
-        assert export['schema_version'] == 3 and export[kind]
+        assert export['schema_version'] == 4 and export[kind]
     assert 'review_reason' in json.loads((tmp_path/'generations.json').read_text())['generations'][0]
 
 

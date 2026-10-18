@@ -1,9 +1,8 @@
 # GBR platform launcher
 
-The first platform increment reuses the established review interface, connected
-to `_98_database/gbr.sqlite3`. It does not yet add generation or bulk YAML screens.
-The shared platform belongs here; reusable worker and editing tools belong in
-`_99_tools`.
+The unified application provides Review, Selection, Generation and YAML editor
+tabs, connected to `_98_database/gbr.sqlite3`. The shared platform belongs here;
+reusable worker and editing tools belong in `_99_tools`.
 
 The native generation controller is available separately for the
 [first local PC test](../_02_generation/LOCAL_TEST.md). Successful FLACs carry
@@ -57,3 +56,10 @@ overwriting either file. Existing cloud worker storage stays in its original
 location so old immutable releases remain collectable. No new setup script or
 extra database is needed. Fresh devices use the same launcher and normal init-db
 or historical import commands.
+
+Startup checks distinguish the launcher's own Python/venv startup chain from
+another running GBR app or controller. Other programs using the same virtual
+environment do not block directory migration. Saved controller PIDs are checked
+against their creation time so a recycled PID does not prevent startup. An
+actual running app/controller still blocks moving its directories; nothing is
+terminated automatically.

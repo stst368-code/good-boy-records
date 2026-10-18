@@ -56,7 +56,8 @@ def main(argv=None):
     export = sub.add_parser("export", help="Export the analytics dataset")
     export.add_argument("--format", choices=("csv", "json", "parquet"), default="csv")
     export.add_argument("--output", default="")
-    export.add_argument("--kind", choices=("generations", "reviews", "events", "segments", "analyses", "review_history", "reviewers", "publishing_history", "preferences", "bookmarks", "bookmark_history"), default="generations")
+    from .exports import EXPORT_TABLES
+    export.add_argument("--kind", choices=tuple(EXPORT_TABLES), default="generations")
     args = p.parse_args(argv)
     config = Config(args.config, allow_insecure_lan=args.command in ('setup','password','mobile'))
     if args.database is not None:

@@ -19,3 +19,31 @@ On Linux/macOS use `.venv/bin/python`. Browser scripts use temporary ports 18765
 Tests never point at the user's real input/archive folders. Cross-filesystem checks use two writable devices when available; otherwise that test skips. A Starlette/httpx test-client deprecation notice may appear without affecting runtime.
 
 See [REFRESH_REVIEW_AND_CHECKS.md](REFRESH_REVIEW_AND_CHECKS.md) for detailed findings, preservation evidence and physical acceptance checks still needed.
+
+
+## Review observations and startup — 1.6.0
+
+Added tests exercise direct positive/negative selection, switching, clearing,
+multiple categories, optional tags and the unchanged fourth-score submission.
+The real-browser flow checks autoplay, selection reset, Back, correction
+revisions, saved Reasons and inactive/renamed vocabulary on desktop and 390/320px
+phone layouts. Both polarity buttons stay rendered throughout.
+
+Database tests cover atomic rollback, retry IDs, all CSV/JSON/Parquet tag datasets,
+JSON export/reimport (including multiple revisions and reasons), conflicting
+imports, missing recordings, large exports, host-only imports and safe/idempotent
+schema-3-to-4 migration with a single verified backup. Analytics tests ensure
+PCM aliases and earlier revisions do not multiply tag frequency counts.
+
+Startup regression tests reproduce launcher-parent and recycled-PID false
+positives, retain real controller guards, and simulate Windows process creation
+time, exit status and denied inspection. These are automated tests on Linux;
+launching on a physical Windows PC still requires installation verification.
+
+Run `pytest _02_generation/_tests _03_review/_generation_review/_tests
+_98_database/_tests _99_tools/_yaml_editor/_tests -q` from the repository root.
+Browser scripts are `ui_smoke.py`, `ui_efficiency.py`, `ui_reviewers.py`,
+`ui_review_context.py`, `ui_generation.py` and `ui_review_tags.py` in the review
+tests directory; each accepts `--browser /path/to/chromium`. Tests use temporary
+databases and synthetic media. GPU inference and a physical LAN are not part
+of these review/startup checks.

@@ -2,6 +2,8 @@ import csv
 import json
 from pathlib import Path
 from .util import atomic_text, dumps, now
+from .review_transfer import bundle
+from .tags import statistics
 
 
 def rows(db):
@@ -16,18 +18,18 @@ def rows(db):
 
 
 EXPORT_TABLES = {"generations": "analytics_dataset", "reviews": "review_dataset", "events": "audio_events", "segments": "segments",
-                 "analyses": "analyses", "review_history": "review_history_dataset", "reviewers": "reviewers", "publishing_history": "publishing_history", "preferences": "preferences", "bookmarks": "bookmarks", "bookmark_history": "bookmark_history"}
+                 "analyses": "analyses", "review_history": "review_history_dataset", "reviewers": "reviewers", "publishing_history": "publishing_history", "preferences": "preferences", "bookmarks": "bookmarks", "bookmark_history": "bookmark_history", "review_tags": "review_tag_dataset", "tag_definitions": "review_tag_definitions", "tag_summary": "review_tag_dataset"}
 
 
 def dataset(db, path, format, kind="generations"):
     if kind not in EXPORT_TABLES:
         raise ValueError("Unknown dataset")
     table = EXPORT_TABLES[kind]
-    data = rows(db) if kind == "generations" else db.all("SELECT * FROM " + table)
+    data = rows(db) if kind == "generations" else statistics(db)['observations'] if kind == 'tag_summary' else db.all("SELECT * FROM " + table)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     if format == "json":
-        atomic_text(path, dumps({"schema_version": 3, "exported_at": now(), kind: data}))
+        atomic_text(path, dumps(bundle(db) if kind == 'reviews' else {"schema_version": 4, "exported_at": now(), kind: data}))
     elif format == "csv":
         with db.connect() as c:
             columns = list(data[0]) if data else [d[0] for d in c.execute("SELECT * FROM " + table + " LIMIT 0").description]

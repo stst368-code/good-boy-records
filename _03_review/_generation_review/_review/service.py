@@ -6,6 +6,7 @@ import random
 import threading
 import time
 import uuid
+from . import tags as review_tags
 from datetime import datetime
 from pathlib import Path
 from .analysis import Analyzer
@@ -124,7 +125,9 @@ class Service:
             if not r:
                 raise Conflict("You can only edit your own reviews", "other_reviewer")
             if r:
-                result.update(review_id=r["id"], scores={k: r[k] for k in ("audio_quality", "composition", "consistency", "realism")}, previous_mode=r["mode"], reason=r['reason'])
+                with closing(self.db.connect()) as c:
+                    tags = review_tags.selections(c, r['id'])
+                result.update(review_id=r["id"], scores={k: r[k] for k in ("audio_quality", "composition", "consistency", "realism")}, previous_mode=r["mode"], reason=r['reason'], tags=tags, tags_recorded=bool(r['tags_recorded']))
         return result
 
     def next(self, peek=False, reviewer_id=None, expected_current=None):
@@ -134,7 +137,7 @@ class Service:
             self.prefetched_id = result["track"]["id"] if peek and result["track"] else None
         return result
 
-    def review(self, gid, scores, mode, expected_review_id=None, listening=None, reassessment=False, reviewer_id=None, reason=None, distribution=None, bookmarked=None, expected_publishing_status=None, submission_id=None, rejected=None):
+    def review(self, gid, scores, mode, expected_review_id=None, listening=None, reassessment=False, reviewer_id=None, reason=None, distribution=None, bookmarked=None, expected_publishing_status=None, submission_id=None, rejected=None, tags=None):
         reviewer_id = reviewer_id or self.default_reviewer_id
         with self.db.transaction() as c:
             g = c.execute("SELECT * FROM generations WHERE id=?", (gid,)).fetchone()
@@ -144,7 +147,8 @@ class Service:
                 saved = c.execute('SELECT * FROM reviews WHERE reviewer_id=? AND submission_id=?', (reviewer_id, submission_id)).fetchone()
                 if saved:
                     flags = json.loads(saved['flags_json'])
-                    if saved['generation_id'] != gid or any(saved[k] != value for k, value in scores.items()) or (reason is not None and saved['reason'] != reason) or (distribution is not None and flags.get('distribution') != distribution) or (bookmarked is not None and flags.get('bookmarked') != bookmarked) or (rejected is not None and flags.get('requested_rejected', flags.get('rejected')) != rejected):
+                    same_tags = tags is None or review_tags.validate(c, tags, saved['id']) == review_tags.selections(c, saved['id'])
+                    if not same_tags or saved['generation_id'] != gid or any(saved[k] != value for k, value in scores.items()) or (reason is not None and saved['reason'] != reason) or (distribution is not None and flags.get('distribution') != distribution) or (bookmarked is not None and flags.get('bookmarked') != bookmarked) or (rejected is not None and flags.get('requested_rejected', flags.get('rejected')) != rejected):
                         raise Conflict('The earlier submission was saved. Use Back to edit that review; your current entries have not been submitted.', 'submission_saved')
                     return {'saved': True, 'review_id': saved['id'], 'already_saved': True}
             session = self.queues.session(c, reviewer_id)
@@ -162,6 +166,9 @@ class Service:
                     raise Conflict("There is no earlier review by you to correct", "other_reviewer")
                 self.queues.require_current(c, reviewer_id, gid, g["audio_id"])
             reason = previous['reason'] if previous and reason is None else reason or ''
+            previous_tags = review_tags.selections(c, previous['id']) if previous else []
+            selected_tags = previous_tags if tags is None else review_tags.validate(c, tags, previous['id'] if previous else None)
+            tags_recorded = int(tags is not None or bool(previous and previous['tags_recorded']))
             flags = self._apply_flags(c, gid, reviewer_id, distribution, bookmarked, expected_publishing_status, rejected)
             automatic_rejection = min(scores.values()) <= 3 and not (flags['distribution'] or flags['bookmarked'])
             if automatic_rejection:
@@ -181,10 +188,13 @@ class Service:
                       (review_id, gid, g["audio_id"], scores["audio_quality"], scores["composition"], scores["consistency"], scores["realism"],
                        average, bucket, timestamp, mode, revision, session["id"], previous["id"] if previous else None, dumps(listening or {}),
                        reviewer_id, assessment_id, previous["assessment_revision"] + 1 if previous else 1, reason, dumps(flags), submission_id))
+            c.execute('UPDATE reviews SET tags_recorded=? WHERE id=?', (tags_recorded, review_id))
+            c.executemany('INSERT INTO review_tags(review_id,tag_id,polarity) VALUES(?,?,?)',
+                          [(review_id, tag['tag_id'], tag['polarity']) for tag in selected_tags])
             c.execute("""INSERT INTO review_history(audio_id,generation_id,action,previous_review_id,review_id,details_json,created_at,reviewer_id,assessment_id)
                        VALUES(?,?,?,?,?,?,?,?,?)""",
                       (g["audio_id"], gid, ("reassessment" if reassessment else "correction") if previous else "review", previous["id"] if previous else None, review_id,
-                       dumps({"scores": scores, "mode": mode, "reason": reason, "flags": flags, "previous_scores": {k: previous[k] for k in scores} if previous else None}), timestamp, reviewer_id, assessment_id))
+                       dumps({"scores": scores, "mode": mode, "reason": reason, "flags": flags, "tags": selected_tags, "tags_recorded": bool(tags_recorded), "previous_tags": previous_tags if previous else None, "previous_scores": {k: previous[k] for k in scores} if previous else None}), timestamp, reviewer_id, assessment_id))
             c.execute("INSERT INTO archive_operations(id,audio_id,generation_id,review_id,bucket,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
                       (uuid.uuid4().hex, g["audio_id"], gid, review_id, bucket, timestamp, timestamp))
             c.execute("UPDATE sessions SET previous_generation_id=?,updated_at=? WHERE id=?", (gid, timestamp, session["id"]))

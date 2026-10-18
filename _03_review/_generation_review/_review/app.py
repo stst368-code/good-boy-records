@@ -21,6 +21,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .config import Config, password_ok
 from .exports import dataset, publishing_manifest, validation
 from .service import Service, Conflict
+from . import tags as review_tags
+from .review_transfer import restore as import_reviews
 from .util import atomic_text, now, dumps, inside
 
 STATIC = Path(__file__).parent / "_static"
@@ -45,6 +47,7 @@ class ReviewBody(StrictBody):
     rejected: StrictBool | None = None
     expected_publishing_status: str | None = None
     submission_id: str | None = Field(default=None, min_length=1, max_length=100)
+    tags: list[dict[str, str]] | None = Field(default=None, max_length=200)
 
 
 class FlagsBody(StrictBody):
@@ -52,6 +55,10 @@ class FlagsBody(StrictBody):
     bookmarked: StrictBool | None = None
     rejected: StrictBool | None = None
     expected_publishing_status: str | None = None
+
+
+class ReviewImportBody(StrictBody):
+    payload: dict
 
 
 class OpenBody(StrictBody):
@@ -140,7 +147,7 @@ def create_app(config_path, start_worker=True, database_path=None):
         yield
         service.close()
 
-    app = FastAPI(title="GBR", version="1.5.0", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="GBR", version="1.6.0", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.service = service
     hosts = {"127.0.0.1", "localhost", "::1", socket.gethostname(), *config.values["allowed_hosts"]}
     host_addresses = {'127.0.0.1', '::1', 'testclient'}
@@ -193,7 +200,8 @@ def create_app(config_path, start_worker=True, database_path=None):
                 origin = request.headers.get("origin")
                 if request.headers.get("x-gbr-request") != "1" or request.headers.get("sec-fetch-site") == "cross-site" or (origin and urlparse(origin).netloc != request.url.netloc):
                     return JSONResponse({"detail": "Same-origin request header required"}, status_code=403)
-                if int(request.headers.get("content-length", "0")) > 100000:
+                limit = 64 * 1024 * 1024 if request.url.path == '/api/import/reviews' else 100000
+                if int(request.headers.get("content-length", "0")) > limit:
                     return JSONResponse({"detail": "Request too large"}, status_code=413)
             if request.url.path not in ("/api/bootstrap", "/api/login") and not authenticated(request):
                 return JSONResponse({"detail": "Sign in required"}, status_code=401)
@@ -242,6 +250,7 @@ def create_app(config_path, start_worker=True, database_path=None):
                 "heartbeat_seconds": min(10, config.values["reservation_seconds"] // 3),
                 "input_directories": [str(p) for p in config.inputs] if authenticated(request) else [],
                 "queue_directories": queue_directories,
+                "review_tags": review_tags.definitions(service.db) if authenticated(request) else [],
                 "durations": {m: config.values[m + "_seconds"] for m in ("fast", "quick", "standard")}}
 
     def reviewer_id(request):
@@ -331,7 +340,7 @@ def create_app(config_path, start_worker=True, database_path=None):
 
     @app.post("/api/tracks/{gid}/review")
     def review(gid: str, body: ReviewBody, request: Request):
-        return service.review(gid, {k: getattr(body, k) for k in ("audio_quality", "composition", "consistency", "realism")}, body.mode, body.expected_review_id, body.listening, body.reassessment, reviewer_id=reviewer_id(request), reason=body.reason, distribution=body.distribution, bookmarked=body.bookmarked, rejected=body.rejected, expected_publishing_status=body.expected_publishing_status, submission_id=body.submission_id)
+        return service.review(gid, {k: getattr(body, k) for k in ("audio_quality", "composition", "consistency", "realism")}, body.mode, body.expected_review_id, body.listening, body.reassessment, reviewer_id=reviewer_id(request), reason=body.reason, distribution=body.distribution, bookmarked=body.bookmarked, rejected=body.rejected, expected_publishing_status=body.expected_publishing_status, submission_id=body.submission_id, tags=body.tags)
 
     @app.get('/api/tracks/{gid}/flags')
     def flags(gid: str, request: Request):
@@ -352,6 +361,11 @@ def create_app(config_path, start_worker=True, database_path=None):
         if not g:
             raise KeyError('Recording not found')
         return {'reviews': service.db.all('SELECT * FROM review_dataset WHERE audio_id=? ORDER BY revision DESC', (g['audio_id'],))}
+
+    @app.get('/api/review-tags/analytics')
+    def tag_analytics(request: Request, group_by: str = '', reviewer: str | None = None):
+        reviewer_id(request)
+        return review_tags.statistics(service.db, [x.strip() for x in group_by.split(',') if x.strip()], reviewer)
 
     @app.post("/api/tracks/{gid}/skip")
     def skip(gid: str, request: Request):
@@ -585,6 +599,11 @@ def create_app(config_path, start_worker=True, database_path=None):
         path = config.data / "exports" / ("gbr-review-" + uuid.uuid4().hex + "." + format)
         dataset(service.db, path, format, kind)
         return FileResponse(path, filename="gbr-review." + format, media_type="application/octet-stream")
+
+    @app.post('/api/import/reviews')
+    def restore_reviews(body: ReviewImportBody, request: Request):
+        require_host(request)
+        return import_reviews(service.db, body.payload)
 
     @app.get("/api/validation")
     def validate():

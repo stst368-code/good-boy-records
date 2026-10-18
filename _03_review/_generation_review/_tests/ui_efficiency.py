@@ -161,6 +161,9 @@ def main():
                 phone.wait_for_function("()=>!document.getElementById('audio').paused")
                 phone.locator('#settingsButton').click()
                 phone.wait_for_selector('#settingsDialog[open]')
+                # Let the host-proxy replies finish before removing interception.
+                # Removing it during a reply makes Chromium mark that route handled.
+                phone.wait_for_load_state('networkidle')
                 assert phone.evaluate("!('serviceWorker' in navigator)")
                 assert not errors, errors
                 print(json.dumps({'autoplay_fast_keyboard_recovery': 'passed', 'nonsecure_http_login_playback': 'passed', 'physical_lan': 'not tested', 'js_errors': errors}))
