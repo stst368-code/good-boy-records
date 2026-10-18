@@ -147,7 +147,7 @@ def create_app(config_path, start_worker=True, database_path=None):
         yield
         service.close()
 
-    app = FastAPI(title="GBR", version="1.6.1", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="GBR", version="1.6.2", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.service = service
     hosts = {"127.0.0.1", "localhost", "::1", socket.gethostname(), *config.values["allowed_hosts"]}
     host_addresses = {'127.0.0.1', '::1', 'testclient'}

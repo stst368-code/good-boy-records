@@ -67,6 +67,64 @@ class GenerationAppTests(unittest.TestCase):
         self.assertEqual(self.source.read_bytes(), self.original)
         self.assertFalse(self.launched)
 
+    def test_load_and_preview_share_default_and_container_root_resolution(self):
+        for value in ['', '   ', str(self.root), str(self.root / '_01_writing'),
+                      '_01_writing/_built', '_01_Writing\\_Built']:
+            with self.subTest(root=value):
+                loaded = self.client.get('/api/generation/catalogue', params={'root': value})
+                self.assertEqual(loaded.status_code, 200, loaded.text)
+                self.assertEqual(Path(loaded.json()['root']), self.built)
+                checked = self.preview(input_root=value, files=['_yaml/gbr-local-smoke.yaml'])
+                self.assertEqual(checked['ready'], 1)
+                self.assertEqual(self.generation.previews[checked['token']]['root'], self.built)
+        self.assertEqual(self.source.read_bytes(), self.original)
+        self.assertFalse((self.root / 'track_list.csv').exists())
+        self.assertFalse(self.launched)
+
+    def test_saved_blank_or_container_paths_are_normalized_without_losing_worker_settings(self):
+        config = self.app.state.service.config
+        for value in [None, '', '   ', str(self.root), str(self.root / '_01_writing')]:
+            with self.subTest(root=value):
+                config.values['generation'] = {'input_root': value, 'storage_bucket': 'keep-bucket',
+                    'parameters': {'sampler_cfg': 2.4}, 'layout': 'album'}
+                returned = self.client.get('/api/generation/preferences').json()
+                self.assertEqual(Path(returned['input_root']), self.built)
+                saved = self.client.post('/api/generation/preferences', headers=self.headers,
+                    json={'input_root': '' if value is None else value, 'connection': {'backend': 'local'}})
+                self.assertEqual(saved.status_code, 200, saved.text)
+                values = json.loads(config.path.read_text())['generation']
+                self.assertEqual(Path(values['input_root']), self.built)
+                self.assertEqual(values['storage_bucket'], 'keep-bucket')
+                self.assertEqual(values['parameters'], {'sampler_cfg': 2.4})
+                self.assertEqual(values['layout'], 'album')
+
+    def test_custom_catalogue_is_used_and_invalid_explicit_folders_do_not_fall_back(self):
+        custom = self.root / 'custom writing'
+        shutil.copytree(self.built, custom)
+        loaded = self.client.get('/api/generation/catalogue', params={'root': str(custom)})
+        self.assertEqual(loaded.status_code, 200, loaded.text)
+        checked = self.preview(input_root=str(custom))
+        self.assertEqual(self.generation.previews[checked['token']]['root'], custom)
+        missing = self.root / 'wrong writing folder'; missing.mkdir()
+        for method in ['load', 'preview']:
+            with self.subTest(action=method):
+                response = self.client.get('/api/generation/catalogue', params={'root': str(missing)}) if method == 'load' else self.client.post(
+                    '/api/generation/preview', headers=self.headers,
+                    json={'input_root': str(missing), 'all_inputs': True, 'connection': {'backend': 'local'}})
+                self.assertEqual(response.status_code, 400, response.text)
+                self.assertIn(str(missing), response.json()['detail'])
+        self.assertFalse(self.launched)
+
+    def test_explicit_catalogue_at_repository_root_remains_supported(self):
+        for name in ['track_list.csv', 'variant_list.csv']:
+            shutil.copyfile(self.built / name, self.root / name)
+        master = self.root / 'track_list.csv'
+        master.write_text(master.read_text().replace('gbr-local-smoke.yaml', '_yaml/gbr-local-smoke.yaml'))
+        shutil.copytree(self.built / '_yaml', self.root / '_yaml')
+        checked = self.preview(input_root=str(self.root), all_inputs=False, files=['_yaml/gbr-local-smoke.yaml'])
+        self.assertEqual(self.generation.previews[checked['token']]['root'], self.root)
+        self.assertEqual(checked['ready'], 1)
+
     def test_successful_start_registers_inbox_and_is_single_use(self):
         checked = self.preview(parameters={'duration': 360}, parameter_priority='form', layout='album')
         response = self.client.post('/api/generation/start', headers=self.headers, json={'token': checked['token']})

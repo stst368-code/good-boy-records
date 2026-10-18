@@ -1,4 +1,4 @@
-const CACHE='gbr-shell-v1.6.0';
+const CACHE='gbr-shell-v1.6.2';
 const SHELL=['/','/static/style.css','/static/base.css','/static/app.js','/static/tags.js','/static/icon.svg','/static/manifest.webmanifest','/tools/yaml-editor/editor.js','/tools/yaml-editor/editor.css','/tools/generation/generation.js','/tools/generation/generation.css'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));

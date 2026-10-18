@@ -53,7 +53,7 @@ def main():
         generated.mkdir(parents=True)
         config = root / 'config.json'
         config.write_text(json.dumps({'database_path': str(database), 'input_directories': [str(generated)],
-            'generation': {'input_root': str(built)}, 'port': 18771}))
+            'generation': {'input_root': ''}, 'port': 18771}))
         app = create_app(config, start_worker=False, database_path=database)
         service, generation = app.state.service, app.state.generation
         generation.root = root
@@ -111,6 +111,26 @@ def main():
                 assert source.read_bytes() == original
                 page.locator('#generationTab').click()
                 page.wait_for_selector('.generation-file')
+                assert page.locator('#genRoot').input_value() == str(built)
+                # A repository/container path loads the standard catalogue and
+                # replaces the visible path with the root actually loaded.
+                page.locator('#genRoot').fill(str(root))
+                assert page.locator('.generation-file').count() == 0
+                page.locator('#genScan').click();page.wait_for_selector('.generation-file')
+                assert page.locator('#genRoot').input_value() == str(built)
+                page.locator('#genSelectVisible').click()
+                assert page.locator('#genSelected').inner_text().startswith('1 selected')
+                # Changing to an invalid folder cannot retain the previous selection.
+                wrong=root/'wrong catalogue';wrong.mkdir()
+                page.locator('#genRoot').fill(str(wrong))
+                assert page.locator('#genSelected').inner_text().startswith('0 selected')
+                with page.expect_response('**/api/generation/catalogue?*') as failed:
+                    page.locator('#genScan').click()
+                assert failed.value.status == 400
+                assert page.locator('.generation-file').count() == 0 and not boundary.calls
+                page.locator('#genRoot').fill('')
+                page.locator('#genScan').click();page.wait_for_selector('.generation-file')
+                assert page.locator('#genRoot').input_value() == str(built)
                 page.locator('#genSelectVisible').click()
                 page.locator('#genPriority').select_option('form')
                 assert page.locator('#genDuration').input_value() == '360'

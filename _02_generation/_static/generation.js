@@ -47,6 +47,8 @@ export function initGeneration({ api, toast, browse }) {
   const state = {
     rows: [],
     selected: new Set(),
+    catalogueRoot: null,
+    scanSequence: 0,
     connections: [],
     token: null,
     preview: null,
@@ -218,11 +220,25 @@ export function initGeneration({ api, toast, browse }) {
     $("genSelected").textContent =
       `${state.selected.size} selected · ${visible().length} shown / ${state.rows.length}`;
   }
+  function clearCatalogue() {
+    state.scanSequence++;
+    state.catalogueRoot = null;
+    state.rows = [];
+    state.selected = new Set();
+    $("genAlbum").replaceChildren(new Option("All albums", ""));
+    invalidate();
+    paintFiles();
+  }
   async function scan() {
+    clearCatalogue();
+    const sequence = state.scanSequence, requestedRoot = $("genRoot").value.trim();
     const result = await api(
       "/generation/catalogue?" +
-        new URLSearchParams({ root: $("genRoot").value }),
+        new URLSearchParams({ root: requestedRoot }),
     );
+    if (sequence !== state.scanSequence || $("genRoot").value.trim() !== requestedRoot) return;
+    $("genRoot").value = result.root;
+    state.catalogueRoot = result.root;
     state.rows = result.inputs;
     state.selected = new Set();
     $("genAlbum").replaceChildren(new Option("All albums", ""));
@@ -259,13 +275,18 @@ export function initGeneration({ api, toast, browse }) {
       !plan.ready || Boolean(plan.invalid && !$("genDropErrors").checked);
   }
   async function preview() {
+    if (!state.catalogueRoot || $("genRoot").value.trim() !== state.catalogueRoot)
+      throw new Error("Load the writing catalogue before checking tracks.");
     if (!state.selected.size)
       throw new Error("Select one or more writing YAMLs first.");
+    const loadedRoot = state.catalogueRoot, files = [...state.selected];
     await save();
+    if (loadedRoot !== state.catalogueRoot || $("genRoot").value.trim() !== loadedRoot)
+      throw new Error("Writing folder changed. Load it again before checking tracks.");
     const body = {
-      input_root: $("genRoot").value,
+      input_root: loadedRoot,
       connection: connection(),
-      files: [...state.selected],
+      files,
       order: $("genOrder").value,
       parameters: parameters(),
       parameter_priority: $("genPriority").value,
@@ -289,7 +310,9 @@ export function initGeneration({ api, toast, browse }) {
           }
         : null,
     };
-    state.preview = await api("/generation/preview", body);
+    const result = await api("/generation/preview", body);
+    if (loadedRoot !== state.catalogueRoot || $("genRoot").value.trim() !== loadedRoot) return;
+    state.preview = result;
     state.token = state.preview.token;
     $("genDropErrors").checked = false;
     paintPlan();
@@ -447,6 +470,7 @@ export function initGeneration({ api, toast, browse }) {
       state.busy = false;
     }
   });
+  $("genRoot").addEventListener("input", clearCatalogue);
   for (const element of root.querySelectorAll("input,select,textarea"))
     if (
       ![
