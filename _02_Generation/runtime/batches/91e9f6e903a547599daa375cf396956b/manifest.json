@@ -1,0 +1,177 @@
+{
+  "format_version": 1,
+  "batch_id": "91e9f6e903a547599daa375cf396956b",
+  "status": "prepared",
+  "created_at": "2026-10-18T12:56:17.691+00:00",
+  "database": "E:\\good-boy-records\\_98_Database\\gbr.sqlite3",
+  "error_policy": "cancel",
+  "selection": {
+    "files": [
+      "_yaml\\dogtushya.yaml"
+    ],
+    "all_inputs": false,
+    "songs": [],
+    "albums": [],
+    "order": "selection",
+    "rating_filter": null,
+    "parameter_priority": "yaml",
+    "template_id": "melodic-dubstep-electronic-pop_0001",
+    "catalogue_captions": true
+  },
+  "specification": {
+    "defaults": {
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "dit": "bf16",
+      "text_encoder": "bf16",
+      "encoder_cfg": 1.5,
+      "top_k": 50,
+      "sampler": "euler",
+      "scheduler": "flow_match_euler",
+      "sampler_cfg": 1.7,
+      "sampler_steps": 35,
+      "duration": 360,
+      "encoder_seed": "auto",
+      "sampler_seed": "auto"
+    },
+    "execution": {
+      "encoding_cache": "prefer",
+      "memory_profile": "resident_stage",
+      "cuda_device": 0,
+      "vram_sample_interval_ms": 100,
+      "conditioning": {
+        "backend": "runpod_dedicated",
+        "address": "ssh://root@69.30.85.49:22146"
+      },
+      "diffusion": {
+        "backend": "runpod_dedicated",
+        "address": "ssh://root@69.30.85.49:22146"
+      }
+    },
+    "model_revision": "fbdf52fbaaca799592917417eb05f1899f1255ec"
+  },
+  "inputs": [
+    {
+      "path": "E:\\good-boy-records\\_01_Writing\\_Built\\_yaml\\dogtushya.yaml",
+      "song_id": "4",
+      "variant_id": "1",
+      "issues": [],
+      "status": "ready",
+      "effective": {
+        "caption": "Global Metadata\nBasic Attributes: bpm is 171. key is A, and scale is minor. Melodic Dubstep / Electronic Pop.\nGlobal Emotional Progression: The track opens with an ethereal and vulnerable atmosphere, establishing a sense of longing through sparse instrumentation. This tension gradually builds through the pre-chorus into a powerful, cathartic release in the drop, where the emotion shifts from introspection to overwhelming surrender. The energy recedes slightly in the second verse before surging again for a final, intensified climax that resolves into a lingering, atmospheric fade-out.\nApplication Scenarios & Imagery: Deep-sea exploration visuals, dramatic slow-motion sequences in film, or immersive gaming moments involving discovery and high stakes. The music evokes the feeling of sinking into deep water where pressure and beauty coexist.\nSonics & Production Profile: The production features a vast, cinematic soundstage with a pristine high-frequency sheen contrasting against a heavy, distorted low-end foundation. The dynamic range is carefully managed, moving from spacious and airy verses to a heavily compressed, \"wall-of-sound\" aesthetic during the drops, maximizing impact without sacrificing clarity.\nVocal Details\nVocal Gender & Timbre: A single female vocalist delivers the performance with a clear, breathy, and emotive timbre. Her voice possesses a smooth texture that conveys intimacy in the lower registers and soaring power in the upper ranges.\nVocal Style: The vocalist employs a contemporary pop delivery that evolves throughout the track. She begins with a soft, almost whispered tone in the verses to enhance vulnerability, then transitions into a belted, resonant style during the pre-chorus and chorus to match the rising intensity. In the drop sections, her vocal lines are often chopped and re-pitched to function as melodic hooks.\nHarmony/Backing Vocals: Layered harmonies appear prominently in the choruses, stacking thirds and fifths above the lead line to create a lush, choral effect. These backing vocals are less present in the verses, allowing the lead to stand alone, but return with increased density in the final chorus to heighten the emotional resolution.\nVocal FX: Significant post-processing is applied, particularly during the instrumental drops where the vocal is sliced, stuttered, and pitch-shifted to create rhythmic synth-like melodies. Throughout the sung sections, a generous amount of plate reverb and subtle delay creates a sense of vast space, while light auto-tune is used for pitch precision without sounding robotic.\nArrangement\nInstrument Lifecycle Description (Primary/Secondary Layering):\nPrimary: A bright, plucked synthesizer arpeggio serves as the main melodic motif in the intro and verses, providing a delicate harmonic bed. This is replaced by a massive, growling mid-bass synth lead during the drops, which carries the primary melodic weight with aggressive distortion and modulation.\nSecondary: Warm, evolving pad synths fill the background throughout the track, swelling in volume during build-ups to increase tension. A deep sub-bass underpins the entire arrangement, becoming more pronounced and driving during the choruses and drops. An acoustic-style piano enters briefly in the bridge to provide an organic contrast before the final electronic surge.\nGroove & Foundation Progression: The rhythm section begins with a minimal electronic kick and soft snare pattern, keeping the groove restrained in the verses. As the track approaches the pre-chorus, the hi-hats accelerate and a clap layer is introduced. The drop unleashes a half-time drum pattern characteristic of the genre, featuring a thunderous, side-chained kick drum and a sharp, reverberant snare on the third beat, creating a heavy, head-nodding groove.\nEmbellishments, Textures & Spatial FX: White noise risers and reverse cymbal swells are utilized extensively to mark transitions between sections. Glitch effects and bit-crushed textures appear momentarily during the breakdowns to add digital grit. Atmospheric water-like sound design elements (bubbles, submerged filters) are subtly woven into the background to reinforce the thematic imagery, while wide stereo delays on the synth leads expand the perceived width of the mix during climactic moments.",
+        "cluster": "Club, EDM, House & Trance",
+        "dit": "bf16",
+        "duration": 360.0,
+        "encoder_cfg": 1.5,
+        "encoder_seed": "auto",
+        "model": "MiniMaxAI/MiniMax-Music3",
+        "sampler": "euler",
+        "sampler_cfg": 1.7,
+        "sampler_seed": "auto",
+        "sampler_steps": 35,
+        "scheduler": "flow_match_euler",
+        "style": "Melodic Dubstep",
+        "text_encoder": "bf16",
+        "top_k": 50
+      },
+      "provenance": {
+        "caption": "template",
+        "cluster": "batch",
+        "dit": "defaults",
+        "duration": "defaults",
+        "encoder_cfg": "defaults",
+        "encoder_seed": "defaults:frozen",
+        "model": "defaults",
+        "sampler": "defaults",
+        "sampler_cfg": "defaults",
+        "sampler_seed": "defaults:frozen",
+        "sampler_steps": "defaults",
+        "scheduler": "defaults",
+        "style": "batch",
+        "text_encoder": "defaults",
+        "top_k": "defaults"
+      },
+      "source_sha256": "4b33a529bdafc137e518f2e382db5743fdd08dd9223709d55a9159d1f2bebaae",
+      "template": {
+        "id": "melodic-dubstep-electronic-pop_0001",
+        "sha256": "a49f86d9368d8bf2137c4015c0256ce92d6631302abe8ef80dd57bac4ec038f2",
+        "path": "E:\\good-boy-records\\_01_Writing\\_references\\_minimax_templates\\melodic-dubstep-electronic-pop_0001.txt",
+        "source": "minimax"
+      },
+      "input_id": "0"
+    }
+  ],
+  "runs": [
+    {
+      "id": "b2fd44a4a8bd4e8b9ae450c8c640918e",
+      "input_id": "0",
+      "snapshot": "inputs/0000-4b33a529bdaf.yaml",
+      "source_sha256": "4b33a529bdafc137e518f2e382db5743fdd08dd9223709d55a9159d1f2bebaae",
+      "request_yaml": "requests/b2fd44a4a8bd4e8b9ae450c8c640918e.yaml",
+      "request_yaml_sha256": "0b48fafff4d0a5fc53edecc9713c3f7518e3a7c790887b7d7218956a1f4a1746",
+      "song_id": "4",
+      "variant_id": "1",
+      "title": "dogtushya",
+      "effective": {
+        "caption": "Global Metadata\nBasic Attributes: bpm is 171. key is A, and scale is minor. Melodic Dubstep / Electronic Pop.\nGlobal Emotional Progression: The track opens with an ethereal and vulnerable atmosphere, establishing a sense of longing through sparse instrumentation. This tension gradually builds through the pre-chorus into a powerful, cathartic release in the drop, where the emotion shifts from introspection to overwhelming surrender. The energy recedes slightly in the second verse before surging again for a final, intensified climax that resolves into a lingering, atmospheric fade-out.\nApplication Scenarios & Imagery: Deep-sea exploration visuals, dramatic slow-motion sequences in film, or immersive gaming moments involving discovery and high stakes. The music evokes the feeling of sinking into deep water where pressure and beauty coexist.\nSonics & Production Profile: The production features a vast, cinematic soundstage with a pristine high-frequency sheen contrasting against a heavy, distorted low-end foundation. The dynamic range is carefully managed, moving from spacious and airy verses to a heavily compressed, \"wall-of-sound\" aesthetic during the drops, maximizing impact without sacrificing clarity.\nVocal Details\nVocal Gender & Timbre: A single female vocalist delivers the performance with a clear, breathy, and emotive timbre. Her voice possesses a smooth texture that conveys intimacy in the lower registers and soaring power in the upper ranges.\nVocal Style: The vocalist employs a contemporary pop delivery that evolves throughout the track. She begins with a soft, almost whispered tone in the verses to enhance vulnerability, then transitions into a belted, resonant style during the pre-chorus and chorus to match the rising intensity. In the drop sections, her vocal lines are often chopped and re-pitched to function as melodic hooks.\nHarmony/Backing Vocals: Layered harmonies appear prominently in the choruses, stacking thirds and fifths above the lead line to create a lush, choral effect. These backing vocals are less present in the verses, allowing the lead to stand alone, but return with increased density in the final chorus to heighten the emotional resolution.\nVocal FX: Significant post-processing is applied, particularly during the instrumental drops where the vocal is sliced, stuttered, and pitch-shifted to create rhythmic synth-like melodies. Throughout the sung sections, a generous amount of plate reverb and subtle delay creates a sense of vast space, while light auto-tune is used for pitch precision without sounding robotic.\nArrangement\nInstrument Lifecycle Description (Primary/Secondary Layering):\nPrimary: A bright, plucked synthesizer arpeggio serves as the main melodic motif in the intro and verses, providing a delicate harmonic bed. This is replaced by a massive, growling mid-bass synth lead during the drops, which carries the primary melodic weight with aggressive distortion and modulation.\nSecondary: Warm, evolving pad synths fill the background throughout the track, swelling in volume during build-ups to increase tension. A deep sub-bass underpins the entire arrangement, becoming more pronounced and driving during the choruses and drops. An acoustic-style piano enters briefly in the bridge to provide an organic contrast before the final electronic surge.\nGroove & Foundation Progression: The rhythm section begins with a minimal electronic kick and soft snare pattern, keeping the groove restrained in the verses. As the track approaches the pre-chorus, the hi-hats accelerate and a clap layer is introduced. The drop unleashes a half-time drum pattern characteristic of the genre, featuring a thunderous, side-chained kick drum and a sharp, reverberant snare on the third beat, creating a heavy, head-nodding groove.\nEmbellishments, Textures & Spatial FX: White noise risers and reverse cymbal swells are utilized extensively to mark transitions between sections. Glitch effects and bit-crushed textures appear momentarily during the breakdowns to add digital grit. Atmospheric water-like sound design elements (bubbles, submerged filters) are subtly woven into the background to reinforce the thematic imagery, while wide stereo delays on the synth leads expand the perceived width of the mix during climactic moments.",
+        "cluster": "Club, EDM, House & Trance",
+        "dit": "bf16",
+        "duration": 360.0,
+        "encoder_cfg": 1.5,
+        "encoder_seed": "1279374290911076908",
+        "model": "MiniMaxAI/MiniMax-Music3",
+        "sampler": "euler",
+        "sampler_cfg": 1.7,
+        "sampler_seed": "15371162354854878847",
+        "sampler_steps": 35,
+        "scheduler": "flow_match_euler",
+        "style": "Melodic Dubstep",
+        "text_encoder": "bf16",
+        "top_k": 50
+      },
+      "provenance": {
+        "caption": "template",
+        "cluster": "batch",
+        "dit": "defaults",
+        "duration": "defaults",
+        "encoder_cfg": "defaults",
+        "encoder_seed": "defaults:frozen",
+        "model": "defaults",
+        "sampler": "defaults",
+        "sampler_cfg": "defaults",
+        "sampler_seed": "defaults:frozen",
+        "sampler_steps": "defaults",
+        "scheduler": "defaults",
+        "style": "batch",
+        "text_encoder": "defaults",
+        "top_k": "defaults"
+      },
+      "album": "",
+      "execution": {
+        "encoding_cache": "prefer",
+        "memory_profile": "resident_stage",
+        "cuda_device": 0,
+        "vram_sample_interval_ms": 100,
+        "offline": false,
+        "conditioning": {
+          "backend": "runpod_dedicated",
+          "address": "ssh://root@69.30.85.49:22146"
+        },
+        "diffusion": {
+          "backend": "runpod_dedicated",
+          "address": "ssh://root@69.30.85.49:22146"
+        }
+      },
+      "model_revision": "fbdf52fbaaca799592917417eb05f1899f1255ec",
+      "template": {
+        "id": "melodic-dubstep-electronic-pop_0001",
+        "sha256": "a49f86d9368d8bf2137c4015c0256ce92d6631302abe8ef80dd57bac4ec038f2",
+        "path": "E:\\good-boy-records\\_01_Writing\\_references\\_minimax_templates\\melodic-dubstep-electronic-pop_0001.txt",
+        "source": "minimax"
+      },
+      "parent_review_generation_id": null,
+      "request_id": null
+    }
+  ],
+  "output_root": "E:\\good-boy-records\\_02_Generation\\generated",
+  "output_layout": "single"
+}

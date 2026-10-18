@@ -1,0 +1,11 @@
+{
+  "connection": {
+    "backend": "runpod_dedicated",
+    "address": "ssh://root@69.30.85.49:22146",
+    "identity_file": "C:\\Users\\Simon\\.ssh\\runpod_gbr",
+    "worker_python": "",
+    "memory_profile": "auto",
+    "auto_setup": true
+  },
+  "install": false
+}

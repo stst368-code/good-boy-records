@@ -1,0 +1,13 @@
+{
+  "manifest": "E:\\good-boy-records\\_02_Generation\\runtime\\batches\\64a5ef8288ca4f5fb687b480e3d9b4ea\\manifest.json",
+  "batch_id": "64a5ef8288ca4f5fb687b480e3d9b4ea",
+  "connection": {
+    "backend": "runpod_dedicated",
+    "address": "ssh://root@69.30.85.49:22146",
+    "identity_file": "C:\\Users\\Simon\\.ssh\\runpod_gbr",
+    "worker_python": "",
+    "memory_profile": "auto",
+    "auto_setup": true
+  },
+  "install": true
+}

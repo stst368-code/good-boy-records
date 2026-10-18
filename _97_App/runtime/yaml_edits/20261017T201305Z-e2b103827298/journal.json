@@ -1,0 +1,426 @@
+{
+  "version": 1,
+  "batch": "20261017T201305Z-e2b103827298",
+  "root": "E:\\good-boy-records\\_01_Writing\\_Built\\_yaml",
+  "state": "rolled_back",
+  "created_at": "2026-10-17T20:13:05.465134+00:00",
+  "operations": [
+    {
+      "kind": "catalogue_ids",
+      "missing_only": false
+    },
+    {
+      "kind": "deduplicate",
+      "key": "title",
+      "keep": "first"
+    }
+  ],
+  "files": [
+    {
+      "path": "a-golden-life.yaml",
+      "before": "753e5b5e548cd667403678c8b93359571898f6a471a9d017ada58ede78258b7e",
+      "after": "017104ffa665364aa3554f616eee95a4ddd636bdbeaf5512571997435707d29a"
+    },
+    {
+      "path": "aerials.yaml",
+      "before": "acd8c5f0e5e3353541dd4407236199cf98e7720af1f2d7c7ba592954344cdb97",
+      "after": "c882ac8eaf1da92f02b0b76f98365cb354d1019466de731e31a977f34f0527a4"
+    },
+    {
+      "path": "all-alone.yaml",
+      "before": "08569c4130a4f6606c73c7ac89b7010cd34c94b7dcc28ed24655c5bc485dcdc3",
+      "after": "8b4034d43e35f75bcb5900d3ded2ebff1a36b3ddc6e9858ec266e5ff115c9902"
+    },
+    {
+      "path": "amsterdam.yaml",
+      "before": "dd62581216c83909ba5edbfbdc74f158af652f3d7c56716d560f1f9cf5cc09c2",
+      "after": "89320dca76463a094745bb9eebe129d637fda952fddbeee00cc8114b09066025"
+    },
+    {
+      "path": "brasston.yaml",
+      "before": "210047f9c9e3d57e426263eb6f23aaea2daf9d8cc8d48ee423e3256460edb36d",
+      "after": "33ebd1df40160b584f4866000a364e71d67db27f19664ca52cb46557298b4227"
+    },
+    {
+      "path": "california-rear-view.yaml",
+      "before": "1cd0910358dcdc3dcd9d0713f515f01699a5be6831ae98de9a1a1fd6b47810de",
+      "after": "de9ce0d337f9740e59898f36a3f34a80eab12731756469312d308b6d7f635f55"
+    },
+    {
+      "path": "chokehold-cherry-python.yaml",
+      "before": "5dd89c6088cbc45c3caf08a50b8152f39ff5c910e5ee8a5786d2b822e705aaab",
+      "after": "f1e85ef43ffd73fab12834c8ca43b57b1b2bed95463f6ad5bb5b4bc382ba7d4f"
+    },
+    {
+      "path": "circle-of-life.yaml",
+      "before": "ad0408f7eda99ef7e69df3ded4b851c4fb26e87080a1434319581319924bd943",
+      "after": "92e450afeddd66d9b4a0a1a6c9a18a88fcde6de6a0768de27e5b56089a68fe1f"
+    },
+    {
+      "path": "cofetărie.yaml",
+      "before": "30eb48bc98cbf3e79273b3e721b941023cf131edc73ea8aa29130a2284c62c90",
+      "after": "d42a42f35bd19c513873d68ec8bca24b161db7210937732335bdf9ae503f5b25"
+    },
+    {
+      "path": "dare.yaml",
+      "before": "aa3b783feb5d55dbf4d6e194a573f7bececd655873f9ceb2474ddba75ee4e48c",
+      "after": "10de1710d98831e4060d08ad9de177bd9fc83fe0641fc29f949101ffb09679e9"
+    },
+    {
+      "path": "dealer.yaml",
+      "before": "396494151576011aa6c656256e943109f4bb155558a266fed900f8ddb20a66a5",
+      "after": "802726bb432455cd28b1c77b6103bdd766160dc545c6d3eb839a8da74c6b11df"
+    },
+    {
+      "path": "demon-days.yaml",
+      "before": "b4ecc2b72d9fc1e60b2fda514dee452d3e70a66d245d7c62d4ad3ce70d2fd5c9",
+      "after": "c0e5770ad3278ac82d8e0debff9ccbdd00535ec36c0bf3547dd6e99d680654a2"
+    },
+    {
+      "path": "dirty-harry.yaml",
+      "before": "876a06fe23949473b3b32df3d199164e6b2f7ca5e2333f1312705488aac4ad94",
+      "after": "8546a5043bb57b88aac4dd4b39b99d854fea20e629bb0f1a0d82f997a3a8eff6"
+    },
+    {
+      "path": "dogtushya.yaml",
+      "before": "82bb75bc52c28fc4b67ddc4ef7f1cf300836e02db065d9b9f112e6113cb5e6eb",
+      "after": "4b33a529bdafc137e518f2e382db5743fdd08dd9223709d55a9159d1f2bebaae"
+    },
+    {
+      "path": "dont-get-lost-in-heaven.yaml",
+      "before": "2efe94dd3bb4bb55cf9c7f708cfe6cdb31471d587b95d2670fd8c3a558a1db9d",
+      "after": "34c3164e89503f03674315cb53cafbb3e43d63aa23545ad382464b822a41787e"
+    },
+    {
+      "path": "dont-look.yaml",
+      "before": "8cd3eb41d3948759d8c6df64dd98a5a56cfff516d91bc09b060ca0dc1f436fc2",
+      "after": "5997398d861c6cf2386563509046471ab709d569e3a2a6fd8348a16c7476ce80"
+    },
+    {
+      "path": "dying-star.yaml",
+      "before": "e0a763387bcb0f675d7a7cd2b5d0865c0f7d3633ca8b9bb54da07eaf66704466",
+      "after": "e3e3b787abd8ace894a702f0f8309f58a3df945ad4ef164d114fa715a160ba59"
+    },
+    {
+      "path": "el-mañana.yaml",
+      "before": "bef8ada62a9cf30699c0bea699839eeb3532e23c96fa6cf4bed407f901a4719f",
+      "after": "668874465afaea6f960c6719a0775bfc61b902765f77d451b838baa81430f26b"
+    },
+    {
+      "path": "every-planet-we-reach-is-dead.yaml",
+      "before": "915199ffc44a4ae3a87dfe57fd65c7001be682a51ac72ced82b8b29b6d08f552",
+      "after": "694b4b20ce39c1cc2952f1bb887186796ae2175c6fd5934ec9c4238b5c51eed0"
+    },
+    {
+      "path": "feel-good-inc.yaml",
+      "before": "8c16579d398b964f7367ba2af42e6a75e90066c1ac2f8806aeeceb6e64ef6f5e",
+      "after": "ed6530606f34053bc01f1089fa67ab0de46585cd52e6c86d669060a61a1e3ac6"
+    },
+    {
+      "path": "fire-coming-out-of-the-monkeys-head.yaml",
+      "before": "8d19afa2f8a6abd5dbd18625fec27feed6916bf7d924f105cab6924b987b240f",
+      "after": "a6f661bacbee7554581f68000a97365cc7997c5433aae7ce064d91b5d6ed3595"
+    },
+    {
+      "path": "fluffies.yaml",
+      "before": "7f37eeb2f1573cca29ce75fb78fefd7f1aabef84a9eca47460782460b1c49bcf",
+      "after": "9e78bad43a4e9e932033a29d6d530c5d3fb898967846b78a1fa87db6e129161f"
+    },
+    {
+      "path": "fuck-her-gently.yaml",
+      "before": "a39a44d75683b35bc413b71f91739edb2a47398ac6531551062d169a30897dab",
+      "after": "8bfba6c01118333bb67885a7c172f35952cdf4307341b8429b7522a9bb5cf5a5"
+    },
+    {
+      "path": "gangster-of-fluff.yaml",
+      "before": "72e6d72734dba7e66557051911f279dd8edc785cfa9638249faa4c67367c7a40",
+      "after": "6c165b3a070e67ebed6fddb4f439b2c75ef2776b47ccf9a6d2a9af102c6cbd3d"
+    },
+    {
+      "path": "gimmie-gimmie-ball.yaml",
+      "before": "b2059b9d8daaccd0f2ea60480b3d0d8a598d3ba0ab7c61f9a9f79e3ac556f261",
+      "after": "6c34b7c51a13e92febc2d0e4e8526ece31d2736a4bf1e6d6078b4e1136a8fa45"
+    },
+    {
+      "path": "golden-rhapsody.yaml",
+      "before": "69cefe8bf68d13e506a9c1ad42945f8974021648b09754307a727d04aa5cc53d",
+      "after": "d3fc72fd36bb77d551ae34f5e1c70a11cacc3258fc43bf9c2d99e06b618b2502"
+    },
+    {
+      "path": "how-deep-is-your-brass.yaml",
+      "before": "877908be71e612bf760d06f2e901161e6795229380f34e10f541bb28c32e1cb3",
+      "after": "5d2ae54137c71eb8f666eaea016a6932a63633a113a7a33b421b3b9c5d58bb95"
+    },
+    {
+      "path": "i-hate-you.yaml",
+      "before": "b8c40a86a8c27b2b8a1f343e0401b0bbcffcb13851e82c8c66addf2c83a55ab5",
+      "after": "ef78cb97f68d6569506f2306a507e487d97ef48bb6fbb9ce493c1e511aa0a03d"
+    },
+    {
+      "path": "if-i-were-a-brass-man.yaml",
+      "before": "d891f9f1773d9055442401edf5de0b5a6d878036f2e158dbd4dde5e3a1d874a8",
+      "after": "08e745f8d96c4142d6d15016f3429c86ada30e95bc621738f62494ee5b481977"
+    },
+    {
+      "path": "jennys-tale.yaml",
+      "before": "7ef34109fb76b6fabc1f85b65f795060473f791ee368b7a887b3e0efa8aeaea8",
+      "after": "635eb44e69dacacc977f2b2e739abe2dff5f90d0291fe9289b185f4c473fa8b2"
+    },
+    {
+      "path": "johnny-three-fridges.yaml",
+      "before": "ba70f57790a4e845abe2231c9e9d441391fe382a277e3c1ddb68e4948d4ec7fa",
+      "after": "2420bb63e7ddac79f75ccfcc75e1f6c73f2e74880ded106d53fe2a8a4f7f30c9"
+    },
+    {
+      "path": "kids-with-guns.yaml",
+      "before": "ab6ee5b029274c6dc83f0632ae780b0cddeb086095d175f7d5cc5caa644ecb0b",
+      "after": "a4ff1ba297c58636ff431f5555743b169da716181b835f5b74ca6c235618ad27"
+    },
+    {
+      "path": "know-thy-hedge.yaml",
+      "before": "625d1f249b50b29830a0eea8b5d12050478c99853afc42692e1cdb8a620fb965",
+      "after": "09110a0040152d8cb5bffe3c0d2ad82afa3922d30073146cba825e77ad4c2f81"
+    },
+    {
+      "path": "last-living-souls.yaml",
+      "before": "d7bd46468cbaefdb7a27d72002920b469d8b0a972ebb95c6d32e22a428a85dc2",
+      "after": "194a175664cb0efab3b8be1220f17168b4f676200d24b0fa5bbc4877047a9bac"
+    },
+    {
+      "path": "lie-by-the-fire.yaml",
+      "before": "dd778289853e3be2aadf3bc555dd717721734f11af78033ed4fe0b46a8bc052b",
+      "after": "4c029544d290bed90592023a6db340f9c30796dd02a442008431a5a0e97995a9"
+    },
+    {
+      "path": "lose-yourself.yaml",
+      "before": "dba606b91a0a5749c47d49de245736fbfd8b2646a0c94a145385520896032d53",
+      "after": "89e345fad0125881614e574bbdd1a5384e7c252d72ec836f8ebcfd601b6d2868"
+    },
+    {
+      "path": "many-manele.yaml",
+      "before": "53065e8d8149380f5bf5218d1a4e030ace83cf386516b8dadef0d99420d792d5",
+      "after": "30103f5850935f43f3c73ce9d4818cfd7083c0e2b0e059a17ac6cb2e4087107c"
+    },
+    {
+      "path": "messy.yaml",
+      "before": "e6ef5b445535cb3553617abd8a5175971067114bd82a4efba949663c3071b038",
+      "after": "72544f31501bc36db144687d63dd978eb4f95f0708b8e77a7bc50f21831c1e5f"
+    },
+    {
+      "path": "microphone-fiend.yaml",
+      "before": "ab281afa3ec92a6aa4cf0e7faacc653c2987567c503523fee0f53a6340db32d2",
+      "after": "e868278b09c55d674b3fb56438d6a4d2ee5f725139506c78fd5c9c56d4268051"
+    },
+    {
+      "path": "miss-nectarine.yaml",
+      "before": "8e9a956f9a1bdc63f59e8c1228d5851fba9b6b070315f068d0c9685d1be2bdd3",
+      "after": "7984d8d9fc0ab4069450e795733af0061dcc1045e4daae32fd906a1e1e2b4ea3"
+    },
+    {
+      "path": "moonlight-magic.yaml",
+      "before": "4971d0132b4d62063770499d373ff354741d926a492c6074f790d4a5569bb351",
+      "after": "a90d12219b5fb6eb38106e83702d46286d22f2ee6d5229c53d385eb25bfc642c"
+    },
+    {
+      "path": "moses-supposes.yaml",
+      "before": "de419d9bf2158a825384a02ee2ec4e96e4201b7cf82db6a524e7e00adc5baf42",
+      "after": "9f6f5e2b69a77ce6750b98b402c3e245dca87c42f0370a755fafbae52cc701d1"
+    },
+    {
+      "path": "my-neck-my-back.yaml",
+      "before": "6eb8c79379bf2e2f9dae7f9bdb2b01c859a465e33c7197a25a1e1eec4253ed78",
+      "after": "30d37b99dcca95a02ce9cb52bddf294b590072240fa60c782f5e6113f0fc9042"
+    },
+    {
+      "path": "nachttischlampe.yaml",
+      "before": "31bb9068db99f1ac7a380d53ca18da366f358381488d745a7cd686d5ebaf908c",
+      "after": "0f9236dd3cb3a4914299516b81ad4aabc15540ca4097e3c89f8276529025de38"
+    },
+    {
+      "path": "new-mills-new-mills.yaml",
+      "before": "306e5971a87a506f3efaaf2e30c12675813bc4a0610eb3609c9bbe849408e003",
+      "after": "d081077a03f34c319122059ba5010a0041905518a40fce55be565523e50ad81c"
+    },
+    {
+      "path": "not-like-that-anymore.yaml",
+      "before": "78f256c4fd17f91cbc45fdbb5424c1912fa150435a1cddb9bfc10a90c27261ad",
+      "after": "1149a18f6e84e318733fc4918d08aef455447269302280882cef0babdea81b6c"
+    },
+    {
+      "path": "november-has-come.yaml",
+      "before": "b295a062f5a2994d4d7a98d6e5b83a82b3399514b9dc7a8d7f9aac2f5ba7ef80",
+      "after": "cb2ff1dac786728a6d5ba9b212426c1e7b23a234aa1086bbc7b1cf5d6f54e03f"
+    },
+    {
+      "path": "o-green-world.yaml",
+      "before": "ab69863bd348a2a3761f00ebbcfbbee2b46ceca00b9bee6ca8ffc1de67dae33d",
+      "after": "501daa84e30ae2d2fedcaa70c3af183de161490a9ccb626156755161e558dd10"
+    },
+    {
+      "path": "paradox.yaml",
+      "before": "d2441b09ccb7b9faddfc8be54aa6a2927479e59043b53a88f460c2b3bbf686cf",
+      "after": "8b56242336dd3cecf27ee607530e4049a14f645dd908e8c4909606f51580a52b"
+    },
+    {
+      "path": "particles.yaml",
+      "before": "5af12044530004e41f04cc4f42f3a6534b57d1ed1357d8d322c32fd2eaf05b0d",
+      "after": "1800677ca0536116a0dd5e367890ae2b1274c5fd5068c368149336b129994560"
+    },
+    {
+      "path": "paws-off-the-velvet.yaml",
+      "before": "e3a9e9425cb395f0716f5841e9ed8d0990a6d348633e8d4cbc39c4eb3dc507e3",
+      "after": "b8d25a678a05fe2283b21f80535afdf5549248a3d2626918be5023f620b72145"
+    },
+    {
+      "path": "paws-off.yaml",
+      "before": "cac462a41841a7cc44e79b6140b69b59a5dbe020a31e0951170ae97a4377bc9a",
+      "after": "ff02208327b6bca3139b239ed814fa04c488ca254e47807a07d91b509bdc4c33"
+    },
+    {
+      "path": "paws-on-your-nightstand.yaml",
+      "before": "21552cd934d025c87065b22113a565ae6da1455123cde2de9e2f7c428ee01b1b",
+      "after": "f74ca8562b82ecbb61c1be4ac6f06b746b9bcf41234913b8a1bc50a90543186d"
+    },
+    {
+      "path": "pity-pawty.yaml",
+      "before": "f6ecf2f15370a4d67b14d93654fe196a41c505bd8cad536308cb535f2199c4a9",
+      "after": "793ebdd21b4e13ef1580406119f541aa1e7e2d10558f31b5ca6d3a4c78f99c27"
+    },
+    {
+      "path": "popstar.yaml",
+      "before": "106b18567d6898d52a7588c41054e54b31b89ad8aa6e3eba7802b3e5d548841c",
+      "after": "e71f4c36d5ab732260e3060861fa1e219523a32da67478aeed025ccddca31eb8"
+    },
+    {
+      "path": "posession-of-a-weapon.yaml",
+      "before": "257c57517458b3fc4471cbaaf5ec27a0d8f408225eb7159ff15fbf2daf4e312b",
+      "after": "62ba09f98f81108f20d5a6ae76193df97859a977b25969a257cecd879ab043ad"
+    },
+    {
+      "path": "pupeii.yaml",
+      "before": "554f2a420d94b306fd61f6e435f892afdfc728f22cc726b8ed78a53912dd0ffa",
+      "after": "86ab2aa1a745ecb5f7f33a08ac2a5323b458ca9186166bcee94fd4b53cd41d63"
+    },
+    {
+      "path": "raspberry-parade.yaml",
+      "before": "18789146f2c3555bba7f2271572e4e12eeae5cbd4357c4819fe9e19417888cbe",
+      "after": "84c93bc89d51844e87b8869e42b7dda257f0721c53919d2149c2a276ac66bb24"
+    },
+    {
+      "path": "real-shady.yaml",
+      "before": "dd23a6f94ae9da60ea189b36b83e365daf599d34dd44699fd2ced35c961092a2",
+      "after": "9917617ea77db6f790d367a251834d36ff94d775b7f41f97f052c41b5bb01c8a"
+    },
+    {
+      "path": "self-rightous-gremelin.yaml",
+      "before": "b29d7c3f07770142f716b9a8036bfb0e536b6d3307e6de90a439c70d3153598a",
+      "after": "8225ba277bfd930a9d71e3b774e5e7e3aa325ce46eebbdb8c5a4ba1b8ba86658"
+    },
+    {
+      "path": "sixteen-balls.yaml",
+      "before": "f010b27cc7f3a63fd0a458857239b22fdbc92744b81a03c802248a767162ccf3",
+      "after": "d39da0cd242ce178e14445442affb60319e675f4ffe72c11c05a6ad9be48b4b0"
+    },
+    {
+      "path": "sixteen-treats.yaml",
+      "before": "5d48e7edda00267e6ea749c9b9d4af0fe9b3d3e6c18e22a7f0459b49cc577d4f",
+      "after": "78afb6c65b1f81f68828ffaf850e8bed5dced2bbd972ad3713f93cc948911aff"
+    },
+    {
+      "path": "smooth-pawterator.yaml",
+      "before": "2685e2a670fe251ec1a2a341fed0cdfcf02f5eef29660b6470152633a41bc8cc",
+      "after": "3818b0c226a26ae8d5db9d69c92cb89538d0f8a426bc51b27ad4fd1d76e40a3a"
+    },
+    {
+      "path": "sorry.yaml",
+      "before": "39eca4da50ee1bd7ee25c2f7904285bbe56598bdea06616e1aa214e9827cf3e6",
+      "after": "93b62d8f19bbe7f7d17150983e2a2709ed9007e09b1afdb91787a41636260f27"
+    },
+    {
+      "path": "spiders.yaml",
+      "before": "4a06e9cc515b9a5382cab4ba13acffab837e0b8d3cabc59b8516580ec168a175",
+      "after": "11f027300c35d845f4a4ee9e49e704c6235fc5596cbd24b63b8816fd50e11625"
+    },
+    {
+      "path": "sugar.yaml",
+      "before": "699e4be62d3387cc3ec132ac468a03bacdb259375ae406d1c7c04f76d53ff961",
+      "after": "3ee292532a80d45a6b9dac50757fb7283f320b2031b9e2464d4e1dedb271273c"
+    },
+    {
+      "path": "super-soaker.yaml",
+      "before": "35ce893aed47c227399ad1aab1f1bdd14fd5ba449f89aefc9be59616fd45d2f9",
+      "after": "4f8bef664ed5a72e9bc8d1ab0f1a9b2257f61334fb8ee50a7fac662fbfbdb33d"
+    },
+    {
+      "path": "the-ball-beyond-the-gate.yaml",
+      "before": "591b572c0db89d16a88c4aa9a6361eba7e70054d7a4eacd4dc5a59c726d1587b",
+      "after": "8c36c4f31cad159d8f730dab15b742ce454b63cea4067f4e012cc53d1a8fde31"
+    },
+    {
+      "path": "the-endless-game.yaml",
+      "before": "8f7a8eacc4199946a5405661bdce201ae1393761567441a27a684537bcdf62cc",
+      "after": "d081e70dd600a64b3a9472d30a7ec0fc92789011d155eb85f2c57232c6357d9d"
+    },
+    {
+      "path": "toxicity.yaml",
+      "before": "1cf1e7490422d2559816516098e45b674f81b076bd71d5fdc27a9ca317eaeba5",
+      "after": "fe0c773abbcef273d1d74e24f7f03ccd291fb189053580186a47489c559c79de"
+    },
+    {
+      "path": "vicinity-of-obscenity.yaml",
+      "before": "eeb8e6ad625babb09ef4c7563025b04390a0a48738fce50844a06ee5c69bf684",
+      "after": "3fa3b8bcb252e880338bfdf89027bf2e1aba0917cceceb69e005960b8daa3833"
+    },
+    {
+      "path": "violent-songography.yaml",
+      "before": "b15bcd71e58b6394e9dd75a165453f3299aa212b4dcb9ce3ceaf19a949e3c2c6",
+      "after": "51093c3cfe295d8b1268af9d77abd878766cc7819fcdefad92fa0688d9ac2873"
+    },
+    {
+      "path": "want-it-all.yaml",
+      "before": "81124f1b043635df0a4c38e4abfbe885b180dbea236a4c47a391a383c6d92e38",
+      "after": "3364c7d7ef0ed57d658bbec0473e97ac59aaa4d83f9943e887171fa84b5d18c6"
+    },
+    {
+      "path": "weedkiller.yaml",
+      "before": "f62731b0c875f919a4f4fa083014329b36f28669127a6eb6e380ddc976ea0967",
+      "after": "cbda4d3aec73b8cfa20aa11252f80af9287526ec9743087c080a06299446b16d"
+    },
+    {
+      "path": "where-golden-flowers-grow.yaml",
+      "before": "e1106e79b9d99a4471af2a9e219bf9d1164776d8076f8fa4a31a97b036dccfc5",
+      "after": "adadb351c8150ee25594f4405d61cd55c873af3b2ca564baebb3807b925be75a"
+    },
+    {
+      "path": "white-light.yaml",
+      "before": "7087de34df6cef1d16d78caea3950c209cf583817a3fe8d55b3cfa7e73451784",
+      "after": "032befc645d6e64c240b6e27f41715aca591a221780ec4195ff9bd5c40e0b8d3"
+    },
+    {
+      "path": "without-me.yaml",
+      "before": "ef5231034483e40cb810f0856a61f32a3965d6a2889fe8919c60d45e172f2ea8",
+      "after": "087f82fe3bc442dea229c10657093fd80ece64fac02c22fbfd2a3b15d5f0db61"
+    },
+    {
+      "path": "world-eater.yaml",
+      "before": "610772f78d0ad634efb76f6f0ee126cb5186e92d51b268497a29433527b99acb",
+      "after": "f9f3955d067fa28eddbdaafc3754bbb35865cc507f65839b4005225e3e4cefe4"
+    },
+    {
+      "path": "worms.yaml",
+      "before": "aaf036f9e90e948fff4e93cbbeb843b813178ae162a3c28c1e01c9a1da8721e6",
+      "after": "7c8971c65829b30807fff9fb29b920c00ffaee337c340fd14ed339da0a0370e0"
+    },
+    {
+      "path": "you-make-me-holy.yaml",
+      "before": "1a0a275c972f828df95fac3409946aad69622c888810586c942772f2a194de2c",
+      "after": "e781cbdce0ba3d0f61efd1bbf18602b8ea14881b8e1e3900bf07831b5f6598cd"
+    },
+    {
+      "path": "you-make-me-sick.yaml",
+      "before": "e27b8a33bfa8dc0b1ea7e11f6a2e08fcd3175e7895e552cca90ec47bb0249d08",
+      "after": "bd24afc1e0af67a848e5a95e1db84cbb65e9e017208b12ecceabeaa2fcea3020"
+    }
+  ],
+  "conflicts": []
+}
