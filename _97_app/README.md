@@ -63,3 +63,11 @@ environment do not block directory migration. Saved controller PIDs are checked
 against their creation time so a recycled PID does not prevent startup. An
 actual running app/controller still blocks moving its directories; nothing is
 terminated automatically.
+
+On Windows, the launcher starts from the repository root. If Windows holds a
+directory open, a case-only change such as `_97_App` to `_97_app` is deferred;
+both spellings already identify the same directory. Startup continues using
+that directory, without a second copy or a temporary directory left behind.
+Non-cosmetic moves and conflicting files retain the existing safety checks.
+This happens before the generation interface loads; starting the app does not
+automatically resume old pod jobs.

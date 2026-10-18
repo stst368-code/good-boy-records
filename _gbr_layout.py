@@ -289,6 +289,39 @@ def _database_paths(database, root):
                         conn.execute('UPDATE sessions SET filters_json=? WHERE rowid=?', (json.dumps(filters, ensure_ascii=False), rowid))
 
 
+def _rename_case(source, target):
+    """Rename a verified directory alias, or defer a locked cosmetic Windows change.
+
+    migrate() has already established that both spellings refer to one folder.
+    Windows continues to resolve the canonical spelling if a launcher, current
+    directory or loaded interpreter holds the existing spelling open.
+    """
+    windows_alias = sys.platform == 'win32' and str(source).casefold() == str(target).casefold()
+    if windows_alias:
+        current = os.getcwd().replace('\\', '/').rstrip('/').casefold()
+        original = str(source).replace('\\', '/').rstrip('/').casefold()
+        if current == original or current.startswith(original + '/'):
+            return False
+    temporary = source.with_name('.gbr-directory-' + uuid.uuid4().hex)
+    try:
+        source.rename(temporary)
+    except OSError as exc:
+        if windows_alias and getattr(exc, 'winerror', None) in {32, 33}:
+            return False
+        raise
+    try:
+        temporary.rename(target)
+    except OSError as exc:
+        try:
+            temporary.rename(source)
+        except OSError as restore_error:
+            raise RuntimeError('Directory rename could not restore ' + str(source) + '; files remain at ' + str(temporary)) from restore_error
+        if windows_alias and getattr(exc, 'winerror', None) in {32, 33}:
+            return False
+        raise
+    return True
+
+
 def migrate(root=None):
     root = Path(root or ROOT).absolute()
     candidates = {root / p for p in ALIASES}
@@ -328,17 +361,17 @@ def migrate(root=None):
     # Every collision is checked before the first data move. A failed DB update rolls the moves back.
     if moves or duplicates or case_dirs or obsolete_cache:
         _running(root)
-    moved, changed_case = [], []
+    moved, changed_case, deferred_case = [], [], []
     try:
         for source, target in moves:
             target.parent.mkdir(parents=True, exist_ok=True)
             source.rename(target)
             moved.append((source, target))
         for source, target in sorted(set(case_dirs), key=lambda item: len(item[0].parts), reverse=True):
-            temporary = source.with_name('.gbr-directory-' + uuid.uuid4().hex)
-            source.rename(temporary)
-            temporary.rename(target)
-            changed_case.append((source, target))
+            if _rename_case(source, target):
+                changed_case.append((source, target))
+            else:
+                deferred_case.append((source, target))
         _database_paths(root / '_98_database/gbr.sqlite3', root)
     except Exception:
         for source, target in reversed(changed_case):
@@ -357,5 +390,6 @@ def migrate(root=None):
         except OSError:
             pass
     return {'moved_files': len(moves), 'merged_identical_files': len(duplicates),
-            'discarded_old_bytecode': len(obsolete_cache), 'case_renames': len(changed_case)}
+            'discarded_old_bytecode': len(obsolete_cache), 'case_renames': len(changed_case),
+            'deferred_case_renames': len(deferred_case)}
 

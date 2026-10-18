@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from _gbr_layout import migrate, manifest_paths, relocated_path, task_paths, _running, _native_created
+from _gbr_layout import migrate, manifest_paths, relocated_path, task_paths, _running, _native_created, _rename_case
 
 
 class DirectoryLayoutTests(unittest.TestCase):
@@ -151,6 +151,87 @@ class DirectoryLayoutTests(unittest.TestCase):
         payload = {'database': str(self.root / '_98_Database/gbr.sqlite3'), 'caption': '_01_Writing appears in a lyric'}
         with patch('_gbr_layout.ROOT', self.root):
             self.assertEqual(manifest_paths(payload)['caption'], payload['caption'])
+
+    @staticmethod
+    def sharing_violation():
+        error = OSError('The process cannot access the file because it is being used by another process')
+        error.winerror = 32
+        return error
+
+    def test_windows_launcher_working_directory_keeps_its_existing_case(self):
+        old = self.root / '_97_App'; old.mkdir()
+        script = old / 'run_gbr.py'; script.write_bytes(b'complete launcher fixture\r\n')
+        with patch('_gbr_layout.sys.platform', 'win32'), patch('_gbr_layout.os.getcwd', return_value=str(old)), patch.object(Path, 'rename') as rename:
+            self.assertFalse(_rename_case(old, self.root / '_97_app'))
+        rename.assert_not_called()
+        self.assertEqual(script.read_bytes(), b'complete launcher fixture\r\n')
+        self.assertEqual(list(self.root.glob('.gbr-directory-*')), [])
+
+    def test_windows_sharing_violation_defers_case_change_and_startup_migration_returns(self):
+        old, new = self.root / '_97_App', self.root / '_97_app'
+        old.mkdir(); (old / 'run_gbr.py').write_bytes(b'launcher\r\n')
+        exists, samefile = Path.exists, os.path.samefile
+        def windows_exists(path):
+            return True if path == new else exists(path)
+        def windows_samefile(a, b):
+            return True if {str(a), str(b)} == {str(old), str(new)} else samefile(a, b)
+        # Model NTFS's case-insensitive alias lookup and a batch-file directory lock.
+        with patch('_gbr_layout.sys.platform', 'win32'), patch.object(Path, 'exists', windows_exists), patch('_gbr_layout.os.path.samefile', windows_samefile), patch.object(Path, 'rename', side_effect=self.sharing_violation()):
+            result = migrate(self.root)
+        self.assertEqual(result['deferred_case_renames'], 1)
+        self.assertEqual(result['case_renames'], 0)
+        self.assertEqual((old / 'run_gbr.py').read_bytes(), b'launcher\r\n')
+        self.assertEqual(list(self.root.glob('.gbr-directory-*')), [])
+
+    def test_windows_second_rename_lock_restores_original_before_deferring(self):
+        old, new = self.root / '_97_App', self.root / '_97_app'
+        old.mkdir(); (old / 'config.json').write_bytes(b'{"preserve":"exact bytes"}')
+        rename = Path.rename
+        def lock_destination(path, target):
+            if Path(target) == new:
+                raise self.sharing_violation()
+            return rename(path, target)
+        with patch('_gbr_layout.sys.platform', 'win32'), patch.object(Path, 'rename', lock_destination):
+            self.assertFalse(_rename_case(old, new))
+        self.assertEqual((old / 'config.json').read_bytes(), b'{"preserve":"exact bytes"}')
+        self.assertFalse(new.exists())
+        self.assertEqual(list(self.root.glob('.gbr-directory-*')), [])
+
+    def test_other_errors_and_real_moves_are_not_silently_deferred(self):
+        old = self.root / '_97_App'; old.mkdir()
+        for target, platform, error in [
+            (self.root / '_97_app', 'win32', PermissionError('Access denied')),
+            (self.root / '_different_app', 'win32', self.sharing_violation()),
+            (self.root / '_97_app', 'linux', self.sharing_violation())]:
+            with self.subTest(target=target, platform=platform):
+                with patch('_gbr_layout.sys.platform', platform), patch.object(Path, 'rename', side_effect=error), self.assertRaises(OSError):
+                    _rename_case(old, target)
+                self.assertTrue(old.is_dir())
+                self.assertEqual(list(self.root.glob('.gbr-directory-*')), [])
+
+    def test_unlocked_case_change_keeps_file_bytes(self):
+        old, new = self.root / '_97_App', self.root / '_97_app'
+        old.mkdir(); data = b'\xef\xbb\xbflyrics: |\r\n  retain\r\n  newlines\r\n'
+        (old / 'source.yaml').write_bytes(data)
+        self.assertTrue(_rename_case(old, new))
+        self.assertEqual((new / 'source.yaml').read_bytes(), data)
+        self.assertFalse(old.exists())
+        self.assertEqual(list(self.root.glob('.gbr-directory-*')), [])
+
+    def test_actual_file_move_error_still_rolls_back_earlier_moves(self):
+        files = [self.root / '_02_Generation/generated' / name for name in ['a.flac', 'b.flac']]
+        for i, path in enumerate(files):
+            path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(bytes([i]))
+        rename = Path.rename
+        def lock_file(path, target):
+            if path == files[1]:
+                raise self.sharing_violation()
+            return rename(path, target)
+        with patch('_gbr_layout.sys.platform', 'win32'), patch.object(Path, 'rename', lock_file), self.assertRaises(OSError):
+            migrate(self.root)
+        for i, path in enumerate(files):
+            self.assertEqual(path.read_bytes(), bytes([i]))
+        self.assertEqual(list((self.root / '_02_generation/_generated').glob('*.flac')), [])
 
     def test_retired_bytecode_does_not_block_reusing_the_new_package(self):
         old = self.root / '_03_Review/_Generation_Review/review/__pycache__/config.cpython-312.pyc'
