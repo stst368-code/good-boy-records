@@ -1,22 +1,5 @@
-title: incredible
-cluster:
-version:
-model:
-dit:
-text_encoder:
-encoder_cfg:
-encoder_seed:
-top_k:
-sampler:
-scheduler:
-sampler_cfg:
-sampler_seed:
-sampler_steps:
-inspiration:
-inspirationyt:
-story:
-caption: |
-lyrics: |
+song_id: 53
+variant_id: 1
 title: incredible
 cluster:
 version:
