@@ -7124,4 +7124,259 @@ The complete technical recipe that can vary between generations.
 
 This includes model / DiT / text-encoder choices and weights where used, sampler and scheduler, steps, sampler CFG, sampler seed, encoder CFG, encoder seed, top-k and other supported generation controls.
 
-The runner can preserve values from YAML or override selected values for controlled reruns. Individual setti
+The runner can preserve values from YAML or override selected values for controlled reruns. Individual settings are not separate systems, so they are consolidated here.`},
+
+  {id:'generation-engine',title:'GENERATION ENGINE',kind:'document',x:0,y:-2100,colour:'#72a36f',group:'generation',markdown:`# Generation engine
+
+The inference system that turns the prompt and parameters into audio.
+
+GBR uses a native **MiniMax diffusion/Transformers pipeline**. It loads the model components, encodes text into conditioning, samples the music and writes FLAC audio. The earlier published catalogue also contains recordings made with ComfyUI.
+
+Text encoding and diffusion are measured stages of one worker job. A compatible cached encoding can avoid repeating conditioning. Both stages currently use the same configured local GPU, dedicated pod or serverless endpoint.`},
+
+  {id:'pipeline',title:'PIPELINE RUNNER',kind:'document',x:0,y:0,colour:'#4e9f91',group:'automation',markdown:`# Pipeline runner
+
+The automation layer around generation.
+
+The shared GBR app selects songs, albums or individual YAMLs, checks their track/variant identities and style pairs, then freezes a generation batch. Parameter ranges, caption diversity and repeats expand into a previewed queue.
+
+Local, dedicated RunPod and serverless workers use the same job contract. Conditioning may be cached. The shared database records effective settings, available hardware, timing, memory and cost measurements; unavailable measurements remain unknown.`},
+
+  {id:'generated-track',title:'GENERATED TRACK',kind:'document',x:0,y:2100,colour:'#5d9baa',group:'output',markdown:`# Generated track
+
+The audio result of a generation job.
+
+The generated recording remains associated with the YAML recipe that produced it. A generation is not automatically a release: it first passes through human listening and selection.`},
+
+  {id:'review',title:'REVIEW & PROMOTION',kind:'document',x:3600,y:-2100,colour:'#5d9baa',group:'output',markdown:`# Review & promotion
+
+Human quality control.
+
+A generated track receives four numerical ratings with optional positive/negative observations and a Reason. Publish, bookmark and reject controls support selection. Review moves the verified audio/YAML bundle into the review archive and preserves each review revision in the shared database.
+
+Accepted recordings are promoted into the showcase workflow.`},
+
+  {id:'timeline',title:'TIMELINE & ANALYSIS',kind:'document',x:3600,y:0,colour:'#667fc0',group:'analysis',markdown:`# Timeline & analysis
+
+Preparation for rich playback.
+
+**Lyric alignment** uses the known lyrics and speech/alignment tooling to produce word timings. The lyric-review tool lets uncertain or interpolated words be corrected manually.
+
+**Audio analysis** extracts timing / musical information used by playback features. Where required, vocal separation such as Demucs can support alignment.
+
+The resulting lyric, audio-analysis and playback sidecars belong to this one preparation stage rather than being separate top-level systems.`},
+
+  {id:'showcase',title:'SHOWCASE LIBRARY',kind:'document',x:3600,y:2100,colour:'#5d9baa',group:'output',markdown:`# Showcase library
+
+The curated source of tracks that Good Boy Records presents.
+
+A showcased variant can contain audio, its YAML, album artwork and generated playback / lyric / analysis sidecars. Composition and variant YAMLs also provide the provenance shown in **Behind the Song**.
+
+The showcase directory is the authoritative content collection; artwork is part of the track package, not a separate system.`},
+
+  {id:'publishing',title:'PUBLISHING',kind:'document',x:7200,y:-1050,colour:'#8068a0',group:'publishing',markdown:`# Publishing
+
+The deployment path from the curated showcase to the public site.
+
+The public site lives in **_96_website**, alongside writing, generation, review and the shared app/database. An explicit catalogue refresh reads curated recordings and can require the review publishing manifest. Current cluster/style ordering follows the shared writing references; catalogue and share identities remain stable.
+
+The Observatory reads a public projection of the shared database: four review scores, revision-bound tags and exactly linked worker telemetry. Porto’s original single-grade archive remains a separately labelled source. The database and private workstation configuration are never served.
+
+Media preparation and R2 synchronisation remain explicit steps. Site builds stage only public metadata and player assets for GitHub Pages.
+
+Catalogue generation, R2 sync and hosting are parts of one publishing concern, so they are aggregated here.`},
+
+  {id:'player',title:'GBR PLAYER',kind:'document',x:7200,y:1050,colour:'#a45b88',group:'player',markdown:`# GBR player
+
+The listener-facing result.
+
+The player consumes the catalogue and showcase media to provide audio playback, album artwork, genre browsing, synchronized lyrics, audio-reactive presentation, Tracks, Story / provenance and this knowledge view.
+
+Karaoke, artwork, visual reactions and metadata presentation are player features rather than independent systems.`}
+]
+
+const GBR_KNOWLEDGE_LINKS = [
+  ['knowledge-root','song-prompt','starts with','creative definition'],
+  ['song-prompt','yaml','captured in','track specification'],
+  ['yaml','generation-params','defines','technical recipe'],
+  ['yaml','pipeline','queued by','automation'],
+  ['generation-params','pipeline','controls','generation jobs'],
+  ['pipeline','generation-engine','drives','inference'],
+  ['song-prompt','generation-engine','conditions','music generation'],
+  ['generation-params','generation-engine','configures','inference'],
+  ['generation-engine','generated-track','produces','audio'],
+  ['generated-track','review','evaluated by','human QC'],
+  ['review','song-prompt','revises','creative changes'],
+  ['review','generation-params','revises','technical changes'],
+  ['review','showcase','promotes','accepted track'],
+  ['showcase','timeline','prepared by','timing + analysis'],
+  ['timeline','showcase','adds','playback sidecars'],
+  ['showcase','publishing','published through','build + storage'],
+  ['publishing','player','delivers','catalogue + media'],
+  ['showcase','player','describes','track content']
+]
+
+loadKnowledgeGraph = async function(){
+  if(knowledgeReady||knowledgeLoading)return;
+  knowledgeLoading=true;
+  try{
+    knowledgeManifest=[];
+    knowledgeNodes=GBR_KNOWLEDGE_NODES.map((n,i)=>({...n,baseX:n.x,baseY:n.y,r:n.kind==='root'?76:n.kind==='document'?50:n.kind==='chain'?34:22,docLabel:(n.group||'knowledge').toUpperCase(),path:`Knowledge / ${n.group||'system'} / ${n.title}`,order:i,parentId:null,level:0,depth:0,anchor:knowledgeSlug(n.title)}));
+    const ids=new Set(knowledgeNodes.map(n=>n.id)),seen=new Set();
+    knowledgeEdges=[];
+    for(const [a,b,type,label] of GBR_KNOWLEDGE_LINKS){if(ids.has(a)&&ids.has(b))knowledgeAddEdge(knowledgeEdges,seen,a,b,type||'related',label||'')}
+    knowledgeReady=true;
+  }finally{knowledgeLoading=false}
+};
+
+function knowledgeNeighbours(node){
+  if(!node)return[];
+  const ids=new Set();
+  for(const e of knowledgeEdges){if(e.a===node.id)ids.add(e.b);else if(e.b===node.id)ids.add(e.a)}
+  return [...ids].map(id=>knowledgeNodes.find(n=>n.id===id)).filter(Boolean)
+}
+knowledgeImmediateChildren = function(node){return knowledgeNeighbours(node)};
+knowledgeVisibleIds = function(){return new Set(knowledgeNodes.map(n=>n.id))};
+knowledgeHiddenChildCount = function(){return 0};
+
+knowledgeLayoutPositions = function(){
+  const map=new Map();
+  for(const n of knowledgeNodes)map.set(n.id,{x:n.baseX??n.x,y:n.baseY??n.y,angle:0});
+  const zoom=Math.max(.06,Number(camera.zoom)||1),mobile=matchMedia('(max-width:900px)').matches;
+  const cardSide=mobile?300:360,screenGap=34;
+  const expanded=new Set(knowledgeExpanded);
+  const movable=knowledgeNodes.filter(n=>n.id!=='knowledge-root');
+  // Screen-space collision solver. Only pairs involving an open card need the
+  // expensive clearance; ordinary closed nodes already have generous spacing.
+  for(let pass=0;pass<18;pass++){
+    let moved=false;
+    for(let i=0;i<knowledgeNodes.length;i++)for(let j=i+1;j<knowledgeNodes.length;j++){
+      const a=knowledgeNodes[i],b=knowledgeNodes[j];
+      if(!expanded.has(a.id)&&!expanded.has(b.id))continue;
+      const pa=map.get(a.id),pb=map.get(b.id);if(!pa||!pb)continue;
+      const sa=expanded.has(a.id)?cardSide:knowledgeNodeSize(a),sb=expanded.has(b.id)?cardSide:knowledgeNodeSize(b);
+      const needX=(sa+sb)/2+screenGap,needY=(sa+sb)/2+screenGap;
+      let dx=(pb.x-pa.x)*zoom,dy=(pb.y-pa.y)*zoom;
+      const ox=needX-Math.abs(dx),oy=needY-Math.abs(dy);
+      if(ox<=0||oy<=0)continue;
+      moved=true;
+      let ux=0,uy=0,push=0;
+      if(ox<oy){ux=dx>=0?1:-1;push=ox/zoom}else{uy=dy>=0?1:-1;push=oy/zoom}
+      const aFixed=a.id==='knowledge-root',bFixed=b.id==='knowledge-root';
+      if(aFixed){pb.x+=ux*push;pb.y+=uy*push}
+      else if(bFixed){pa.x-=ux*push;pa.y-=uy*push}
+      else{pa.x-=ux*push*.5;pa.y-=uy*push*.5;pb.x+=ux*push*.5;pb.y+=uy*push*.5}
+    }
+    if(!moved)break
+  }
+  return map
+};
+
+knowledgeOwnMarkdown = function(node){return String(node?.markdown||`# ${node?.title||'Knowledge'}\n\nNo additional notes have been written for this node yet.`)};
+knowledgeExpandPath = function(id){const n=knowledgeNodes.find(x=>x.id===id);if(n)knowledgeExpandNode(n)};
+knowledgeCollapseNode = function(id){knowledgeExpanded.delete(id);knowledgeExpansionOrder=knowledgeExpansionOrder.filter(x=>x!==id);if(knowledgeSelectedId===id)knowledgeSelectedId=null;syncKnowledgeWorldCards()};
+knowledgeExpandNode = function(node){if(!node||node.kind==='root')return;knowledgeExpanded.add(node.id);knowledgeSelectedId=node.id;knowledgeExpansionOrder=knowledgeExpansionOrder.filter(x=>x!==node.id);knowledgeExpansionOrder.push(node.id);syncKnowledgeWorldCards()};
+knowledgeToggleNode = function(node){if(!node||node.kind==='root')return;if(knowledgeExpanded.has(node.id))knowledgeCollapseNode(node.id);else knowledgeExpandNode(node)};
+
+knowledgeCardHtml = function(node){
+  const related=knowledgeNeighbours(node),previousRender=knowledgeRenderNodeId;knowledgeRenderNodeId=node.id;let body='';
+  try{body=renderMarkdown(knowledgeOwnMarkdown(node))}finally{knowledgeRenderNodeId=previousRender}
+  const links=related.slice(0,12).map(n=>`<button type="button" class="knowledge-related-link" data-related-id="${escapeHtml(n.id)}">${escapeHtml(n.title)}</button>`).join('');
+  return `<article class="knowledge-world-card" data-node-id="${escapeHtml(node.id)}" style="--node-colour:${escapeHtml(node.colour||'#d0802f')}">
+    <header class="knowledge-world-card-head"><span><small>${escapeHtml((node.group||'KNOWLEDGE').toUpperCase())}</small><strong>${escapeHtml(node.title)}</strong></span><button class="knowledge-card-close" type="button" title="Close" aria-label="Close ${escapeHtml(node.title)}">×</button></header>
+    <div class="knowledge-world-card-body">${body}${links?`<h3>Connected to</h3><div class="knowledge-related-list">${links}</div>`:''}</div>
+    <footer class="knowledge-world-card-foot"><span>${related.length} CONNECTION${related.length===1?'':'S'}</span><span>TOOLS · DATA · PROCESS</span></footer>
+  </article>`
+};
+
+fitKnowledge = function(immediate=false){
+  if(!knowledgeNodes.length)return;
+  const r=ui.stage.getBoundingClientRect(),layout=knowledgeLayoutPositions();
+  const pts=knowledgeNodes.map(n=>layout.get(n.id)||{x:n.baseX??n.x,y:n.baseY??n.y}).filter(p=>Number.isFinite(p?.x)&&Number.isFinite(p?.y));
+  if(!pts.length)return;
+  const minX=Math.min(...pts.map(p=>p.x)),maxX=Math.max(...pts.map(p=>p.x)),minY=Math.min(...pts.map(p=>p.y)),maxY=Math.max(...pts.map(p=>p.y));
+  const cx=(minX+maxX)/2,cy=(minY+maxY)/2,spanX=Math.max(1,maxX-minX),spanY=Math.max(1,maxY-minY);
+  // Nodes are fixed-size screen objects, so reserve real pixels around the outer centres.
+  const screenPad=matchMedia('(max-width:900px)').matches?72:96;
+  const usableW=Math.max(1,r.width-screenPad*2),usableH=Math.max(1,r.height-screenPad*2);
+  const z=Math.min(usableW/spanX,usableH/spanY)*.96;
+  camera.targetX=cx;camera.targetY=cy;camera.targetZoom=Math.max(.06,Math.min(1,z));
+  if(immediate){camera.x=camera.targetX;camera.y=camera.targetY;camera.zoom=camera.targetZoom}
+  updateZoomLabel()
+};
+
+document.body.dataset.view='tracks';
+load().then(()=>draw()).catch(err=>{ui.loading.textContent=`Landscape build error: ${err.message}`;console.error(err)});
+</script>
+
+<style id="v10111-panel-layer-and-knowledge-zoom">
+/* GBR v10.11.1 — shared desktop/mobile panel stacking and knowledge overview. */
+.side-panel{z-index:580!important}
+.utility-button#tracksButton.active{color:#fff1dd!important;border-color:var(--accent)!important;box-shadow:inset 0 0 14px rgba(var(--accent-rgb),.18),0 0 9px rgba(var(--accent-rgb),.12)!important}
+</style>
+
+<style id="v10110-knowledge-network">
+body[data-view="knowledge"] .knowledge-tabs{display:none!important}
+.knowledge-world-card{z-index:2}
+.knowledge-related-list{display:flex;flex-wrap:wrap;gap:5px;margin:7px 0 2px}
+.knowledge-related-link{border:1px solid color-mix(in srgb,var(--node-colour) 45%,#514438 55%);background:#0c0d0b;color:#cdbda8;padding:5px 7px;border-radius:3px;font:800 7px/1.1 "Courier New",monospace;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.knowledge-related-link:hover{border-color:var(--node-colour);color:#fff0dc}
+</style>
+
+<style id="v10124-share-links">
+/* v10.12.4 — compact share button; four top controls still fit phone widths. */
+#shareButton.active{color:#fff4e3!important;border-color:var(--accent)!important;box-shadow:inset 0 0 15px rgba(var(--accent-rgb),.18),0 0 10px rgba(var(--accent-rgb),.15)!important}
+@media(max-width:900px){
+  .utility-button{min-width:80px!important;width:80px!important;padding:0 8px!important;font-size:10px!important}
+}
+@media(max-width:350px){
+  .utility-nav{gap:4px!important;right:5px!important}
+  .utility-button{min-width:76px!important;width:76px!important;padding:0 6px!important;font-size:9px!important}
+}
+</style>
+<!-- GBR_BUILD: v10.12.4 SHARE_LINKS -->
+
+<style id="v10127-autoplay-filters">
+/* GBR v10.12.8 — analogue cluster/language autoplay filters. Filtering never removes music from
+   the galaxy; it only changes visual emphasis and automatic-selection eligibility. */
+#filterButton.active{color:#fff1dd!important;border-color:var(--accent)!important;box-shadow:inset 0 0 14px rgba(var(--accent-rgb),.18),0 0 9px rgba(var(--accent-rgb),.12)!important}
+.filter-panel{max-width:760px;margin:0 auto;display:grid;gap:22px;padding-bottom:18px}
+.filter-status{display:grid;grid-template-columns:1fr auto;gap:4px 14px;align-items:end;padding:13px 14px;border:1px solid color-mix(in srgb,var(--accent) 36%,#40372f 64%);border-radius:6px;background:linear-gradient(180deg,#11120f,#080908);box-shadow:inset 0 1px rgba(255,255,255,.035)}
+.filter-status>span{color:#8e806e;font:900 8px/1 "Courier New",monospace;letter-spacing:.15em}.filter-status>strong{color:color-mix(in srgb,var(--accent) 72%,#f4eadb 28%);font:900 22px/1 "Courier New",monospace}.filter-status>small{grid-column:1/-1;color:#8f8577;font:12px/1.4 Arial,sans-serif}
+.filter-section{padding:0;border:0}.filter-section>header{display:flex;align-items:end;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #ffffff10}.filter-section>header small{display:block;margin-bottom:4px;color:var(--accent);font:900 8px/1 "Courier New",monospace;letter-spacing:.15em}.filter-section>header h2{margin:0!important;color:#e9dece!important;font:700 20px/1.05 Georgia,serif!important}
+.filter-clusters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 10px}
+.filter-language-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 10px}
+.filter-option{--push-colour:#d0802f;display:grid;grid-template-columns:minmax(0,1fr) 38px;align-items:center;gap:8px;min-height:48px;padding:7px 7px 7px 10px;border:1px solid #ffffff0b;border-radius:4px;background:linear-gradient(180deg,#10110f,#090a09);transition:opacity .15s ease,border-color .15s ease,background .15s ease}.filter-option.on{border-color:color-mix(in srgb,var(--push-colour) 26%,#ffffff12 74%)}.filter-option.off{opacity:.58;background:#070807}.filter-option-copy{min-width:0}.filter-option-copy b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd2c2;font:800 11px/1.1 Arial,sans-serif;text-transform:uppercase;letter-spacing:.035em}.filter-option-copy small{display:block;margin-top:4px;color:#7f7466;font:800 7px/1 "Courier New",monospace;letter-spacing:.09em}
+.analogue-filter-push{--push-colour:#d0802f;position:relative;width:32px;height:32px;padding:0;border-radius:50%;border:1px solid #766a5d;background:radial-gradient(circle at 42% 36%,#5e5b55 0 8%,#353530 22%,#171815 58%,#080908 72%);box-shadow:inset 0 0 0 3px #0a0b09,inset 0 1px 2px #ffffff25,0 2px 5px #000c;cursor:pointer;justify-self:end}.analogue-filter-push::after{content:"";position:absolute;inset:-3px;border:1px solid #252622;border-radius:50%;box-shadow:0 1px 0 #ffffff10,inset 0 1px #000}.analogue-filter-push .push-lens{position:absolute;inset:7px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#5a554d,#252520 55%,#10110f);box-shadow:inset 0 1px 2px #ffffff12,inset 0 -2px 3px #000b;transition:.12s ease}.analogue-filter-push[aria-pressed="true"] .push-lens{background:radial-gradient(circle at 38% 30%,#fff5d4 0 8%,color-mix(in srgb,var(--push-colour) 78%,#fff 22%) 25%,var(--push-colour) 58%,color-mix(in srgb,var(--push-colour) 62%,#000 38%) 100%);box-shadow:0 0 9px color-mix(in srgb,var(--push-colour) 80%,transparent),0 0 18px color-mix(in srgb,var(--push-colour) 38%,transparent),inset 0 1px 2px #fff8}.analogue-filter-push:active{transform:translateY(1px);box-shadow:inset 0 0 0 3px #0a0b09,inset 0 2px 5px #000,0 1px 2px #000}.analogue-filter-push:focus-visible{outline:2px solid #fff4d7;outline-offset:3px}
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.track-version-row.filtered{opacity:.56;filter:saturate(.15)}.track-version-row.filtered:hover{opacity:.84}.track-version-row.filtered .track-version-play{border-style:dashed}
+@media(max-width:900px){
+  /* Five utility controls: keep the strip fully visible even on small phones. */
+  .utility-nav{left:5px!important;right:5px!important;justify-content:flex-end!important;gap:4px!important;overflow:visible!important}
+  .utility-button{min-width:64px!important;width:64px!important;height:32px!important;padding:0 5px!important;font-size:8px!important}
+  .filter-clusters,.filter-language-grid{grid-template-columns:1fr}.filter-panel{gap:18px}.filter-status>strong{font-size:18px}.filter-section>header h2{font-size:18px!important}.filter-option{min-height:52px}.filter-option-copy b{font-size:12px}.analogue-filter-push{width:34px;height:34px}
+}
+@media(max-width:350px){.utility-button{min-width:58px!important;width:58px!important;font-size:7px!important}.utility-nav{gap:3px!important}}
+</style>
+<!-- GBR_BUILD: v10.12.9 ZONE_EFFECT_RETHINK -->
+
+</body>
+</html>
+<style>
+.lyrics .karaoke-current{will-change:transform!important;backface-visibility:hidden!important;transform:translate3d(0,-50%,0);transition:transform .20s cubic-bezier(.22,.72,.24,1)!important}
+@media(max-width:900px){.lyrics .karaoke-current{transition:transform .24s cubic-bezier(.2,.7,.2,1)!important;contain:layout paint style!important}.lyrics{contain:layout paint!important}}
+</style>
+
+<style id="v10121-mobile-lyrics-panel-layer">
+/* GBR v10.12.1 — phone-specific polish from live device QA. */
+@media(max-width:900px){
+  /* The one-line lyric was optically too high inside the enlarged 96px box. */
+  .lyrics .karaoke-current{top:66%!important}
+
+  /* The independent fixed playing sleeve must never sit over Tracks/Story. */
+  body.panel-open #playingCoverViewport,
+  body.panel-open #playingCoverScreen,
+  body.panel-open #easterStoryOverlay{display:none!important;visibility:hidden!important}
+}
+</style>
+<!-- GBR_BUILD: v10.12.1 MOBILE_LYRICS_PANEL_LAYER_PEAK_RAYS -->

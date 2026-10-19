@@ -124,8 +124,10 @@ def test_keep_creates_unique_variant_and_archive_replace_preserves_original_byte
     with patch('pathlib.Path.replace',side_effect=OSError('simulated catalogue lock')):
         with pytest.raises(OSError):w.publish(second['id'],'archive_replace',second['revision'])
     assert w.public(second['id'])['status']=='publishing'
+    assert f.source.resolve() in f.generation.writing_publications()
     archive=Path(w.public(second['id'])['publication']['archive']);assert archive.read_bytes()==original
     result=w.publish(second['id'],'archive_replace',second['revision'])
+    assert not f.generation.writing_publications()
     assert result['status']=='published' and f.source.read_bytes()!=original
     assert archive.read_bytes()==original and not list(f.root.rglob('*.tmp'))
 
