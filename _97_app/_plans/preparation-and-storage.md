@@ -74,8 +74,8 @@ Simon supplies his artwork API workflow.
 
 ## Directory and promotion flow
 
-Writing → generation → review → `_04_preparation` → `_05_website`.
-The former `_04_website` source is relocated by the existing compatibility layer.
+Writing → generation → review → `_04_preparation` → `_96_website`.
+The former `_04_website` and `_05_website` sources are relocated by the existing compatibility layer.
 Public routes, catalogue identities, share tokens and existing R2 media URLs remain
 stable. No cloud objects are moved or removed by this update.
 
@@ -237,7 +237,7 @@ window plus a current pointer rather than endless active database copies.
 
 ## Tidy-up review
 
-Done: reserve stage numbering; move website source to stage 5; update paths and
+Done: reserve stage numbering; move website source to utility 96; update paths and
 build checks; ignore preparation/media/model runtime files; cap preview cache; retain one verified
 source bundle; remove the tracked machine-specific review config (including its
 password hash) and obsolete bundle checksum/build-report/update-note files from the repository. A fresh
@@ -279,7 +279,7 @@ A clean public build retained 168 main and nine hidden recordings.
 The only schema addition is `processing_tasks` and its indexes. Existing shared
 databases install it idempotently on app startup; fresh initialization installs
 the same SQL. No re-import or replacement database is required. The existing
-verified directory migration relocates website source into stage 5. Close active
+verified directory migration relocates website source into utility 96. Close active
 GBR controllers before pulling structural changes, then launch normally.
 
 GPU model inference, Demucs/WhisperX accuracy, a physical Comfy model generation, physical

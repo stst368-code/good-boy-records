@@ -231,3 +231,13 @@ _Reviewed/
 !/_99_tools/_yaml_editor/_tests/
 !/_99_tools/_yaml_editor/_tests/test_*.py
 _03_review/_generation_review/config.json
+
+# Writing artifacts use the shared DB; original archives and local LLM binaries stay local.
+/_01_writing/_archive/
+/_99_tools/_llama_cpp/
+!/_01_writing/_tests/
+!/_01_writing/_tests/test_*.py
+!/_01_writing/_tests/ui_*.py
+/_96_website/_site/
+/_96_website/_showcase/
+/_96_website/.gbr-site-*/

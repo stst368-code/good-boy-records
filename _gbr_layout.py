@@ -13,7 +13,8 @@ import sys
 import uuid
 
 DIRECTORIES = {
-    "_04_website": "_05_website",
+    "_04_website": "_96_website",
+    "_05_website": "_96_website",
     "_01_Writing": "_01_writing",
     "_01_Writing/_Built": "_01_writing/_built",
     "_01_Writing/_Built/_yaml": "_01_writing/_built/_yaml",

@@ -169,9 +169,10 @@ class Styles:
                 raise ValueError("styles.csv contains a missing or duplicate template ID")
             source = row.get("template_source")
             if source is not None:
-                if source not in {"minimax", "custom"}:
-                    raise ValueError(f"{row['ID']}: template_source must be minimax or custom")
-                prefix = "_minimax_templates" if source == "minimax" else "_custom_templates"
+                prefixes = {'minimax':'_minimax_templates', 'sample':'_minimax_templates', 'custom':'_custom_templates', 'llm':'_llm_templates'}
+                if source not in prefixes:
+                    raise ValueError(f"{row['ID']}: template_source must be minimax, sample, custom or llm")
+                prefix = prefixes[source]
                 relative = Path(row["template"].replace("\\", "/"))
                 if relative.is_absolute() or ".." in relative.parts or not relative.parts or relative.parts[0] != prefix or relative.suffix.lower() != ".txt":
                     raise ValueError(f"{row['ID']}: {source} templates must be .txt files under {prefix}/")
@@ -191,7 +192,7 @@ class Styles:
 
 
 def validate_template_format(caption, source):
-    if source != "custom":
+    if source not in {"custom", "llm"}:
         return
     headings = [line.strip().lstrip("#").strip().removesuffix(":").strip() for line in caption.splitlines()]
     expected = ["Global Metadata", "Vocal Details", "Arrangement"]

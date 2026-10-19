@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 pushd "%~dp0.." || exit /b 1
-py -3.12 _05_website\build.py --serve --open %*
+py -3.12 _96_website\build.py --serve --open %*
 set "GBR_WEBSITE_EXIT=%ERRORLEVEL%"
 popd
 if not "%GBR_WEBSITE_EXIT%"=="0" pause

@@ -2,6 +2,7 @@ import {initPreparation} from "/tools/preparation/preparation.js";
 import {initYamlEditor} from "/tools/yaml-editor/editor.js";
 import {initGeneration} from "/tools/generation/generation.js";
 import {initWorkers} from "/tools/generation/workers.js";
+import {initWriting} from "/tools/writing/writing.js";
 import {ReviewTags, savedTags} from "/static/tags.js";
 const $=id=>document.getElementById(id);
 const reviewTags=new ReviewTags($("tagGroups"),$("clearTags"));
@@ -35,7 +36,7 @@ function ratingButtons(){
 }
 function paintRatings(){
   $('changeUser').disabled=state.submitting||state.advancePending||state.flagSaving;
-  $('back').disabled=!state.canBack||state.submitting||state.advancePending;$('skip').disabled=!state.track||state.submitting||state.advancePending||state.reservationLost;$('queueButton').disabled=state.submitting||state.advancePending;$('selectionTab').disabled=state.submitting||state.advancePending;$('yamlTab').disabled=state.submitting||state.advancePending;$('generationTab').disabled=state.submitting||state.advancePending;$('preparationTab').disabled=state.submitting||state.advancePending;
+  $('back').disabled=!state.canBack||state.submitting||state.advancePending;$('skip').disabled=!state.track||state.submitting||state.advancePending||state.reservationLost;$('queueButton').disabled=state.submitting||state.advancePending;$('selectionTab').disabled=state.submitting||state.advancePending;$('yamlTab').disabled=state.submitting||state.advancePending;$('generationTab').disabled=state.submitting||state.advancePending;$('preparationTab').disabled=state.submitting||state.advancePending;$('writingTab').disabled=state.submitting||state.advancePending;
   const complete=DIMENSIONS.every(d=>state.scores[d]!==undefined);$('submitReview').hidden=state.autoSubmit||state.selectionListen||!state.track;$('submitReview').disabled=!complete||state.submitting||state.advancePending||state.reservationLost||state.flagSaving;$('retryReview').hidden=!state.autoSubmit||!state.saveError||state.reservationLost||state.advancePending;$('retryReview').disabled=state.submitting;$('reason').disabled=state.submitting||state.advancePending;$('autoSubmit').disabled=state.submitting||state.advancePending;paintFlags();reviewTags.setDisabled(!state.track||state.selectionListen||state.submitting||state.advancePending||state.reservationLost);
   const missing=DIMENSIONS.findIndex(d=>state.scores[d]===undefined);if(missing>=0&&state.scores[DIMENSIONS[state.ratingIndex]]!==undefined)state.ratingIndex=missing;
   document.querySelectorAll('.rating').forEach((row,i)=>row.classList.toggle('keyboard-active',i===state.ratingIndex));
@@ -195,13 +196,16 @@ function mediaSession(){
   const actions={play:()=>audio.play(),pause:()=>audio.pause(),stop:()=>{audio.pause();audio.currentTime=0;},seekbackward:details=>audio.currentTime=Math.max(0,audio.currentTime-(details.seekOffset||10)),seekforward:details=>audio.currentTime=Math.min(audio.duration||0,audio.currentTime+(details.seekOffset||10)),seekto:details=>audio.currentTime=details.seekTime,nexttrack:()=>audio.currentTime=Math.min(audio.duration||0,audio.currentTime+10),previoustrack:()=>audio.currentTime=Math.max(0,audio.currentTime-10)};
   for(const [name,handler] of Object.entries(actions))try{navigator.mediaSession.setActionHandler(name,handler);}catch{}
 }
-function showView(view){if(view!=='preparation')preparation.close();state.view=view;for(const name of ['review','selection','yaml','generation','preparation']){$(name+'View').hidden=view!==name;$(name+'Tab').classList.toggle('active',view===name);}if(view==='review')drawWave();}
+function showView(view){if(view!=='preparation')preparation.close();if(view!=='writing')writing.close();state.view=view;for(const name of ['writing','yaml','generation','review','selection','preparation']){$(name+'View').hidden=view!==name;$(name+'Tab').classList.toggle('active',view===name);}if(view==='review')drawWave();}
 $('reviewTab').onclick=guarded(async()=>{showView('review');if(state.selectionListen||!state.track)await nextTrack();else await refreshFlags();});
 $('selectionTab').onclick=guarded(async()=>{showView('selection');await loadCandidates();});
 const yamlEditor=initYamlEditor({api,toast,browse:async callback=>{await openDirectory(callback);}});
 const preparation=initPreparation({api,toast});
 $('preparationTab').onclick=guarded(async()=>{audio.pause();showView('preparation');await preparation.open();});
-const workers=initWorkers({api,toast,onChange:async()=>{await generation.reloadWorkers();}});
+const writing=initWriting({api,toast,onPublished:kind=>{generation.writingChanged(kind);if(kind==='track')yamlEditor.invalidateCatalogue();}});
+$('writingTab').onclick=guarded(async()=>{audio.pause();showView('writing');await writing.open();});
+$('openWritingSettings').onclick=guarded(async()=>{$('settingsDialog').close();await writing.openSettings();});
+const workers=initWorkers({api,toast,onChange:async()=>{await generation.reloadWorkers();},configureWriting:()=>writing.openSettings()});
 const generation=initGeneration({api,toast,browse:async callback=>{await openDirectory(callback);},configureWorkers:()=>workers.open()});
 $('openWorkerSettings').onclick=guarded(async()=>{$('settingsDialog').close();await workers.open();});
 $('generationTab').onclick=guarded(async()=>{audio.pause();showView('generation');await generation.open();});
@@ -304,7 +308,7 @@ $('resumeQueue').onclick=guarded(()=>nextTrack(false));
 window.addEventListener('focus',()=>heartbeat().catch(()=>{}));
 async function boot(){
   const b=await api('/bootstrap');if(!b.authenticated){if(!$('loginDialog').open)$('loginDialog').showModal();return;}
-  reviewTags.configure(b.review_tags||[]);state.canConfigure=b.can_configure;$("reviewImportLabel").hidden=!state.canConfigure;$('generationTab').hidden=!state.canConfigure;state.reviewer=b.reviewer;if(!b.reviewer){state.reviewerId='';localStorage.removeItem('gbr-reviewer-id');await showReviewerDialog(b.reviewers);return;}$('reviewerBar').hidden=false;$('reviewerName').textContent=b.reviewer.display_name;clearInterval(heartbeatTimer);heartbeatTimer=setInterval(()=>heartbeat().catch(()=>{}),b.heartbeat_seconds*1000);state.durations=b.durations;if(b.queue){state.queue={song:'',genre:'',directory:'',order:b.queue.order_by,direction:b.queue.direction,...JSON.parse(b.queue.filters_json)};}
+  reviewTags.configure(b.review_tags||[]);state.canConfigure=b.can_configure;$("reviewImportLabel").hidden=!state.canConfigure;$('generationTab').hidden=!state.canConfigure;$('writingTab').hidden=!state.canConfigure;state.reviewer=b.reviewer;if(!b.reviewer){state.reviewerId='';localStorage.removeItem('gbr-reviewer-id');await showReviewerDialog(b.reviewers);return;}$('reviewerBar').hidden=false;$('reviewerName').textContent=b.reviewer.display_name;clearInterval(heartbeatTimer);heartbeatTimer=setInterval(()=>heartbeat().catch(()=>{}),b.heartbeat_seconds*1000);state.durations=b.durations;if(b.queue){state.queue={song:'',genre:'',directory:'',order:b.queue.order_by,direction:b.queue.direction,...JSON.parse(b.queue.filters_json)};}
   audio.volume=Number(localStorage.getItem('gbr-volume')||50)/100;$('volume').value=audio.volume*100;
   await nextTrack();if('serviceWorker' in navigator&&isSecureContext)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 }

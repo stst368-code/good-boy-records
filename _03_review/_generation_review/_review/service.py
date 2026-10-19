@@ -62,6 +62,8 @@ class Service:
 
     def close(self):
         self.stop_event.set()
+        if getattr(self, 'writing', None):
+            self.writing.close()
         if getattr(self, 'preparation', None):
             self.preparation.close()
         if self.worker:
