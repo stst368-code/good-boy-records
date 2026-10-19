@@ -1,0 +1,52 @@
+name: GBR website
+on:
+  pull_request:
+    paths: ['_04_website/**', '.github/workflows/website.yml']
+  push:
+    branches: [main]
+    paths: ['_04_website/**', '.github/workflows/website.yml']
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy to GitHub Pages
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r _04_website/requirements.txt
+      - run: python -m unittest discover -s _04_website/_tests -p 'test_*.py'
+      - run: python _04_website/build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gbr-website
+          path: _04_website/_site
+          include-hidden-files: true
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name == 'workflow_dispatch' && inputs.deploy && github.ref == 'refs/heads/main'
+        with:
+          path: _04_website/_site
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - id: deployment
+        uses: actions/deploy-pages@v4
