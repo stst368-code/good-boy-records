@@ -1,0 +1,74 @@
+{
+  "source": "minimax_conditioning_pipeline(4).py:build_full_prompt",
+  "source_sha256": "4efc808d0ab58947f9d0ab2eb4d33489037a41e0a794458ed64e952ef7491324",
+  "cross_check": "Attached FLAC contains MiniMaxMusic3TextEncode + KSampler + VAEDecodeAudio + SaveAudio; caption/lyrics/seeds not copied",
+  "mode": "full",
+  "persistent_encoding_cache": "not supported; Comfy graph cache only",
+  "embedded_node_versions": [
+    {
+      "class_type": "VAELoader",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    },
+    {
+      "class_type": "VAEDecodeAudio",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    },
+    {
+      "class_type": "ConditioningZeroOut",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    },
+    {
+      "class_type": "KSampler",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    },
+    {
+      "class_type": "EmptyMiniMaxMusic3LatentAudio",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    },
+    {
+      "class_type": "UNETLoader",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    },
+    {
+      "class_type": "CLIPLoader",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    },
+    {
+      "class_type": "SaveAudio",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    },
+    {
+      "class_type": "MiniMaxMusic3TextEncode",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    },
+    {
+      "class_type": "MiniMaxMusic3TextEncode",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    },
+    {
+      "class_type": "MiniMaxMusic3TextEncode",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    },
+    {
+      "class_type": "MiniMaxMusic3TextEncode",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    },
+    {
+      "class_type": "MiniMaxMusic3TextEncode",
+      "cnr_id": "comfy-core",
+      "ver": "0.37.1"
+    }
+  ]
+}

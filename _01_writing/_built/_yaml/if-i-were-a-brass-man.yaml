@@ -4,6 +4,7 @@ title: if-i-were-a-brass-man
 album: brasston
 pos: 4
 version:
+language: en
 model:
 dit:
 text_encoder:

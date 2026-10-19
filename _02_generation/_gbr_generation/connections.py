@@ -63,9 +63,11 @@ def normalize(connection):
             address = parts[1]
         if not re.fullmatch(r'[A-Za-z0-9_-]{3,100}', address):
             raise ValueError('Enter the RunPod Serverless endpoint ID')
+    elif result['backend']=='comfyui':
+        result['auto_setup']=False;result['identity_file']='';result['worker_python']=''
     elif result['backend'] != 'local' or address:
         raise ValueError('Local execution has no remote address')
-    result['address'] = address
+    result['address'] = address.rstrip('/') if result['backend']=='comfyui' else address
     if result['identity_file'].casefold().endswith('.pub'):
         raise ValueError('Choose the private RunPod SSH key, without the .pub suffix')
     for key in ('identity_file', 'worker_python'):
@@ -81,6 +83,7 @@ def connection_key(connection):
 
 def execution(connection, cache='prefer'):
     profile = connection.get('memory_profile', 'auto')
+    if connection['backend']=='comfyui':profile='server_managed'
     if profile == 'auto':
         profile = 'low_vram' if connection['backend'] == 'local' else 'resident_stage'
     target = {'backend': connection['backend'], 'address': connection.get('address') or None}

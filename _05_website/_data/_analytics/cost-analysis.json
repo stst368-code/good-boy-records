@@ -1,0 +1,1047 @@
+{
+  "format": "gbr-compute-cost-v1",
+  "generated_at": "2026-10-09T23:05:33.134351+00:00",
+  "source_rows": 14417,
+  "billable_rows": 1948,
+  "currency": "USD",
+  "cost_basis": "pipeline-estimated-stage-costs",
+  "workers": [
+    {
+      "worker": "RunPod A40",
+      "gpu": "A40",
+      "cost_usd": 47.661237,
+      "worker_seconds": 313012.308,
+      "billable_rows": 928,
+      "distinct_jobs_seen": 620,
+      "stages": [
+        "conditioning_total",
+        "sampling_total"
+      ]
+    },
+    {
+      "worker": "RTX A6000 48 GB c2",
+      "gpu": "RTX A6000",
+      "cost_usd": 15.405295,
+      "worker_seconds": 93998.407,
+      "billable_rows": 356,
+      "distinct_jobs_seen": 255,
+      "stages": [
+        "conditioning_total",
+        "sampling_total"
+      ]
+    },
+    {
+      "worker": "RTX A6000 48 GB c",
+      "gpu": "RTX A6000",
+      "cost_usd": 10.867266,
+      "worker_seconds": 66308.743,
+      "billable_rows": 208,
+      "distinct_jobs_seen": 171,
+      "stages": [
+        "conditioning_total",
+        "sampling_total"
+      ]
+    },
+    {
+      "worker": "RunPod RTX 5090 32GB",
+      "gpu": "RTX 5090 32GB",
+      "cost_usd": 7.843732,
+      "worker_seconds": 28237.436,
+      "billable_rows": 158,
+      "distinct_jobs_seen": 148,
+      "stages": [
+        "conditioning_total",
+        "sampling_total"
+      ]
+    },
+    {
+      "worker": "RunPod PRO 6000 MIG 24GB",
+      "gpu": "PRO 6000 MIG 24GB",
+      "cost_usd": 1.61529,
+      "worker_seconds": 9691.739,
+      "billable_rows": 25,
+      "distinct_jobs_seen": 23,
+      "stages": [
+        "conditioning_total",
+        "sampling_total"
+      ]
+    },
+    {
+      "worker": "Local DiT",
+      "gpu": "Local 12GB GPU",
+      "cost_usd": 0.373551,
+      "worker_seconds": 134478.24,
+      "billable_rows": 273,
+      "distinct_jobs_seen": 273,
+      "stages": [
+        "sampling_total"
+      ]
+    }
+  ],
+  "matched_generations": [],
+  "matched_count": 0,
+  "unmatched_rows": 1948,
+  "ambiguous_rows": 0,
+  "skipped_rows": 12469,
+  "audit": {
+    "unmatched_examples": [
+      {
+        "row": 6,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "93bc51a61d75e5632b654d60a8ac04c7ec5272e0120a038fb31a972a4cefe2de"
+      },
+      {
+        "row": 11,
+        "worker": "RunPod PRO 6000 MIG 24GB",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "1d25a474a9388d99fee7734a76530cd34435a7765525502515254d65f981fffb"
+      },
+      {
+        "row": 15,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "93bc51a61d75e5632b654d60a8ac04c7ec5272e0120a038fb31a972a4cefe2de"
+      },
+      {
+        "row": 20,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "e1328ec69efd6b8d038b1308974ca78fb20bc1a0ad1a5a31f1b234c570e9473e"
+      },
+      {
+        "row": 24,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "1d25a474a9388d99fee7734a76530cd34435a7765525502515254d65f981fffb"
+      },
+      {
+        "row": 29,
+        "worker": "RunPod PRO 6000 MIG 24GB",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "5d06062435ed67d5aeebb00d722d1030c4718f4a6daa62ab40e5d9b766692ab1"
+      },
+      {
+        "row": 33,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "e1328ec69efd6b8d038b1308974ca78fb20bc1a0ad1a5a31f1b234c570e9473e"
+      },
+      {
+        "row": 38,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "ac54fcb7ebd68730809e10bf7d288eee363b2966501d5895ae194d95090ce831"
+      },
+      {
+        "row": 43,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "5d06062435ed67d5aeebb00d722d1030c4718f4a6daa62ab40e5d9b766692ab1"
+      },
+      {
+        "row": 47,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "14d591820b4617de20354cfb1f0013f4355f4afd9f011c623637bed4cffeec22"
+      },
+      {
+        "row": 51,
+        "worker": "RunPod PRO 6000 MIG 24GB",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "fc8c7493a17c2b4389a1b05a6de663b1de0b1978f83dd16c601491146f63f362"
+      },
+      {
+        "row": 55,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "ac54fcb7ebd68730809e10bf7d288eee363b2966501d5895ae194d95090ce831"
+      },
+      {
+        "row": 60,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "eb1fbb35bcedf654783b70d751e75d5eae46a5c1006c4e4f21794d3e27c0e0c1"
+      },
+      {
+        "row": 64,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "fc8c7493a17c2b4389a1b05a6de663b1de0b1978f83dd16c601491146f63f362"
+      },
+      {
+        "row": 69,
+        "worker": "RunPod PRO 6000 MIG 24GB",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "304fc44324f49b7d02c782abfb332df210d930e213a167b2e1ed05859c1e140b"
+      },
+      {
+        "row": 73,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "f6fb4d624e6b52ac746045dbeb88666186ec195be4c6b15c8a8681208310f6a6"
+      },
+      {
+        "row": 77,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "eb1fbb35bcedf654783b70d751e75d5eae46a5c1006c4e4f21794d3e27c0e0c1"
+      },
+      {
+        "row": 82,
+        "worker": "RunPod PRO 6000 MIG 24GB",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "b94d2bbb44288abe897db98236fba0033d8a704d3da2e1e0dd650960ee658d4c"
+      },
+      {
+        "row": 86,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "6edadea2b8abebfcf3a5396e9209b19c52337bc0404bcf116d5c2a1cb8ba83c2"
+      },
+      {
+        "row": 90,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "304fc44324f49b7d02c782abfb332df210d930e213a167b2e1ed05859c1e140b"
+      },
+      {
+        "row": 95,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "f6fb4d624e6b52ac746045dbeb88666186ec195be4c6b15c8a8681208310f6a6"
+      },
+      {
+        "row": 101,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "b94d2bbb44288abe897db98236fba0033d8a704d3da2e1e0dd650960ee658d4c"
+      },
+      {
+        "row": 105,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "d769e180e4e724a585d8f63c3496557a4d41fe3ed3af4ca4b6589808bcf53c01"
+      },
+      {
+        "row": 109,
+        "worker": "RunPod PRO 6000 MIG 24GB",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "948eb034ef8daf211412e2de262442d993510440e8d60f446dcc55ebbf912853"
+      },
+      {
+        "row": 113,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "0ec8f06024acf8b37f49980cf5ab755f5e63dd6f605f68263ce5af97179f77a5"
+      },
+      {
+        "row": 117,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "6edadea2b8abebfcf3a5396e9209b19c52337bc0404bcf116d5c2a1cb8ba83c2"
+      },
+      {
+        "row": 122,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "948eb034ef8daf211412e2de262442d993510440e8d60f446dcc55ebbf912853"
+      },
+      {
+        "row": 127,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "73201a5ee69d2c88cce854910c8ebb0c7c20173e31bb4dbe4b1dd82c008ae85e"
+      },
+      {
+        "row": 133,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "d769e180e4e724a585d8f63c3496557a4d41fe3ed3af4ca4b6589808bcf53c01"
+      },
+      {
+        "row": 137,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "094d0532a0fd43334eea1ed5b18999f49eb3e3e4dd5afe7634675d4b79e1ff5f"
+      },
+      {
+        "row": 140,
+        "worker": "RunPod PRO 6000 MIG 24GB",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "ccaa63bdc7814c3b33ad010648492fc9f9d3967b07bb70d91e58a83eb8b5eb7a"
+      },
+      {
+        "row": 144,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "73201a5ee69d2c88cce854910c8ebb0c7c20173e31bb4dbe4b1dd82c008ae85e"
+      },
+      {
+        "row": 149,
+        "worker": "RunPod PRO 6000 MIG 24GB",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "48f56ed0427ff52c7f303fb94f35d16ae5a2078e14e70a925977023fc237fcb7"
+      },
+      {
+        "row": 153,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "3900457aa91647dee268c14852bde1105dcf43a1a5498983be0cf6f32160a201"
+      },
+      {
+        "row": 157,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "14d591820b4617de20354cfb1f0013f4355f4afd9f011c623637bed4cffeec22"
+      },
+      {
+        "row": 162,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "00b4829c70ae9b89cc296b324ddc7a58f0fb7fd94a660384e0e79487454ba30d"
+      },
+      {
+        "row": 166,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "094d0532a0fd43334eea1ed5b18999f49eb3e3e4dd5afe7634675d4b79e1ff5f"
+      },
+      {
+        "row": 171,
+        "worker": "RunPod PRO 6000 MIG 24GB",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "68f015f86b97ff6ef3e31f58fa6fba79d0fb290081278a947c41d39f732e07e7"
+      },
+      {
+        "row": 175,
+        "worker": "RunPod A40",
+        "stage": "conditioning_total",
+        "file": null,
+        "job_id": "7de2ec6dbc01f969f5ccc04f3d467b3fb6a58459cdb3c561a38c4c38de8b027a"
+      },
+      {
+        "row": 179,
+        "worker": "Local DiT",
+        "stage": "sampling_total",
+        "file": null,
+        "job_id": "00b4829c70ae9b89cc296b324ddc7a58f0fb7fd94a660384e0e79487454ba30d"
+      }
+    ],
+    "ambiguous_examples": [],
+    "skipped_examples": [
+      {
+        "row": 2,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_queue_wait"
+      },
+      {
+        "row": 3,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_queue_wait"
+      },
+      {
+        "row": 4,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_compute"
+      },
+      {
+        "row": 5,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_download"
+      },
+      {
+        "row": 7,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_queue_wait"
+      },
+      {
+        "row": 8,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "sampling_queue_wait"
+      },
+      {
+        "row": 9,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_compute"
+      },
+      {
+        "row": 10,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_download"
+      },
+      {
+        "row": 12,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_queue_wait"
+      },
+      {
+        "row": 13,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "sampling_compute"
+      },
+      {
+        "row": 14,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "audio_download"
+      },
+      {
+        "row": 16,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "job_total"
+      },
+      {
+        "row": 17,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "sampling_queue_wait"
+      },
+      {
+        "row": 18,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_compute"
+      },
+      {
+        "row": 19,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_download"
+      },
+      {
+        "row": 21,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_queue_wait"
+      },
+      {
+        "row": 22,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "sampling_compute"
+      },
+      {
+        "row": 23,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "audio_download"
+      },
+      {
+        "row": 25,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "job_total"
+      },
+      {
+        "row": 26,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "sampling_queue_wait"
+      },
+      {
+        "row": 27,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_compute"
+      },
+      {
+        "row": 28,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_download"
+      },
+      {
+        "row": 30,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_queue_wait"
+      },
+      {
+        "row": 31,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "sampling_compute"
+      },
+      {
+        "row": 32,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "audio_download"
+      },
+      {
+        "row": 34,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "job_total"
+      },
+      {
+        "row": 35,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "sampling_queue_wait"
+      },
+      {
+        "row": 36,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_compute"
+      },
+      {
+        "row": 37,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_download"
+      },
+      {
+        "row": 39,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_queue_wait"
+      },
+      {
+        "row": 40,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_compute"
+      },
+      {
+        "row": 41,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "sampling_compute"
+      },
+      {
+        "row": 42,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "audio_download"
+      },
+      {
+        "row": 44,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "job_total"
+      },
+      {
+        "row": 45,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "sampling_queue_wait"
+      },
+      {
+        "row": 46,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_download"
+      },
+      {
+        "row": 48,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_queue_wait"
+      },
+      {
+        "row": 49,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_compute"
+      },
+      {
+        "row": 50,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_download"
+      },
+      {
+        "row": 52,
+        "reason": "overlap_or_nonbillable_substage",
+        "stage": "conditioning_queue_wait"
+      }
+    ],
+    "headers": [
+      "actual_audio_seconds",
+      "billable",
+      "cost_currency",
+      "cost_per_hour",
+      "details_json",
+      "duration_seconds",
+      "encoder_cfg",
+      "error",
+      "estimated_cost",
+      "estimated_cost_per_step",
+      "estimated_cost_per_step_audio_minute",
+      "finished_at",
+      "gpu_name",
+      "job_id",
+      "output_stem",
+      "requested_audio_seconds",
+      "role",
+      "sampler",
+      "sampler_cfg",
+      "sampler_steps",
+      "scheduler",
+      "seconds_per_step",
+      "seconds_per_step_audio_minute",
+      "stage",
+      "started_at",
+      "step_audio_minutes",
+      "success",
+      "timing_id",
+      "title",
+      "top_k",
+      "version",
+      "worker_id",
+      "worker_name"
+    ]
+  },
+  "warning": "Costs are pipeline telemetry estimates, not validated invoice charges. Unmatched costs are NOT allocated to rated records.",
+  "pipeline_summary": {
+    "rows": [
+      {
+        "worker_id": "local",
+        "gpu_name": "Local 12GB GPU",
+        "stage": "sampling_total",
+        "successful_runs": "267",
+        "failed_runs": "6",
+        "total_runs": "273",
+        "avg_seconds": "492.5943",
+        "min_seconds": "2.4895",
+        "max_seconds": "9088.1842",
+        "jobs_per_hour": "7.3082",
+        "total_worker_seconds": "134478.2395",
+        "cost_per_hour": "0.01",
+        "cost_currency": "USD",
+        "estimated_total_cost": "0.373551",
+        "estimated_cost_per_success": "0.001399",
+        "total_sampler_steps": "9599",
+        "avg_sampler_steps_per_success": "35.9513",
+        "seconds_per_step": "13.52860426",
+        "steps_per_worker_second": "0.07391746",
+        "estimated_cost_per_step": "3.75795e-05",
+        "total_step_audio_minutes": "29392.117164",
+        "seconds_per_step_audio_minute": "4.41822791",
+        "estimated_cost_per_step_audio_minute": "1.22729e-05",
+        "requested_audio_seconds": "93450.0",
+        "actual_audio_seconds": "48731.603",
+        "actual_vs_requested_ratio": "0.521472",
+        "audio_seconds_per_worker_second": "0.362375",
+        "worker_seconds_per_audio_second": "2.759569",
+        "estimated_cost_per_actual_audio_hour": "0.027596"
+      },
+      {
+        "worker_id": "runpod_a",
+        "gpu_name": "A40",
+        "stage": "conditioning_total",
+        "successful_runs": "556",
+        "failed_runs": "23",
+        "total_runs": "579",
+        "avg_seconds": "308.521",
+        "min_seconds": "30.4019",
+        "max_seconds": "1354.1307",
+        "jobs_per_hour": "11.6686",
+        "total_worker_seconds": "178633.637",
+        "cost_per_hour": "0.49",
+        "cost_currency": "USD",
+        "estimated_total_cost": "27.131163",
+        "estimated_cost_per_success": "0.048797",
+        "total_sampler_steps": "",
+        "avg_sampler_steps_per_success": "",
+        "seconds_per_step": "",
+        "steps_per_worker_second": "",
+        "estimated_cost_per_step": "",
+        "total_step_audio_minutes": "",
+        "seconds_per_step_audio_minute": "",
+        "estimated_cost_per_step_audio_minute": "",
+        "requested_audio_seconds": "194600.0",
+        "actual_audio_seconds": "109865.448",
+        "actual_vs_requested_ratio": "0.564571",
+        "audio_seconds_per_worker_second": "0.615032",
+        "worker_seconds_per_audio_second": "1.625931",
+        "estimated_cost_per_actual_audio_hour": "0.889016"
+      },
+      {
+        "worker_id": "runpod_a",
+        "gpu_name": "A40",
+        "stage": "sampling_total",
+        "successful_runs": "156",
+        "failed_runs": "187",
+        "total_runs": "343",
+        "avg_seconds": "363.33",
+        "min_seconds": "29.1056",
+        "max_seconds": "2475.8066",
+        "jobs_per_hour": "9.9083",
+        "total_worker_seconds": "124622.2036",
+        "cost_per_hour": "0.55",
+        "cost_currency": "USD",
+        "estimated_total_cost": "19.039503",
+        "estimated_cost_per_success": "0.122048",
+        "total_sampler_steps": "5557",
+        "avg_sampler_steps_per_success": "35.6218",
+        "seconds_per_step": "11.56088739",
+        "steps_per_worker_second": "0.08649855",
+        "estimated_cost_per_step": "0.0017662467",
+        "total_step_audio_minutes": "18672.251066",
+        "seconds_per_step_audio_minute": "3.44060558",
+        "estimated_cost_per_step_audio_minute": "0.0005256481",
+        "requested_audio_seconds": "54600.0",
+        "actual_audio_seconds": "31565.253",
+        "actual_vs_requested_ratio": "0.578118",
+        "audio_seconds_per_worker_second": "0.253288",
+        "worker_seconds_per_audio_second": "3.948082",
+        "estimated_cost_per_actual_audio_hour": "2.171445"
+      },
+      {
+        "worker_id": "runpod_a2",
+        "gpu_name": "A40",
+        "stage": "conditioning_total",
+        "successful_runs": "3",
+        "failed_runs": "0",
+        "total_runs": "3",
+        "avg_seconds": "406.3221",
+        "min_seconds": "235.0369",
+        "max_seconds": "740.6707",
+        "jobs_per_hour": "8.86",
+        "total_worker_seconds": "1218.9662",
+        "cost_per_hour": "0.55",
+        "cost_currency": "USD",
+        "estimated_total_cost": "0.186231",
+        "estimated_cost_per_success": "0.062077",
+        "total_sampler_steps": "",
+        "avg_sampler_steps_per_success": "",
+        "seconds_per_step": "",
+        "steps_per_worker_second": "",
+        "estimated_cost_per_step": "",
+        "total_step_audio_minutes": "",
+        "seconds_per_step_audio_minute": "",
+        "estimated_cost_per_step_audio_minute": "",
+        "requested_audio_seconds": "1050.0",
+        "actual_audio_seconds": "559.752",
+        "actual_vs_requested_ratio": "0.533097",
+        "audio_seconds_per_worker_second": "0.459202",
+        "worker_seconds_per_audio_second": "2.17769",
+        "estimated_cost_per_actual_audio_hour": "1.19773"
+      },
+      {
+        "worker_id": "runpod_a2",
+        "gpu_name": "A40",
+        "stage": "sampling_total",
+        "successful_runs": "3",
+        "failed_runs": "0",
+        "total_runs": "3",
+        "avg_seconds": "2845.8336",
+        "min_seconds": "491.5777",
+        "max_seconds": "7553.4032",
+        "jobs_per_hour": "1.265",
+        "total_worker_seconds": "8537.5009",
+        "cost_per_hour": "0.55",
+        "cost_currency": "USD",
+        "estimated_total_cost": "1.30434",
+        "estimated_cost_per_success": "0.43478",
+        "total_sampler_steps": "110",
+        "avg_sampler_steps_per_success": "36.6667",
+        "seconds_per_step": "77.61364441",
+        "steps_per_worker_second": "0.01288433",
+        "estimated_cost_per_step": "0.0118576401",
+        "total_step_audio_minutes": "352.906546",
+        "seconds_per_step_audio_minute": "24.19195957",
+        "estimated_cost_per_step_audio_minute": "0.0036959938",
+        "requested_audio_seconds": "1050.0",
+        "actual_audio_seconds": "567.577",
+        "actual_vs_requested_ratio": "0.540549",
+        "audio_seconds_per_worker_second": "0.06648",
+        "worker_seconds_per_audio_second": "15.042015",
+        "estimated_cost_per_actual_audio_hour": "8.273108"
+      },
+      {
+        "worker_id": "runpod_b",
+        "gpu_name": "PRO 6000 MIG 24GB",
+        "stage": "conditioning_total",
+        "successful_runs": "14",
+        "failed_runs": "0",
+        "total_runs": "14",
+        "avg_seconds": "433.531",
+        "min_seconds": "255.918",
+        "max_seconds": "622.5896",
+        "jobs_per_hour": "8.3039",
+        "total_worker_seconds": "6069.4336",
+        "cost_per_hour": "0.6",
+        "cost_currency": "USD",
+        "estimated_total_cost": "1.011572",
+        "estimated_cost_per_success": "0.072255",
+        "total_sampler_steps": "",
+        "avg_sampler_steps_per_success": "",
+        "seconds_per_step": "",
+        "steps_per_worker_second": "",
+        "estimated_cost_per_step": "",
+        "total_step_audio_minutes": "",
+        "seconds_per_step_audio_minute": "",
+        "estimated_cost_per_step_audio_minute": "",
+        "requested_audio_seconds": "4900.0",
+        "actual_audio_seconds": "",
+        "actual_vs_requested_ratio": "",
+        "audio_seconds_per_worker_second": "",
+        "worker_seconds_per_audio_second": "",
+        "estimated_cost_per_actual_audio_hour": ""
+      },
+      {
+        "worker_id": "runpod_b",
+        "gpu_name": "PRO 6000 MIG 24GB",
+        "stage": "sampling_total",
+        "successful_runs": "11",
+        "failed_runs": "0",
+        "total_runs": "11",
+        "avg_seconds": "329.3005",
+        "min_seconds": "111.6429",
+        "max_seconds": "432.0355",
+        "jobs_per_hour": "10.9323",
+        "total_worker_seconds": "3622.3052",
+        "cost_per_hour": "0.6",
+        "cost_currency": "USD",
+        "estimated_total_cost": "0.603718",
+        "estimated_cost_per_success": "0.054883",
+        "total_sampler_steps": "380",
+        "avg_sampler_steps_per_success": "34.5455",
+        "seconds_per_step": "9.53238218",
+        "steps_per_worker_second": "0.10490557",
+        "estimated_cost_per_step": "0.0015887304",
+        "total_step_audio_minutes": "",
+        "seconds_per_step_audio_minute": "",
+        "estimated_cost_per_step_audio_minute": "",
+        "requested_audio_seconds": "3850.0",
+        "actual_audio_seconds": "",
+        "actual_vs_requested_ratio": "",
+        "audio_seconds_per_worker_second": "",
+        "worker_seconds_per_audio_second": "",
+        "estimated_cost_per_actual_audio_hour": ""
+      },
+      {
+        "worker_id": "runpod_b",
+        "gpu_name": "RTX 5090 32GB",
+        "stage": "conditioning_total",
+        "successful_runs": "50",
+        "failed_runs": "51",
+        "total_runs": "101",
+        "avg_seconds": "146.3011",
+        "min_seconds": "60.6993",
+        "max_seconds": "268.0333",
+        "jobs_per_hour": "24.6068",
+        "total_worker_seconds": "14776.4118",
+        "cost_per_hour": "1.0",
+        "cost_currency": "USD",
+        "estimated_total_cost": "4.104559",
+        "estimated_cost_per_success": "0.082091",
+        "total_sampler_steps": "",
+        "avg_sampler_steps_per_success": "",
+        "seconds_per_step": "",
+        "steps_per_worker_second": "",
+        "estimated_cost_per_step": "",
+        "total_step_audio_minutes": "",
+        "seconds_per_step_audio_minute": "",
+        "estimated_cost_per_step_audio_minute": "",
+        "requested_audio_seconds": "17500.0",
+        "actual_audio_seconds": "9990.687",
+        "actual_vs_requested_ratio": "0.570896",
+        "audio_seconds_per_worker_second": "0.676124",
+        "worker_seconds_per_audio_second": "1.479019",
+        "estimated_cost_per_actual_audio_hour": "1.479019"
+      },
+      {
+        "worker_id": "runpod_b",
+        "gpu_name": "RTX 5090 32GB",
+        "stage": "sampling_total",
+        "successful_runs": "24",
+        "failed_runs": "33",
+        "total_runs": "57",
+        "avg_seconds": "236.1583",
+        "min_seconds": "94.7855",
+        "max_seconds": "579.8594",
+        "jobs_per_hour": "15.244",
+        "total_worker_seconds": "13461.0238",
+        "cost_per_hour": "1.0",
+        "cost_currency": "USD",
+        "estimated_total_cost": "3.739173",
+        "estimated_cost_per_success": "0.155799",
+        "total_sampler_steps": "884",
+        "avg_sampler_steps_per_success": "36.8333",
+        "seconds_per_step": "6.47214501",
+        "steps_per_worker_second": "0.15450828",
+        "estimated_cost_per_step": "0.0017978181",
+        "total_step_audio_minutes": "3022.591613",
+        "seconds_per_step_audio_minute": "1.89287106",
+        "estimated_cost_per_step_audio_minute": "0.0005257975",
+        "requested_audio_seconds": "8400.0",
+        "actual_audio_seconds": "4976.222",
+        "actual_vs_requested_ratio": "0.592407",
+        "audio_seconds_per_worker_second": "0.369676",
+        "worker_seconds_per_audio_second": "2.705069",
+        "estimated_cost_per_actual_audio_hour": "2.705069"
+      },
+      {
+        "worker_id": "runpod_c",
+        "gpu_name": "RTX A6000",
+        "stage": "conditioning_total",
+        "successful_runs": "36",
+        "failed_runs": "0",
+        "total_runs": "36",
+        "avg_seconds": "235.9552",
+        "min_seconds": "155.0817",
+        "max_seconds": "399.0392",
+        "jobs_per_hour": "15.2571",
+        "total_worker_seconds": "8494.3869",
+        "cost_per_hour": "0.59",
+        "cost_currency": "USD",
+        "estimated_total_cost": "1.392136",
+        "estimated_cost_per_success": "0.03867",
+        "total_sampler_steps": "",
+        "avg_sampler_steps_per_success": "",
+        "seconds_per_step": "",
+        "steps_per_worker_second": "",
+        "estimated_cost_per_step": "",
+        "total_step_audio_minutes": "",
+        "seconds_per_step_audio_minute": "",
+        "estimated_cost_per_step_audio_minute": "",
+        "requested_audio_seconds": "12600.0",
+        "actual_audio_seconds": "6569.297",
+        "actual_vs_requested_ratio": "0.521373",
+        "audio_seconds_per_worker_second": "0.773369",
+        "worker_seconds_per_audio_second": "1.293044",
+        "estimated_cost_per_actual_audio_hour": "0.762896"
+      },
+      {
+        "worker_id": "runpod_c",
+        "gpu_name": "RTX A6000",
+        "stage": "sampling_total",
+        "successful_runs": "150",
+        "failed_runs": "22",
+        "total_runs": "172",
+        "avg_seconds": "336.13",
+        "min_seconds": "0.0017",
+        "max_seconds": "679.3388",
+        "jobs_per_hour": "10.7101",
+        "total_worker_seconds": "57814.3558",
+        "cost_per_hour": "0.59",
+        "cost_currency": "USD",
+        "estimated_total_cost": "9.475131",
+        "estimated_cost_per_success": "0.063168",
+        "total_sampler_steps": "5540",
+        "avg_sampler_steps_per_success": "36.9333",
+        "seconds_per_step": "10.35042559",
+        "steps_per_worker_second": "0.09661438",
+        "estimated_cost_per_step": "0.0016963197",
+        "total_step_audio_minutes": "17725.41291",
+        "seconds_per_step_audio_minute": "3.23498009",
+        "estimated_cost_per_step_audio_minute": "0.0005301773",
+        "requested_audio_seconds": "52500.0",
+        "actual_audio_seconds": "28809.973",
+        "actual_vs_requested_ratio": "0.548761",
+        "audio_seconds_per_worker_second": "0.498319",
+        "worker_seconds_per_audio_second": "2.006748",
+        "estimated_cost_per_actual_audio_hour": "1.183981"
+      },
+      {
+        "worker_id": "runpod_c2",
+        "gpu_name": "RTX A6000",
+        "stage": "conditioning_total",
+        "successful_runs": "245",
+        "failed_runs": "0",
+        "total_runs": "245",
+        "avg_seconds": "251.2612",
+        "min_seconds": "110.6595",
+        "max_seconds": "2248.5707",
+        "jobs_per_hour": "14.3277",
+        "total_worker_seconds": "61558.9985",
+        "cost_per_hour": "0.59",
+        "cost_currency": "USD",
+        "estimated_total_cost": "10.088836",
+        "estimated_cost_per_success": "0.041179",
+        "total_sampler_steps": "",
+        "avg_sampler_steps_per_success": "",
+        "seconds_per_step": "",
+        "steps_per_worker_second": "",
+        "estimated_cost_per_step": "",
+        "total_step_audio_minutes": "",
+        "seconds_per_step_audio_minute": "",
+        "estimated_cost_per_step_audio_minute": "",
+        "requested_audio_seconds": "85750.0",
+        "actual_audio_seconds": "45842.506",
+        "actual_vs_requested_ratio": "0.534606",
+        "audio_seconds_per_worker_second": "0.744692",
+        "worker_seconds_per_audio_second": "1.342837",
+        "estimated_cost_per_actual_audio_hour": "0.792274"
+      },
+      {
+        "worker_id": "runpod_c2",
+        "gpu_name": "RTX A6000",
+        "stage": "sampling_total",
+        "successful_runs": "88",
+        "failed_runs": "23",
+        "total_runs": "111",
+        "avg_seconds": "292.2469",
+        "min_seconds": "0.0019",
+        "max_seconds": "645.8972",
+        "jobs_per_hour": "12.3184",
+        "total_worker_seconds": "32439.4089",
+        "cost_per_hour": "0.59",
+        "cost_currency": "USD",
+        "estimated_total_cost": "5.316459",
+        "estimated_cost_per_success": "0.060414",
+        "total_sampler_steps": "3120",
+        "avg_sampler_steps_per_success": "35.4545",
+        "seconds_per_step": "10.2352193",
+        "steps_per_worker_second": "0.09770186",
+        "estimated_cost_per_step": "0.0016774387",
+        "total_step_audio_minutes": "9718.183764",
+        "seconds_per_step_audio_minute": "3.28599304",
+        "estimated_cost_per_step_audio_minute": "0.0005385377",
+        "requested_audio_seconds": "30800.0",
+        "actual_audio_seconds": "16324.476",
+        "actual_vs_requested_ratio": "0.530015",
+        "audio_seconds_per_worker_second": "0.50323",
+        "worker_seconds_per_audio_second": "1.987164",
+        "estimated_cost_per_actual_audio_hour": "1.172427"
+      }
+    ],
+    "headers": [
+      "actual_audio_seconds",
+      "actual_vs_requested_ratio",
+      "audio_seconds_per_worker_second",
+      "avg_sampler_steps_per_success",
+      "avg_seconds",
+      "cost_currency",
+      "cost_per_hour",
+      "estimated_cost_per_actual_audio_hour",
+      "estimated_cost_per_step",
+      "estimated_cost_per_step_audio_minute",
+      "estimated_cost_per_success",
+      "estimated_total_cost",
+      "failed_runs",
+      "gpu_name",
+      "jobs_per_hour",
+      "max_seconds",
+      "min_seconds",
+      "requested_audio_seconds",
+      "seconds_per_step",
+      "seconds_per_step_audio_minute",
+      "stage",
+      "steps_per_worker_second",
+      "successful_runs",
+      "total_runs",
+      "total_sampler_steps",
+      "total_step_audio_minutes",
+      "total_worker_seconds",
+      "worker_id",
+      "worker_seconds_per_audio_second"
+    ]
+  }
+}

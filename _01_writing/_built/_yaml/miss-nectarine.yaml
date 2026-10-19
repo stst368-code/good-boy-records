@@ -4,6 +4,7 @@ title: miss-nectarine
 album: weedkiller
 pos: 8
 version:
+language: en
 model:
 dit:
 text_encoder:

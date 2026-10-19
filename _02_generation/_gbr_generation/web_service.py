@@ -144,7 +144,7 @@ class GenerationService:
                 raise ValueError('No selected inputs meet the saved-rating filter')
         parameters = {**DEFAULT_PARAMETERS, **data.get('parameters', {})}
         spec = {'defaults': parameters, 'execution': execution(connection, data.get('encoding_cache', 'prefer')),
-                'model_revision': data.get('model_revision') or SMOKE_MODEL_REVISION}
+                'model_revision': None if connection['backend']=='comfyui' else data.get('model_revision') or SMOKE_MODEL_REVISION}
         for key in ('rerun', 'parent_review_generation_id', 'request_id'):
             if data.get(key):
                 spec[key] = data[key]
@@ -166,6 +166,11 @@ class GenerationService:
         if len(selected) * len(combinations) * caption_count > MAX_RUNS:
             raise ValueError('Batch exceeds 10000 generations; select fewer tracks, captions or combinations')
         spec['experiments'] = experiment
+        if connection['backend']=='comfyui':
+            sys.path.insert(0,str(self.root/'_99_tools/_workers_comfyui'))
+            from client import Client
+            try:data['_comfy_inventory']=Client(connection['address']).inventory()
+            except OSError as error:raise ValueError('Cannot query ComfyUI pod URL: '+str(error)) from error
         checked = []
         for item in selected:
             planned = []
@@ -222,6 +227,13 @@ class GenerationService:
             record = preflight([item], request, styles, reference_root)[0]
             if record.effective.get('model') != MODEL:
                 record.issues.append(Issue('unsupported_model', 'This worker currently supports native ' + MODEL + ' only'))
+            if data.get('_comfy_inventory') and record.ready:
+                from client import Client
+                parameters=dict(record.effective)
+                for key in ('encoder_seed','sampler_seed'):
+                    if parameters.get(key,'auto')=='auto':parameters[key]='0'
+                try:Client(data['connection']['address']).prepare({'parameters':parameters,'lyrics':record.document.values.get('lyrics',''),'attempt_id':'preflight'},data['_comfy_inventory'])
+                except (ValueError,KeyError) as error:record.issues.append(Issue('comfy_preflight',str(error)))
             record._experiment = {'caption': caption_index, 'combination': combination_index, 'repetition': repeat_index, 'overrides': overrides}
             return record
 
@@ -375,3 +387,14 @@ class GenerationService:
         return self.launch({**task, 'install': bool(task['connection'].get('auto_setup', task.get('install', False))) if action in {'continue', 'retry'} else False,
                             'resume': action == 'resume', 'retry_failed': action == 'retry',
                             'cleanup': action == 'cleanup'})
+
+
+    def comfy_inventory(self,address):
+        sys.path.insert(0,str(self.root/'_99_tools/_workers_comfyui'))
+        from client import Client
+        try:inventory=Client(address).inventory()
+        except OSError as error:raise ValueError('Cannot query ComfyUI pod URL: '+str(error)) from error
+        nodes=inventory['nodes']
+        def options(node,field):return nodes.get(node,{}).get('input',{}).get('required',{}).get(field,[[]])[0]
+        return {'system':inventory['system'],'samplers':options('KSampler','sampler_name'),'schedulers':options('KSampler','scheduler'),
+                'text_encoders':options('CLIPLoader','clip_name'),'diffusion_models':options('UNETLoader','unet_name')}

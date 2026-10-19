@@ -8,11 +8,36 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 WORKER = ROOT / '_99_tools' / '_workers_infdit'
 COMMANDS = {'setup-generation', 'doctor-generation', 'test-generation', 'setup-runpod', 'doctor-runpod',
-            'migrate', 'init-db', 'check-references'}
+            'migrate', 'init-db', 'check-references', 'plan-r2', 'check-comfy', 'doctor-processing', 'setup-processing'}
 
 
 def dispatch(arguments):
     command, *tail = arguments
+    if command == 'setup-processing':
+        return subprocess.call([sys.executable,str(ROOT/'_99_tools/_workers_processing/setup_worker.py'),*tail])
+    if command == 'doctor-processing':
+        argparse.ArgumentParser(description='Query FFmpeg and installed preparation packages without loading model weights.').parse_args(tail)
+        executable='Scripts/python.exe' if sys.platform=='win32' else 'bin/python'
+        candidates=[ROOT/'_99_tools/_workers_processing/.venv'/executable,ROOT/'_03_review/_generation_review/.venv'/executable]
+        candidate=next((path for path in candidates if path.is_file()),Path(sys.executable))
+        return subprocess.call([str(candidate),str(ROOT/'_99_tools/_workers_processing/worker.py'),'--doctor'])
+    if command == 'check-comfy':
+        return subprocess.call([sys.executable,str(ROOT/'_99_tools/_workers_comfyui/check_worker.py'),*tail])
+    if command == 'plan-r2':
+        import sqlite3
+        from contextlib import closing
+        parser=argparse.ArgumentParser(description='Build a read-only, content-addressed R2 inventory plan; never uploads or deletes.')
+        parser.add_argument('--database',type=Path,default=ROOT/'_98_database/gbr.sqlite3')
+        args=parser.parse_args(tail)
+        sys.path.insert(0,str(ROOT/'_04_preparation'))
+        from _gbr_preparation.storage_plan import plan
+        with closing(sqlite3.connect(args.database.resolve(strict=True).as_uri()+'?mode=ro',uri=True)) as conn:
+            conn.row_factory=sqlite3.Row
+            conn.execute('PRAGMA query_only=ON');conn.execute('BEGIN')
+            class ReadOnly:
+                def all(self,sql):return [dict(row) for row in conn.execute(sql)]
+            print(json.dumps(plan(ReadOnly()),ensure_ascii=False,indent=2))
+        return 0
     if command in {'setup-runpod', 'doctor-runpod'}:
         parser = argparse.ArgumentParser(description=('Install and verify' if command == 'setup-runpod' else 'Query') +
             ' the native worker on an existing dedicated RunPod. Does not rent or stop pods.')

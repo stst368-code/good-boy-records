@@ -1,0 +1,16 @@
+{
+  "format": "gbr-generation-summary-v1",
+  "generated_at": "2026-10-10T17:26:59+00:00",
+  "total": 1181,
+  "ratings": {
+    "0": 36,
+    "1": 179,
+    "2": 290,
+    "3": 305,
+    "4": 136,
+    "5": 235
+  },
+  "mean_rating": 2.873,
+  "audio_analysed": 1170,
+  "published": 156
+}

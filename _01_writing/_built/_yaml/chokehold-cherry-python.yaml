@@ -4,6 +4,7 @@ title: chokehold-cherry-python
 album: weedkiller
 pos: 9
 version: vocal-jazz
+language: en
 model: minimax H3
 dit:
 text_encoder:

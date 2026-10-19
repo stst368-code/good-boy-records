@@ -3,6 +3,7 @@ variant_id: 2
 title: moses-supposes
 cluster:
 version: post-punk-indie-rock_0001
+language: en
 model: MiniMaxAI/MiniMax-Music3
 dit: bf16
 text_encoder: bf16

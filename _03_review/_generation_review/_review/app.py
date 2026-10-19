@@ -17,6 +17,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, StrictInt, StrictBool, ConfigDict
+from starlette.background import BackgroundTask
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .config import Config, password_ok
 from .exports import dataset, publishing_manifest, validation
@@ -598,7 +599,8 @@ def create_app(config_path, start_worker=True, database_path=None):
     def export(format: Literal["csv", "json", "parquet"], kind: str = "generations"):
         path = config.data / "exports" / ("gbr-review-" + uuid.uuid4().hex + "." + format)
         dataset(service.db, path, format, kind)
-        return FileResponse(path, filename="gbr-review." + format, media_type="application/octet-stream")
+        return FileResponse(path, filename="gbr-review." + format, media_type="application/octet-stream",
+                            background=BackgroundTask(path.unlink, missing_ok=True))
 
     @app.post('/api/import/reviews')
     def restore_reviews(body: ReviewImportBody, request: Request):
@@ -632,6 +634,13 @@ def create_app(config_path, start_worker=True, database_path=None):
     app.include_router(generation_routes)
     app.state.generation = generation
     app.mount('/tools/generation', StaticFiles(directory=generation_root / '_static'), name='generation')
+    preparation_root = repo_root / '_04_preparation'
+    sys.path.insert(0, str(preparation_root))
+    from _gbr_preparation.api import router as preparation_router
+    preparation_routes, preparation = preparation_router(repo_root, service, local)
+    app.include_router(preparation_routes)
+    app.state.preparation = preparation
+    app.mount('/tools/preparation', StaticFiles(directory=preparation_root / '_static'), name='preparation')
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app
 

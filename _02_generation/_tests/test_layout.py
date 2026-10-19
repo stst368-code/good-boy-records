@@ -245,7 +245,8 @@ class DirectoryLayoutTests(unittest.TestCase):
         self.assertFalse(old.exists())
 
     def test_repository_source_directories_follow_the_convention(self):
-        skip = {'.git', '.venv', '__pycache__', '.pytest_cache', 'runtime', '_runtime', '_generated'}
+        # GitHub requires its reserved paths. Built public routes and media are not source directories.
+        skip = {'.git', '.github', '.venv', '__pycache__', '.pytest_cache', 'runtime', '_runtime', '_generated', '_site', '_showcase', '_tracks', '_artwork'}
         for parent, dirs, files in os.walk(ROOT):
             dirs[:] = [name for name in dirs if name not in skip]
             for name in dirs:

@@ -5,12 +5,14 @@
   <meta name="theme-color" content="#11161b"><meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/static/manifest.webmanifest"><link rel="icon" href="/static/icon.svg" type="image/svg+xml">
   <title>GBR</title><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/tools/yaml-editor/editor.css"><link rel="stylesheet" href="/tools/generation/generation.css">
+  <link rel="stylesheet" href="/tools/preparation/preparation.css">
 </head>
 <body>
 <header class="topbar"><a class="wordmark" href="#review" aria-label="Good Boy Records review"><span class="logo">GBR</span><span>GOOD BOY RECORDS<small>REVIEW ROOM</small></span></a>
-  <nav aria-label="Main"><button id="reviewTab" class="tab active">Review</button><button id="selectionTab" class="tab">Selection</button><button id="generationTab" class="tab">Generation</button><button id="yamlTab" class="tab">YAML editor</button><button id="settingsButton" class="icon-button" aria-label="Settings" title="Settings">⚙</button></nav>
+  <nav aria-label="Main"><button id="reviewTab" class="tab active">Review</button><button id="selectionTab" class="tab">Selection</button><button id="generationTab" class="tab">Generation</button><button id="preparationTab" class="tab">Preparation</button><button id="yamlTab" class="tab">YAML editor</button><button id="settingsButton" class="icon-button" aria-label="Settings" title="Settings">⚙</button></nav>
 </header>
 <main>
+  <section id="preparationView" hidden aria-label="Preparation"></section>
   <div id="reviewerBar" class="reviewer-bar" hidden><span>Reviewing as <strong id="reviewerName"></strong></span><button id="changeUser" class="quiet-button">Change user</button></div>
   <section id="reviewView" aria-label="Music review">
     <div class="queue-toolbar"><button id="queueButton" class="quiet-button">Queue options <span aria-hidden="true">⌄</span></button><span id="queueCount" class="queue-count" role="status" aria-live="polite"></span></div>

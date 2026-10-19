@@ -4,6 +4,7 @@ title: dirty-harry
 album: demon-days
 pos: 4
 version:
+language: en
 model:
 dit:
 text_encoder:

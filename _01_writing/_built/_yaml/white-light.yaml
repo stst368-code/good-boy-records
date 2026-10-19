@@ -4,6 +4,7 @@ title: white-light
 album: demon-days
 pos: 10
 version:
+language: en
 model:
 dit:
 text_encoder:

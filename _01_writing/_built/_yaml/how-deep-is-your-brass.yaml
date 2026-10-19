@@ -4,6 +4,7 @@ title: how-deep-is-your-brass
 album: brasston
 pos: 2
 version:
+language: en
 model:
 dit:
 text_encoder:

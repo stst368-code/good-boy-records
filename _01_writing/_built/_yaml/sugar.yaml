@@ -4,6 +4,7 @@ title: sugar
 album: soad
 pos: 5
 version:
+language: en
 model:
 dit:
 text_encoder:
