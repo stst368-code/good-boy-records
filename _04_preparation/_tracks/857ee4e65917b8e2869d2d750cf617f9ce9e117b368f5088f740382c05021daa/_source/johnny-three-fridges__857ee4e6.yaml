@@ -1,0 +1,106 @@
+title: johnny-three-fridges
+cluster: Jazz, Swing & Big Band
+version: Jazz Ballad / Mandopop
+model: minimax H3
+dit: fp16
+text_encoder: int8_convrot
+encoder_cfg: 1.7
+encoder_seed: 412358652530953
+top_k: 45
+sampler: dpmpp_sde_gpu
+scheduler: ddim_uniform
+sampler_cfg: 1.7
+sampler_seed: 82769053534511
+sampler_steps: 30
+inspiration:
+inspirationyt:
+story:
+caption_source: sample
+caption: |-
+  Global Metadata
+  Basic Attributes: bpm is 65. key is Bb, and scale is major. Jazz Ballad / Mandopop.
+  Global Emotional Progression: The piece opens with a solitary, contemplative atmosphere that establishes a sense of nostalgia and quiet introspection. As the arrangement gradually thickens with the entry of the rhythm section, the emotional weight deepens into a poignant, storytelling mode without ever becoming aggressive. The track maintains a consistent, gentle melancholy throughout, culminating in a soft, unresolved fade that leaves the listener in a state of lingering reflection.
+  Application Scenarios & Imagery: A dimly lit jazz lounge on a rainy evening, reading an old letter by a window, or a slow-motion scene in a period drama depicting a bittersweet farewell.
+  Sonics & Production Profile: The soundstage is intimate and warm, with a focus on mid-range clarity to highlight the vocal and piano interplay. The frequency response is rounded, avoiding harsh highs, while the low end provided by the upright bass is woody and organic rather than booming. The dynamic aesthetic is highly breathable, preserving the natural attack and decay of the acoustic instruments with minimal compression.
+  Vocal Details
+  Vocal Gender & Timbre: Singer A (Female). The vocalist possesses a soft, breathy, and airy timbre that sits comfortably in the mid-to-high register, conveying a sense of fragility and intimacy.
+  Vocal Style: The performance is characterized by a delicate, whisper-like delivery that prioritizes emotional nuance over power. The singer employs subtle dynamic swells and a gentle vibrato at the end of phrases, maintaining a restrained, storytelling approach that mirrors the lyrical theme of recalling memories.
+  Harmony/Backing Vocals: No distinct backing vocals or harmony layers are present; the vocal line remains a singular, unaccompanied melody throughout the track to enhance the feeling of solitude.
+  Vocal FX: The vocal is treated with a lush, long-tail hall reverb that creates a spacious, dreamlike aura, blending the voice slightly into the instrumental texture. A very subtle delay is applied to trail off the ends of phrases, adding depth without creating rhythmic distraction.
+  Arrangement
+  Instrument Lifecycle Description (Primary/Secondary Layering):
+  Primary: A grand piano serves as the harmonic and melodic backbone, playing flowing arpeggios and chord voicings from the Intro through to the Outro. Its tone is warm and resonant, anchoring the song's jazz identity.
+  Secondary: An upright bass enters shortly after the intro, providing a walking bassline that grounds the harmony with a woody, acoustic texture. A drum kit utilizing brushes rather than sticks joins in the first verse, offering a soft, sweeping rhythmic pulse that supports the groove without overpowering the melody.
+  Groove & Foundation Progression: The rhythmic foundation is established by the interplay between the walking upright bass and the brush-driven drum pattern. This combination creates a gentle, swinging feel that remains consistent in tempo and intensity, allowing the emotional content of the melody to take precedence. There are no sudden shifts in the groove; instead, the energy ebbs and flows subtly with the phrasing of the piano and vocals.
+  Embellishments, Textures & Spatial FX: Occasional cymbal swells and soft ride cymbal taps add textural shimmer during transitions between sections. The spatial mix places the piano slightly wide in the stereo field, while the bass and vocals remain centered, creating a focused yet immersive listening environment. Subtle room ambience captures the natural resonance of the acoustic instruments, enhancing the live, organic feel of the recording.
+lyrics: |
+  [intro]
+  they call him Johnny
+  ...
+  Johnny, Three Fridges
+  a name enough to chill the bone
+  once you've heard my story
+  i'll let you judge if you're safe at home
+  [verse]
+  so, what's a man to do with three whole fridges
+  one for food, one for beer
+  third one you'll never get near
+  he'll have you over, n' cook you dinner
+  delicious to eat, calories for a sinner
+  hear it hum, hear it shiver
+  go near fridge three and you'll hear him snigger
+  [pre-chorus]
+  so what he heck is going down
+  in that sweet ol' minnesota town?
+  well keep on 'a listenin'
+  cuz I know the story, i wrote it down
+  [chorus]
+  ol' Johnny Three Fridges, sinister by name
+  livin' the dream, playin' his all American game
+  what's he got in 'em?
+  day to day, never the same
+  don't get nosey, don't go pryin'
+  else you'll be the one runnin' away cryin'
+  [post-chorus]
+  so, listen up and listen real close
+  won't be long before i'm gone ghost
+  i'm spillin' the beans
+  on ol Johnny Three Fridges dreams
+  [verse]
+  see, ain't nothin' sinister
+  ain't nothin' chillin'
+  except a white tailed deer
+  and some ruffed grouse dead from killin'
+  that's it that's all
+  least that's all he'll tell ya' he got chilling'
+  [pre-chorus]
+  so, listen again, listen well
+  my song my story should ring a bell
+  what's in fridge number three ain' nobody around to tell
+  [instrumental]
+  [chorus]
+  ol' Johnny Three Fridges, sinister by name
+  livin' the dream, playin' his all American game
+  what's he got in 'em?
+  day to day, never the same
+  don't get nosey, don't go pryin'
+  else you'll be the one runnin' away cryin'
+  [post-chorus]
+  family man, family man
+  ol' Johnny Three Fridges got a big family, man
+  mouths to feed from dawn till eve
+  maybe three fridges ain't so hard to believe
+  [verse]
+  bet with that revelation
+  you're startin' to relax now but hear my hesitation
+  one's in the kitchen, ordinary as can be
+  second in the garage, nothin' hauntin' there still
+  but when you find that third fridge
+  tucked behind the basement door
+  you'll see why Johnny told me
+  I ain't welcome anymore
+  [outro]
+  so dear friend
+  time's now for this here song to end
+  hear my message, understand my warnin'
+  maybe you'll wake to a delicious breakfast in the mornin'

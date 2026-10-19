@@ -1,0 +1,127 @@
+title: microphone-fiend
+cluster: Cinematic Orchestral & Epic
+version: Orchestral Choral / Patriotic Anthem
+model: minimax H3
+dit: fp16
+text_encoder: int8_convrot
+encoder_cfg: 1.7
+encoder_seed: 964386745403505
+top_k: 45
+sampler: dpmpp_sde_gpu
+scheduler: ddim_uniform
+sampler_cfg: 1.6
+sampler_seed: 116861178060193
+sampler_steps: 35
+inspiration:
+inspirationyt:
+story:
+caption_source: sample
+caption: |-
+  Global Metadata
+  Basic Attributes: bpm is 105. key is Bb, and scale is major. Orchestral Choral / Patriotic Anthem.
+  Global Emotional Progression: The piece opens with a stately, martial grandeur that establishes a sense of historical weight and solemnity. As the lead vocal enters, the mood shifts to one of determined narrative storytelling, gradually building in intensity. The choruses unleash a surge of collective power and triumph, characterized by swelling dynamics and full-ensemble saturation. The track culminates in a majestic, climactic finale where the emotional tone reaches its peak of heroic resolve before resolving into a final, resonant chord.
+  Application Scenarios & Imagery: Large-scale national ceremonies, historical documentary montages depicting collective struggle and victory, or cinematic scenes of vast landscapes and monumental architecture.
+  Sonics & Production Profile: The soundstage is exceptionally wide and deep, simulating a large concert hall or open arena. The frequency response is full-range, with powerful low-end support from the bass section and percussion, while the brass and choir occupy a bright, piercing upper-mid spectrum. The dynamic aesthetic is expansive, moving from controlled, moderate levels in the verses to a heavily saturated, "wall-of-sound" compression during the climactic ensemble sections.
+  Vocal Details
+  Vocal Gender & Timbre: Singer A (Male) and a Mixed Choir (Male/Female). Singer A possesses a clear, resonant tenor-baritone timbre with a theatrical, operatic quality. The Mixed Choir provides a massive, blended texture ranging from deep, rumbling basses to soaring sopranos, creating a unified wall of sound.
+  Vocal Style: Singer A delivers the verses with a declamatory, narrative style, emphasizing precise diction and sustained, legato phrasing that conveys dignity. In the choruses, the delivery becomes more forceful and projected. The Mixed Choir alternates between homophonic block chords for rhythmic impact and rich, polyphonic harmonies that swell behind the lead, evolving from supportive backing to a dominant, driving force in the final sections.
+  Harmony/Backing Vocals: The Mixed Choir serves as the primary harmonic engine throughout. In the verses, they provide subtle, sustained pads underneath the lead. During the choruses, they engage in robust, multi-part harmony singing, often doubling the melody an octave higher or providing counter-melodies that thicken the texture. The final climax features dense, layered choral arrangements that create a sense of overwhelming magnitude.
+  Vocal FX: Both the lead and choir are treated with a long-decay hall reverb to simulate a vast acoustic space. Subtle compression is applied to the lead vocal to maintain presence against the heavy orchestration, while the choir receives a slight delay to enhance the perception of depth and size.
+  Arrangement
+  Instrument Lifecycle Description (Primary/Secondary Layering):
+  Primary: A full Symphonic Orchestra acts as the core foundation. The Brass section (trumpets, trombones, horns) carries the main melodic hooks and fanfares, present prominently in the Intro, Choruses, and Outro. The String section provides sweeping harmonic beds and rhythmic ostinatos that drive the momentum, particularly intensifying during the build-ups.
+  Secondary: A Grand Piano and Orchestral Percussion (timpani, snare rolls) add rhythmic definition and dramatic punctuation. The Piano appears in the verses to ground the harmony, while the Percussion drives the martial feel. A Bass Guitar/Upright Bass reinforces the low end, locking in with the timpani to anchor the progression.
+  Groove & Foundation Progression: The rhythm is established by a marching-style drum kit and timpani, featuring a steady, deliberate kick-snare pattern that evokes a processional feel. This groove remains consistent but gains density as the track progresses; cymbal crashes and snare rolls are added in the pre-chorus to build tension, exploding into a full, driving beat with heavy brass accents in the chorus.
+  Embellishments, Textures & Spatial FX: Cymbal swells and reverse-reverb effects are used as transitional bridges between sections. Woodwind flourishes (flutes and clarinets) appear briefly in the interludes to add color and lightness before the heavy brass returns. The arrangement utilizes wide stereo panning for the string and choir sections to maximize the immersive, cinematic atmosphere.
+lyrics: |-
+  [intro]
+  [instrumental]
+  [verse]
+  I was a fiend before I became a teen
+  I melted microphones instead of cones of ice cream
+  Music orientated so when hip-hop was originated
+  Fitted like pieces of puzzles, complicated
+  'Cause I grabbed the mic and try to say, "Yes, y'all"
+  They tried to take it and say that I'm too small
+  Cool 'cause I don't get upset
+  I kick a hole in the speaker, pull the plug then I jet (Then I jet)
+  Back to the lab without a mic to grab
+  So then I add all the rhymes I had
+  One after the other one, then I make another one
+  To this the opposite then ask if the brother's done
+  I get a cravin' like I fiend for nicotine
+  But I don't need a cigarette, know what I mean?
+  I'm ragin', rippin' up the stage and
+  Don't it sound amazin'?
+  'Cause every rhyme is made and thought of
+  'Cause it's sort of an addiction
+  Magnetized by the mixing
+  Vocals, vocabulary, your verses, you're stuck in
+  The mic is a Drano, volcanoes eruptin'
+  Rhymes overflowin', gradually growin'
+  Everything is written in the cold, so it can coincide ('Cide)
+  My thoughts to guide
+  Forty-eight tracks to slide
+  The invincible, microphone fiend, Rakim (Rakim)
+  Spread the word 'cause I'm in
+  E-F-F-E-C-T
+  A smooth operator operating correctly
+  But back to the problem, I got a habit
+  You can't solve it, silly rabbit
+  The prescription is a hyper tone that's thorough when
+  I fiend for a microphone like heroin (Heroin)
+  Soon as the bass kicks, I need a fix
+  Give me a stage and a mic and a mix
+  And I'll put you in a mood or is it a state of
+  Unawareness, beware, it's the re-animator (Re-animator)
+  A menace to a microphone, a lethal weapon
+  An assassinator, if the people ain't steppin'
+  You'll see a part of me that you never seen
+  When I'm fiendin' for a microphone, I'm the microphone fiend
+  After twelve, I'm worse than a gremlin
+  Feed me hip-hop and I start tremblin' (Tremblin')
+  The thrill of suspense is intense, you're horrified
+  But this ain't the cinemas of 'Tales From the Darkside'
+  By any means necessary, this is what has to be done
+  Make way 'cause here I come
+  My DJ cuts material (Material)
+  Grand imperial
+  It's a must that I bust any mic you hand to me
+  It's inherited, it runs in the family
+  I wrote the rhyme that broke the bull's back
+  If that don't slow 'em up, I carry a full pack
+  Now I don't wanna have to let off, you should've kept off
+  You didn't keep the stage warm, step off (Step off)
+  Ladies and gentleman, you're about to see
+  A pastime hobby about to be
+  Taken to the maximum, I can't relax, see
+  I'm hype as a hypochondriac 'cause the rap be one
+  Hell of a antidote, somethin' you can't smoke
+  More than dope, you're tryin' to move away but you can't, you're broke
+  More than cracked up, you should've backed up
+  For those that act up, need to be more than smacked up
+  Any entertainer, I got a torture chamber
+  One-on-one and I'm the remainder (Remainder)
+  So close your eyes and hold your breath (Breath)
+  And I'ma hit you with the blow of death (Death)
+  Before you go, you'll remember you seen
+  The fiend of a microphone, I'm the microphone fiend (I'm the microphone fiend)
+  [outro]
+  The microphone fiend (The microphone fiend)
+  The micro-the micro-the micro—, the microphone fiend (The microphone fiend)
+  The micro-the-the mic-the microphone fiend
+  The micro-the-the microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The micro-the microphone
+  The micro-the micro-the microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The micro-the micro-the microphone
+  The micro-the micro-the microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The-the-the-the-the microphone fiend (The microphone fiend)
+  The mic (The mic), the microphone fiend

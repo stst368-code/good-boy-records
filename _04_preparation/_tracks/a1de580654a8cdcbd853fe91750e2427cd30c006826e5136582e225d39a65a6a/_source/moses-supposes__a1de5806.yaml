@@ -1,0 +1,188 @@
+title: moses-supposes
+cluster: ''
+version: nu-metal
+model: minimax H3
+dit: fp16
+text_encoder: int8_convrot
+encoder_cfg: 1.7
+encoder_seed: 1837164916
+top_k: 45
+sampler: dpmpp_sde_gpu
+scheduler: ddim_uniform
+sampler_cfg: 1.7
+sampler_seed: 4548661068
+sampler_steps: 30
+inspiration:
+inspirationyt:
+story:
+caption_source: custom
+caption: |-
+  Global Metadata
+  Basic Attributes: roughly 210–240 BPM. Raw Second-Wave Black Metal / Extreme Black Metal. Relentless, primitive, hostile and violently fast from the first second to the final cutoff. The defining feature is an almost uninterrupted barrage of rapid double-kick bass drums and blast beats, with no breakdowns, no half-time sections, no slow passages and no atmospheric respite. Tremolo-picked guitars should remain thin, abrasive and vicious rather than thick modern death-metal chugging. Harmony is cold, dissonant and minor-key, with repeating malignant riff shapes and rapid chord movement rather than technical showcase playing.
+  Global Emotional Progression: Begin at maximum hostility and remain there. Verses, choruses and bridge should change through riff shape, vocal phrasing and cymbal pattern rather than through reduced intensity. Every section should feel like another stage of the same uncontrolled attack. The final section becomes even more frantic through denser blasting, harsher tremolo movement and increasingly desperate vocals before ending abruptly.
+  Application Scenarios & Imagery: A tiny underground venue, concrete walls, deafening amplifiers, sweat, feedback and a band performing with almost reckless physical intensity.
+  Sonics & Production Profile: Raw, abrasive and close. Guitars are sharp and grainy, bass is dirty but audible, drums are fast and physical, and the kick remains clearly perceptible beneath the blast beats. Avoid polished modern metal production, cinematic layers, orchestration, electronic elements and spacious atmospheric passages.
+  Vocal Details
+  Vocal Gender & Timbre: Singer A (Female), an extremely harsh female black-metal vocalist with piercing upper-register screams, torn rasps and occasional deeper throat-driven shrieks.
+  Vocal Style: Continuous extreme screaming with no clean singing, whispering or melodic relief. Verses use frantic clipped phrases and savage sustained screams. Choruses become wider and more hysterical through doubled screams rather than melodic hooks. The bridge remains equally fast and violent, with prolonged desperate screams layered over uninterrupted blasting. The final passage should sound physically exhausted but increasingly ferocious.
+  Harmony/Backing Vocals: Sparse doubled screams and occasional distant shriek layers only. No sung harmony or choir.
+  Vocal FX: Minimal processing. Short dirty room reverb, light saturation and occasional raw doubling. Keep the voice painfully close and human.
+  Arrangement
+  Instrument Lifecycle: Tremolo-picked distorted guitars, distorted bass and full-speed acoustic drums enter almost immediately and remain active throughout. Do not remove the drums, guitars or bass for transitions.
+  Groove & Foundation Progression: Maintain continuous high-speed double-kick and blast-beat propulsion across intro, verses, choruses, bridge and outro. Never drop into half-time. Never introduce a breakdown. Never reduce the pulse for dramatic contrast. Section changes come from alternating blast-beat patterns, snare emphasis, ride or crash changes, tremolo riff substitutions and short fills while preserving maximum forward momentum.
+  Embellishments, Textures & Spatial FX: Brief amplifier feedback and cymbal wash may mark transitions, but never interrupt the attack. Avoid solos, clean guitar, acoustic passages, ambient interludes and extended instrumental pauses. Finish with either an instantaneous full-band cutoff or a final violent chord struck directly out of the ongoing blast.
+lyrics: |-
+  [intro]
+  Moses...
+  supposes...
+  his toeses...
+  are Roses...
+  But Moses...
+  supposes...
+  Erroneously...
+  [verse]
+  Moses supposes his toeses are Roses
+  But Moses supposes Erroneously
+  Moses he knowses his toeses aren't roses
+  As Moses supposes his toeses to be!
+  Moses supposes his toeses are Roses
+  But Moses supposes Erroneously
+  [chorus]
+  A mose is a mose!
+  A rose is a rose!
+  A toes is a toes!
+  mose (mose) rose (rose) toes (toes)
+  Hooptie doodie doodle
+  doodle doodie hooptie
+  (ha ha ha ha ha ha)
+  [verse]
+  Peter (Peter)
+  Piper (Piper)
+  Peter Piper picked a peck of pickled peppers
+  A peck of pickled peppers Peter Piper picked
+  If Peter Piper picked a peck of pickled peppers
+  Where's the peck of pickled peppers Peter Piper picked?
+  (ugh!)
+  How much wood would a woodchuck chuck if a woodchuck could chuck wood?
+  if a woodchuck could chuck wood How much wood would a woodchuck chuck
+  (i don't give a fuck!)
+  Well Mary...
+  she sells seashells by the seashore.
+  the shells she sells are seashells, I'm sure
+  Six sticky skeletons and Silas sees six swans
+  Sharp sharks seek snacks and Selfish shellfish sellers
+  (ugh!)
+  kitty cat? kitty kitty cat cat?
+  would a kit-kat eating kitty kat eat a kit-kat snapped?
+  or would that kitten kitty-kat eat its kit-kat whole?
+  would it make any difference if that kitty-kat was a city-cat?
+  would the kitty-kat-city-cat eat it's city-bitty-kit-kat snapped?
+  or would the city-kitty-kat be sitting-pretty-kat
+  not a fussy-pussy but a busy little pussy-cat?
+  busy kitty, pretty kitty
+  picky kitty, city kitty
+  bitty kit-kat, ate its kitty-kat
+  which kitty gets the kitty's kit-kat?
+  and which kitty-kat is the real twa-splat!
+  [chorus]
+  A mose is a mose!
+  A rose is a rose!
+  A toes is a toes!
+  Hooptie doodie doodle
+  doodle doodie hooptie
+  doodle doodle doodie
+  hooptie
+  (ha ha haha ha haha)
+  [verse]
+  I wish to wish the wish you wish to wish
+  but if you wish the wish the witch wishes
+  I won't wish the wish you wish to wish
+  I wish you were the fish in my dish
+  Fresh fried fish, fish fresh fried,
+  fried fish fresh, fish fried fresh
+  Four fresh fish flashed fins at five fat frogs
+  five fat frogs flipped fast from five flat logs
+  Six slick snakes slipped straight through six small slots
+  while six shocked sheep shouted
+  (stop stop stop!)
+  (neighhhh ugh!)
+  One one was a racehorse
+  two two was one too
+  one one won one race
+  and two two won one too
+  Eleven elves licked eleven little licorice lollipops
+  I thought a thought (ugh)
+  but the thought I thought
+  wasn't the thought I thought I thought (hmm)
+  ....
+  (ha-ha-ha-ha)
+  [chorus]
+  A mose is a mose!
+  A rose is a rose!
+  A toes is a toes!
+  Hooptie doodie doodle
+  doodle doodie hooptie
+  (hahahahahaha)
+  doodle doodle
+  doodie doodie
+  hooptie hooptie
+  ugh!
+  [verse]
+  Red lorry, yellow lorry
+  lorry yellow, lorry red
+  Red lorry, yellow lorry
+  lorry yellow, lorry red
+  Red lorry, yellow lorry
+  lorry yellow, lorry red
+  Red leather, yellow leather
+  yellow leather, leather red
+  red-dead-bed-head-simon-sed
+  (ugh!)
+  Crisp crusts crackle crunchily (crackle)
+  Round the rugged rock, the ragged rascal ran
+  If two witches were watching two wrist watches
+  which witch would watch which wrist watch? (tick tock)
+  If “there” is there (there)
+  and “their” is theirs (their)
+  and “they’re” means they are (they're)
+  then where are they? (huh?)
+  (ha ha)
+  [chorus]
+  A mose is a mose!
+  A rose is a rose!
+  A toes is a toes!
+  Hooptie doodie doodle
+  doodle doodie hooptie
+  (mwhahahahahaha)
+  [bridge]
+  Very well, very well, very well...
+  (huh?)
+  Iron-Maiden
+  Judas-Priest
+  Black-Sabbath
+  Motörhead, Anthrax, Testament, Overkill
+  Megadeth, Metallica, Slayer, Exodus
+  Sepultura, Kreator, Sodom, Destruction
+  Pantera-Machine-Head-Fear-Factory-Ministry
+  Napalm-Death-Carcass-Obituary-Morbid-Angel
+  Cannibal-Corpse-Deicide-Suffocation-Immolation
+  (ha ha)
+  Slip-knot (knot)
+  Mudvayne, Coal-Chamber, Soulfly
+  Mastodon-Gojira
+  Meshuggah-Lamb-of-God
+  Venom-Bathory-Mayhem-Darkthrone
+  Emperor-Immortal-Satyricon-Enslaved
+  Behemoth-Belphegor-Dimmu-Borgir
+  Necrophagist-Nile-Cryptopsy
+  Opeth-Katatonia-Amorphis
+  In-Flames-Dark-Tranquillity-At-the-Gates
+  Arch-Enemy-Children-of-Bodom
+  Napalm-Death-Death-Death
+  (you're lost in the dark)
+  ha ha
+  [outro]
+  A mose a rose a tose (tose)
+  A rose a tose a mose (mose)
+  A tose a mose a rose (rose)
+  (ha ha ha ha ha ha)

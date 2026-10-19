@@ -1,0 +1,36 @@
+title: brasston
+cluster: Modern R&B & Neo-Soul
+version: Contemporary R&B / Trap Soul
+model: minimax H3
+dit: fp32
+text_encoder: bf16
+encoder_cfg: 1.7
+encoder_seed: 391689695707794
+top_k: 85
+sampler: euler
+scheduler: simple
+sampler_cfg: 1.8
+sampler_seed: 912529584027858
+sampler_steps: 30
+inspiration:
+inspirationyt:
+story:
+caption_source: sample
+caption: |-
+  Global Metadata
+  Basic Attributes: bpm is 94. key is Ab, and scale is minor. Contemporary R&B / Trap Soul.
+  Global Emotional Progression: The track opens with an ethereal, mysterious atmosphere that quickly grounds into a confident and seductive groove. The verses maintain a cool, restrained intimacy, which swells into a bold, assertive declaration of power during the choruses. The bridge introduces a momentary shift toward a more hypnotic and spellbinding texture before returning to the high-energy confidence of the final refrain, ending with a lingering sense of enchantment.
+  Application Scenarios & Imagery: A dimly lit, upscale lounge setting, late-night driving through city lights, or a scene depicting a character confidently casting a metaphorical spell in a modern fantasy context.
+  Sonics & Production Profile: The mix features a wide stereo image with a polished, high-fidelity sheen. The frequency spectrum is dominated by a deep, resonant sub-bass and crisp, airy highs, while the mid-range remains clean to highlight the vocal presence. The dynamic profile is moderately compressed, maintaining a consistent, radio-ready loudness while allowing the vocal nuances to breathe above the instrumental bed.
+  Vocal Details
+  Vocal Gender & Timbre: Singer A (Female). The vocalist possesses a smooth, rich mezzo-soprano timbre with a slightly breathy quality in the lower register that transitions into a clear, powerful belt in the upper range.
+  Vocal Style: The performance begins with soft, melismatic runs and a relaxed, conversational delivery in the verses. As the song progresses to the pre-chorus and chorus, the style evolves into a more rhythmic, punchy, and assertive delivery, emphasizing confidence and control. The bridge features a more sustained, legato approach to build tension before the final energetic release.
+  Harmony/Backing Vocals: Dense, multi-layered harmonies appear prominently in the choruses and the outro, often utilizing close-interval stacking to create a lush, choir-like wall of sound. Ad-libbed runs and call-and-response phrases are woven throughout the second half of the track, adding textural complexity without obscuring the lead melody.
+  Vocal FX: The lead vocal is treated with a moderate amount of plate reverb and a subtle delay to enhance the spacious, magical atmosphere. Occasional pitch-correction artifacts are used stylistically for a modern R&B aesthetic, and specific ad-libs feature a slight filter sweep or doubling effect to widen the soundstage.
+  Arrangement
+  Instrument Lifecycle Description (Primary/Secondary Layering):
+  Primary: A deep, sliding 808-style sub-bass synth serves as the harmonic and rhythmic anchor, present from the first beat and driving the groove throughout the entire track.
+  Secondary: Atmospheric synth pads with a slow attack provide a mystical backdrop from the intro, while a bright, plucked synth melody enters in the verses to add rhythmic interest. A warm electric piano chord progression layers in during the pre-chorus to thicken the harmonic texture before receding slightly in the chorus to let the bass and drums dominate.
+  Groove & Foundation Progression: The rhythm section is built on a trap-influenced drum machine pattern. The verses feature a sparse arrangement with a crisp snare and rapid, rolling hi-hats. Upon entering the chorus, the kick drum becomes more pronounced and layered, and the hi-hat patterns become more intricate and syncopated, significantly increasing the track's kinetic energy. The bridge strips back the percussion to a minimal heartbeat-like kick before rebuilding the full groove for the finale.
+  Embellishments, Textures & Spatial FX: Subtle riser effects and reverse cymbal swells are used as transitional markers leading into the choruses. Occasional vocal chops and granular synth textures appear in the background during instrumental breaks, enhancing the "magical" thematic element. A low-pass filter sweep is applied to the entire mix during the bridge introduction to create a sense of underwater immersion before the frequencies open up for the final climax.
+lyrics: "[intro]\nWho does she think she is? That girl has tangled with the wrong man! No one says \"no\" to Gaston!\n(Heh heh. Darn right)\nDismissed! Rejected! \nPublicly humiliated!\nWhy, it's more than I can bear\n(More beer?)\nWhat for? \nNothing helps\nI'm disgraced\n[bridge]\n(Who, you? Never!)\n(Gaston, you've got to pull yourself together)\n[verse]\n(Gosh, it disturbs me to see you, Gaston)\n(Looking so down in the dumps)\n(Every guy here'd love to be you, Gaston)\n(Even when taking your lumps)\n[pre-chorus]\n(There's no man in town as admired as you)\n(You're ev'ryone's favorite guy)\n(Ev'ryone's awed and inspired by you)\n(And it's not very hard to see why)\n[chorus]\nNo one's slick as Gaston\nNo one's quick as Gaston\nNo one's neck's as incredibly thick as Gaston\nFor there's no man in town half as manly\nPerfect, a pure paragon\nYou can ask any Tom, Dick, or Stanley\nAnd they'll tell you whose team they prefer to be on\n[post-chorus]\nNo one's big like Gaston\nA king pin like Gaston\nNo one's got a swell cleft in his chin like Gaston\n[verse]\nAs a specimen, yes, I'm intimidating\n(My, what a guy, that Gaston)\n(Give five \"hurrahs!\")\n(Give twelve \"hip-hips!\")\nGaston is the best\nAnd the rest is all drips\n(No one fights like Gaston)\n(Douses lights like Gaston)\nIn a wrestling match nobody bites like Gaston\n(For there's no one as burly and brawny)\nAs you see I've got biceps to spare\n(Not a bit of him's scraggly or scrawny)\nThat's right! And ev'ry last inch of me's covered with hair\n(No one hits like Gaston)\n(Matches wits like Gaston)\n[bridge]\nIn a spitting match nobody spits like Gaston\nI'm espcially good at expectorating!\n(Ten points for Gaston!)\nWhen I was a lad, I ate four dozen eggs\nEv'ry morning to help me get large\nAnd now that I'm grown, I eat five dozen eggs\nSo I'm roughly the size of a barge\n[pre-chorus]\nNo one shoots like Gaston\nMakes those beauts like Gaston\nThen goes tromping around wearing boots like Gaston\nI use antlers in all of my decorating\nSay it again\n[chorus]\nWho's a man among men?\nAnd then say it once more\nWho's the hero next door?\nWho's a super success?\nDon't you know? Can't you guess?\nAsk his fans and his five hangers-on\nThere's just one guy in town who's got all of it down\n[outro]\nAnd his name's G-A-S--T--\nG-A-S-T-E--\nG-A-S-T-O--oh!\nGaston!"
