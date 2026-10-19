@@ -301,12 +301,12 @@ class Workers:
             entries = [e for e in entries if e['launcher']['auto_start']]
         for entry in entries:
             report = self.query(entry, activate=entry['launcher']['auto_start'])
-            if report['online']:
+            if report['online'] and (not automatic or report.get('compatible', True)):
                 return entry, report
             if not automatic:
                 # Native setup belongs to the background controller. Explicitly
                 # selected fresh installs can still be prepared there.
-                if entry['connection']['backend'] != 'comfyui' and entry['connection']['auto_setup']:
+                if entry['connection']['backend'] in {'local', 'runpod_dedicated'} and entry['connection']['auto_setup']:
                     return entry, report
                 raise ValueError(report['error'])
         raise ValueError('No enabled worker is online. Query workers or enable local ComfyUI auto-start in Worker settings.')

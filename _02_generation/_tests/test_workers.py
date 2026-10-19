@@ -201,3 +201,17 @@ def test_new_worker_endpoints_keep_host_auth_csrf_and_no_extra_database(app):
     before = sorted(p.relative_to(app.root).as_posix() for p in app.root.rglob('*.sqlite3'))
     save(app, {'backend':'local'})
     assert sorted(p.relative_to(app.root).as_posix() for p in app.root.rglob('*.sqlite3')) == before
+
+
+def test_automatic_autostart_still_requires_music_support_and_serverless_cannot_install_itself(app):
+    g = app.generation
+    entry = save(app, {'backend':'comfyui','address':'http://127.0.0.1:8188'},
+                 launcher={'path':str(app.root/'start.py'),'auto_start':True})
+    with patch.object(g.workers, 'inspect', return_value={'models':{},'missing_nodes':['MiniMaxMusic3TextEncode']}), \
+         patch('_gbr_generation.workers.ensure_comfy'):
+        with pytest.raises(ValueError,match='No enabled worker'):
+            g.workers.select('auto',automatic=True)
+    endpoint = save(app, {'backend':'runpod_serverless','address':'endpoint123'})
+    with patch.object(g.workers,'inspect',side_effect=ValueError('Set API key')):
+        with pytest.raises(ValueError,match='Set API key'):
+            g.workers.select(endpoint['id'])
