@@ -231,9 +231,26 @@ _Reviewed/
 !/_99_tools/_yaml_editor/_tests/test_*.py
 
 # Website source is tracked; public builds and curated media stay local/R2.
-/_04_website/_site/
-/_04_website/_showcase/
-/_04_website/.gbr-site-*/
-!/_04_website/_tests/
-!/_04_website/_tests/test_*.py
-!/_04_website/_tests/ui_*.py
+/_05_website/_site/
+/_05_website/_showcase/
+/_05_website/.gbr-site-*/
+/_04_website/
+
+# Preparation keeps one source bundle and explicit derived artifacts out of Git.
+/_04_preparation/_tracks/
+/_04_preparation/_references/_artwork/
+!/_04_preparation/_tests/
+!/_04_preparation/_tests/*.py
+/_99_tools/_workers_processing/_runtime/
+/_99_tools/_workers_comfyui/_runtime/
+*.safetensors
+*.gguf
+*.ckpt
+*.pth
+*.pt
+*.m4a
+*.ogg
+*.opus
+!/_05_website/_tests/
+!/_05_website/_tests/test_*.py
+!/_05_website/_tests/ui_*.py

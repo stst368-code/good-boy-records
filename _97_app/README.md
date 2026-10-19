@@ -1,6 +1,6 @@
 # GBR platform launcher
 
-The unified application provides Review, Selection, Generation and YAML editor
+The unified application provides Review, Selection, Generation, Preparation and YAML editor
 tabs, connected to `_98_database/gbr.sqlite3`. The shared platform belongs here;
 reusable worker and editing tools belong in `_99_tools`.
 
@@ -71,3 +71,10 @@ that directory, without a second copy or a temporary directory left behind.
 Non-cosmetic moves and conflicting files retain the existing safety checks.
 This happens before the generation interface loads; starting the app does not
 automatically resume old pod jobs.
+
+Preparation promotes reviewed distribution selections into `_04_preparation`,
+with stereo mastering trials, visual features, artwork briefs and processing
+history in the same database. FFmpeg is needed for audio renders;
+`python _97_app/run_gbr.py doctor-processing` checks the host without loading models.
+The [preparation, engine and storage plan](_plans/preparation-and-storage.md)
+identifies the built features and pending GPU/release integrations.

@@ -51,7 +51,7 @@ def main(argv=None):
         except (OSError, ValueError, RuntimeError, sqlite3.Error) as exc:
             raise SystemExit(str(exc)) from exc
     parser = argparse.ArgumentParser(description=__doc__, epilog=(
-        "Device commands: setup-generation, doctor-generation, setup-runpod, doctor-runpod, test-generation, init-db, migrate, check-references. "
+        "Device commands: setup-generation, doctor-generation, setup-runpod, doctor-runpod, test-generation, init-db, migrate, check-references, plan-r2, check-comfy, doctor-processing. "
         "Use COMMAND --help for options. init-db creates an empty DB; migrate imports existing history."))
     parser.add_argument("--config", type=Path, default=REVIEW_ROOT / "config.json")
     parser.add_argument("--database", type=Path, default=ROOT / "_98_database" / "gbr.sqlite3")

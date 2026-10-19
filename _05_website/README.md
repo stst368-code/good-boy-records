@@ -5,7 +5,7 @@ The player, knowledge map and Signal Observatory originated in the public
 `25bb37cacd292429972c8efa58fe8ab2407eea78`. This version connects them to the
 shared GBR song/variant, review and worker schemas.
 
-Run `py -3.12 _04_website/build.py --serve --open`, or `Preview-Windows.bat`.
+Run `py -3.12 _05_website/build.py --serve --open`, or `Preview-Windows.bat`.
 Only the generated `_site` directory is served. Ordinary builds use committed
 public metadata and need no database, worker or media credentials.
 
@@ -14,7 +14,7 @@ public metadata and need no database, worker or media credentials.
 Refresh from the existing shared database and preview in one command:
 
 ```powershell
-py -3.12 _04_website/build.py --export-platform --serve --open
+py -3.12 _05_website/build.py --export-platform --serve --open
 ```
 
 The default source is `_98_database/gbr.sqlite3`; override with `--database PATH`.
@@ -50,8 +50,8 @@ The local source folders use the repository's lowercase naming convention:
 Refresh only from a complete curated media collection:
 
 ```powershell
-py -3.12 -m pip install -r _04_website/requirements.txt
-py -3.12 _04_website/build.py --refresh-catalogue --showcase "E:\curated-showcase"
+py -3.12 -m pip install -r _05_website/requirements.txt
+py -3.12 _05_website/build.py --refresh-catalogue --showcase "E:\curated-showcase"
 ```
 
 This reads legacy variant folders and new flat recording bundles. The shared
@@ -81,7 +81,7 @@ publishes only when **GBR website** is explicitly dispatched on `main` with
 original inputs, review archives, environments and local media are excluded.
 A failed build retains the last completed site and cleans temporary staging.
 
-Run `python -m unittest discover -s _04_website/_tests` for schema/export/build
+Run `python -m unittest discover -s _05_website/_tests` for schema/export/build
 regressions. `_tests/ui_website.py --browser PATH` checks root/nested routes and
 mobile/desktop playback, share links, knowledge and analytics using synthetic
 media. `_tests/ui_platform.py --browser PATH` checks the shared-schema projection,

@@ -48,6 +48,8 @@ class Service:
         except OSError as exc:
             self.indexer.error(str(self.config.archive), "Archive unavailable: " + str(exc))
         self.archiver.reconcile()
+        if getattr(self, 'preparation', None):
+            self.preparation.sync_selection()
         self.db.execute("UPDATE audio SET analysis_state='pending' WHERE analysis_state='analysing'")
         self.db.execute("UPDATE audio SET analysis_state='retune_pending' WHERE analysis_state='retuning'")
         for a in self.db.all("SELECT id FROM audio WHERE analysis_state='ready'"):
@@ -60,6 +62,8 @@ class Service:
 
     def close(self):
         self.stop_event.set()
+        if getattr(self, 'preparation', None):
+            self.preparation.close()
         if self.worker:
             self.worker.join(timeout=8)
 
@@ -197,6 +201,8 @@ class Service:
                        dumps({"scores": scores, "mode": mode, "reason": reason, "flags": flags, "tags": selected_tags, "tags_recorded": bool(tags_recorded), "previous_tags": previous_tags if previous else None, "previous_scores": {k: previous[k] for k in scores} if previous else None}), timestamp, reviewer_id, assessment_id))
             c.execute("INSERT INTO archive_operations(id,audio_id,generation_id,review_id,bucket,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
                       (uuid.uuid4().hex, g["audio_id"], gid, review_id, bucket, timestamp, timestamp))
+            if getattr(self, 'preparation', None):
+                self.preparation.queue_promotion(c, gid)
             c.execute("UPDATE sessions SET previous_generation_id=?,updated_at=? WHERE id=?", (gid, timestamp, session["id"]))
             if not previous:
                 c.execute("DELETE FROM queue_reservations WHERE audio_id=? AND reviewer_id=?", (g["audio_id"], reviewer_id))
@@ -254,6 +260,8 @@ class Service:
                   (gid, status, selected, published, reference, timestamp))
         c.execute("INSERT INTO publishing_history(generation_id,old_status,new_status,external_reference,created_at) VALUES(?,?,?,?,?)",
                   (gid, old["status"] if old else "not_selected", status, reference, timestamp))
+        if status == 'selected' and getattr(self, 'preparation', None):
+            self.preparation.queue_promotion(c, gid)
 
     def _flags(self, c, gid, rid):
         status = c.execute('SELECT status FROM publishing_selection WHERE generation_id=?', (gid,)).fetchone()

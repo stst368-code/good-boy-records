@@ -18,13 +18,15 @@ def rows(db):
 
 
 EXPORT_TABLES = {"generations": "analytics_dataset", "reviews": "review_dataset", "events": "audio_events", "segments": "segments",
-                 "analyses": "analyses", "review_history": "review_history_dataset", "reviewers": "reviewers", "publishing_history": "publishing_history", "preferences": "preferences", "bookmarks": "bookmarks", "bookmark_history": "bookmark_history", "review_tags": "review_tag_dataset", "tag_definitions": "review_tag_definitions", "tag_summary": "review_tag_dataset"}
+                 "analyses": "analyses", "review_history": "review_history_dataset", "reviewers": "reviewers", "publishing_history": "publishing_history", "preferences": "preferences", "bookmarks": "bookmarks", "bookmark_history": "bookmark_history", "review_tags": "review_tag_dataset", "tag_definitions": "review_tag_definitions", "tag_summary": "review_tag_dataset", "processing_tasks": "processing_tasks"}
 
 
 def dataset(db, path, format, kind="generations"):
     if kind not in EXPORT_TABLES:
         raise ValueError("Unknown dataset")
     table = EXPORT_TABLES[kind]
+    if kind == 'processing_tasks' and not db.one("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)):
+        raise ValueError('Processing history requires the shared platform database')
     data = rows(db) if kind == "generations" else statistics(db)['observations'] if kind == 'tag_summary' else db.all("SELECT * FROM " + table)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

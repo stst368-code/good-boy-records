@@ -1,4 +1,4 @@
-# GBR Review 1.3.0
+# GBR Review
 
 A standalone local application for listening to, rating and archiving generated FLAC/YAML pairs. Python runs on the computer holding the audio; the interface opens in a browser. No generation service, GBR website, cloud account or Node build is required.
 
@@ -60,7 +60,7 @@ The four scores have equal weight. The exact mean is stored; the archive bucket 
 
 Desktop shortcuts: **0–5** scores the highlighted dimension and moves to the next; the fourth score saves. **Up/Down** changes the highlighted dimension. **Space** play/pause, **Left/Right** seek five seconds, **R** restart, **N** skip, **B** Back, **T** next point, **F/Q/S/U** Fast/Quick/Standard/Full. Shortcuts are disabled while typing, during saving, when a dialog is open or in Selection. **S now selects Standard; N skips.**
 
-Playback stays active when switching between Review and Selection or opening queue/settings dialogs. Loading a different recording stops the old one. A/B comparison uses the same persistent player. See [docs/USAGE.md](docs/USAGE.md) for details.
+Playback stays active when switching between Review and Selection or opening queue/settings dialogs. Loading a different recording stops the old one. A/B comparison uses the same persistent player. See [_docs/USAGE.md](_docs/USAGE.md) for details.
 
 ## Mobile / LAN
 
@@ -72,7 +72,7 @@ All authenticated devices share the database. Different reviewer names have inde
 
 Media Session integration supports play, pause, stop and seek from compatible headphones and lock-screen controls. External next/previous actions seek ten seconds; they do not submit ratings or archive tracks. Full tracks and generated snippet sessions use ordinary continuous audio playback, avoiding background JavaScript scheduling for snippets.
 
-Background playback remains controlled by the browser and operating system. The responsive review interface, audio and scoring work over ordinary LAN HTTP. Only optional PWA installation/service workers require HTTPS or localhost. Optional TLS certificate/key configuration is described in [docs/USAGE.md](docs/USAGE.md). Use HTTP on a trusted local network; its access-code and session traffic are unencrypted. Optional HTTPS is still supported.
+Background playback remains controlled by the browser and operating system. The responsive review interface, audio and scoring work over ordinary LAN HTTP. Only optional PWA installation/service workers require HTTPS or localhost. Optional TLS certificate/key configuration is described in [_docs/USAGE.md](_docs/USAGE.md). Use HTTP on a trusted local network; its access-code and session traffic are unencrypted. Optional HTTPS is still supported.
 
 ## Publishing selection
 
@@ -116,7 +116,7 @@ Example Windows commands, from the extracted application folder:
 .venv\Scripts\python.exe run_review.py validate
 ```
 
-See [docs/ANALYTICS.md](docs/ANALYTICS.md) for read-only SQLite access, Polars examples, dataset definitions, API usage and song/genre-controlled queries.
+See [_docs/ANALYTICS.md](_docs/ANALYTICS.md) for read-only SQLite access, Polars examples, dataset definitions, API usage and song/genre-controlled queries.
 
 ## Recovery and troubleshooting
 
@@ -128,22 +128,22 @@ See [docs/ANALYTICS.md](docs/ANALYTICS.md) for read-only SQLite access, Polars e
 - Stop the old server before running a second copy. An OS-level process lock prevents simultaneous archive workers for the same data directory.
 - If a custom hostname/IP is rejected, add that exact hostname/IP to `allowed_hosts` in `config.json` and restart.
 
-Detailed backup/restore and migration advice is in [docs/USAGE.md](docs/USAGE.md). Known limits and specification decisions are listed separately in [docs/GAPS_AND_ISSUES.md](docs/GAPS_AND_ISSUES.md).
+Detailed backup/restore and migration advice is in [_docs/USAGE.md](_docs/USAGE.md). Known limits and specification decisions are listed separately in [_docs/GAPS_AND_ISSUES.md](_docs/GAPS_AND_ISSUES.md).
 
 ## Included validation
 
-The ZIP includes **97 passing backend tests** and four Chromium integration scripts. Testing covers byte-exact transfer between two Linux filesystems, move-journal recovery, provenance preservation, ratings, correction history, authentication, sampling and exports. Browser checks cover playback, touch-target dimensions, waveform/range/spectral controls, automatic submission, Back, publishing states and blind A/B preference. Additional checks cover Fast/autoplay, keyboard review, lossless fallback, save/next-request failure recovery, and nonsecure HTTP browser login/playback using a local request-forwarding harness.
+The repository includes backend tests and Chromium integration scripts; current validation totals accompany the pull request. The following describes the review-specific checks. Testing covers byte-exact transfer between two Linux filesystems, move-journal recovery, provenance preservation, ratings, correction history, authentication, sampling and exports. Browser checks cover playback, touch-target dimensions, waveform/range/spectral controls, automatic submission, Back, publishing states and blind A/B preference. Additional checks cover Fast/autoplay, keyboard review, lossless fallback, save/next-request failure recovery, and nonsecure HTTP browser login/playback using a local request-forwarding harness.
 
-Additional checks cover two independent browser identities, exclusive queues, user changes, isolated Back/Skip/filters, expired submissions, remembered identity and caption alignment at 390/320 px. Windows scripts and physical iOS/Android/Bluetooth behaviour still need validation on those devices. This package is a runnable Python application, not a precompiled Windows executable or an offline Python runtime bundle. See [docs/TESTING.md](docs/TESTING.md).
+Additional checks cover two independent browser identities, exclusive queues, user changes, isolated Back/Skip/filters, expired submissions, remembered identity and caption alignment at 390/320 px. Windows scripts and physical iOS/Android/Bluetooth behaviour still need validation on those devices. This package is a runnable Python application, not a precompiled Windows executable or an offline Python runtime bundle. See [_docs/TESTING.md](_docs/TESTING.md).
 
 ## Multi-reviewer update
 
-See [README-UPDATE.md](README-UPDATE.md) for the in-place upgrade, and [docs/MULTI_REVIEWER.md](docs/MULTI_REVIEWER.md) for reviewer identity, reservation behavior, attribution fields and limitations. No second-pass assignment or aggregation is enabled.
+Use the [platform launcher](../../_97_app/README.md) for current device setup and updates, and [_docs/MULTI_REVIEWER.md](_docs/MULTI_REVIEWER.md) for reviewer identity, reservation behavior, attribution fields and limitations. No second-pass assignment or aggregation is enabled.
 
 ## Rating captions in 1.2.1
 
-The centred exceptional-rating reminder replaces the hotkey line. Captions now cover 0, 1–2, 3–4 and 5, with gold brackets under the two paired ranges. All six scoring buttons stay independent. See [docs/UI_BRACKETS_UPDATE.md](docs/UI_BRACKETS_UPDATE.md).
+The centred exceptional-rating reminder replaces the hotkey line. Captions now cover 0, 1–2, 3–4 and 5, with gold brackets under the two paired ranges. All six scoring buttons stay independent. See [_docs/UI_BRACKETS_UPDATE.md](_docs/UI_BRACKETS_UPDATE.md).
 
 ## Review context in 1.3.0
 
-Track flags, personal bookmarks, optional Reason, and an Auto-submit switch are available in Review. Selection finds bookmarks and shows saved reasons. Settings has a host-side folder picker and optional protected cache cleanup. See [README-UPDATE.md](README-UPDATE.md) and [docs/REVIEW_CONTEXT.md](docs/REVIEW_CONTEXT.md).
+Track flags, personal bookmarks, optional Reason, and an Auto-submit switch are available in Review. Selection finds bookmarks and shows saved reasons. Settings has a host-side folder picker and optional protected cache cleanup. See [_docs/REVIEW_CONTEXT.md](_docs/REVIEW_CONTEXT.md) for the original interaction notes. Reviewed distribution selections now enter Stage 4 through the verified move journal; the [current preparation plan](../../_97_app/_plans/preparation-and-storage.md) describes this flow.

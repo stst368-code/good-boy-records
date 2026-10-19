@@ -40,6 +40,6 @@ Images can use normal Markdown image syntax or the richer `:::image` block. The 
 
 ## Publishing architecture
 
-An explicit catalogue refresh reads the curated showcase into `_04_website/_data/catalogue.json`. Ordinary builds use committed metadata instead of scanning a partial checkout. Media remains on R2 under the existing `showcase/` keys. GitHub Pages serves only the public `_04_website` build, independently of the local app and database.
+An explicit catalogue refresh reads the curated showcase into `_05_website/_data/catalogue.json`. Ordinary builds use committed metadata instead of scanning a partial checkout. Media remains on R2 under the existing `showcase/` keys. GitHub Pages serves only the public `_05_website` build, independently of the local app and database.
 
 The Signal Observatory offers a read-only public projection of the shared database. It displays the four review scores, current positive/negative tags and linked hardware/timing/VRAM measurements. Each PCM recording counts once, and unknown telemetry stays unknown. The earlier Porto listening-grade archive remains a separate source so its rating model is not silently mixed with newer reviews.

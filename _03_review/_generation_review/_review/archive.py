@@ -70,6 +70,14 @@ class Archiver:
           JOIN songs s ON s.id=g.song_id WHERE g.audio_id=? ORDER BY g.created_at,g.id""", (a["id"],))
         base = a["archive_stem"] or slug(gs[0]["title"]) + "__" + a["pcm_sha256"][:8]
         folder = self.config.archive / str(op["bucket"])
+        preparation = getattr(self, 'preparation_root', None)
+        if op.get('operation_type') == 'prepare':
+            if preparation is None:
+                raise ValueError('Preparation storage has not been configured')
+            folder = preparation / a['id'] / '_source'
+        elif preparation and a['archive_path'] and Path(a['archive_path']).resolve().is_relative_to(preparation.resolve()):
+            # A revised rating must not move an in-progress preparation back to Review.
+            folder = Path(a['archive_path']).parent
         source_audio = self.available(a["id"])
         if not source_audio:
             raise FileNotFoundError("Recording unavailable; review remains saved")
@@ -131,6 +139,9 @@ class Archiver:
         if not latest or latest["id"] != op["review_id"]:
             self.db.execute("UPDATE archive_operations SET status='superseded',updated_at=? WHERE id=?", (now(), op["id"]))
             return
+        if op.get('operation_type') == 'prepare' and not self.db.one("SELECT 1 FROM publishing_selection p JOIN generations g ON g.id=p.generation_id WHERE g.audio_id=? AND p.status IN ('selected','published')", (op['audio_id'],)):
+            self.db.execute("UPDATE archive_operations SET status='cancelled',updated_at=? WHERE id=?", (now(),op['id']))
+            return
         try:
             self.db.execute("UPDATE archive_operations SET status='running',attempts=attempts+1,error=NULL,updated_at=? WHERE id=?", (now(), op["id"]))
             plan = json.loads(op["plan_json"])
@@ -144,6 +155,8 @@ class Archiver:
             if audio_identity(plan["audio_destination"])[0] != op["audio_id"]:
                 raise ValueError("Decoded recording verification failed")
             with self.db.transaction() as c:
+                if op.get('operation_type') == 'prepare' and not c.execute("SELECT 1 FROM publishing_selection p JOIN generations g ON g.id=p.generation_id WHERE g.audio_id=? AND p.status IN ('selected','published')", (op['audio_id'],)).fetchone():
+                    raise ValueError('Distribution selection changed during promotion; sources retained')
                 c.execute("UPDATE audio SET archive_path=?,archive_stem=?,archive_bucket=? WHERE id=?",
                           (plan["audio_destination"], plan["stem"], op["bucket"], op["audio_id"]))
                 for gid, yp in plan["generation_yamls"].items():
@@ -154,6 +167,9 @@ class Archiver:
             # Only remove sources whose exact bytes still match the indexed version.
             for original in plan["originals"] + plan["items"]:
                 source = Path(original["source"])
+                writing = Path(__file__).resolve().parents[3] / '_01_writing'
+                if source.resolve().is_relative_to(writing.resolve()):
+                    continue
                 if str(source) in destinations or not source.exists():
                     continue
                 if original["sha256"] is None or digest(source) != original["sha256"]:
