@@ -40,6 +40,7 @@ TAXONOMY = ROOT / "_templates" / "music_genre_taxonomy.csv"
 DEFAULT_OUTPUT = ROOT / "_data" / "catalogue.json"
 EXISTING_IDS = {}
 EXISTING_TRACKS = {}
+STYLES = ROOT.parent / '_01_writing/_references/styles.csv'
 
 AUDIO_EXTS = {".flac", ".mp3"}
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -47,6 +48,12 @@ ATR_AUDIO_EXTS = {".flac", ".mp3", ".wav", ".m4a", ".ogg", ".opus", ".webm"}
 AUDIO_RANK = {".flac": 0, ".mp3": 1}
 RESERVED_TOP = {"easter"}
 RESERVED_VARIANT_SUFFIX = "-atr"
+
+
+def recording_yaml(path):
+    # The worker's immutable input snapshot accompanies its completed recipe.
+    # It is provenance, not a second playable recording.
+    return path.name.casefold() not in {'source.yaml', 'source.yml'}
 
 
 def slugify(value: Any) -> str:
@@ -101,6 +108,15 @@ def number(raw: dict[str, Any], *keys: str) -> int | float | None:
                 return float(value) if "." in value else int(value)
             except ValueError:
                 pass
+    return None
+
+
+def seed_text(raw, *keys):
+    # JS numbers cannot represent all unsigned 64-bit seeds exactly.
+    for key in keys:
+        value = raw.get(key)
+        if isinstance(value, str) and value.strip() or isinstance(value, int) and not isinstance(value, bool):
+            return str(value).strip()
     return None
 
 
@@ -233,10 +249,17 @@ def choose_timing(directory, yaml_path):
 
 
 class Taxonomy:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, styles: Path = STYLES):
         self.rows: list[dict[str, Any]] = []
         self.lookup: dict[str, dict[str, Any]] = {}
         self.parent_order: dict[str, int] = {}
+        self.style_order, self.cluster_order = {}, {}
+        if styles.is_file():
+            with styles.open(encoding='utf-8-sig', newline='') as stream:
+                for row in csv.DictReader(stream):
+                    cluster, style = norm(row.get('cluster')), norm(row.get('style_primary'))
+                    self.cluster_order.setdefault(cluster, len(self.cluster_order))
+                    self.style_order.setdefault((cluster, style), len(self.style_order))
         if not path.is_file():
             print(f"warn taxonomy missing: {path}; unmatched versions will be Unclassified")
             return
@@ -267,6 +290,8 @@ class Taxonomy:
             palette = ['#D0802F', '#DCB250', '#66CC99', '#5D9BAA', '#8068A0', '#A45B88']
             colour = (known.get('parent_colour') or '#D0802F') if known else palette[int(hashlib.sha1(label.casefold().encode()).hexdigest()[:8],16) % len(palette)]
             result['parent_colour'] = colour
+            result['parent_order'] = self.cluster_order.get(norm(label), 1_000_000)
+            result['taxonomy_order'] = self.style_order.get((norm(label), norm(style or version)), 1_000_000)
             if result['taxonomy_order'] == 1_000_000:
                 result['child_colour'] = colour
         return result
@@ -301,7 +326,7 @@ def composition_yaml(song_dir: Path) -> tuple[Path | None, dict[str, Any]]:
         if path.is_file():
             return path, load_yaml(path) or {}
     # Do not guess among several root YAMLs. A composition YAML is optional.
-    roots = [p for p in song_dir.iterdir() if p.is_file() and p.suffix.lower() in {".yaml", ".yml"}]
+    roots = [p for p in song_dir.iterdir() if p.is_file() and p.suffix.lower() in {".yaml", ".yml"} and recording_yaml(p)]
     if len(roots) == 1:
         return roots[0], load_yaml(roots[0]) or {}
     return None, {}
@@ -338,6 +363,8 @@ def stable_track_id(composition_id, version, yaml_path, seen):
 def variant_yamls(song_dir: Path) -> list[Path]:
     out = []
     for path in [*song_dir.rglob("*.yaml"), *song_dir.rglob("*.yml")]:
+        if not recording_yaml(path):
+            continue
         if path.parent == song_dir:
             continue
         if any(part.casefold().endswith(RESERVED_VARIANT_SUFFIX) for part in path.relative_to(song_dir).parts[:-1]):
@@ -397,7 +424,7 @@ def build_track(
         "shareToken": token,
         "composition": title_id,
         "title": title_id,
-        "displayTitle": humanise(raw.get("title") or common.get("title") or title_id),
+        "displayTitle": str(raw.get("display_title") or raw.get("title") or common.get("title") or humanise(title_id)),
         "variant": version,
         "version": version,
         "language": language,
@@ -455,12 +482,12 @@ def build_track(
         },
         "generation": {
             "encoderCfg": number(raw, "encoder_cfg"),
-            "encoderSeed": number(raw, "encoder_seed"),
+            "encoderSeed": seed_text(raw, "encoder_seed"),
             "topK": number(raw, "top_k", "topk"),
             "sampler": str(raw.get("sampler") or "").strip(),
             "scheduler": str(raw.get("scheduler") or "").strip(),
             "samplerCfg": number(raw, "sampler_cfg", "cfg"),
-            "samplerSeed": number(raw, "sampler_seed", "seed"),
+            "samplerSeed": seed_text(raw, "sampler_seed", "seed"),
             "steps": number(raw, "sampler_steps", "steps"),
             "temperature": number(raw, "temperature"),
             "topP": number(raw, "top_p", "topp"),
@@ -537,7 +564,39 @@ def build_easter() -> list[dict[str, Any]]:
     return tracks
 
 
-def build(output: Path) -> int:
+def publishing_gate(tracks, manifest_path):
+    manifest = read_json(manifest_path)
+    if not isinstance(manifest, dict) or manifest.get('schema_version') != 1 or not isinstance(manifest.get('tracks'), list):
+        raise ValueError('Expected the review app publishing manifest (schema_version 1)')
+    selected = {}
+    for row in manifest['tracks']:
+        if row.get('publishing_status') not in {'selected', 'published'}:
+            continue
+        digest, identifier = row.get('yaml_sha256'), row.get('generation_id')
+        if not digest or not identifier or digest in selected:
+            raise ValueError('Publishing selections need unique completed-YAML hashes and generation IDs')
+        selected[digest] = row
+    matched, used = [], set()
+    for track in tracks:
+        relative = track['yamlUrl'].removeprefix('showcase/')
+        digest = hashlib.sha256((SHOWCASE / relative).read_bytes()).hexdigest()
+        if digest not in selected:
+            continue
+        if digest in used or not any(track['audio']['sources'].values()):
+            raise ValueError('A publishing selection must match one YAML and playable audio in the curated collection')
+        used.add(digest)
+        row = selected[digest]
+        track['generation_id'] = row['generation_id']
+        track['publishing_status'] = row['publishing_status']
+        matched.append(track)
+    if used != set(selected):
+        raise ValueError('Some publishing selections are missing from the curated collection; catalogue retained')
+    if not matched:
+        raise ValueError('No selected/published recordings matched; catalogue retained')
+    return matched
+
+
+def build(output: Path, publishing_manifest=None) -> int:
     if not SHOWCASE.is_dir():
         raise SystemExit(f"Showcase directory is missing: {SHOWCASE}")
 
@@ -545,10 +604,12 @@ def build(output: Path) -> int:
     existing = (read_json(output) if output.is_file() else {}) or {}
     EXISTING_TRACKS = {t['yamlUrl']: t for t in existing.get('tracks', []) if t.get('yamlUrl') and t.get('id')}
     EXISTING_IDS = {p: t['id'] for p, t in EXISTING_TRACKS.items()}
-    taxonomy = Taxonomy(TAXONOMY)
+    taxonomy = Taxonomy(TAXONOMY, STYLES)
     tracks: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
     for yaml_path in sorted([*SHOWCASE.glob('*.yaml'), *SHOWCASE.glob('*.yml')]):
+        if not recording_yaml(yaml_path):
+            continue
         raw = load_yaml(yaml_path)
         if raw and raw.get('lyrics'):
             tracks.append(build_track(yaml_path, raw, slugify(raw.get('title') or yaml_path.stem), {}, None, taxonomy, seen_ids))
@@ -578,6 +639,8 @@ def build(output: Path) -> int:
         if not bank.is_dir():
             continue
         for yaml_path in sorted([*bank.rglob("*.yaml"), *bank.rglob("*.yml")], key=lambda p: p.as_posix().casefold()):
+            if not recording_yaml(yaml_path):
+                continue
             raw = load_yaml(yaml_path)
             if not raw or not raw.get("lyrics"):
                 continue
@@ -587,6 +650,8 @@ def build(output: Path) -> int:
                 raw["version"] = raw.get("one_off_label") or "one-off"
             tracks.append(build_track(yaml_path, raw, composition_id, {}, None, taxonomy, seen_ids))
 
+    if publishing_manifest:
+        tracks = publishing_gate(tracks, publishing_manifest)
     slot = {t["id"] for t in tracks}
     if len(slot) != len(tracks):
         raise SystemExit("Internal error: duplicate catalogue IDs survived disambiguation")
@@ -633,16 +698,22 @@ def build(output: Path) -> int:
 
 
 def main() -> int:
-    global SHOWCASE
+    global SHOWCASE, STYLES
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="catalogue JSON destination")
     parser.add_argument("--showcase", type=Path, default=SHOWCASE, help="Complete curated media collection; read only")
+    parser.add_argument('--styles', type=Path, default=STYLES, help='Shared writing styles.csv; old taxonomy remains a historical fallback')
+    parser.add_argument('--publishing-manifest', type=Path, help='Only include selections matched by completed-YAML SHA256')
     args = parser.parse_args()
     SHOWCASE = args.showcase.resolve()
+    STYLES = args.styles.resolve()
     output = Path(args.output)
     if not output.is_absolute():
         output = (ROOT / output).resolve()
-    return build(output)
+    try:
+        return build(output, args.publishing_manifest)
+    except (OSError, ValueError) as error:
+        parser.exit(1, 'Cannot refresh catalogue: ' + str(error) + '\n')
 
 
 if __name__ == "__main__":

@@ -40,9 +40,10 @@ class BuildTests(unittest.TestCase):
         self.assertEqual((out / 'catalogue.json').read_bytes(), (self.root / '_data/catalogue.json').read_bytes())
         self.assertEqual(before, fingerprints(self.root / '_data'))
         self.assertFalse(any(p.endswith(('.py', '.flac', '.yaml', '.bat', '.sqlite3')) or 'config' in p for p in fingerprints(out)))
-        self.assertFalse((out / 'data/analytics/cost-analysis.json').exists())
-        self.assertFalse((out / 'data/analytics/summary.json').exists())
-        self.assertIn('data-cost-export="absent"', (out / 'analytics/index.html').read_text())
+        for name in ['cost-analysis.json','summary.json']:
+            self.assertEqual((out / 'data/analytics' / name).read_bytes(), (self.root / '_data/_analytics' / name).read_bytes())
+        self.assertIn('data-cost-export="available"', (out / 'analytics/index.html').read_text())
+        self.assertIn('data-platform-export="absent"', (out / 'analytics/index.html').read_text())
         for document in json.loads((out / 'knowledge-manifest.json').read_text())['documents']:
             self.assertTrue((out / document['path']).is_file())
 
@@ -77,6 +78,20 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.root / '_site/index.html').is_file())
 
+    def test_optional_platform_projection_is_staged_and_invalid_refresh_keeps_completed_build(self):
+        projection = {'format':'gbr-platform-analytics-v1','review_model':'four-metric-0-5',
+                      'generated_at':'2026-10-19','count':0,'generations':[]}
+        path = self.root / '_data/_analytics/platform.json'
+        path.write_text(json.dumps(projection))
+        result = website.build(self.root)
+        self.assertEqual(result['platform_recordings'],0)
+        self.assertIn('data-platform-export="available"',(self.root/'_site/analytics/index.html').read_text())
+        before = fingerprints(self.root / '_site')
+        projection['count']=1
+        path.write_text(json.dumps(projection))
+        with self.assertRaisesRegex(ValueError,'count'):website.build(self.root)
+        self.assertEqual(before,fingerprints(self.root / '_site'))
+
 
 class CatalogueTests(unittest.TestCase):
     def setUp(self):
@@ -87,8 +102,8 @@ class CatalogueTests(unittest.TestCase):
         self.media.mkdir()
         self.output = self.base / 'catalogue.json'
 
-    def refresh(self):
-        return subprocess.run([sys.executable, str(ROOT / '_tools/build_catalogue.py'), '--showcase', str(self.media), '--output', str(self.output)], capture_output=True, text=True, timeout=30)
+    def refresh(self, *extra):
+        return subprocess.run([sys.executable, str(ROOT / '_tools/build_catalogue.py'), '--showcase', str(self.media), '--output', str(self.output), *map(str,extra)], capture_output=True, text=True, timeout=30)
 
     def test_flat_and_legacy_yamls_keep_distinct_ids_share_tokens_sidecars_and_source_bytes(self):
         for name in ['one', 'two', 'three']:
@@ -133,6 +148,44 @@ class CatalogueTests(unittest.TestCase):
         self.media.rmdir()
         self.assertNotEqual(self.refresh().returncode, 0)
         self.assertEqual(self.output.read_bytes(), before)
+
+    def test_native_bundle_snapshot_is_not_a_second_recording_and_shared_styles_set_order(self):
+        bundle=self.media/'song-001'
+        bundle.mkdir()
+        yaml=b'song_id: 13\nvariant_id: 2\ntitle: A Song\ncluster: Native Cluster\nstyle: Native Style\nexplicit: no\ngeneration_datetime: 2610190201\nencoder_seed: 18446744073709551615\nlyrics: |\n  keep this\n'
+        (bundle/'song-001.yaml').write_bytes(yaml)
+        (bundle/'source.yaml').write_bytes(yaml)
+        (bundle/'song-001.flac').write_bytes(b'audio')
+        styles=self.base/'styles.csv'
+        styles.write_text('ID,cluster,style_primary,template_source\ntemplate,Native Cluster,Native Style,custom\n')
+        result=self.refresh('--styles',styles)
+        self.assertEqual(result.returncode,0,result.stderr)
+        tracks=json.loads(self.output.read_text())['tracks']
+        self.assertEqual(len(tracks),1)
+        self.assertEqual(tracks[0]['genre']['parent_order'],0)
+        self.assertEqual(tracks[0]['genre']['taxonomy_order'],0)
+        self.assertEqual(tracks[0]['displayTitle'],'A Song')
+        self.assertFalse(tracks[0]['explicit'])
+        self.assertEqual(tracks[0]['generation']['encoderSeed'],'18446744073709551615')
+        self.assertEqual(tracks[0]['generation_datetime'],2610190201)
+        self.assertEqual((bundle/'source.yaml').read_bytes(),yaml)
+
+    def test_publishing_manifest_selects_exact_output_yaml_and_fails_without_erasing(self):
+        for name in ['selected','other']:
+            (self.media/(name+'.yaml')).write_text('title: '+name+'\nlyrics: |\n  verse\n')
+            (self.media/(name+'.mp3')).write_bytes(b'audio')
+        manifest=self.base/'publishing.json'
+        row={'generation_id':'g1','yaml_sha256':sha256((self.media/'selected.yaml').read_bytes()).hexdigest(),'publishing_status':'selected'}
+        manifest.write_text(json.dumps({'schema_version':1,'tracks':[row]}))
+        result=self.refresh('--publishing-manifest',manifest)
+        self.assertEqual(result.returncode,0,result.stderr)
+        data=json.loads(self.output.read_text())
+        self.assertEqual(data['trackCount'],1)
+        self.assertEqual(data['tracks'][0]['generation_id'],'g1')
+        before=self.output.read_bytes()
+        manifest.write_text(json.dumps({'schema_version':1,'tracks':[{**row,'yaml_sha256':'absent'}]}))
+        self.assertNotEqual(self.refresh('--publishing-manifest',manifest).returncode,0)
+        self.assertEqual(self.output.read_bytes(),before)
 
 
 if __name__ == '__main__':

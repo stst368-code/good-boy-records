@@ -5023,7 +5023,7 @@ function oklch(hex){const c=rgb(hex),r=srgbLinear(c.r),g=srgbLinear(c.g),b=srgbL
 function colourCompare(a,b){const ca=oklch(a||'#808080'),cb=oklch(b||'#808080');return ca.h-cb.h||ca.l-cb.l||ca.c-cb.c}
 function accent(track){const c=track?.genre?.child_colour||'#d0802f',v=rgb(c);document.documentElement.style.setProperty('--accent',c);document.documentElement.style.setProperty('--accent-rgb',`${v.r},${v.g},${v.b}`);return v}
 function titleOf(t){return t?.displayTitle||t?.composition||t?.title||t?.id||'Untitled'}
-function variantOf(t){return t?.variant||t?.version||t?.genre?.child_genre||'—'}
+function variantOf(t){return t?.variant||t?.version||(typeof t?.style==='string'?t.style:'')||t?.style_primary||t?.genre?.child_genre||'—'}
 
 /* Share links are deliberately opaque and short. The track id itself never appears
    in the shared URL, and the ?s= token is removed from the address bar immediately
@@ -5958,11 +5958,11 @@ function knowledgeTargetForHref(fromNode,href,docByKey,nodeByDocAnchor){
 const HOW_MADE_STAGES=[
   {id:'idea',title:'IDEA',colour:'#d0802f',keys:['inspiration','idea','parody','concept','songwriting'],markdown:`# IDEA\n\nEvery track starts with an idea. It might be an actual song idea, a parody, something that happened that day, or general nonsense that got out of hand.\n\nThe important bit is that there is something worth turning into a song.\n\n## Creative loop\n\nThe same basic idea can be pushed through completely different styles. There is no canonical parent recording in Good Boy Records: each finished version stands on its own.`},
   {id:'write',title:'WRITE',colour:'#c49a45',keys:['prompt','caption','lyrics','vocal details','arrangement','genre','song structure'],markdown:`# WRITE\n\nThe idea becomes two things: **lyrics** and a **caption**.\n\nThe lyrics describe what is sung. The caption describes how the music should sound: genre, instrumentation, voice, tempo, arrangement, production and delivery.\n\nLLMs such as ChatGPT are useful for trying the same song in wildly different styles, reshaping both caption and lyrics where the genre needs it.\n\n## Output\n\nA generation-ready song description: caption + lyrics.`},
-  {id:'encode',title:'ENCODE',colour:'#a9a04f',keys:['text encoder','conditioning','encoder cfg','top-k','top_k','encode','clip'],markdown:`# ENCODE\n\nThe caption and lyrics are not sent straight into the music generator as ordinary text. A **text encoder** turns them into numerical conditioning the music model can work with.\n\n\`WORDS → TEXT ENCODER → CONDITIONING\`\n\nThe native runner can pass conditioning straight to sampling or cache it so encoding and generation can happen on different workers.`},
+  {id:'encode',title:'ENCODE',colour:'#a9a04f',keys:['text encoder','conditioning','encoder cfg','top-k','top_k','encode','clip'],markdown:`# ENCODE\n\nThe caption and lyrics are not sent straight into the music generator as ordinary text. A **text encoder** turns them into numerical conditioning the music model can work with.\n\n\`WORDS → TEXT ENCODER → CONDITIONING\`\n\nThe native runner can pass conditioning straight to sampling or reuse a compatible cached encoding across jobs. Each job currently uses one configured local, dedicated RunPod or serverless worker for both stages.`},
   {id:'generate',title:'GENERATE',colour:'#77a167',keys:['model','dit','sampler','scheduler','steps','cfg','seed','sampling','generation'],markdown:`# GENERATE\n\nConditioning enters the generative stage and the music is sampled. This is where **seed, CFG, steps, sampler, scheduler and model** matter.\n\nAt the end we have the generated song, with FLAC as the primary generated audio format in this workflow.\n\n## The useful way to learn this\n\nDo not just describe parameter changes. Let people hear them. Keep the source material and other variables fixed, then compare 1 step, 20 steps, 200 steps, different CFG values, samplers or schedulers.\n\n## Harness branch\n\nThe YAML/Python/worker/cache system is automation around this basic process. It is useful, but it is not required to understand how the song itself is generated.`},
   {id:'listen',title:'LISTEN',colour:'#5d9aa8',keys:['test','listen','review','comparison','experiment','good','bad','archive'],markdown:`# LISTEN\n\nThe highly sophisticated quality-control department is me listening to it.\n\nA generated recording either gets archived or kept.\n\n\`GENERATED → LISTEN → ARCHIVE / KEEP\`\n\nCreative experimentation loops back to the caption, lyrics or genre. Technical experimentation loops back to seed, CFG, steps, sampler, scheduler or other generation settings.`},
   {id:'analyse',title:'ANALYSE',colour:'#647fc3',keys:['whisper','whisperx','demucs','lyrics.json','lyric timing','alignment','audio analysis','beat','onset','energy','playback.json'],markdown:`# ANALYSE\n\nA keeper still needs preparing for Good Boy Records.\n\n**Demucs** separates the vocal stem. **WhisperX** aligns the known lyrics to that vocal so the player knows when each word happens. A separate audio-analysis pass follows the musical progression and produces data used by the lighting and visual system.\n\nThose sides come together as GBR playback data: \`gbr.lyrics.json\`, \`gbr.audio.json\` and \`gbr.playback.json\`.`},
-  {id:'publish',title:'PUBLISH',colour:'#8d6cbe',keys:['format','catalogue','showcase','mp3','flac','artwork','r2','deploy','site build','github pages'],markdown:`# PUBLISH\n\nPromotion is deliberately uncomplicated: a keeper is copied into **showcase**. Each published recording keeps a stable catalogue identity. Song, variant and review history are recorded in the shared platform database.\n\nThe showcase content is scanned to build \`data/catalogue.json\`. Media is synchronised with **rclone** to **Cloudflare R2**, while the Good Boy Records application is served through **GitHub Pages**.\n\nAlbum artwork is created per recording and the web playback copy is MP3.`},
+  {id:'publish',title:'PUBLISH',colour:'#8d6cbe',keys:['format','catalogue','showcase','mp3','flac','artwork','r2','deploy','site build','github pages'],markdown:`# PUBLISH\n\nPromotion is deliberately uncomplicated: a keeper is copied into **showcase**. Each published recording keeps a stable catalogue identity. Song, variant and review history are recorded in the shared platform database.\n\nAn explicit refresh reads the curated collection into \`_04_website/_data/catalogue.json\`. It can require the review publishing manifest; the public build serves \`catalogue.json\` at its root. Media is synchronised with **rclone** to **Cloudflare R2**, while the Good Boy Records application is served through **GitHub Pages**.\n\nAlbum artwork is created per recording and the web playback copy is MP3.`},
   {id:'play',title:'PLAY',colour:'#b2679d',keys:['player','lyrics','lighting','visual','cassette','playback','now playing','good boy records'],markdown:`# PLAY\n\nThis is the bit the listener sees.\n\nGood Boy Records turns the finished recording, artwork, timed lyrics and analysis data into the cassette-style player: browsing, artwork, Now Playing, synchronised word-level lyrics, transport, lighting, track details and generation information.\n\nThe website is the presentation layer. It is not the music generator.`}
 ]
 function howMadeStageFor(doc,md){
@@ -6011,7 +6011,7 @@ async function loadKnowledgeGraph(){
     const stageMap=new Map(HOW_MADE_STAGES.map(st=>[st.id,built.find(n=>n.id===`how-made:${st.id}`)]));
     // Two deliberately separate explanatory branches: the automation harness and the technical reference.
     const generateStage=stageMap.get('generate');
-    const harnessNode={id:'how-made:harness',docId:'how-made:harness',docLabel:"how it's made",title:'GENERATION HARNESS',kind:'chain',level:0,depth:0,x:generateStage.x+300,y:generateStage.y-170,baseX:generateStage.x+300,baseY:generateStage.y-170,r:38,colour:'#4f9b89',angle:generateStage.angle+.55,parentId:generateStage.id,path:"how it's made / harness",anchor:'',markdown:`# GENERATION HARNESS\n\nYou do **not** need this to generate a song. This is the machinery I built around generation so I do not have to babysit ComfyUI one job at a time.\n\n## YAML jobs\n\nCaption, lyrics and optional generation settings live together in YAML: model, text encoder, seed, CFG, steps, sampler, scheduler and so on.\n\n## Python pipeline\n\nThe pipeline reads those jobs and assigns work to an available local or cloud worker.\n\n## Split compute\n\nThe BF16 conditioning setup can be too large for my local 12 GB RTX 4070 Ti, so conditioning can run on a larger RunPod GPU. The diffusion transformer used here is roughly 9 GB in FP32 and can fit locally.\n\n## Conditioning cache\n\nConditioning is cached rather than immediately passed to sampling. That lets encoding and diffusion happen on different workers and lets cloud and local resources be mixed.`};
+    const harnessNode={id:'how-made:harness',docId:'how-made:harness',docLabel:"how it's made",title:'GENERATION HARNESS',kind:'chain',level:0,depth:0,x:generateStage.x+300,y:generateStage.y-170,baseX:generateStage.x+300,baseY:generateStage.y-170,r:38,colour:'#4f9b89',angle:generateStage.angle+.55,parentId:generateStage.id,path:"how it's made / harness",anchor:'',markdown:`# GENERATION HARNESS\n\nYou do **not** need this to generate a song. The current shared GBR app validates, freezes and queues native MiniMax jobs; the historical public catalogue also contains ComfyUI recordings.\n\n## YAML jobs\n\nCaption, lyrics and optional generation settings live together in YAML: model, text encoder, seed, CFG, steps, sampler, scheduler and so on.\n\n## Python pipeline\n\nThe pipeline reads those jobs and assigns work to an available local or cloud worker.\n\n## Split compute\n\nA job can target local hardware, dedicated RunPod or a serverless endpoint. Both stages share that target; discovered hardware, memory profile and observed VRAM usage are logged rather than assuming one GPU configuration.\n\n## Conditioning cache\n\nEncoding can be cached or recomputed. Cache identity includes the conditioning inputs, model revision and relevant controls, so incompatible settings are not reused.`};
     built.push(harnessNode);knowledgeAddEdge(edges,edgeSeen,generateStage.id,harnessNode.id,'branch');
 
     const techNode={id:'how-made:tech-reference',docId:'how-made:tech-reference',docLabel:"how it's made",title:'TECH REFERENCE',kind:'chain',level:0,depth:0,x:cx-330,y:cy+120,baseX:cx-330,baseY:cy+120,r:38,colour:'#b86d62',angle:Math.PI,parentId:root.id,path:"how it's made / reference",anchor:'',markdown:`# TECH REFERENCE\n\nThe reference branch keeps tools and file formats out of the main story.\n\n## Generation\n\n**Native MiniMax diffusion/Transformers** — current inference pipeline. Earlier catalogue recordings also used ComfyUI.\n\n**MiniMax music model** — generates the music from conditioning.\n\n**Text encoder** — turns caption + lyrics into conditioning.\n\n**Python** — automation and pipeline glue.\n\n**YAML** — human-readable generation job format.\n\n## Post-processing\n\n**Demucs** — stem separation.\n\n**WhisperX** — word-level lyric alignment.\n\n**Audacity** — audio editing/conversion, including the MP3 playback copy.\n\n## Infrastructure\n\n**RunPod** — cloud GPU workers.\n\n**Cloudflare R2** — published media storage.\n\n**rclone** — synchronises media to R2.\n\n**GitHub Pages** — serves the Good Boy Records application.\n\n## Files\n\n**.yaml** song definition and generation configuration  \n**.flac** generated/master audio  \n**.mp3** web playback audio  \n**.json** catalogue, lyrics, analysis and playback data  \n**image files** album artwork  \n**.py** pipeline and analysis tooling  \n**.bat** convenient local launchers`};
@@ -6402,7 +6402,15 @@ function renderStoryPanel(){
   const songBlock=hasStructured?provenanceSection('The Song',song.story,song.inspiration,song.inspirationUrl,song.yamlUrl):'';
   const versionBlock=hasStructured?provenanceSection('This Version',version.story,version.inspiration,version.inspirationUrl,version.yamlUrl,song):provenanceSection('About This Track',legacy.story,legacy.inspiration,legacy.inspirationUrl,legacy.yamlUrl);
   const g=t.generation||{},model=t.model||{};
+  const explicitLabel=t.explicit===null||t.explicit===undefined?'':(['yes','true','1'].includes(String(t.explicit).toLowerCase())?'Yes':['no','false','0'].includes(String(t.explicit).toLowerCase())?'No':String(t.explicit));
   const facts=[
+    ['Song ID',t.song_id],
+    ['Variant ID',t.variant_id],
+    ['Cluster',t.genre?.cluster],
+    ['Style',variantOf(t)],
+    ['Explicit',explicitLabel],
+    ['Generated (YYMMDDHHMM)',t.generation_datetime],
+    ['Generation ID',t.generation_id],
     ['Genre',t.genre?.child_genre||t.genre?.requested||''],
     ['Model',model.name||''],
     ['DiT',model.dit||''],
@@ -6527,7 +6535,7 @@ function buildNodes(refit=true){
     /* v10.12.5 — build the map from the TOP taxonomy level first. Previous
        builds laid parents around the ring and only labelled clusters afterwards,
        which let related genres bunch together and gave the map no real territories. */
-    const clusterOrder=['rap / hip hop','electronic music','classical','heavy / experimental','rock','unclassified','pop','country / folk','rhythm music'];
+    const clusterOrder=[...new Set(tracks.map(t=>String(t.genre?.cluster||'unclassified').trim().toLowerCase()))];
     const norm=v=>String(v||'unclassified').trim().toLowerCase();
     const clusterInfo=new Map();
     for(const t of tracks){
@@ -7124,7 +7132,7 @@ The inference system that turns the prompt and parameters into audio.
 
 GBR uses a native **MiniMax diffusion/Transformers pipeline**. It loads the model components, encodes text into conditioning, samples the music and writes FLAC audio. The earlier published catalogue also contains recordings made with ComfyUI.
 
-Text encoding / conditioning and diffusion sampling can be separated when useful, including cached-conditioning workflows. Those are stages inside the generation engine rather than independent concepts on the main map.`},
+Text encoding and diffusion are measured stages of one worker job. A compatible cached encoding can avoid repeating conditioning. Both stages currently use the same configured local GPU, dedicated pod or serverless endpoint.`},
 
   {id:'pipeline',title:'PIPELINE RUNNER',kind:'document',x:0,y:0,colour:'#4e9f91',group:'automation',markdown:`# Pipeline runner
 
@@ -7170,7 +7178,11 @@ The showcase directory is the authoritative content collection; artwork is part 
 
 The deployment path from the curated showcase to the public site.
 
-The site build creates the catalogue and player assets. Media is copied to Cloudflare R2 with rclone, while the application is served through the site's hosting/deployment path.
+The public site lives in **_04_website**, alongside writing, generation, review and the shared app/database. An explicit catalogue refresh reads curated recordings and can require the review publishing manifest. Current cluster/style ordering follows the shared writing references; catalogue and share identities remain stable.
+
+The Observatory reads a public projection of the shared database: four review scores, revision-bound tags and exactly linked worker telemetry. Porto’s original single-grade archive remains a separately labelled source. The database and private workstation configuration are never served.
+
+Media preparation and R2 synchronisation remain explicit steps. Site builds stage only public metadata and player assets for GitHub Pages.
 
 Catalogue generation, R2 sync and hosting are parts of one publishing concern, so they are aggregated here.`},
 

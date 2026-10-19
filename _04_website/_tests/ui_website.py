@@ -95,6 +95,10 @@ def main():
                 page.locator('#panelClose').click()
                 page.locator('#storyButton').click()
                 assert page.locator('#panelBody').inner_text().strip()
+                page.evaluate('Object.assign(tracks[index],{song_id:"13",variant_id:"2",explicit:false,generation_datetime:"2610190201"});renderStoryPanel()')
+                facts=page.locator('#panelBody').inner_text()
+                for label in ['Song ID','Variant ID','Explicit','No','2610190201']:
+                    assert label.casefold() in facts.casefold(),(label,facts)
                 page.locator('#panelClose').click()
                 page.locator('#knowledgeButton').click()
                 page.wait_for_function('knowledgeReady && knowledgeNodes.length>0')

@@ -5,11 +5,14 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
 import uuid
 import webbrowser
+sys.path.insert(0, str(Path(__file__).resolve().parent / '_tools'))
+from export_platform import export as export_platform, validate as validate_platform
 
 ROOT = Path(__file__).resolve().parent
 FORMAT = 'gbr-website-build-v1'
@@ -66,17 +69,20 @@ def stage(root, target):
     for name in ('index.html', 'landscape.html'):
         shutil.copyfile(root / '_templates/landscape.html', target / name)
     (target / 'analytics').mkdir()
-    for name in ('index.html', 'analytics.js', 'analytics.css'):
+    for name in ('index.html', 'analytics.js', 'analytics.css', 'platform.js'):
         shutil.copyfile(root / '_analytics' / name, target / 'analytics' / name)
     destination = target / 'data/analytics'
     destination.mkdir(parents=True)
-    for name in ('generations.json', 'summary.json', 'cost-analysis.json'):
+    for name in ('generations.json', 'summary.json', 'cost-analysis.json', 'platform.json'):
         source = root / '_data/_analytics' / name
         if source.is_file():
+            if name == 'platform.json':
+                validate_platform(json.loads(read_json(source)))
             shutil.copyfile(source, destination / name)
     page = target / 'analytics/index.html'
     availability = 'available' if (destination / 'cost-analysis.json').is_file() else 'absent'
-    page.write_text(page.read_text(encoding='utf-8').replace('<body>', '<body data-cost-export="' + availability + '">', 1), encoding='utf-8')
+    platform_available = 'available' if (destination / 'platform.json').is_file() else 'absent'
+    page.write_text(page.read_text(encoding='utf-8').replace('<body>', '<body data-cost-export="' + availability + '" data-platform-export="' + platform_available + '">', 1), encoding='utf-8')
     source = root / '_content/_folders'
     for document in sorted(source.rglob('*.md')):
         if document.is_symlink():
@@ -101,6 +107,10 @@ def stage(root, target):
     manifest = {'format': FORMAT, 'tracks': main, 'hidden_tracks': hidden,
                 'historical_analytics_records': len(analysis['generations']),
                 'analytics_generated_at': analysis.get('generated_at'), 'knowledge_documents': len(knowledge['documents'])}
+    if platform_available == 'available':
+        current = json.loads(read_json(destination / 'platform.json'))
+        manifest['platform_recordings'] = current['count']
+        manifest['platform_exported_at'] = current['generated_at']
     (target / 'build-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     return manifest
 
@@ -135,6 +145,9 @@ def main(argv=None):
     parser.add_argument('--output', type=Path, default=ROOT / '_site')
     parser.add_argument('--refresh-catalogue', action='store_true', help='Read a complete curated collection into the committed catalogue')
     parser.add_argument('--showcase', type=Path, default=ROOT / '_showcase')
+    parser.add_argument('--publishing-manifest', type=Path, help='Gate a catalogue refresh using the app publishing manifest')
+    parser.add_argument('--export-platform', action='store_true', help='Refresh public research from the shared database (read only)')
+    parser.add_argument('--database', type=Path, default=ROOT.parent / '_98_database/gbr.sqlite3')
     parser.add_argument('--refresh-easter', action='store_true', help='Explicit read-only rclone refresh of hidden R2 metadata')
     parser.add_argument('--serve', action='store_true')
     parser.add_argument('--port', type=int, default=8080)
@@ -142,8 +155,13 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         output_path(ROOT, args.output)
+        if args.publishing_manifest and not args.refresh_catalogue:
+            raise ValueError('--publishing-manifest requires --refresh-catalogue')
+        if args.export_platform:
+            export_platform(args.database, styles=ROOT.parent / '_01_writing/_references/styles.csv')
         if args.refresh_catalogue:
-            subprocess.run([sys.executable, str(ROOT / '_tools/build_catalogue.py'), '--showcase', str(args.showcase.resolve())], check=True)
+            extra = ['--publishing-manifest', str(args.publishing_manifest.resolve())] if args.publishing_manifest else []
+            subprocess.run([sys.executable, str(ROOT / '_tools/build_catalogue.py'), '--showcase', str(args.showcase.resolve()), *extra], check=True)
         if args.refresh_easter:
             subprocess.run([sys.executable, str(ROOT / '_tools/refresh_easter.py'), str(ROOT / '_data/catalogue.json')], check=True)
         print(json.dumps({'output': str(args.output.resolve()), **build(output=args.output)}))
@@ -158,7 +176,7 @@ def main(argv=None):
                     server.serve_forever()
                 except KeyboardInterrupt:
                     pass
-    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, sqlite3.Error, subprocess.CalledProcessError) as error:
         parser.exit(1, 'Cannot build GBR website: ' + str(error) + '\n')
     return 0
 
