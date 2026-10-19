@@ -8,7 +8,10 @@ from .service import Preparation
 
 class Job(BaseModel):
     model_config=ConfigDict(extra='forbid')
-    kind: Literal['mix_preview','mix_master','visuals']
+    kind: Literal['mix_preview','mix_master','visuals','lyric_alignment']
+    stem_task_id: str | None=None
+    input_artifact_id: str | None=None
+    language: str | None=None
     mix: dict=Field(default_factory=dict)
     start: float=Field(default=0,ge=0,allow_inf_nan=False)
     seconds: StrictInt=Field(default=30,ge=1,le=60)
@@ -16,7 +19,7 @@ class Job(BaseModel):
 
 class Artwork(BaseModel):
     model_config=ConfigDict(extra='forbid')
-    family: Literal['qwen-2.1','moss-image','flux']='qwen-2.1'
+    family: Literal['comfyui','qwen-2.1','moss-image','flux']='comfyui'
     direction: str=Field(default='',max_length=5000)
     references: list[str]=Field(default_factory=list,max_length=10)
     seed: StrictInt=Field(default=0,ge=0,lt=2**63)
@@ -59,9 +62,15 @@ def router(root,review,local):
         from .storage_plan import plan
         return plan(service.db)
 
+    @routes.get('/projects/{gid}/editorial')
+    def editorial(gid: str,artifact: str | None=None):return service.editorial(gid,artifact)
+
+    @routes.post('/projects/{gid}/editorial/{kind}')
+    def save_editorial(gid: str,kind: Literal['lyric_edit','visual_edit'],body: dict):return service.save_editorial(gid,kind,body)
+
     @routes.get('/audio/{gid}')
-    def audio(gid: str):
-        service.require();_,source=service.source(gid)
+    def audio(gid: str,artifact: str | None=None):
+        service.require();_,source=service.source(gid,artifact_id=artifact)
         return FileResponse(source,media_type='audio/flac')
 
     @routes.get('/artifacts/{identifier}')

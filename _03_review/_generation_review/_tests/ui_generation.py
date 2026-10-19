@@ -24,6 +24,7 @@ from _gbr_generation.executor import execute
 from _gbr_generation.yaml_document import YamlDocument
 from _review.app import create_app
 from test_execution import ExecutionTests
+from test_comfy_execution import server as comfy_server
 
 
 def main():
@@ -174,6 +175,19 @@ def main():
                 assert len(list(service.config.archive.rglob('*.*'))) == 4
                 assert source.read_bytes() == original
                 page.locator('#generationTab').click()
+                with comfy_server() as (url,comfy):
+                    page.locator('#genBackend').select_option('comfyui');page.locator('#genAddress').fill(url)
+                    assert page.locator('#genIdentityWrap').is_hidden()
+                    page.locator('#genCheckWorker').click()
+                    page.wait_for_function("()=>document.getElementById('genConnectionStatus').textContent.includes('model and sampler choices loaded')")
+                    assert page.locator('#genSchedule').input_value()=='simple'
+                    assert page.locator('#genDit').input_value()=='minimax_music3_dit_fp32.safetensors'
+                    page.locator('#genPreview').click();page.wait_for_selector('#genPlan:not([hidden])')
+                    assert '1 ready' in page.locator('#genPlanSummary').inner_text()
+                    assert comfy['submissions']==0
+                    page.locator('#genBackend').select_option('local')
+                    assert page.locator('#genSchedule').input_value()=='flow_match_euler'
+                    assert page.locator('#genDit').input_value()=='bf16'
                 page.set_viewport_size({'width': 390, 'height': 844})
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
                 assert not errors, errors

@@ -3,6 +3,7 @@ variant_id: 1
 title: california-rear-view
 cluster:
 version:
+language: en
 model:
 dit:
 text_encoder:

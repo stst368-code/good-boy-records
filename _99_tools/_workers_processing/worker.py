@@ -22,7 +22,11 @@ def render(request):
     if mix['mid_db']:filters.append(f"equalizer=f=1000:t=q:w=1:g={mix['mid_db']}")
     if mix['treble_db']:filters.append(f"treble=g={mix['treble_db']}")
     command=[ffmpeg,'-hide_banner','-v','error','-nostdin','-n','-i',request['source']]
-    graph='[0:a]'+','.join(filters or ['anull'])+'[tone];'
+    input_label='0:a';prefix=''
+    if request.get('stems'):
+        command+=['-i',request['stems']['vocals'],'-i',request['stems']['accompaniment']]
+        prefix=f"[1:a]volume={mix['vocal_db']}dB[v];[2:a]volume={mix['accompaniment_db']}dB[m];[v][m]amix=inputs=2:normalize=0[stem_mix];";input_label='stem_mix'
+    graph=prefix+'['+input_label+']'+','.join(filters or ['anull'])+'[tone];'
     if mix['reverb']:
         rate=44100
         t=np.arange(int(rate*mix['room_seconds']))/rate
@@ -33,7 +37,7 @@ def render(request):
         command+=['-i',str(ir)]
         help_text=subprocess.run([ffmpeg,'-hide_banner','-h','filter=afir'],capture_output=True,text=True,check=True).stdout
         normalise='irnorm=-1' if 'irnorm' in help_text else 'gtype=none'
-        graph+=f'[tone][1:a]afir=dry=1:wet=1:irgain=1:irfmt=mono:{normalise}[room];'
+        graph+=f'[tone][{3 if request.get("stems") else 1}:a]afir=dry=1:wet=1:irgain=1:irfmt=mono:{normalise}[room];'
         source='room'
     else:source='tone'
     final=[]
@@ -43,13 +47,13 @@ def render(request):
     if mix['fade_out']:final.append(f"afade=t=out:st={max(0,duration-mix['fade_out'])}:d={min(duration,mix['fade_out'])}")
     # Fades use whole-recording time before audition trimming; preview and master share a chain.
     if request['kind']=='mix_preview':final+=['atrim=start='+str(recipe['start'])+':duration='+str(recipe['seconds']),'asetpts=PTS-STARTPTS']
-    else:final.append('atrim=end_sample='+str(sf.info(request['source']).frames))
+    else:final.append('atrim=end_sample='+str(round(duration*sf.info(request['stems']['vocals']).samplerate) if request.get('stems') else sf.info(request['source']).frames))
     graph+=f'[{source}]'+','.join(final or ['anull'])+'[out]'
     command+=['-filter_complex',graph,'-map','[out]','-map_metadata','-1','-c:a',
               'pcm_s24le' if request['kind']=='mix_preview' else 'flac']
     if request['kind']=='mix_master':command+=['-sample_fmt','s32','-bits_per_raw_sample','24']
     command+=[str(output)]
-    bypass=request['kind']=='mix_master' and not any(mix[key] for key in ['gain_db','bass_db','mid_db','treble_db','reverb','fade_in','fade_out']) and mix['limiter_db'] is None
+    bypass=request['kind']=='mix_master' and not request.get('stems') and not any(mix[key] for key in ['gain_db','bass_db','mid_db','treble_db','reverb','fade_in','fade_out']) and mix['limiter_db'] is None
     if bypass:
         # Keep bit depth/container bytes for a true bypass. This temporary hard
         # link is removed with the task directory after the source is reused.
@@ -77,9 +81,9 @@ def visuals(request):
     info=sf.info(request['source']);step=max(1,info.samplerate//10)
     rows=[]
     for index,block in enumerate(sf.blocks(request['source'],blocksize=step,dtype='float32',always_2d=True)):
-        mono=block.mean(axis=1);spectrum=np.abs(np.fft.rfft(mono*np.hanning(len(mono))))**2
-        frequencies=np.fft.rfftfreq(len(mono),1/info.samplerate);total=float(spectrum.sum())
-        rows.append({'t':round(index*step/info.samplerate,4),'rms':float(np.sqrt(np.mean(mono**2))),
+        spectrum=(np.abs(np.fft.rfft(block*np.hanning(len(block))[:,None],axis=0))**2).mean(axis=1)
+        frequencies=np.fft.rfftfreq(len(block),1/info.samplerate);total=float(spectrum.sum())
+        rows.append({'t':round(index*step/info.samplerate,4),'rms':float(np.sqrt(np.mean(block.astype('float64')**2))),
                      'bass':float(spectrum[frequencies<250].sum()/total) if total else 0,
                      'brightness':float(spectrum[frequencies>3000].sum()/total) if total else 0})
     max_rms=max((r['rms'] for r in rows),default=0)
@@ -92,7 +96,7 @@ def visuals(request):
             events.append({'time':row['t'],'strength':row['energy'],'duration':.8});last=row['t']
         previous=row['energy']
     output.write_text(json.dumps({'format':'gbr-playback-v1','fps':10,'duration':info.duration,
-        'source_sha256':request['source_sha256'],'frames':rows,'dance':{'events':events,'algorithm':'rms-rise-v1'},'limitations':['Energy/frequency measurements, not beat detection or musical-quality scoring.']},allow_nan=False),encoding='utf-8')
+        'source_sha256':request['source_sha256'],'feature_algorithm':'channel-rms-power-v2','frames':rows,'dance':{'events':events,'algorithm':'rms-rise-v1'},'limitations':['Energy/frequency measurements, not beat detection or musical-quality scoring.']},allow_nan=False),encoding='utf-8')
     return {'output':str(output),'artifact_kind':'visual_features',
             'software':{'numpy':np.__version__,'soundfile':sf.__version__},'measurements':{'frames':len(rows)}}
 
@@ -102,8 +106,8 @@ def main():
         import importlib.util
         modules={name:importlib.util.find_spec(name) is not None for name in ['numpy','soundfile','demucs','whisperx']}
         print(json.dumps({'ffmpeg':shutil.which('ffmpeg'),'modules':modules,
-            'ready_adapters':['mix_preview','mix_master','visuals'] if all(modules[n] for n in ['numpy','soundfile']) and shutil.which('ffmpeg') else [],
-            'pending_adapters':['stem_separation','lyric_alignment','image_diffusion']}))
+            'ready_adapters':(['mix_preview','mix_master','visuals'] if all(modules[n] for n in ['numpy','soundfile']) and shutil.which('ffmpeg') else [])+(['lyric_alignment'] if modules['demucs'] and modules['whisperx'] and shutil.which('ffmpeg') else []),
+            'pending_adapters':(['lyric_alignment'] if not (modules['demucs'] and modules['whisperx']) else [])+['image_diffusion']}))
         return
     request=json.load(sys.stdin)
     if request['kind'] in {'mix_preview','mix_master'}:result=render(request)

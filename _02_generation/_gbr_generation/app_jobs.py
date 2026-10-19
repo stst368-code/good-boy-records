@@ -26,6 +26,10 @@ def write_state(folder, status, **extra):
 
 def prepare_worker(connection, *, install=False):
     backend = connection['backend']
+    if backend=='comfyui':
+        sys.path.insert(0,str(ROOT/'_99_tools/_workers_comfyui'))
+        from client import Client
+        client=Client(connection['address']);return {'system':client.inventory()['system'],'engine':'comfyui','encoding_cache':'Comfy graph cache only'}
     if backend == 'runpod_dedicated':
         client = RunpodClient(connection['address'], connection.get('identity_file') or None)
         return client.setup() if install else client.rpc('doctor')

@@ -28,7 +28,7 @@ export function initGeneration({ api, toast, browse }) {
     </section>
     <section class="generation-panel"><h2>Worker</h2>
       <label>Saved connection<select id="genSaved"><option value="">New connection</option></select></label>
-      <label>Run on<select id="genBackend"><option value="local">This PC</option><option value="runpod_dedicated">RunPod dedicated pod</option><option value="runpod_serverless">RunPod Serverless</option></select></label>
+      <label>Run on<select id="genBackend"><option value="local">This PC</option><option value="runpod_dedicated">RunPod dedicated pod</option><option value="runpod_serverless">RunPod Serverless</option><option value="comfyui">ComfyUI URL · local or pod</option></select></label>
       <label id="genAddressWrap">Connection<input id="genAddress" placeholder="Paste the direct SSH command or ssh://root@IP:PORT"></label>
       <label id="genIdentityWrap">Private key on this PC<input id="genIdentity" list="genKeyList" placeholder="Choose the private key registered in RunPod"><datalist id="genKeyList"></datalist></label>
       <div id="genServerless" hidden><label>RunPod API key <span class="subtle small">Session only; blank uses RUNPOD_API_KEY</span><input id="genApiKey" type="password" autocomplete="new-password"></label>
@@ -38,12 +38,13 @@ export function initGeneration({ api, toast, browse }) {
       <label>Memory mode<select id="genMemory"><option value="auto">Automatic for this run mode</option><option value="low_vram">CPU offload for smaller GPUs</option><option value="resident_stage">Keep the active stage on GPU</option></select></label>
       <label class="generation-check"><input id="genAutoSetup" type="checkbox" checked> Prepare or reuse the worker automatically</label>
       <div class="generation-inline"><button id="genSaveWorker" type="button">Save connection</button><button id="genCheckWorker" type="button">Check connection</button><button id="genPrepareWorker" type="button">Prepare worker</button></div>
-      <p id="genConnectionStatus" class="subtle small" role="status"></p>
+      <p id="genComfyNote" class="subtle small" hidden>ComfyUI uses its own graph cache; native persistent require/disable controls do not apply. Check connection to load checkpoint and sampler choices. Add _99_tools/_workers_comfyui/gbr_bridge.py to ComfyUI/custom_nodes for verified remote file cleanup.</p><p id="genConnectionStatus" class="subtle small" role="status"></p>
       <section id="genPlan" class="generation-plan" hidden><h2>Batch check</h2><p id="genPlanSummary"></p><div id="genPlanRows"></div><label class="generation-check"><input id="genDropErrors" type="checkbox"> Drop errored inputs and run the valid tracks</label><button id="genStart" class="primary" type="button">Generate checked tracks</button><button id="genCancelPreview" type="button">Cancel batch</button></section>
       <h2>Jobs</h2><button id="genRefreshJobs" class="quiet-button" type="button">Refresh</button><div id="genJobs" class="generation-jobs"></div>
     </section>
   </div>`;
   const $ = (id) => document.getElementById(id);
+  const nativeChoices=Object.fromEntries(["genSampler","genSchedule","genEncoder","genDit"].map(id=>[id,[...$(id).options].map(o=>o.value)]));
   const state = {
     rows: [],
     selected: new Set(),
@@ -131,12 +132,18 @@ export function initGeneration({ api, toast, browse }) {
   }
   function backendFields() {
     const mode = $("genBackend").value;
+    if(mode==='comfyui'&&state.previousMode!=='comfyui')state.nativeSelection=Object.fromEntries(Object.keys(nativeChoices).map(id=>[id,$(id).value]));
+    if(mode!=='comfyui'&&state.previousMode==='comfyui')for(const [id,values] of Object.entries(nativeChoices)){$(id).replaceChildren(...values.map(v=>new Option(v,v)));$(id).value=state.nativeSelection?.[id]||values[0];}
+    state.previousMode=mode;
+    for(const option of $('genCache').options)option.disabled=mode==='comfyui'&&option.value!=='prefer';
     $("genAddressWrap").hidden = mode === "local";
     $("genIdentityWrap").hidden = mode !== "runpod_dedicated";
     $("genServerless").hidden = mode !== "runpod_serverless";
-    $("genPrepareWorker").hidden = mode === "runpod_serverless";
-    $("genAutoSetup").closest("label").hidden = mode === "runpod_serverless";
-    $("genAddress").placeholder =
+    $("genPrepareWorker").hidden = ["runpod_serverless","comfyui"].includes(mode);
+    $("genAutoSetup").closest("label").hidden = ["runpod_serverless","comfyui"].includes(mode);
+    $("genComfyNote").hidden=mode!=="comfyui";
+    $("genMemory").closest("label").hidden=mode==="comfyui";
+    $("genAddress").placeholder = mode==="comfyui"?"https://POD-8188.proxy.runpod.net":
       mode === "runpod_serverless"
         ? "Endpoint ID or https://api.runpod.ai/v2/ENDPOINT"
         : "Direct SSH command or ssh://root@IP:PORT";
@@ -172,7 +179,7 @@ export function initGeneration({ api, toast, browse }) {
       const label =
         item.backend === "local"
           ? "This PC"
-          : `${item.backend === "runpod_dedicated" ? "Pod" : "Serverless"} · ${item.address}`;
+          : `${item.backend === "comfyui" ? "ComfyUI" : item.backend === "runpod_dedicated" ? "Pod" : "Serverless"} · ${item.address}`;
       $("genSaved").append(new Option(label, String(index)));
       if (item.backend === current.backend && item.address === current.address)
         $("genSaved").value = String(index);
@@ -448,7 +455,17 @@ export function initGeneration({ api, toast, browse }) {
     await save();
     toast("Connection saved.");
   });
-  $("genCheckWorker").onclick = guarded(() => worker(false));
+  $("genCheckWorker").onclick = guarded(async()=>{
+    if(connection().backend==='comfyui'){
+      const inventory=await api('/generation/comfy-inventory',connection());
+      for(const [id,values] of [['genSampler',inventory.samplers],['genSchedule',inventory.schedulers],['genEncoder',inventory.text_encoders],['genDit',inventory.diffusion_models]]){
+        const selected=$(id).value;$(id).replaceChildren(...values.map(value=>new Option(value,value)));if(values.includes(selected))$(id).value=selected;else if(/\.(safetensors|gguf|ckpt|pt)$/i.test(selected)){const missing=new Option('Unavailable · '+selected,selected);missing.disabled=true;$(id).append(missing);$(id).value=selected;}
+      }
+      await save();
+      $('genConnectionStatus').textContent='ComfyUI connected; model and sampler choices loaded from this worker.';invalidate();return;
+    }
+    await worker(false);
+  });
   $("genPrepareWorker").onclick = guarded(() => worker(true));
   $("genPreview").onclick = guarded(preview);
   $("genDropErrors").onchange = paintPlan;
@@ -509,7 +526,7 @@ export function initGeneration({ api, toast, browse }) {
           ["genSamplerSeed", "sampler_seed"],
           ["genModel", "model"],
         ])
-          $(id).value = prefs.parameters[key] ?? $("" + id).value;
+          {const value=prefs.parameters[key]??$(id).value;if($(id).tagName==='SELECT'&&connection().backend==='comfyui'&&![...$(id).options].some(o=>o.value===String(value)))$(id).append(new Option(String(value),String(value)));$(id).value=value;}
         $("genLayout").value = prefs.layout;
         $("genStorageEndpoint").value = prefs.storage_endpoint;
         $("genStorageBucket").value = prefs.storage_bucket;

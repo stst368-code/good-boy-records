@@ -67,11 +67,41 @@ def main():
                     page.reload();page.wait_for_selector('#preparationTab');page.locator('#preparationTab').click()
                     page.wait_for_function("()=>document.getElementById('prepPrompt').value.includes('Ink engraving')")
                     assert page.locator('#prepDirection').input_value()=='Ink engraving, emerald and copper'
+                    page.locator('[data-mix=gain_db]').fill('-6')
                     page.locator('#prepMaster').click()
                     page.wait_for_function("()=>document.getElementById('prepHistory').textContent.includes('mix master · done')",timeout=25000)
                     page.locator('#prepVisuals').click()
                     page.wait_for_function("()=>document.getElementById('prepHistory').textContent.includes('visuals · done')",timeout=25000)
                     assert page.locator('#prepHistory a',has_text='visual_features').count()
+                    page.wait_for_function("()=>document.getElementById('prepTimelineStatus').textContent.includes('Visual features ready')")
+                    page.locator('#prepSensitivity').fill('2')
+                    page.locator('#prepAddCue').click()
+                    cue=page.locator('.prep-cue').first
+                    cue.locator('[data-field=start]').fill('0.1');cue.locator('[data-field=start]').dispatch_event('change')
+                    cue.locator('[data-field=end]').fill('2');cue.locator('[data-field=end]').dispatch_event('change')
+                    page.locator('#prepSaveLights').click()
+                    page.wait_for_function("()=>document.getElementById('prepTimelineStatus').textContent.includes('Lighting saved')")
+                    assert prep.editorial(gid)['sensitivity']==2
+                    page.locator('#prepRaw').evaluate('async a=>{a.currentTime=.5;await a.play()}')
+                    page.wait_for_function("()=>Number(document.getElementById('prepStar').style.opacity)>.15",timeout=6000)
+                    page.locator('#prepRaw').evaluate('a=>a.pause()')
+                    page.locator('#prepLyricWords [data-word]').first.click()
+                    page.locator('#prepWordStart').fill('0.3');page.locator('#prepWordEnd').fill('0.8');page.locator('#prepWordConfirmed').check();page.locator('#prepWordApply').click()
+                    page.locator('#prepTimelineWindow').select_option('10')
+                    tag=page.locator('.prep-word-tag').first;box=tag.bounding_box()
+                    page.mouse.move(box['x']+2,box['y']+10);page.mouse.down();page.mouse.move(box['x']+22,box['y']+10,steps=4);page.mouse.up()
+                    page.locator('#prepSaveLyrics').click()
+                    page.wait_for_function("()=>document.getElementById('prepTimelineStatus').textContent.includes('Lyric revision saved')")
+                    assert prep.editorial(gid)['words'][0]['start']>.3
+                    page.locator('#prepReloadTimeline').click()
+                    page.wait_for_function("()=>document.getElementById('prepSensitivity').value==='2'")
+                    assert page.locator('#prepLyricWords .untimed').count()>0
+                    page.locator('#prepAudioSource').select_option(master_id:=(next(a['id'] for t in prep.tasks(gid) for a in t['artifacts'] if a['kind']=='master_candidate')))
+                    page.wait_for_function("()=>document.getElementById('prepTimelineStatus').textContent.includes('Calculate visual features')")
+                    assert page.locator('.prep-word-tag').count()==0
+                    page.locator('#prepAudioSource').select_option('')
+                    page.wait_for_function("()=>document.querySelectorAll('.prep-word-tag').length>0")
+
                     page.locator('#prepClean').click()
                     page.wait_for_function("()=>!document.getElementById('prepProcessed').getAttribute('src')")
                     assert page.locator('#prepHistory a',has_text='master_candidate').count()

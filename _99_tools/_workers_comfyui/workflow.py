@@ -54,6 +54,24 @@ def compile_workflow(graph,bindings,values,inventory):
             if kind=='STRING' and not isinstance(actual,str):raise ValueError(field+' requires text')
             if input_name in node['inputs'] and isinstance(node['inputs'][input_name],list):raise ValueError('Binding would replace a graph connection: '+input_name)
             node['inputs'][input_name]=actual
+    # Validate fixed graph values too, so renamed inputs/choices fail before dispatch.
+    for node_id,node in compiled.items():
+        declaration=inventory[node['class_type']].get('input',{})
+        required=declaration.get('required',{});optional=declaration.get('optional',{})
+        absent=set(required)-set(node['inputs'])
+        if absent:raise ValueError('Workflow is missing required inputs: '+', '.join(sorted(absent)))
+        for name,value in node['inputs'].items():
+            advertised=required.get(name) or optional.get(name)
+            if not advertised:raise ValueError('Workflow input is not advertised: '+name)
+            if isinstance(value,list) and len(value)==2 and isinstance(value[0],str) and type(value[1]) is int:
+                if value[0] not in compiled or value[1]<0:raise ValueError('Workflow contains an invalid connection')
+                continue
+            kind=advertised[0];limits=advertised[1] if len(advertised)>1 and isinstance(advertised[1],dict) else {}
+            if isinstance(kind,list) and value not in kind:raise ValueError('Workflow fixed choice is unavailable: '+name)
+            if isinstance(kind,str) and kind in ('INT','FLOAT'):
+                if isinstance(value,bool) or not isinstance(value,(int,float)) or kind=='INT' and type(value) is not int:raise ValueError('Workflow fixed numeric type is invalid: '+name)
+                if value<limits.get('min',-float('inf')) or value>limits.get('max',float('inf')):raise ValueError('Workflow fixed value is outside range: '+name)
+            if kind=='STRING' and not isinstance(value,str):raise ValueError('Workflow fixed text input is invalid: '+name)
     return {'prompt':compiled,'workflow_sha256':hashlib.sha256(canonical(compiled).encode()).hexdigest(),
             'source_workflow_sha256':hashlib.sha256(canonical(graph).encode()).hexdigest(),
             'effective_controls':values,'node_classes':sorted({n['class_type'] for n in compiled.values()}),

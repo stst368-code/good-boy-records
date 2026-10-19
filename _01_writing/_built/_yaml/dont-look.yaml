@@ -4,6 +4,7 @@ title: dont-look
 album: weedkiller
 pos: 5
 version: musical
+language: en
 model: minimax H3
 dit:
 text_encoder:

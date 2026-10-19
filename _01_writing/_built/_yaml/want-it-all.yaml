@@ -4,6 +4,7 @@ title: want-it-all
 album: weedkiller
 pos: 11
 version:
+language: en
 model:
 dit:
 text_encoder:

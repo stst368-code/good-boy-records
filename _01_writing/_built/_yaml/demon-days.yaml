@@ -4,6 +4,7 @@ title: demon-days
 album: demon-days
 pos: 14
 version:
+language: en
 model:
 dit:
 text_encoder:

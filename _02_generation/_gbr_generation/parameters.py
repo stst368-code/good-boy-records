@@ -25,7 +25,7 @@ def execution_options(specification):
     device = options.get("cuda_device", 0)
     interval = options.get("vram_sample_interval_ms", 100)
     offline = options.get("offline", False)
-    if profile not in {"low_vram", "resident_stage"}:
+    if profile not in {"low_vram", "resident_stage", "server_managed"}:
         raise ValueError("memory_profile must be low_vram or resident_stage")
     if type(device) is not int or device < 0:
         raise ValueError("cuda_device must be a nonnegative integer")
@@ -40,11 +40,13 @@ def execution_options(specification):
         if not isinstance(target, dict) or set(target) - {"backend", "address"}:
             raise ValueError(f"execution.{stage} accepts only backend and address; models belong to the job")
         backend, address = target.get("backend", "local"), target.get("address")
-        if backend not in {"local", "runpod_dedicated", "runpod_serverless"}:
+        if backend not in {"local", "runpod_dedicated", "runpod_serverless", "comfyui"}:
             raise ValueError(f"Unsupported {stage} backend")
         if address is not None and (not isinstance(address, str) or not address.strip()):
             raise ValueError("Worker address must be nonempty text when supplied")
         result[stage] = {"backend": backend, "address": address}
+    if profile=='server_managed' and any(result[stage]['backend']!='comfyui' for stage in ('conditioning','diffusion')):
+        raise ValueError('server_managed memory is for ComfyUI only')
     return result
 
 

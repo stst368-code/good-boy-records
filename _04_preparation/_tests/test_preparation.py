@@ -231,3 +231,85 @@ def test_processing_history_download_is_complete_and_temporary_export_is_removed
         assert 'Copper engraving' in json.loads(exported[0]['recipe_json'])['prompt']
         assert not list((app.state.service.config.data/'exports').glob('*'))
     assert service.db.all('SELECT * FROM processing_tasks')==before
+
+
+def test_editorial_revision_confidence_approval_and_source_binding(prepared):
+    service,prep,path,aid,gid,raw=prepared;source=promote(prepared)
+    initial=prep.editorial(gid);assert all(w['start'] is None and w['confidence'] is None for w in initial['words'])
+    body={'source_sha256':initial['source_sha256'],'parent_task_id':None,'words':initial['words'],'approved':True}
+    with pytest.raises(ValueError,match='confirm'):prep.save_editorial(gid,'lyric_edit',body)
+    body['approved']=False;first=prep.save_editorial(gid,'lyric_edit',body)
+    assert prep.editorial(gid)['lyric_task_id']==first['id']
+    with pytest.raises(ValueError,match='stale'):prep.save_editorial(gid,'lyric_edit',body)
+    body['parent_task_id']=first['id'];body['words'][0].update(start=.2,end=.6,confirmed=True,text='corrected')
+    for w in body['words'][1:]:w['omitted']=True
+    body['approved']=True;second=prep.save_editorial(gid,'lyric_edit',body)
+    assert second['approved'] and second['words'][0]['source_text']=='first'
+    old=json.loads(prep.artifact(first['id']+'-output').read_text());assert old['words'][0]['text']=='first'
+    assert next(source.parent.glob('*.yaml')).read_bytes()==raw
+    body['source_sha256']='0'*64;body['parent_task_id']=second['id']
+    with pytest.raises(ValueError,match='Audio changed'):prep.save_editorial(gid,'lyric_edit',body)
+
+
+def test_saved_lighting_has_real_events_and_master_specific_history(prepared):
+    service,prep,path,aid,gid,raw=prepared;source=promote(prepared)
+    result=prep.submit(gid,'visuals',{});wait(prep,result['id'])
+    data=prep.editorial(gid);assert data['feature_artifact_id']
+    saved=prep.save_editorial(gid,'visual_edit',{'source_sha256':data['source_sha256'],'parent_task_id':None,'sensitivity':2,'sections':[{'start':.5,'end':2,'boost':2,'label':'Chorus'}]})
+    exported=json.loads(prep.artifact(saved['id']+'-output').read_text());assert exported['dance']['events']
+    assert exported['sections'][0]['label']=='Chorus'
+    assert prep.editorial(gid)['sensitivity']==2
+    master=prep.submit(gid,'mix_master',{'mix':{'gain_db':-6}});wait(prep,master['id'])
+    candidate=prep.editorial(gid,master['id']+'-output')
+    assert candidate['source_sha256']!=data['source_sha256'] and not candidate['features'] and candidate['lyric_task_id'] is None
+    assert len(service.db.all("SELECT name FROM sqlite_master WHERE name='processing_tasks'"))==1
+
+
+def test_asr_matches_keep_all_supplied_tokens_and_leave_missing_words_untimed():
+    import importlib.util
+    spec=importlib.util.spec_from_file_location('alignment_worker',ROOT/'_99_tools/_workers_processing/alignment.py');module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    from _gbr_preparation.editorial import lyric_words
+    original=lyric_words('[verse]\nfirst lost word\n[chorus]\nfirst again')
+    words,extra=module.match_words(original,[{'word':'First','start':.2,'end':.4,'score':.9},{'word':'word','start':1,'end':1.3,'score':.5},{'word':'first','start':2,'end':2.5,'score':.95},{'word':'again','start':3,'end':3.5,'score':.9},{'word':'hallucination'}])
+    assert len(words)==5 and words[1]['start'] is None and words[2]['confidence']==.5
+    assert words[3]['section']=='chorus' and extra[-1]['word']=='hallucination'
+
+
+def test_two_stem_mix_uses_separate_gains_and_same_audio_identity_contract(prepared):
+    from _gbr_preparation.service import canonical
+    service,prep,path,aid,gid,raw=prepared;source=promote(prepared)
+    sha=digest(source);identifier=prep._insert(gid,'lyric_alignment',{'language':'en'},sha,'done')
+    samples,rate=sf.read(source);folder=source.parent.parent/'_derived';folder.mkdir(exist_ok=True)
+    for index,kind in enumerate(['vocals','accompaniment']):
+        stem=folder/(kind+'.flac');sf.write(stem,samples*.5,rate,subtype='PCM_24')
+        service.db.execute('INSERT INTO generation_artifacts VALUES(?,NULL,?,?,?,?,NULL,?)',(identifier+'-'+str(index),'stem_'+kind,digest(stem),str(stem),stem.stat().st_size,canonical({'processing_task_id':identifier,'source_generation_id':gid})))
+    full=prep.submit(gid,'mix_preview',{'mix':{},'stem_task_id':identifier,'seconds':1});wait(prep,full['id'])
+    mixed=prep.submit(gid,'mix_preview',{'mix':{'vocal_db':-6},'stem_task_id':identifier,'seconds':1});row=wait(prep,mixed['id'])
+    levels=json.loads(row['telemetry_json'])['measurements'];assert levels['duration']==pytest.approx(1,abs=.01)
+    output,_=sf.read(prep.artifact(mixed['id']+'-output'));expected=samples[:rate]*(.5+.5*10**(-6/20));assert np.max(np.abs(output-expected))<.00001
+    with pytest.raises(ValueError,match='Enable the separated'):prep.submit(gid,'mix_master',{'mix':{'vocal_db':-6}})
+    assert digest(source)==sha
+
+
+def test_browser_light_event_calculation_matches_export_exactly():
+    import subprocess
+    from _gbr_preparation.editorial import lighting
+    features={'duration':4,'source_sha256':'0'*64,'frames':[{'t':i/10,'energy':(.2,.9,.4,.8)[i%4]} for i in range(40)]}
+    script="import fs from 'node:fs';const src=fs.readFileSync(process.argv[1],'utf8');const m=await import('data:text/javascript;base64,'+Buffer.from(src).toString('base64'));const d=JSON.parse(fs.readFileSync(0,'utf8'));process.stdout.write(JSON.stringify(m.lightEvents(d.features,d.sensitivity,d.sections)));"
+    for sensitivity in [.25,1,3]:
+        settings={'sensitivity':sensitivity,'sections':[{'start':1,'end':2.8,'boost':1.5,'label':'Chorus'}]}
+        exported=lighting(settings,features)['dance']['events']
+        preview=json.loads(subprocess.check_output(['node','--input-type=module','-e',script,str(ROOT/'_04_preparation/_static/timeline.js')],input=json.dumps({'features':features,**settings}).encode()))
+        assert len(preview)==len(exported)
+        for actual,wanted in zip(preview,exported):assert actual==pytest.approx(wanted,abs=1e-12)
+
+
+
+def test_stereo_visual_energy_does_not_cancel_opposite_phase_channels(tmp_path):
+    import importlib.util
+    spec=importlib.util.spec_from_file_location('visual_worker',ROOT/'_99_tools/_workers_processing/worker.py');module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    rate=16000;t=np.arange(rate)/rate;signal=.1*np.sin(2*np.pi*330*t);source=tmp_path/'antiphase.flac'
+    sf.write(source,np.stack([signal,-signal],axis=1),rate,subtype='PCM_24')
+    result=module.visuals({'source':str(source),'source_sha256':digest(source),'output':str(tmp_path/'features')})
+    data=json.loads(Path(result['output']).read_text());assert len(data['frames'])==10
+    assert min(frame['energy'] for frame in data['frames'])>.99

@@ -22,6 +22,8 @@ sys.path.insert(0, str(ROOT / "_98_database"))
 from _gbr_worker.contract import PROTOCOL, execution_target, file_sha, validate_job
 from _gbr_worker.runpod import RemotePending, RunpodClient
 from _gbr_worker.serverless import ServerlessClient
+sys.path.insert(0,str(ROOT/"_99_tools/_workers_comfyui"))
+from client import Client as ComfyClient
 
 
 def now():
@@ -193,7 +195,7 @@ def publish_bundle(directory, run, state, result, source, attempt_id, timezone_n
         metadata = {**run["effective"], "song_id": run["song_id"], "variant_id": run["variant_id"], "title": run["title"],
                     "gbr_run_id": run["id"], "gbr_attempt_id": attempt_id, "gbr_source_sha256": run["source_sha256"],
                     "generation_timestamp": result["completed_at"],
-                    "generation_source": "gbr_native_" + execution_target(run["execution"])[0],
+                    "generation_source": ("gbr_" if execution_target(run["execution"])[0]=="comfyui" else "gbr_native_") + execution_target(run["execution"])[0],
                     "genre": run["effective"].get("style"),
                     "model_revision": result["models"]["revision"], "hardware": result.get("hardware"),
                     "audio_duration_seconds": info.duration}
@@ -248,7 +250,7 @@ def recover(manifest_path, run_id, *, remote_stopped=False):
                 return {'run_id': run_id, 'status': 'succeeded', 'output': str(Path(artifacts[0]['uri']).parent)}
         state = conn.execute("SELECT * FROM generation_execution_state WHERE run_id=?", (run_id,)).fetchone()
         active = conn.execute("SELECT * FROM generation_attempts WHERE run_id=? AND status='running'", (run_id,)).fetchall()
-        if any(a["execution_mode"] in {'runpod_dedicated', 'runpod_serverless'} for a in active) and not remote_stopped:
+        if any(a["execution_mode"] in {'runpod_dedicated', 'runpod_serverless', 'comfyui'} for a in active) and not remote_stopped:
             raise ValueError("Remote work may still be running. Use execute --resume-remote to collect it, or recover --remote-stopped only after stopping the pod worker")
         for attempt in active:
             work = Path(manifest_path).resolve().parent / "attempts" / attempt["id"]
@@ -303,6 +305,8 @@ def cleanup_outputs(manifest_path, *, runpod_identity=None):
                 client = RunpodClient(address, runpod_identity, release=reference.get('release'))
             elif backend == 'runpod_serverless':
                 client = ServerlessClient(address)
+            elif backend == 'comfyui':
+                client = ComfyClient(address)
             else:
                 pending.unlink()
                 if job['attempt_id'] not in cleaned:
@@ -349,13 +353,13 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             if status == "succeeded" or status == "failed" and not retry_failed:
                 conn.rollback()
                 continue
-            resuming = status == "running" and resume_remote and backend in {'runpod_dedicated', 'runpod_serverless'}
+            resuming = status == "running" and resume_remote and backend in {'runpod_dedicated', 'runpod_serverless', 'comfyui'}
             if resume_remote and not resuming:
                 conn.rollback()
                 continue
             if status not in {"prepared", "failed"} and not resuming:
                 conn.rollback()
-                raise ValueError(f"Run {run['id']} is {status}; use --resume-remote for RunPod or recover for an interrupted local job")
+                raise ValueError(f"Run {run['id']} is {status}; use --resume-remote for ComfyUI/RunPod or recover for an interrupted local job")
             state = reserve_output(conn, run, output_root, manifest.get('output_layout', 'legacy'))
             if Path(state["output_directory"]).exists():
                 conn.rollback()
@@ -414,6 +418,8 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                         client = RunpodClient(address, runpod_identity, release=reference.get('release'))
                     elif not launcher and backend == 'runpod_serverless':
                         client = ServerlessClient(address)
+                    elif not launcher and backend=='comfyui':
+                        client=ComfyClient(address)
                 elif launcher:
                     launcher(python, directory / "request.json", directory)
                 elif backend == "runpod_dedicated":
@@ -423,6 +429,9 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                 elif backend == 'runpod_serverless':
                     client = ServerlessClient(address)
                     client.run(job, directory, resume=resuming)
+                elif backend=='comfyui':
+                    client=ComfyClient(address)
+                    client.run(job,directory,resume=resuming)
                 else:
                     with (directory / "stderr.log").open("x", encoding="utf-8") as log:
                         process = subprocess.Popen([str(python), "-u", str(WORKER / "worker.py"), "run", str(directory / "request.json")],
@@ -484,7 +493,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             except BaseException as exc:
                 error = f"{type(exc).__name__}: {exc}"
                 marker = None
-                pending = backend in {'runpod_dedicated', 'runpod_serverless'} and isinstance(exc, (RemotePending, KeyboardInterrupt))
+                pending = backend in {'runpod_dedicated', 'runpod_serverless', 'comfyui'} and isinstance(exc, (RemotePending, KeyboardInterrupt))
                 if isinstance(exc, KeyboardInterrupt):
                     print("Controller interrupted; reconnect with --resume-remote. The pod continues working." if pending
                           else "Local test interrupted; saving available telemetry.", file=sys.stderr)

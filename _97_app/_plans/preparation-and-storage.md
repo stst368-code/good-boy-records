@@ -5,12 +5,72 @@ workers, one canonical recording bundle. This document is the current plan.
 
 | Area | Built now | Next integration |
 | --- | --- | --- |
-| Stage 4 | Preparation tab; reviewed distribution selections enter the existing verified move journal; audio/YAML/native companions move together | Separation/alignment worker environments and final release approval |
-| Mixing | Real FFmpeg previews and FLAC master candidates; gain, three-band EQ, convolution room reverb, fades, optional sample-peak limiter; reusable recipes and processing history | Stem faders, compression, loudness-matched comparisons, two-pass loudness/true-peak finishing |
-| Playback analysis | CPU energy/bass/brightness features and measured energy-rise events; output has `dance.events` understood by the player | Rich beat/downbeat/section analysis, manual corrections and release assembly |
-| Artwork | YAML-derived editable direction, reproducible prompt, selected reference hashes and model-family choice | Actual image diffusion, candidate selection and artwork approval |
-| ComfyUI | Read-only worker discovery and API-workflow compiler; explicit mappings and range/choice validation | A validated MiniMax workflow, dispatch, collection, cancellation and full local/RunPod test |
+| Stage 4 | Preparation tab; reviewed distribution selections enter the existing verified move journal; audio/YAML/native companions move together | Validate optional model execution on hardware; final release approval |
+| Mixing | Real FFmpeg previews and FLAC master candidates; gain, three-band EQ, convolution room reverb, fades, optional sample-peak limiter; two-stem vocal/accompaniment faders and reusable recipes | Compression, loudness-matched comparisons, two-pass loudness/true-peak finishing |
+| Playback analysis | CPU features, a playback star indicator, per-recording sensitivity and editable start/end/boost sections; source-bound `dance.events` export | Rich beat/downbeat analysis and final release assembly |
+| Artwork | YAML-derived direction, prompt and reference hashes; ComfyUI selected as execution route | Simon supplies an artwork API workflow; then image diffusion/candidate approval |
+| ComfyUI | Recovered runner full-generation API graph; pod/local HTTP URL, dynamic inventory, dispatch, reconnect, verified FLAC publication and optional cleanup bridge | Physical pod test; persistent cross-job encoding-cache controls; scoped cancellation |
 | R2 | Read-only inventory/key plan from the shared artifact registry | Remote inventory reconciliation, release manifests and staged cutover |
+
+## Approved update: lighting, lyric checking, language and ComfyUI
+
+The Preparation page now has a source/master selector, playback star indicator,
+sensitivity control and labelled section boosts with start/end/duration. The preview
+uses the same event calculation as the saved playback sidecar. Settings bind to
+this recording and audio hash; changed master audio starts with its own mapping.
+
+Lyric checking lives on the same page. The optional worker separates vocals and
+accompaniment with Demucs, runs WhisperX, and matches recognised aligned words to
+the supplied YAML tokens. Every supplied token remains present; unmatched tokens
+stay untimed and recognition-only words are shown separately. This is ASR-assisted
+alignment checking, not an invented uniform timing track or a musical-quality judge.
+Amber highlights need checking; red tokens have no timing. Edit text/times, drag
+word tags, resize word ends, mark words not sung, and confirm corrections. Low
+confidence, edited or untimed words block approval until resolved/confirmed.
+Revisions, approvals, source text and source hash are retained. YAML is never
+rewritten by this page. Unsaved drafts block accidental recording/master switches.
+
+Run `python _97_app/run_gbr.py setup-processing` once for the isolated environment;
+`--cpu` chooses CPU packages. CUDA setup uses the pinned 12.8 PyTorch build and
+needs a compatible driver/runtime; a missing CUDA library is an environment error,
+not a reason to reinstall MiniMax. Models download only on an explicit job. Workers
+share the existing GPU lock, load separation/ASR/alignment models sequentially and
+record allocator/device memory coverage plus CPU RSS when available. Stems use
+float WAV to preserve peaks for mixing; final candidates remain FLAC. Model execution
+and singing accuracy still require a physical hardware test.
+
+`language: en` was inserted into the track template and 80 other built YAMLs.
+Three pre-existing language values were left intact. Removing each inserted line
+reproduces the original file bytes exactly. Future bulk additions use the YAML
+editor's template mode. Set non-English tracks to their actual language before
+alignment. Original generation snapshots and completed historical YAMLs were not
+changed.
+
+Use **Generation → ComfyUI URL · local or pod**, paste the ComfyUI base URL such as
+`https://POD-8188.proxy.runpod.net`, then **Check connection**. This queries actual
+checkpoint, sampler and scheduler choices. It needs no SSH key. The graph was
+extracted from the old runner's `build_full_prompt` and cross-checked against the
+attached FLAC's embedded API graph. Song-specific caption/lyrics/seeds were not
+copied into the reusable template. Every queued job gets the same existing
+selection, frozen inputs, shared attempt ledger, output bundle and review import.
+Lost submission acknowledgements are resolved by attempt ID and saved prompt ID;
+unknown submissions are never automatically sent again.
+
+Comfy currently uses its own graph cache. Native persistent `require` and
+`disabled` encoding policies are explicitly rejected for this mode. Comfy's global
+memory flags belong to its server launch, so the native memory-profile selector is
+hidden. A separate local Comfy server manages its own GPU queue; stock endpoints
+do not coordinate its memory with simultaneous native work. Checkpoint hashes and verified remote cleanup use the small
+`_99_tools/_workers_comfyui/gbr_bridge.py` extension: place it in that pod's
+`ComfyUI/custom_nodes`, then restart ComfyUI. Without it, name-based provenance is
+labelled, unknown peaks remain null, and remote cleanup remains visibly pending
+until the bridge is installed. Local intermediate audio is still removed only
+after verified publication. GBR never clears another client's queue or interrupts
+an unrelated Comfy prompt. Pause stops the batch after the current song.
+
+Artwork will also use a ComfyUI URL. The brief/reference preparation remains
+available; no image graph or guessed reference bindings are dispatched before
+Simon supplies his artwork API workflow.
 
 ## Directory and promotion flow
 
@@ -105,7 +165,7 @@ ComfyUI needs an API-format workflow, explicit field-to-node mappings, required
 node/version inventory and exact checkpoint identities. The compiler now refuses
 unmapped requested parameters, unsupported nodes/choices, out-of-range values and
 bindings that would destroy graph connections. It preserves 64-bit seeds and the
-original workflow. It only preflights/compiles; it cannot launch a generation yet.
+original workflow. It now dispatches the recovered full graph through the same generation controller; node/model inventories are checked before queuing and again at job start.
 
 Native BF16/FP32 and a quantised Comfy checkpoint may not represent the same model
 or numerical path. Compare checkpoint hashes/revisions, precision/quantisation,
@@ -114,7 +174,7 @@ attributing a quality/memory difference to the UI engine. Comfy's streamed loadi
 or quantised weights may help the 12 GB desktop; measure peak GPU **and system RAM**,
 load time and generation time. Do not promise a fit from DiT size alone.
 
-Dedicated pods can expose Comfy through the existing SSH connection/tunnel. Build
+Dedicated pods use their ComfyUI HTTP base URL directly; localhost URLs also work. Build
 one portable worker contract first; then wrap it in a persistent serverless handler
 with pinned custom nodes, durable storage and cost accounting. Native cache blobs
 and Comfy cache blobs must be distinct unless compatibility is proven. Use a
@@ -189,7 +249,7 @@ documentation is left intact; duplicate build instructions and archived logs can
 be consolidated after you confirm which document remains canonical. No user audio,
 source writing YAMLs, cloud media or databases are deleted by repository tidying.
 
-## Decisions for Simon
+## Remaining decisions for Simon
 
 | Decision | Recommended starting point | Alternative |
 | --- | --- | --- |
@@ -197,18 +257,20 @@ source writing YAMLs, cloud media or databases are deleted by repository tidying
 | Finishing target | Preserve dynamics; opt-in loudness presets and measured true-peak ceiling | Fixed target for every genre |
 | Artwork text | Title only; curated references; Qwen editing trial, licence choice before production | Text-free cover or album-wide shared artwork |
 | Public masters | Web encode public; full FLAC optional per release | Public FLAC for all releases |
-| Comfy baseline | Supply one API-format MiniMax workflow that already works for you, including node/checkpoint versions | Build a new reference workflow and validate against your current outputs |
+| Comfy baseline | Recovered legacy full graph is integrated; validate it on the current Comfy pod | Build a new reference workflow and validate against your current outputs |
 | R2 cutover | New hash objects + manifest, old URLs retained through verification | In-place reorganisation with more rollback/link risk |
 
-Next implementation priority: validate your working Comfy workflow and isolated
-Demucs/WhisperX environment, then finish the stem/alignment review and release
-approval screens. The built stereo mixing station can be tested immediately. Use `run_gbr.py doctor-processing` to query FFmpeg and installed preparation packages without loading models.
+Next implementation priority: physically test the recovered Comfy graph and isolated
+Demucs/WhisperX worker, then integrate the supplied artwork workflow and final release
+approval screen. The built stereo mixing station can be tested immediately. Use `run_gbr.py doctor-processing` to query FFmpeg and installed preparation packages without loading models.
 
 ## Validation and migration notes
 
-The local regression run passed 363 tests and 127 parameterized subtests across
-generation, review, the shared database, YAML maintenance, preparation and the
-public site. Chromium checks exercised real FFmpeg previews and source/processed
+The updated local core suites passed 360 tests and 127 parameterized subtests across
+generation, review, the shared database, YAML maintenance and preparation. The
+unchanged public-site suite previously passed 16 additional tests. The attached
+359.99-second Moses FLAC also produced 3,600 visual frames and 98 default energy-rise
+events without changing its source bytes. These are signal events, not verified beats. Chromium checks exercised real FFmpeg previews and source/processed
 playback at 1440/390/320 px, artwork-brief restoration, master candidates, visual
 features and preview eviction. Existing review-tag/fourth-rating/autoplay and
 generation-to-review flows also passed, as did the relocated public analytics.
@@ -220,7 +282,7 @@ the same SQL. No re-import or replacement database is required. The existing
 verified directory migration relocates website source into stage 5. Close active
 GBR controllers before pulling structural changes, then launch normally.
 
-GPU model inference, Demucs/WhisperX accuracy, an actual Comfy generation, physical
+GPU model inference, Demucs/WhisperX accuracy, a physical Comfy model generation, physical
 Windows file locking and R2 migration/playback have not been validated by this
 update. Local browser media was synthetic. No pods or bucket contents were changed.
 

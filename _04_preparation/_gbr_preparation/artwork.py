@@ -2,12 +2,12 @@
 import hashlib
 import re
 
-FAMILIES = {'qwen-2.1', 'moss-image', 'flux'}
+FAMILIES = {'comfyui', 'qwen-2.1', 'moss-image', 'flux'}
 
 
-def brief(metadata, family='qwen-2.1', direction='', references=(), seed=0):
+def brief(metadata, family='comfyui', direction='', references=(), seed=0):
     if family not in FAMILIES:
-        raise ValueError('Choose Qwen 2.1, MOSS Image or FLUX')
+        raise ValueError('Choose ComfyUI or a recorded historical model family')
     if type(seed) is not int or not 0 <= seed < 2**63:
         raise ValueError('Artwork seed must be an integer from 0 to 2**63-1')
     title = str(metadata.get('title') or '').strip()
@@ -30,4 +30,4 @@ References: use supplied images for palette, technique and composition; retain t
     return {'version': 1, 'family': family, 'width': 1024, 'height': 1024,
             'seed': str(seed), 'direction': direction.strip(), 'prompt': prompt, 'reference_ids': refs,
             'prompt_sha256': hashlib.sha256(prompt.encode()).hexdigest(),
-            'status': 'brief_only', 'needs': 'A validated image workflow and model revision are required before diffusion.'}
+            'status': 'brief_only', 'needs': 'Supply the artwork ComfyUI API workflow before image diffusion; its actual model and reference bindings will be recorded.'}

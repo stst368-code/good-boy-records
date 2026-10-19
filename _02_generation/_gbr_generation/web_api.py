@@ -19,7 +19,7 @@ class Body(BaseModel):
 
 
 class Connection(Body):
-    backend: Literal['local', 'runpod_dedicated', 'runpod_serverless'] = 'local'
+    backend: Literal['local', 'runpod_dedicated', 'runpod_serverless', 'comfyui'] = 'local'
     address: str = Field(default='', max_length=2000)
     identity_file: str = Field(default='', max_length=4000)
     worker_python: str = Field(default='', max_length=4000)
@@ -115,6 +115,13 @@ def router(root, review_service, local):
         _, catalogue = service.styles()
         return {'templates': [{'id': row['ID'], 'cluster': row['cluster'], 'style': row['style_primary'],
                               'source': row.get('template_source')} for row in catalogue.rows]}
+
+    @routes.post('/comfy-inventory')
+    def comfy_inventory(body: Connection):
+        from .connections import normalize
+        connection=normalize(body.model_dump())
+        if connection['backend']!='comfyui':raise ValueError('Choose a ComfyUI URL')
+        return service.comfy_inventory(connection['address'])
 
     @routes.post('/worker')
     def worker(body: Worker):

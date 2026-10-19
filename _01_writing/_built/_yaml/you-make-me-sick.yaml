@@ -4,6 +4,7 @@ title: you-make-me-sick
 album: weedkiller
 pos: 2
 version: orchestral
+language: en
 model: minimax H3
 dit:
 text_encoder:

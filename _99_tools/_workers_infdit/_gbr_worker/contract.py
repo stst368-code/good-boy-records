@@ -34,6 +34,10 @@ def ssh_endpoint(address):
 def execution_target(execution):
     """Conditioning and diffusion share one local GPU, dedicated pod or serverless endpoint."""
     targets = [execution[stage] for stage in ("conditioning", "diffusion")]
+    if all(t['backend']=='comfyui' for t in targets) and targets[0].get('address')==targets[1].get('address'):
+        address=targets[0].get('address');url=urlsplit(address or '')
+        if url.scheme not in {'http','https'} or not url.hostname or url.username or url.password or url.path not in ('','/') or url.query or url.fragment:raise ValueError('Use the ComfyUI pod base URL without credentials or paths')
+        return 'comfyui',address.rstrip('/')
     if all(t["backend"] == "local" and not t.get("address") for t in targets):
         return "local", None
     if (all(t["backend"] == "runpod_dedicated" for t in targets)
@@ -71,12 +75,19 @@ def validate_job(job, *, allow_unfrozen_seeds=False, require_local=True):
         target = execution[stage]
         if require_local and (target["backend"] != "local" or target.get("address")):
             raise ValueError("A local worker cannot execute a remote target")
+    comfy=all(execution[stage]['backend']=='comfyui' for stage in ('conditioning','diffusion'))
+    if comfy:
+        execution_target(execution)
+        if execution.get('encoding_cache','prefer')!='prefer':raise ValueError('ComfyUI currently uses its own graph cache; require/disable persistent encoding controls are native-only')
     for field in ("dit", "text_encoder"):
+        if comfy:
+            if not isinstance(p.get(field),str) or not p[field].strip():raise ValueError('Choose a Comfy checkpoint or precision')
+            continue
         if p.get(field) not in {"bf16", "fp32"}:
             raise ValueError(f"{field}: native worker supports explicit bf16 or fp32 precision")
     if type(p.get('top_k')) is not int or not 1 <= p['top_k'] <= 16384:
         raise ValueError('top_k must be an integer between 1 and 16384')
-    if p.get('sampler') not in SAMPLERS or p.get('scheduler') not in SCHEDULES:
+    if not comfy and (p.get('sampler') not in SAMPLERS or p.get('scheduler') not in SCHEDULES):
         raise ValueError('Unsupported native flow sampler/schedule; choose ' + ', '.join(SAMPLERS) + ' / ' + ', '.join(SCHEDULES))
     for field in ("encoder_seed", "sampler_seed"):
         value = p.get(field)
@@ -104,7 +115,7 @@ def validate_job(job, *, allow_unfrozen_seeds=False, require_local=True):
         raise ValueError("model_revision must be a full 40-character commit SHA")
     if execution.get("encoding_cache", "prefer") not in {"prefer", "require", "disabled"}:
         raise ValueError("Invalid encoding cache policy")
-    if execution.get("memory_profile", "low_vram") not in {"low_vram", "resident_stage"}:
+    if execution.get("memory_profile", "low_vram") not in ({"low_vram", "resident_stage", "server_managed"} if comfy else {"low_vram", "resident_stage"}):
         raise ValueError("Unknown memory profile")
     if type(execution.get("cuda_device", 0)) is not int or execution.get("cuda_device", 0) < 0:
         raise ValueError("cuda_device must be a nonnegative integer")

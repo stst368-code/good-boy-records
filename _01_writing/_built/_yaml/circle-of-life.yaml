@@ -4,6 +4,7 @@ title: circle-of-life
 album: brasston
 pos: 5
 version:
+language: en
 model:
 dit:
 text_encoder:

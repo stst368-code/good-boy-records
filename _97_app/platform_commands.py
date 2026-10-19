@@ -8,16 +8,19 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 WORKER = ROOT / '_99_tools' / '_workers_infdit'
 COMMANDS = {'setup-generation', 'doctor-generation', 'test-generation', 'setup-runpod', 'doctor-runpod',
-            'migrate', 'init-db', 'check-references', 'plan-r2', 'check-comfy', 'doctor-processing'}
+            'migrate', 'init-db', 'check-references', 'plan-r2', 'check-comfy', 'doctor-processing', 'setup-processing'}
 
 
 def dispatch(arguments):
     command, *tail = arguments
+    if command == 'setup-processing':
+        return subprocess.call([sys.executable,str(ROOT/'_99_tools/_workers_processing/setup_worker.py'),*tail])
     if command == 'doctor-processing':
         argparse.ArgumentParser(description='Query FFmpeg and installed preparation packages without loading model weights.').parse_args(tail)
-        environment=ROOT/'_03_review/_generation_review/.venv'
-        candidate=environment/('Scripts/python.exe' if sys.platform=='win32' else 'bin/python')
-        return subprocess.call([str(candidate) if candidate.is_file() else sys.executable,str(ROOT/'_99_tools/_workers_processing/worker.py'),'--doctor'])
+        executable='Scripts/python.exe' if sys.platform=='win32' else 'bin/python'
+        candidates=[ROOT/'_99_tools/_workers_processing/.venv'/executable,ROOT/'_03_review/_generation_review/.venv'/executable]
+        candidate=next((path for path in candidates if path.is_file()),Path(sys.executable))
+        return subprocess.call([str(candidate),str(ROOT/'_99_tools/_workers_processing/worker.py'),'--doctor'])
     if command == 'check-comfy':
         return subprocess.call([sys.executable,str(ROOT/'_99_tools/_workers_comfyui/check_worker.py'),*tail])
     if command == 'plan-r2':

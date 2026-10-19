@@ -4,6 +4,7 @@ title: moonlight-magic
 album: weedkiller
 pos: 7
 version:
+language: en
 model:
 dit:
 text_encoder:

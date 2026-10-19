@@ -73,8 +73,19 @@ This happens before the generation interface loads; starting the app does not
 automatically resume old pod jobs.
 
 Preparation promotes reviewed distribution selections into `_04_preparation`,
-with stereo mastering trials, visual features, artwork briefs and processing
+with stereo/two-stem mastering trials, source-bound light/lyric timelines, artwork briefs and processing
 history in the same database. FFmpeg is needed for audio renders;
 `python _97_app/run_gbr.py doctor-processing` checks the host without loading models.
 The [preparation, engine and storage plan](_plans/preparation-and-storage.md)
 identifies the built features and pending GPU/release integrations.
+
+ComfyUI music generation uses the local/pod HTTP URL directly in Generation.
+Check connection to discover model/sampler choices. Its recovered full workflow
+uses Comfy graph caching; native persistent encoding-cache controls remain
+native-only. The optional `_99_tools/_workers_comfyui/gbr_bridge.py` extension
+provides checkpoint hashing and verified temporary-output cleanup through that URL.
+
+`python _97_app/run_gbr.py setup-processing` installs the isolated Demucs/WhisperX
+environment; `--cpu` selects CPU packages. Models download on an explicit job.
+Lighting/lyric annotations use the current working audio hash and never rewrite
+source YAMLs. Artwork stays at brief preparation until the API workflow is supplied.
