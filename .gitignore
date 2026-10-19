@@ -229,3 +229,11 @@ _Reviewed/
 !/_03_review/_generation_review/_tests/conftest.py
 !/_99_tools/_yaml_editor/_tests/
 !/_99_tools/_yaml_editor/_tests/test_*.py
+
+# Website source is tracked; public builds and curated media stay local/R2.
+/_04_website/_site/
+/_04_website/_showcase/
+/_04_website/.gbr-site-*/
+!/_04_website/_tests/
+!/_04_website/_tests/test_*.py
+!/_04_website/_tests/ui_*.py
