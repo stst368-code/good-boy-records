@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 import sys
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -64,6 +66,30 @@ class AppQueueTests(unittest.TestCase):
         cleanup.assert_called_once()
         prepare.assert_not_called()
         inference.assert_not_called()
+
+    def test_busy_worker_queues_controller_then_runs_after_release(self):
+        results = []
+        with app_jobs.gpu_lock('gbr-controller:local:'):
+            thread = threading.Thread(target=lambda: results.append(self.run_task(self.fixture.worker)))
+            thread.start()
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                state = self.folder / 'state.json'
+                if state.is_file() and json.loads(state.read_text())['status'] == 'waiting_worker':break
+                time.sleep(.02)
+            else:self.fail('Controller never entered its waiting state')
+            self.assertFalse(self.fixture.calls)
+        thread.join(timeout=10)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(results, [0])
+        self.assertEqual(len(self.fixture.calls), 2)
+
+    def test_waiting_worker_can_be_paused_without_generating(self):
+        (self.folder / 'pause').touch()
+        with app_jobs.gpu_lock('gbr-controller:local:'):
+            self.assertEqual(self.run_task(self.fixture.worker), 0)
+        self.assertEqual(json.loads((self.folder / 'state.json').read_text())['status'], 'paused')
+        self.assertFalse(self.fixture.calls)
 
 
 if __name__ == '__main__':

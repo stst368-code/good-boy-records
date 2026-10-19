@@ -75,6 +75,12 @@ def main():
             return {'task_id': folder.name, 'batch_id': task['batch_id']}
 
         generation.launch = launch
+        inspect_worker = generation.workers.inspect
+        def inspect(entry):
+            if entry['connection']['backend'] == 'local':
+                return {'busy':False,'hardware':{'gpu_name':'CPU boundary fixture'},'models':generation.native_choices()}
+            return inspect_worker(entry)
+        generation.workers.inspect = inspect
         server = uvicorn.Server(uvicorn.Config(app, host='127.0.0.1', port=18771, log_level='error', loop='_review.server_loop:create_loop'))
         thread = threading.Thread(target=server.run, daemon=True)
         thread.start()
@@ -176,23 +182,49 @@ def main():
                 assert source.read_bytes() == original
                 page.locator('#generationTab').click()
                 with comfy_server() as (url,comfy):
-                    page.locator('#genBackend').select_option('comfyui');page.locator('#genAddress').fill(url)
-                    assert page.locator('#genIdentityWrap').is_hidden()
-                    page.locator('#genCheckWorker').click()
-                    page.wait_for_function("()=>document.getElementById('genConnectionStatus').textContent.includes('model and sampler choices loaded')")
-                    assert page.locator('#genSchedule').input_value()=='simple'
+                    assert page.locator('#genBackend').count() == 0
+                    page.locator('#genWorkerSettings').click()
+                    page.wait_for_selector('#workerSettingsDialog[open]')
+                    page.locator('#workerNew').click()
+                    page.locator('#workerBackend').select_option('comfyui')
+                    page.locator('#workerAddress').fill(url)
+                    assert page.locator('#workerKeyWrap').is_hidden()
+                    with page.expect_response('**/api/generation/workers/query'):
+                        page.locator('#workerQuery').click()
+                    page.wait_for_function("()=>document.getElementById('workerStatus').textContent.includes('Online')")
+                    assert 'test GPU' in page.locator('#workerGpu').inner_text()
+                    page.locator('#workerEncoder').select_option('minimax_music3_text_encoder_bf16.safetensors')
+                    page.locator('#workerDit').select_option('minimax_music3_dit_fp32.safetensors')
+                    page.locator('#workerSampler').select_option('euler')
+                    page.locator('#workerScheduler').select_option('simple')
+                    with page.expect_response('**/api/generation/workers'):
+                        page.locator('#workerSave').click()
+                    page.wait_for_function("()=>!document.getElementById('workerSave').disabled")
+                    page.screenshot(path='/workspace/scratch/286b0af2d5d4/app_stage/workers-desktop.png',full_page=True)
+                    page.locator('#workersClose').click()
+                    with page.expect_response('**/api/generation/workers/query'):
+                        page.locator('#genWorker').select_option('comfyui|'+url)
+                    page.wait_for_function("()=>document.getElementById('genSchedule').value==='simple'")
                     assert page.locator('#genDit').input_value()=='minimax_music3_dit_fp32.safetensors'
                     page.locator('#genPreview').click();page.wait_for_selector('#genPlan:not([hidden])')
                     assert '1 ready' in page.locator('#genPlanSummary').inner_text()
                     assert comfy['submissions']==0
-                    page.locator('#genBackend').select_option('local')
-                    assert page.locator('#genSchedule').input_value()=='flow_match_euler'
+                    with page.expect_response('**/api/generation/workers/query'):
+                        page.locator('#genWorker').select_option('local|')
+                    page.wait_for_function("()=>document.getElementById('genSchedule').value==='flow_match_euler'")
                     assert page.locator('#genDit').input_value()=='bf16'
+                    # Worker setup is also reachable from the application settings.
+                    page.locator('#settingsButton').click();page.locator('#openWorkerSettings').click()
+                    page.wait_for_selector('#workerSettingsDialog[open]')
+                    page.set_viewport_size({'width':390,'height':844})
+                    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+                    page.screenshot(path='/workspace/scratch/286b0af2d5d4/app_stage/workers-mobile.png',full_page=True)
+                    page.locator('#workersClose').click()
                 page.set_viewport_size({'width': 390, 'height': 844})
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
                 assert not errors, errors
                 browser.close()
-                print(json.dumps({'selection_preview_dispatch_review_archive': 'passed', 'native_inference': 'not run', 'js_errors': errors}))
+                print(json.dumps({'selection_preview_dispatch_review_archive': 'passed', 'native_inference': 'not run', 'worker_settings_and_discovery':'passed', 'js_errors': errors}))
         finally:
             server.should_exit = True
             thread.join(timeout=10)

@@ -7,7 +7,7 @@ import folder_paths
 from server import PromptServer
 
 @PromptServer.instance.routes.get('/gbr/capabilities')
-async def capabilities(request):return web.json_response({'version':1,'verified_output_cleanup':True})
+async def capabilities(request):return web.json_response({'version':2,'verified_output_cleanup':True,'checkpoint_sha256':True})
 
 @PromptServer.instance.routes.post('/gbr/ack')
 async def acknowledge(request):

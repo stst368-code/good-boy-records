@@ -31,7 +31,18 @@ class Client:
     def request(self,path,data=None,timeout=45):
         body=None if data is None else canonical(data).encode()
         with urlopen(Request(self.address+path,data=body,headers={'Content-Type':'application/json'}),timeout=timeout) as response:return json.load(response)
-    def inventory(self):return {'system':self.request('/system_stats'),'nodes':self.request('/object_info')}
+    def capabilities(self,timeout=5):
+        # Stock ComfyUI may route absent extension URLs to a static handler.
+        try:
+            result=self.request('/gbr/capabilities',timeout=timeout)
+            return result if isinstance(result,dict) else {}
+        except HTTPError as error:
+            if error.code not in (404,405,501):raise
+        except (json.JSONDecodeError,UnicodeDecodeError):pass
+        return {}
+    def inventory(self,timeout=45):
+        return {'system':self.request('/system_stats',timeout=timeout),'nodes':self.request('/object_info',timeout=timeout),
+                'capabilities':self.capabilities(timeout=min(timeout,5))}
     def prepare(self,job,inventory=None):
         inventory=inventory or self.inventory();nodes=inventory['nodes'];graph=json.loads((ROOT/'_workflows/music-full.json').read_text());bindings=json.loads((ROOT/'_workflows/music-bindings.json').read_text())
         def choices(node,key):
@@ -43,9 +54,15 @@ class Client:
         compiled=compile_workflow(graph,bindings,values,nodes)
         identity={k:values[k] for k in ['text_encoder','dit','vae']};identity.update(identity_kind='workflow-and-checkpoint-names',checkpoint_sha256=None,node_classes=compiled['node_classes'])
         identity['source_workflow_sha256']=compiled['source_workflow_sha256']
-        try:identity['checkpoint_sha256']=self.request('/gbr/model-info',{k:values[k] for k in ['text_encoder','dit','vae']},timeout=300);identity['identity_kind']='workflow-and-checkpoint-sha256'
-        except HTTPError as error:
-            if error.code!=404:raise
+        if inventory.get('capabilities',{}).get('checkpoint_sha256'):
+            names={k:values[k] for k in ['text_encoder','dit','vae']}
+            cache=inventory.setdefault('_checkpoint_hashes',{})
+            try:
+                key=canonical(names)
+                if key not in cache:cache[key]=self.request('/gbr/model-info',names,timeout=300)
+                identity['checkpoint_sha256']=cache[key];identity['identity_kind']='workflow-and-checkpoint-sha256'
+            except HTTPError as error:
+                if error.code not in (404,405,501):raise
         identity['revision']=hashlib.sha1(canonical(identity).encode()).hexdigest()
         if job.get('model_revision') and job['model_revision']!=identity['revision']:raise ValueError('Comfy model inventory changed from the reserved run')
         devices=inventory['system'].get('devices',[]);device=devices[0] if devices else {};system=inventory['system'].get('system',{})
@@ -53,6 +70,8 @@ class Client:
         return {'compiled':compiled,'identity':identity,'hardware':hardware,'system':system}
     def acknowledge(self,job,directory):
         ref=json.loads((Path(directory)/'comfy.json').read_text())
+        if not self.capabilities().get('verified_output_cleanup'):
+            raise RuntimeError('ComfyUI output cleanup is pending: install _99_tools/_workers_comfyui/gbr_bridge.py in ComfyUI/custom_nodes, restart ComfyUI, then retry Clean temporary files. The verified local result is already saved.')
         self.request('/gbr/ack',{'attempt_id':job['attempt_id'],'file':ref['file'],'sha256':ref['download_sha256']})
     def run(self,job,directory,resume=False):
         from _gbr_worker.runpod import RemotePending

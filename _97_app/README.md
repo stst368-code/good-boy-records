@@ -79,11 +79,31 @@ history in the same database. FFmpeg is needed for audio renders;
 The [preparation, engine and storage plan](_plans/preparation-and-storage.md)
 identifies the built features and pending GPU/release integrations.
 
-ComfyUI music generation uses the local/pod HTTP URL directly in Generation.
-Check connection to discover model/sampler choices. Its recovered full workflow
+Configure workers under **Settings → Worker settings** (also accessible from
+Generation). Select a type and address, then **Query models & GPU** to retrieve
+MiniMax encoder/DiT/VAE choices, samplers, queue state and available GPU memory.
+Optional defaults fill untouched generation controls. Existing saved connections
+migrate on the first settings save; measurements keep using the shared database.
+
+Generation selects a saved worker or **Automatic**, which queries enabled workers
+and prefers online idle workers before online busy workers. A batch keeps its
+chosen endpoint and checked parameters; changing settings cannot redirect it.
+Busy GBR controllers wait for their worker rather than failing the batch.
+
+For local ComfyUI, use a loopback URL such as `http://127.0.0.1:8188` and optionally
+set an absolute `.bat`, `.cmd`, `.ps1`, `.sh`, executable or Python start-file path.
+Arguments are a JSON list; a Python entry point can specify its ComfyUI environment's
+Python executable. Enable auto-start to launch only when needed and wait for the
+API. **Start / query** tests it. Launch logs use one runtime folder per address;
+GBR does not stop ComfyUI when the application closes. Pod ComfyUI uses its HTTP URL.
+
+The recovered full ComfyUI workflow
 uses Comfy graph caching; native persistent encoding-cache controls remain
 native-only. The optional `_99_tools/_workers_comfyui/gbr_bridge.py` extension
 provides checkpoint hashing and verified temporary-output cleanup through that URL.
+Stock servers with missing extension routes (including HTTP 405) can generate;
+cleanup remains pending until the bridge is installed and **Clean temporary files**
+is retried. Required API failures identify the worker rather than the writing YAMLs.
 
 `python _97_app/run_gbr.py setup-processing` installs the isolated Demucs/WhisperX
 environment; `--cpu` selects CPU packages. Models download on an explicit job.

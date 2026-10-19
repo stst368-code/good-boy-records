@@ -18,7 +18,8 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: python -m pip install -r _03_review/_generation_review/requirements-dev.txt
       - run: python -m pytest _04_preparation/_tests -q
-      - run: python -m pytest _02_generation/_tests/test_comfy_execution.py -q
+      - run: python -m pytest _02_generation/_tests/test_comfy_execution.py _02_generation/_tests/test_workers.py _02_generation/_tests/test_app_jobs.py -q
       - run: node --input-type=module --check < _04_preparation/_static/preparation.js
       - run: node --input-type=module --check < _04_preparation/_static/timeline.js
       - run: node --input-type=module --check < _02_generation/_static/generation.js
+      - run: node --input-type=module --check < _02_generation/_static/workers.js

@@ -32,6 +32,8 @@ class GenerationService:
         self.root, self.review = Path(root), review_service
         self.previews, self.processes, self.secrets = {}, {}, {}
         self.lock = threading.RLock()
+        from .workers import Workers
+        self.workers = Workers(self)
 
     @property
     def runtime(self):
@@ -68,8 +70,8 @@ class GenerationService:
     def preferences(self):
         saved = deepcopy(self.review.config.values.get('generation', {}))
         keys = key_candidates()
-        connections = saved.get('connections', [])
-        if not connections:
+        connections = [e['connection'] for e in saved['workers']] if 'workers' in saved else saved.get('connections', [])
+        if not connections and 'workers' not in saved:
             connections = [normalize({'backend': 'local'})]
             latest = self.runtime / 'local_test/latest.json'
             try:
@@ -80,7 +82,7 @@ class GenerationService:
                                                    'identity_file': keys[0] if keys else ''}))
             except (OSError, ValueError, KeyError):
                 pass
-        return {'connections': connections, 'key_candidates': keys, 'parameters': saved.get('parameters', DEFAULT_PARAMETERS),
+        return {'connections': connections, 'worker_id': saved.get('worker_id', 'auto'), 'key_candidates': keys, 'parameters': saved.get('parameters', DEFAULT_PARAMETERS),
                 'input_root': str(self.catalogue_root(saved.get('input_root'))),
                 'output_root': str(self.generated), 'layout': saved.get('layout', 'single'),
                 'storage_endpoint': saved.get('storage_endpoint', os.environ.get('GBR_S3_ENDPOINT', '')),
@@ -91,13 +93,21 @@ class GenerationService:
                 'shared_database_ready': self.shared_ready()}
 
     def remember(self, data):
-        connection = normalize(data['connection'])
+        connection = normalize(data['connection']) if data.get('connection') is not None else None
         with self.lock, self.review.config_lock:
             saved = deepcopy(self.review.config.values.get('generation', {}))
-            connections = [c for c in saved.get('connections', []) if connection_key(c) != connection_key(connection)]
-            saved['connections'] = [*connections, connection]
+            if connection is not None:
+                if 'workers' in saved:
+                    existing = next((e for e in saved['workers'] if e['id'] == connection_key(connection)), None)
+                    if existing is None:
+                        saved['workers'].append(self.workers.normalize({'connection': connection}))
+                    else:
+                        existing['connection'] = connection
+                else:
+                    connections = [c for c in saved.get('connections', []) if connection_key(c) != connection_key(connection)]
+                    saved['connections'] = [*connections, connection]
             saved['input_root'] = str(self.catalogue_root(data.get('input_root', saved.get('input_root'))))
-            for key in ('parameters', 'layout', 'storage_endpoint', 'storage_bucket', 'storage_region'):
+            for key in ('parameters', 'layout', 'storage_endpoint', 'storage_bucket', 'storage_region', 'worker_id'):
                 if key in data:
                     saved[key] = data[key]
             for key, value in data.get('secrets', {}).items():
@@ -131,7 +141,19 @@ class GenerationService:
     def preview(self, data):
         if not self.shared_ready():
             raise ValueError('Open GBR through _97_app with the migrated shared database before generating')
-        connection = normalize(data['connection'])
+        worker = None
+        if data.get('worker_id'):
+            worker, report = self.workers.select(data['worker_id'], automatic=data['worker_id'] == 'auto')
+            data['_worker'] = worker
+            connection = worker['connection']
+            data['connection'] = connection
+            if report.get('_inventory'):
+                data['_comfy_inventory'] = report['_inventory']
+        elif data.get('connection'):
+            connection = normalize(data['connection'])
+            data['connection'] = connection
+        else:
+            raise ValueError('Select a saved worker or Automatic')
         catalogue = Catalogue(self.catalogue_root(data.get('input_root')))
         selected = catalogue.select(all_inputs=data.get('all_inputs', False), songs=data.get('songs', []),
             albums=data.get('albums', []), files=data.get('files', []), order=data.get('order', 'selection'))
@@ -142,7 +164,7 @@ class GenerationService:
                 reviewer_id=rating_filter.get('reviewer_id'), cluster=rating_filter.get('cluster'), style=rating_filter.get('style'))
             if not selected:
                 raise ValueError('No selected inputs meet the saved-rating filter')
-        parameters = {**DEFAULT_PARAMETERS, **data.get('parameters', {})}
+        parameters = {**DEFAULT_PARAMETERS, **(worker or {}).get('defaults', {}), **data.get('parameters', {})}
         spec = {'defaults': parameters, 'execution': execution(connection, data.get('encoding_cache', 'prefer')),
                 'model_revision': None if connection['backend']=='comfyui' else data.get('model_revision') or SMOKE_MODEL_REVISION}
         for key in ('rerun', 'parent_review_generation_id', 'request_id'):
@@ -167,9 +189,10 @@ class GenerationService:
             raise ValueError('Batch exceeds 10000 generations; select fewer tracks, captions or combinations')
         spec['experiments'] = experiment
         if connection['backend']=='comfyui':
-            sys.path.insert(0,str(self.root/'_99_tools/_workers_comfyui'))
+            sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'_99_tools/_workers_comfyui'))
             from client import Client
-            try:data['_comfy_inventory']=Client(connection['address']).inventory()
+            try:
+                if not data.get('_comfy_inventory'):data['_comfy_inventory']=Client(connection['address']).inventory()
             except OSError as error:raise ValueError('Cannot query ComfyUI pod URL: '+str(error)) from error
         checked = []
         for item in selected:
@@ -257,6 +280,7 @@ class GenerationService:
                 del self.previews[next(iter(self.previews))]
             token = uuid.uuid4().hex
             self.previews[token] = {'created': now, 'checked': checked, 'spec': spec, 'connection': connection,
+                'launcher': (data.get('_worker') or {}).get('launcher'),
                 'root': catalogue.root, 'layout': data.get('layout', 'single'),
                 'selection': {key: data.get(key) for key in ('files', 'all_inputs', 'songs', 'albums', 'order', 'rating_filter', 'parameter_priority', 'template_id', 'catalogue_captions', 'caption_mode', 'caption_count', 'caption_cluster', 'caption_style', 'experiments')}}
             if rating_evidence is not None:
@@ -264,7 +288,7 @@ class GenerationService:
         return {'token': token, 'inputs': [record.summary() for record in checked], 'ready': sum(record.ready for record in checked),
                 'invalid': sum(not record.ready for record in checked), 'output_root': str(self.generated),
                 'generation_count': sum(len(r.planned_runs or [{}]) for r in checked if r.ready),
-                'execution': spec['execution'], 'parameters': spec['defaults']}
+                'execution': spec['execution'], 'parameters': spec['defaults'], 'worker_id': connection_key(connection)}
 
     def launch(self, task, credentials=None):
         folder = self.runtime / 'app_jobs' / uuid.uuid4().hex
@@ -328,6 +352,7 @@ class GenerationService:
                     self.review.config.validate()
                     self.review.config.save()
             result = self.launch({'manifest': str(manifest), 'batch_id': batch_id, 'connection': preview['connection'],
+                                  'launcher': preview.get('launcher'),
                                   'install': preview['connection']['auto_setup']})
             self.review.scan_event.set()
             return result
@@ -390,11 +415,32 @@ class GenerationService:
 
 
     def comfy_inventory(self,address):
-        sys.path.insert(0,str(self.root/'_99_tools/_workers_comfyui'))
+        sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'_99_tools/_workers_comfyui'))
         from client import Client
         try:inventory=Client(address).inventory()
         except OSError as error:raise ValueError('Cannot query ComfyUI pod URL: '+str(error)) from error
+        return self.comfy_choices(inventory)
+
+    @staticmethod
+    def native_choices():
+        from _gbr_worker.contract import SAMPLERS, SCHEDULES
+        return {'text_encoders': ['bf16', 'fp32'], 'diffusion_models': ['bf16', 'fp32'],
+                'samplers': sorted(SAMPLERS), 'schedulers': sorted(SCHEDULES), 'vaes': []}
+
+    @staticmethod
+    def comfy_choices(inventory):
         nodes=inventory['nodes']
         def options(node,field):return nodes.get(node,{}).get('input',{}).get('required',{}).get(field,[[]])[0]
-        return {'system':inventory['system'],'samplers':options('KSampler','sampler_name'),'schedulers':options('KSampler','scheduler'),
-                'text_encoders':options('CLIPLoader','clip_name'),'diffusion_models':options('UNETLoader','unet_name')}
+        def relevant(node, field):
+            values = options(node, field)
+            return [v for v in values if isinstance(v, str) and 'minimax' in re.sub(r'[^a-z0-9]', '', v.casefold())] if isinstance(values, list) else []
+        models = {'text_encoders': relevant('CLIPLoader','clip_name'), 'diffusion_models': relevant('UNETLoader','unet_name'),
+                  'vaes': relevant('VAELoader','vae_name'), 'samplers': options('KSampler','sampler_name'), 'schedulers': options('KSampler','scheduler')}
+        graph = json.loads((Path(__file__).resolve().parents[2]/'_99_tools/_workers_comfyui/_workflows/music-full.json').read_text())
+        missing = sorted({n['class_type'] for n in graph.values()} - set(nodes))
+        devices = inventory['system'].get('devices', [])
+        device = devices[0] if devices else {}
+        return {'system': inventory['system'], **models, 'models': models, 'missing_nodes': missing,
+                'capabilities': inventory.get('capabilities', {}),
+                'hardware': {'gpu_name': device.get('name'), 'usable_vram_bytes': device.get('vram_total'),
+                             'free_vram_bytes_at_start': device.get('vram_free'), 'devices': devices}}

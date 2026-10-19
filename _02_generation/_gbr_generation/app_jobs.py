@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
+from contextlib import contextmanager
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / '_02_generation'))
@@ -50,6 +52,29 @@ def prepare_worker(connection, *, install=False):
     return json.loads(subprocess.check_output([str(python), str(WORKER / 'worker.py'), 'doctor']))
 
 
+@contextmanager
+def controller_slot(folder, connection):
+    identity = 'gbr-controller:' + connection['backend'] + ':' + (connection.get('address') or '')
+    lock = gpu_lock(identity)
+    while True:
+        try:
+            lock.__enter__()
+            break
+        except RuntimeError as error:
+            if 'Another GBR worker' not in str(error):
+                raise
+            if (folder / 'pause').exists():
+                yield False
+                return
+            write_state(folder, 'waiting_worker')
+            time.sleep(.5)
+            lock = gpu_lock(identity)
+    try:
+        yield True
+    finally:
+        lock.__exit__(None, None, None)
+
+
 def run_task(path):
     from _gbr_layout import task_paths
     task = task_paths(json.loads(Path(path).read_text(encoding='utf-8')))
@@ -57,7 +82,10 @@ def run_task(path):
     connection = task['connection']
     try:
         # Multiple controller processes cannot run overlapping batches on the same target.
-        with gpu_lock('gbr-controller:' + connection['backend'] + ':' + connection.get('address', 'local')):
+        with controller_slot(folder, connection) as acquired:
+            if not acquired:
+                write_state(folder, 'paused')
+                return 0
             if task.get('cleanup'):
                 write_state(folder, 'cleaning')
                 result = cleanup_outputs(task['manifest'], runpod_identity=connection.get('identity_file') or None)
@@ -65,6 +93,10 @@ def run_task(path):
                 write_state(folder, 'cleanup_complete', batch_id=task['batch_id'])
                 return 0
             write_state(folder, 'preparing' if task.get('install') else 'checking')
+            if connection['backend'] == 'comfyui' and (task.get('launcher') or {}).get('auto_start'):
+                sys.path.insert(0, str(ROOT / '_99_tools/_workers_comfyui'))
+                from _gbr_generation.workers import ensure_comfy
+                ensure_comfy(connection, task['launcher'], ROOT / '_02_generation/_runtime')
             if not task.get('manifest') and not task.get('install') and connection['backend'] == 'runpod_dedicated':
                 report = RunpodClient(connection['address'], connection.get('identity_file') or None).check_connection()
             else:

@@ -1,6 +1,7 @@
 import {initPreparation} from "/tools/preparation/preparation.js";
 import {initYamlEditor} from "/tools/yaml-editor/editor.js";
 import {initGeneration} from "/tools/generation/generation.js";
+import {initWorkers} from "/tools/generation/workers.js";
 import {ReviewTags, savedTags} from "/static/tags.js";
 const $=id=>document.getElementById(id);
 const reviewTags=new ReviewTags($("tagGroups"),$("clearTags"));
@@ -200,7 +201,9 @@ $('selectionTab').onclick=guarded(async()=>{showView('selection');await loadCand
 const yamlEditor=initYamlEditor({api,toast,browse:async callback=>{await openDirectory(callback);}});
 const preparation=initPreparation({api,toast});
 $('preparationTab').onclick=guarded(async()=>{audio.pause();showView('preparation');await preparation.open();});
-const generation=initGeneration({api,toast,browse:async callback=>{await openDirectory(callback);}});
+const workers=initWorkers({api,toast,onChange:async()=>{await generation.reloadWorkers();}});
+const generation=initGeneration({api,toast,browse:async callback=>{await openDirectory(callback);},configureWorkers:()=>workers.open()});
+$('openWorkerSettings').onclick=guarded(async()=>{$('settingsDialog').close();await workers.open();});
 $('generationTab').onclick=guarded(async()=>{audio.pause();showView('generation');await generation.open();});
 $('yamlTab').onclick=guarded(async()=>{audio.pause();showView('yaml');await yamlEditor.open();});
 $('back').onclick=guarded(async()=>{const reviewerId=state.reviewerId,result=await api('/queue/back');if(reviewerId===state.reviewerId&&result.track)await loadTrack(result.track);});
