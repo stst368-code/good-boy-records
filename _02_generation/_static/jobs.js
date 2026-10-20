@@ -51,8 +51,23 @@ export function initJobs({root,api,toast,onQueued}){
   }
   function diagnosticDrawer(batch){
     const key=batch.id+'/diagnostics',e=drawer(key,'Technical log'),body=node('div','job-diagnostics');e.append(body);
-    const load=guard(async()=>{if(!e.open)return;const result=await api('/generation/tasks');state.logs.set(batch.id,result.tasks.filter(t=>t.batch_id===batch.id));body.replaceChildren();for(const task of state.logs.get(batch.id)){const section=node('section'),title=node('div','generation-inline');title.append(node('strong','',workerName(task.worker_id||task.connection.backend+'|'+(task.connection.address||''))),button('Clear log view',async()=>{state.cursors[task.id]=task.log_end||0;sessionStorage.setItem('gbr-generation-log-cursors',JSON.stringify(state.cursors));await load();}),button('Show full log',async()=>{delete state.cursors[task.id];sessionStorage.setItem('gbr-generation-log-cursors',JSON.stringify(state.cursors));await load();}));const bytes=new TextEncoder().encode(task.log||'');const shown=new TextDecoder().decode(bytes.slice(Math.max(0,(state.cursors[task.id]||0)-(task.log_start||0))));section.append(title,node('pre','',shown||'Log view cleared. New events will appear here.'));body.append(section);}});
-    e.addEventListener('toggle',load);if(e.open)load();return e;
+    const load=guard(async()=>{
+      if(!e.open)return;
+      if(!state.logRequest)state.logRequest=api('/generation/tasks').finally(()=>{state.logRequest=null;});
+      const result=await state.logRequest,tasks=result.tasks.filter(t=>t.batch_id===batch.id);state.logs.set(batch.id,tasks);
+      const retained=new Set(tasks.map(t=>t.id));for(const section of body.children)if(!retained.has(section.dataset.task))section.remove();
+      for(const task of tasks){
+        let section=body.querySelector(`[data-task="${task.id}"]`);
+        if(!section){
+          section=node('section');section.dataset.task=task.id;const title=node('div','generation-inline');
+          title.append(node('strong','',workerName(task.worker_id||task.connection.backend+'|'+(task.connection.address||''))),button('Clear log view',async()=>{state.cursors[task.id]=state.logs.get(batch.id).find(t=>t.id===task.id)?.log_end||0;sessionStorage.setItem('gbr-generation-log-cursors',JSON.stringify(state.cursors));await load();}),button('Show full log',async()=>{delete state.cursors[task.id];sessionStorage.setItem('gbr-generation-log-cursors',JSON.stringify(state.cursors));await load();}));
+          section.append(title,node('pre'));body.append(section);
+        }
+        const bytes=new TextEncoder().encode(task.log||''),shown=new TextDecoder().decode(bytes.slice(Math.max(0,(state.cursors[task.id]||0)-(task.log_start||0))))||'Log view cleared. New events will appear here.',pre=section.querySelector('pre');
+        if(pre.textContent!==shown){const follow=pre.scrollTop+pre.clientHeight>=pre.scrollHeight-8;pre.textContent=shown;if(follow)pre.scrollTop=pre.scrollHeight;}
+      }
+    });
+    e.refreshLog=load;e.addEventListener('toggle',load);if(e.open)load();return e;
   }
   function card(batch){
     const e=node('article','job-batch '+batch.section);e.dataset.batch=batch.id;
@@ -89,6 +104,6 @@ export function initJobs({root,api,toast,onQueued}){
       for(const [index,job] of jobs.entries()){let existing=root.querySelector(`[data-batch="${job.id}"]`);if(existing)updateCard(existing,job);else existing=card(job);if(list.children[index]!==existing)list.insertBefore(existing,list.children[index]||null);}
     }
   }
-  async function refresh(){const sequence=++state.sequence,data=await api('/generation/jobs');if(sequence!==state.sequence)return;state.jobs=data.jobs;for(const job of data.jobs)if(state.open.has(job.id+'/runs'))await loadRuns(job.id,false,sequence);if(sequence!==state.sequence)return;render();onQueued?.(data);return data;}
+  async function refresh(){const sequence=++state.sequence,data=await api('/generation/jobs');if(sequence!==state.sequence)return;state.jobs=data.jobs;for(const job of data.jobs)if(state.open.has(job.id+'/runs'))await loadRuns(job.id,false,sequence);if(sequence!==state.sequence)return;render();await Promise.all([...root.querySelectorAll('details[open]')].filter(e=>e.refreshLog).map(e=>e.refreshLog()));onQueued?.(data);return data;}
   return {refresh,hasActive:()=>state.jobs.some(j=>j.section==='active')};
 }

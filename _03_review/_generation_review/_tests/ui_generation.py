@@ -175,6 +175,11 @@ def main():
                 page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('CPU boundary fixture')")
                 page.locator('#genJobs button',has_text='Clear log view').first.click()
                 page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('Log view cleared')")
+                with next((generation.runtime / 'app_jobs').glob('*/controller.log')).open('a',encoding='utf-8') as log:
+                    log.write('[2026-10-20T19:00:00+00:00] New event after clearing\n')
+                page.locator('#genRefreshJobs').click()
+                page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('New event after clearing')")
+                assert 'CPU boundary fixture' not in page.locator('#genJobs').inner_text()
                 page.locator('#genJobs button',has_text='Show full log').first.click()
                 page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('CPU boundary fixture')")
                 page.locator('#reviewTab').click()
