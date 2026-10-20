@@ -210,6 +210,7 @@ cache/
 *backups/
 _Reviewed/
 */config.json
+/_03_review/_generation_review/config.json
 
 # Shared platform runtime and database snapshots
 /_97_app/_runtime/
@@ -230,4 +231,5 @@ _Reviewed/
 !/_03_review/_generation_review/_tests/conftest.py
 !/_99_tools/_yaml_editor/_tests/
 !/_99_tools/_yaml_editor/_tests/test_*.py
+_03_review/_generation_review/config.json
 _03_review/_generation_review/config.json
