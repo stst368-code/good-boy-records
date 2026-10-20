@@ -68,9 +68,9 @@ def main():
             folder = generation.runtime / 'app_jobs' / uuid.uuid4().hex
             folder.mkdir(parents=True)
             (folder / 'task.json').write_text(json.dumps(task))
-            result = execute(task['manifest'], worker_python=sys.executable, launcher=boundary.worker)
+            result = execute(task['manifest'], worker_python=sys.executable, launcher=boundary.worker,worker_id=task.get('worker_id'))
             (folder / 'state.json').write_text(json.dumps({'status': result['status']}))
-            (folder / 'controller.log').write_text('CPU boundary fixture: ' + json.dumps(result))
+            (folder / 'controller.log').write_text('[2026-10-20T17:00:00.000+00:00] CPU boundary fixture: ' + json.dumps(result))
             service.indexer.scan()
             return {'task_id': folder.name, 'batch_id': task['batch_id']}
 
@@ -139,24 +139,22 @@ def main():
                 page.locator('#genScan').click();page.wait_for_selector('.generation-file')
                 assert page.locator('#genRoot').input_value() == str(built)
                 page.locator('#genSelectVisible').click()
-                page.locator('#genPriority').select_option('form')
+                page.locator('#genDurationMode').select_option('fixed')
                 assert page.locator('#genDuration').input_value() == '360'
-                page.locator('summary', has_text='Experiment quantities and ranges').click()
                 page.locator('#genRepetitions').fill('2')
                 page.locator('#genCaptionCount').fill('2')
-                page.locator('#genAddSweep').click()
-                page.locator('#genSweeps input').first.fill('1:2:0.5')
-                page.locator('#genAddSweep').click()
-                page.locator('#genSweeps select').nth(1).select_option('sampler_steps')
-                page.locator('#genSweeps input').nth(1).fill('20,30')
+                page.locator('#genCfgMode').select_option('range')
+                for control,value in zip(page.locator('#genCfgRange input').all(),['1','2','0.5']):control.fill(value)
+                page.locator('#genStepsMode').select_option('list')
+                page.locator('#genStepsList').fill('20,30')
                 page.locator('#genPreview').click()
                 page.wait_for_selector('#genPlan:not([hidden])')
                 assert '24 generations' in page.locator('#genPlanSummary').inner_text()
                 assert not boundary.calls
                 page.locator('#genRepetitions').fill('1')
                 page.locator('#genCaptionCount').fill('1')
-                page.locator('#genSweeps button').first.click()
-                page.locator('#genSweeps button').first.click()
+                page.locator('#genCfgMode').select_option('yaml')
+                page.locator('#genStepsMode').select_option('yaml')
                 page.locator('#genPreview').click()
                 page.wait_for_selector('#genPlan:not([hidden])')
                 assert '1 ready' in page.locator('#genPlanSummary').inner_text()
@@ -168,6 +166,17 @@ def main():
                 assert source.read_bytes() == original
                 artifacts = service.db.all('SELECT * FROM generation_artifacts')
                 assert len(artifacts) == 4 and all(Path(row['uri']).is_relative_to(generated) for row in artifacts)
+                page.locator('#genJobs details summary').first.click()
+                assert 'CPU boundary fixture' in page.locator('#genJobs pre').first.inner_text()
+                page.locator('#genClearLogs').click()
+                page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('Log view cleared')")
+                logfile=next((generation.runtime/'app_jobs').glob('*/controller.log'))
+                with logfile.open('a') as stream:stream.write('\n[2026-10-20T17:00:01.000+00:00] New event after clear\n')
+                page.locator('#genRefreshJobs').click()
+                page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('New event after clear')")
+                assert 'CPU boundary fixture' not in page.locator('#genJobs pre').first.inner_text()
+                page.locator('#genRestoreLogs').click()
+                page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('CPU boundary fixture')")
                 page.locator('#reviewTab').click()
                 page.wait_for_selector('#reviewCard:not([hidden])')
                 assert '1 left' in page.locator('#queueCount').inner_text()
@@ -204,15 +213,24 @@ def main():
                     page.locator('#workersClose').click()
                     with page.expect_response('**/api/generation/workers/query'):
                         page.locator('#genWorker').select_option('comfyui|'+url)
-                    page.wait_for_function("()=>document.getElementById('genSchedule').value==='simple'")
-                    assert page.locator('#genDit').input_value()=='minimax_music3_dit_fp32.safetensors'
+                    assert page.locator('#genModelPairs select').first.locator('option',has_text='minimax_music3_text_encoder_bf16.safetensors').count()==1
+                    assert page.locator('#genSamplerPairs [data-field=scheduler] option',has_text='simple').count()==1
+                    page.locator('#genSamplingMode').select_option('pairs')
+                    page.locator('#genSamplerPairs [data-field=sampler]').select_option('euler')
+                    page.locator('#genSamplerPairs [data-field=scheduler]').select_option('simple')
+                    page.locator('#genAddSamplerPair').click()
+                    page.locator('#genSamplerPairs [data-field=sampler]').nth(1).select_option('dpmpp_2m_sde_gpu')
+                    page.locator('#genSamplerPairs [data-field=scheduler]').nth(1).select_option('ddim_uniform')
+                    page.locator('#genPreview').click();page.wait_for_selector('#genPlan:not([hidden])')
+                    assert '2 generations' in page.locator('#genPlanSummary').inner_text()
+                    page.locator('#genSamplerPairs button').nth(1).click()
                     page.locator('#genPreview').click();page.wait_for_selector('#genPlan:not([hidden])')
                     assert '1 ready' in page.locator('#genPlanSummary').inner_text()
                     assert comfy['submissions']==0
                     with page.expect_response('**/api/generation/workers/query'):
                         page.locator('#genWorker').select_option('local|')
-                    page.wait_for_function("()=>document.getElementById('genSchedule').value==='flow_match_euler'")
-                    assert page.locator('#genDit').input_value()=='bf16'
+                    page.locator('#genSamplingMode').select_option('worker')
+                    assert page.locator('#genSamplerPairs [data-field=scheduler] option',has_text='flow_match_euler').count()==1
                     # Worker setup is also reachable from the application settings.
                     page.locator('#settingsButton').click();page.locator('#openWorkerSettings').click()
                     page.wait_for_selector('#workerSettingsDialog[open]')
@@ -222,6 +240,10 @@ def main():
                     page.locator('#workersClose').click()
                 page.set_viewport_size({'width': 390, 'height': 844})
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+                page.screenshot(path='/workspace/scratch/286b0af2d5d4/app_stage/generation-mobile.png',full_page=True)
+                page.set_viewport_size({'width':1920,'height':1080})
+                assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+                page.screenshot(path='/workspace/scratch/286b0af2d5d4/app_stage/generation-desktop.png',full_page=True)
                 assert not errors, errors
                 browser.close()
                 print(json.dumps({'selection_preview_dispatch_review_archive': 'passed', 'native_inference': 'not run', 'worker_settings_and_discovery':'passed', 'js_errors': errors}))

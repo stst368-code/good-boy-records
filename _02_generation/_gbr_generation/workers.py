@@ -310,3 +310,15 @@ class Workers:
                     return entry, report
                 raise ValueError(report['error'])
         raise ValueError('No enabled worker is online. Query workers or enable local ComfyUI auto-start in Worker settings.')
+
+    def pool(self):
+        entries=[e for e in self.entries() if e['enabled']]
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            reports=list(pool.map(self.query,entries))
+        candidates=[(e,r) for e,r in zip(entries,reports) if r['online'] and r.get('compatible',True)]
+        for e,r in zip(entries,reports):
+            if not r['online'] and e['launcher']['auto_start']:
+                r=self.query(e,activate=True)
+                if r['online'] and r.get('compatible',True):candidates.append((e,r))
+        if not candidates:raise ValueError('No compatible enabled workers are online. Query workers in Settings.')
+        return sorted(candidates,key=lambda pair:bool(pair[1]['busy']))

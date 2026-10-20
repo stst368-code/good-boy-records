@@ -36,11 +36,19 @@ def inventory():
 
 
 @contextmanager
-def server(drop_ack=False,extensions=True,unknown_code=404,prompt_code=None,busy=False,nodes_override=None):
+def server(drop_ack=False,extensions=True,unknown_code=404,prompt_code=None,busy=False,nodes_override=None,api_prefix='',browser_headers=False):
     output=io.BytesIO();wave=np.sin(np.arange(4410)*.05)*.1;sf.write(output,np.stack([wave,wave],axis=1),44100,format='FLAC',subtype='PCM_24');audio=output.getvalue();state={'submissions':0,'acked':False,'requests':[]}
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
+        def route(self):
+            if browser_headers and not (self.headers.get('User-Agent','').startswith('Mozilla/5.0') and self.headers.get('Accept')=='application/json, text/plain, */*' and self.headers.get('Cache-Control')=='no-cache' and self.headers.get('Pragma')=='no-cache'):
+                self.send_response(403);self.end_headers();self.wfile.write(b'Cloudflare error 1010');return False
+            if api_prefix:
+                if not self.path.startswith(api_prefix+'/'):self.send_response(404);self.end_headers();return False
+                self.path=self.path[len(api_prefix):]
+            return True
         def do_POST(self):
+            if not self.route():return
             state['requests'].append(('POST',self.path))
             value=json.loads(self.rfile.read(int(self.headers.get('Content-Length',0))))
             if self.path=='/prompt':
@@ -54,6 +62,7 @@ def server(drop_ack=False,extensions=True,unknown_code=404,prompt_code=None,busy
         def respond(self,data):
             raw=json.dumps(data).encode();self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
         def do_GET(self):
+            if not self.route():return
             state['requests'].append(('GET',self.path))
             if self.path=='/object_info':self.respond(nodes_override or inventory())
             elif self.path=='/gbr/capabilities' and extensions:self.respond({'version':2,'verified_output_cleanup':True,'checkpoint_sha256':False})

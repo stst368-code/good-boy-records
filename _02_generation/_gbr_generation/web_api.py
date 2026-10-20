@@ -78,6 +78,7 @@ class Preview(Body):
     order: Literal['selection', 'filename', 'album'] = 'selection'
     parameters: dict = Field(default_factory=dict)
     parameter_priority: Literal['yaml', 'form'] = 'yaml'
+    parameter_sources: dict[str, Literal['yaml', 'worker', 'control']] = Field(default_factory=dict)
     field_precedence: dict = Field(default_factory=dict)
     template_id: str | None = None
     catalogue_captions: StrictBool = True

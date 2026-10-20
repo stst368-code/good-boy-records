@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from contextlib import contextmanager
+from datetime import datetime,timezone
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / '_02_generation'))
@@ -22,7 +23,10 @@ from _gbr_generation.planner import verify_plan
 def write_state(folder, status, **extra):
     path = folder / 'state.json'
     temporary = folder / 'state.tmp'
-    temporary.write_text(canonical({'status': status, **extra}), encoding='utf-8')
+    timestamp=datetime.now(timezone.utc).isoformat(timespec='milliseconds')
+    previous=json.loads(path.read_text()) if path.is_file() else {}
+    if previous.get('status')!=status:print(f'[{timestamp}] {status.replace("_"," ")}'+(' · '+str(extra.get('error')) if extra.get('error') else ''),flush=True)
+    temporary.write_text(canonical({'status': status,'updated_at':timestamp, **extra}), encoding='utf-8')
     temporary.replace(path)
 
 
@@ -88,7 +92,7 @@ def run_task(path):
                 return 0
             if task.get('cleanup'):
                 write_state(folder, 'cleaning')
-                result = cleanup_outputs(task['manifest'], runpod_identity=connection.get('identity_file') or None)
+                result = cleanup_outputs(task['manifest'], runpod_identity=connection.get('identity_file') or None,**({'worker_id':task['worker_id']} if task.get('worker_id') else {}))
                 print(canonical(result), flush=True)
                 write_state(folder, 'cleanup_complete', batch_id=task['batch_id'])
                 return 0
@@ -109,7 +113,7 @@ def run_task(path):
                 return 0
             manifest = verify_plan(task['manifest'])
             try:
-                cleanup_outputs(task['manifest'], runpod_identity=connection.get('identity_file') or None)
+                cleanup_outputs(task['manifest'], runpod_identity=connection.get('identity_file') or None,**({'worker_id':task['worker_id']} if task.get('worker_id') else {}))
             except (OSError, ValueError, RuntimeError) as exc:
                 print('Earlier temporary files retained for cleanup: ' + str(exc), flush=True)
             attempted = set()
@@ -117,10 +121,10 @@ def run_task(path):
                 write_state(folder, 'running', batch_id=manifest['batch_id'])
                 result = execute(task['manifest'], worker_python=connection.get('worker_python') or None,
                     runpod_identity=connection.get('identity_file') or None, limit=1,
-                    retry_failed=task.get('retry_failed', False), resume_remote=task.get('resume', False))
+                    retry_failed=task.get('retry_failed', False), resume_remote=task.get('resume', False),worker_id=task.get('worker_id'))
                 print(canonical(result), flush=True)
                 if not result['attempts']:
-                    write_state(folder, result['status'], batch_id=manifest['batch_id'])
+                    write_state(folder, 'queue_complete' if task.get('worker_id') else result['status'], batch_id=manifest['batch_id'])
                     return 1 if result['status'] == 'failed' else 0
                 # A failed or disconnected attempt stops the queue; only explicit actions retry it.
                 if result['attempts'][0]['status'] != 'succeeded':
@@ -138,5 +142,21 @@ def run_task(path):
         return 1
 
 
+class TimestampStream:
+    def __init__(self,stream):self.stream=stream;self.pending=''
+    def __getattr__(self,name):return getattr(self.stream,name)
+    def write(self,value):
+        self.pending+=value
+        while '\n' in self.pending:
+            line,self.pending=self.pending.split('\n',1)
+            stamp=datetime.now(timezone.utc).isoformat(timespec='milliseconds')
+            self.stream.write((line if line.startswith('[20') else '['+stamp+'] '+line)+'\n')
+        return len(value)
+    def flush(self):
+        if self.pending:self.write('\n')
+        self.stream.flush()
+
+
 if __name__ == '__main__':
+    sys.stdout=TimestampStream(sys.stdout);sys.stderr=TimestampStream(sys.stderr)
     raise SystemExit(run_task(sys.argv[1]))

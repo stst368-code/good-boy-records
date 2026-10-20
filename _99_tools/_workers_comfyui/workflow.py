@@ -20,7 +20,8 @@ def discover(address,fetch=None):
         raise ValueError('Use a ComfyUI base URL without credentials, paths or query parameters')
     def get(path):
         if fetch:return fetch(path)
-        with urlopen(address.rstrip('/')+path,timeout=15) as response:return json.load(response)
+        from client import Client
+        return Client(address).request(path,timeout=15)
     return {'system':get('/system_stats'),'nodes':get('/object_info')}
 
 

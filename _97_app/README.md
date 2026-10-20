@@ -85,17 +85,27 @@ MiniMax encoder/DiT/VAE choices, samplers, queue state and available GPU memory.
 Optional defaults fill untouched generation controls. Existing saved connections
 migrate on the first settings save; measurements keep using the shared database.
 
-Generation selects a saved worker or **Automatic**, which queries enabled workers
-and prefers online idle workers before online busy workers. A batch keeps its
-chosen endpoint and checked parameters; changing settings cannot redirect it.
-Busy GBR controllers wait for their worker rather than failing the batch.
+Generation selects a saved worker or **All available workers**, which queries enabled
+workers and runs a shared queue across compatible online endpoints. Each generation is
+claimed once; faster workers can take more jobs. Busy endpoints join when their GBR
+controller becomes available. Each worker uses its own defaults and available models.
+The checked alternatives are frozen in the batch; settings changes cannot redirect it.
+
+Controls follow Models, Text conditioning, Diffusion and Queue/output. Encoder/DiT and
+sampler/scheduler rows keep each listed pair together. Numeric controls offer YAML/worker,
+worker default, fixed value, list or range in one place. Explicit choices constrain
+eligible workers; leaving models at their default uses each worker's available checkpoints.
+Logs have UTC timestamps; Clear log view hides existing text without deleting history.
 
 For local ComfyUI, use a loopback URL such as `http://127.0.0.1:8188` and optionally
 set an absolute `.bat`, `.cmd`, `.ps1`, `.sh`, executable or Python start-file path.
 Arguments are a JSON list; a Python entry point can specify its ComfyUI environment's
 Python executable. Enable auto-start to launch only when needed and wait for the
 API. **Start / query** tests it. Launch logs use one runtime folder per address;
-GBR does not stop ComfyUI when the application closes. Pod ComfyUI uses its HTTP URL.
+GBR does not stop ComfyUI when the application closes. Pod ComfyUI uses its full HTTP
+service URL, such as `https://POD_ID-8188.proxy.runpod.net`. Keep the exposed port in
+the hostname. The client uses the legacy browser headers for API calls and FLAC
+downloads, and discovers root or `/api` routes without retrying uncertain POSTs.
 
 The recovered full ComfyUI workflow
 uses Comfy graph caching; native persistent encoding-cache controls remain

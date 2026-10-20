@@ -220,6 +220,14 @@ def prepare_batch(checked, specification, workspace, database, *, input_root, er
                         if effective.get(seed, "auto") == "auto":
                             effective[seed] = str(secrets.randbits(64))
                             provenance[seed] = provenance.get(seed, "automatic") + ":frozen"
+                    worker_options=[]
+                    for option in case.get('worker_options') or []:
+                        option={**option,'effective':dict(option['effective']),'provenance':dict(option['provenance'])}
+                        for seed in SEEDS:
+                            if option['effective'].get(seed,'auto')=='auto':
+                                option['effective'][seed]=effective[seed]
+                                option['provenance'][seed]=option['provenance'].get(seed,'automatic')+':frozen'
+                        worker_options.append(option)
                     run_id = uuid.uuid4().hex
                     request_name = f"requests/{run_id}.yaml"
                     working = record.document.with_generation_values(output_changes(record.document, effective))
@@ -230,6 +238,7 @@ def prepare_batch(checked, specification, workspace, database, *, input_root, er
                         "title": record.document.values["title"], "effective": effective, "provenance": provenance,
                         'album': record.item.metadata.get('album_name') or '',
                         "execution": execution_options(specification),
+                        "worker_options":worker_options,
                         "model_revision": specification.get("model_revision"),
                         "template": case.get("template"), "experiment": case.get("experiment"), "parent_review_generation_id": parent, "request_id": request_id})
             rendered = json_text(manifest).encode("utf-8")

@@ -10,6 +10,8 @@ from urllib.request import Request,urlopen
 from workflow import discover,compile_workflow,canonical
 
 ROOT=Path(__file__).parent
+HEADERS={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36',
+         'Accept':'application/json, text/plain, */*','Cache-Control':'no-cache','Pragma':'no-cache'}
 
 
 def base_url(address):
@@ -18,19 +20,44 @@ def base_url(address):
     return address.rstrip('/')
 
 
-def resolve(options,value,label):
+def resolve(options,value,label,preferred=None):
     if value in options:return value
+    relevant=[name for name in options if 'minimax' in ''.join(c for c in name.casefold() if c.isalnum())]
+    if value in (None,'','auto'):
+        if preferred in relevant:return preferred
+        if relevant:return relevant[0]
+        raise ValueError(label+': no MiniMax checkpoint is available on this worker')
     aliases={'bf16':['bf16','bfloat16'],'fp32':['fp32','float32'],'fp16':['fp16','float16'],'int8':['int8','q8'],'fp8':['fp8']}
-    candidates=[name for name in options if 'minimax' in name.casefold() and any(alias in name.casefold() for alias in aliases.get(value,[value]))]
+    candidates=[name for name in relevant if any(alias in name.casefold() for alias in aliases.get(value,[value]))]
     if label=='VAE' and not candidates:candidates=[name for name in options if 'minimax' in name.casefold() and any(part in name.casefold() for part in ('dav','vae'))]
     if len(candidates)!=1:raise ValueError(f'{label}: choose an exact checkpoint filename; matches={candidates}')
     return candidates[0]
 
 class Client:
-    def __init__(self,address):self.address=base_url(address)
-    def request(self,path,data=None,timeout=45):
+    def __init__(self,address):self.address=base_url(address);self.prefix=None
+    def _open(self,path,data=None,timeout=45):
         body=None if data is None else canonical(data).encode()
-        with urlopen(Request(self.address+path,data=body,headers={'Content-Type':'application/json'}),timeout=timeout) as response:return json.load(response)
+        return urlopen(Request(self.address+path,data=body,headers={**HEADERS,**({'Content-Type':'application/json'} if body is not None else {})}),timeout=timeout)
+    def _prefix(self,timeout):
+        if self.prefix is not None:return
+        last=None
+        for prefix in ('','/api'):
+            try:
+                with self._open(prefix+'/system_stats',timeout=timeout) as response:stats=json.load(response)
+                if not isinstance(stats,dict) or 'system' not in stats:raise ValueError('Response is not ComfyUI system statistics')
+                self.prefix=prefix;return
+            except HTTPError as error:
+                if error.code==403:
+                    detail=error.read(4096).decode('utf-8',errors='replace')
+                    kind='RunPod/Cloudflare rejected the request' if '1010' in detail or 'cloudflare' in detail.casefold() else 'The worker or proxy denied access'
+                    raise ValueError(f'{kind} (HTTP 403 at {error.url}). Use the full HTTP service URL from RunPod Connect, including -8188 (or the exposed ComfyUI port), and verify it opens in your browser. Authentication/access rules must be resolved on the worker.') from None
+                if error.code not in (404,405):raise
+                last=error
+            except (ValueError,UnicodeDecodeError) as error:last=error
+        raise ValueError('No ComfyUI API at '+self.address+' or its /api route: '+str(last)) from last
+    def request(self,path,data=None,timeout=45):
+        self._prefix(timeout)
+        with self._open(self.prefix+path,data,timeout) as response:return json.load(response)
     def capabilities(self,timeout=5):
         # Stock ComfyUI may route absent extension URLs to a static handler.
         try:
@@ -118,7 +145,8 @@ class Client:
             file=ref['file']
             if file.get('type','output')!='output' or Path(file['filename']).name!=file['filename'] or '..' in Path(file.get('subfolder','')).parts or '\\' in file.get('subfolder','') or not file.get('subfolder','').startswith('gbr') or not file['filename'].startswith(job['attempt_id']):raise ValueError('Comfy returned a file outside this attempt namespace')
             output=directory/'audio.flac';temporary=directory/'download.part'
-            with urlopen(self.address+'/view?'+urlencode(file),timeout=120) as response,temporary.open('wb') as stream:
+            self._prefix(45)
+            with self._open(self.prefix+'/view?'+urlencode(file),timeout=120) as response,temporary.open('wb') as stream:
                 total=0
                 while chunk:=response.read(1024*1024):
                     total+=len(chunk)

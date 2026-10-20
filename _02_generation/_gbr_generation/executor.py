@@ -267,7 +267,7 @@ def recover(manifest_path, run_id, *, remote_stopped=False):
         return {"run_id": run_id, "status": "failed", "retry": "execute --retry-failed"}
 
 
-def cleanup_outputs(manifest_path, *, runpod_identity=None):
+def cleanup_outputs(manifest_path, *, runpod_identity=None, worker_id=None):
     """Retry acknowledgement only after all published artifacts still verify, including after archive."""
     manifest_path = Path(manifest_path).resolve(strict=True)
     manifest = verify_plan(manifest_path)
@@ -279,6 +279,7 @@ def cleanup_outputs(manifest_path, *, runpod_identity=None):
                 continue
             pending = directory / 'cleanup-pending.json'
             job = json.loads((directory / 'request.json').read_text())
+            if worker_id and '|'.join(str(v or '') for v in execution_target(job['execution']))!=worker_id:continue
             run = runs.get(job['run_id'])
             if not run or job['attempt_id'] != directory.name:
                 raise ValueError('Cleanup reference differs from the frozen attempt')
@@ -299,7 +300,7 @@ def cleanup_outputs(manifest_path, *, runpod_identity=None):
                 cleaned.append(job['attempt_id'])
             if not pending.is_file():
                 continue
-            backend, address = execution_target(run['execution'])
+            backend, address = execution_target(job['execution'])
             if backend == 'runpod_dedicated':
                 reference = json.loads((directory / 'remote.json').read_text())
                 client = RunpodClient(address, runpod_identity, release=reference.get('release'))
@@ -320,13 +321,20 @@ def cleanup_outputs(manifest_path, *, runpod_identity=None):
 
 
 def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, timezone_name="Europe/London",
-            launcher=None, runpod_identity=None, resume_remote=False):
+            launcher=None, runpod_identity=None, resume_remote=False, worker_id=None):
     from zoneinfo import ZoneInfo
     ZoneInfo(timezone_name)
     if type(limit) is not int or limit < 1:
         raise ValueError("limit must be a positive integer")
     manifest_path = Path(manifest_path).resolve(strict=True)
     manifest = verify_plan(manifest_path)
+    if any(r.get('worker_options') for r in manifest['runs']):
+        if not worker_id:raise ValueError('This shared batch requires a worker identity')
+        runs=[]
+        for run in manifest['runs']:
+            option=next((o for o in run.get('worker_options',[]) if o['worker_id']==worker_id),None)
+            if option:runs.append({**run,**{k:option[k] for k in ('effective','provenance','execution','model_revision')}})
+        manifest={**manifest,'runs':runs}
     # Resolving a venv's interpreter symlink would select its base environment on POSIX.
     python = Path(worker_python or default_python()).expanduser().absolute()
     # Validate every selected job before claiming any or starting inference.
@@ -353,6 +361,14 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             if status == "succeeded" or status == "failed" and not retry_failed:
                 conn.rollback()
                 continue
+            if worker_id:
+                previous=conn.execute('SELECT id FROM generation_attempts WHERE run_id=? ORDER BY started_at DESC,rowid DESC LIMIT 1',(run['id'],)).fetchone()
+                if previous:
+                    saved=json.loads((attempts_root/previous['id']/'request.json').read_text())
+                    if saved['execution']!=run['execution'] or saved['parameters']!=run['effective']:
+                        conn.rollback();continue
+                if status=='running' and not resume_remote:
+                    conn.rollback();continue
             resuming = status == "running" and resume_remote and backend in {'runpod_dedicated', 'runpod_serverless', 'comfyui'}
             if resume_remote and not resuming:
                 conn.rollback()
@@ -407,8 +423,9 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                     attempt_id, run["id"], None, "full_generation", "running", backend, "{}", started, None, None))
                 conn.execute("INSERT INTO generation_timing_spans VALUES(?,?,?,?,?,?,?,?,?,?,?)", (
                     attempt_id + "-total", attempt_id, None, "total", started, None, None, None, None, None, 1))
-                conn.execute("UPDATE generation_runs SET status='running',started_at=? WHERE id=?", (started, run["id"]))
+                conn.execute("UPDATE generation_runs SET status='running',started_at=?,effective_json=? WHERE id=?", (started,json_text(run['effective']), run["id"]))
             conn.commit()
+            print(f'[{now()}] Starting {run["title"]} · run {run["id"][:8]} · attempt {attempt_id[:8]} · {backend} {address or "local"}',flush=True)
             clock, error, marker, pending = time.perf_counter(), None, None, False
             try:
                 if publication is not None:

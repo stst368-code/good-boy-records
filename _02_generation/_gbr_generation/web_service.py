@@ -141,9 +141,11 @@ class GenerationService:
     def preview(self, data):
         if not self.shared_ready():
             raise ValueError('Open GBR through _97_app with the migrated shared database before generating')
+        data=deepcopy(data)
+        pool=self.workers.pool() if data.get('worker_id') in {'auto','all'} else None
         worker = None
         if data.get('worker_id'):
-            worker, report = self.workers.select(data['worker_id'], automatic=data['worker_id'] == 'auto')
+            worker, report = pool[0] if pool else self.workers.select(data['worker_id'])
             data['_worker'] = worker
             connection = worker['connection']
             data['connection'] = connection
@@ -164,7 +166,11 @@ class GenerationService:
                 reviewer_id=rating_filter.get('reviewer_id'), cluster=rating_filter.get('cluster'), style=rating_filter.get('style'))
             if not selected:
                 raise ValueError('No selected inputs meet the saved-rating filter')
-        parameters = {**DEFAULT_PARAMETERS, **(worker or {}).get('defaults', {}), **data.get('parameters', {})}
+        if connection['backend']=='comfyui' and not data.get('_comfy_inventory'):
+            sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'_99_tools/_workers_comfyui'))
+            from client import Client
+            data['_comfy_inventory']=Client(connection['address']).inventory()
+        parameters = self.worker_parameters(data,worker,data.get('_comfy_inventory'))
         spec = {'defaults': parameters, 'execution': execution(connection, data.get('encoding_cache', 'prefer')),
                 'model_revision': None if connection['backend']=='comfyui' else data.get('model_revision') or SMOKE_MODEL_REVISION}
         for key in ('rerun', 'parent_review_generation_id', 'request_id'):
@@ -174,6 +180,7 @@ class GenerationService:
             spec['batch'] = parameters
         if data.get('field_precedence'):
             spec['field_precedence'] = data['field_precedence']
+        self.parameter_sources(spec,data)
         reference_root, styles = self.styles()
         experiment = data.get('experiments') or {}
         combinations = expand(experiment)
@@ -201,23 +208,70 @@ class GenerationService:
             if caption_mode == 'random' and not data.get('template_id'):
                 caption_cluster = data.get('caption_cluster') or (rating_filter or {}).get('cluster')
                 caption_style = data.get('caption_style') or (rating_filter or {}).get('style')
-                pool = [key for key, row in styles.by_id.items()
+                caption_pool = [key for key, row in styles.by_id.items()
                         if (not caption_cluster or row['cluster'].casefold() == caption_cluster.strip().casefold())
                         and (not caption_style or row['style_primary'].casefold() == caption_style.strip().casefold())]
-                if caption_count > len(pool):
-                    raise ValueError(f'Caption pool has {len(pool)} templates; choose fewer captions or broaden the filters')
-                random_ids = secrets.SystemRandom().sample(pool, caption_count)
+                if caption_count > len(caption_pool):
+                    raise ValueError(f'Caption pool has {len(caption_pool)} templates; choose fewer captions or broaden the filters')
+                random_ids = secrets.SystemRandom().sample(caption_pool, caption_count)
             for caption_index, chosen_template in enumerate(random_ids or [data.get('template_id')]):
                 for overrides, combination_index, repeat_index in combinations:
-                    planned.append(self._preview_case(item, spec, styles, reference_root, data,
-                        chosen_template, overrides, caption_index, combination_index, repeat_index))
+                    if not pool:
+                        case=self._preview_case(item, spec, styles, reference_root, data,chosen_template,overrides,caption_index,combination_index,repeat_index)
+                    else:
+                        candidates=[];errors=[];case=None
+                        for entry,report in pool:
+                            candidate_data={**data,'connection':entry['connection'],'_worker':entry,'_comfy_inventory':report.get('_inventory')}
+                            candidate_spec={**deepcopy(spec),'defaults':self.worker_parameters(candidate_data,entry,report.get('_inventory')),
+                                'execution':execution(entry['connection'],data.get('encoding_cache','prefer')),
+                                'model_revision':None if entry['connection']['backend']=='comfyui' else data.get('model_revision') or SMOKE_MODEL_REVISION}
+                            if data.get('parameter_priority')=='form':candidate_spec['batch']=dict(candidate_spec['defaults'])
+                            trial=self._preview_case(item,candidate_spec,styles,reference_root,candidate_data,chosen_template,overrides,caption_index,combination_index,repeat_index)
+                            if trial.ready:
+                                if not candidates:case=trial
+                                candidates.append({'worker_id':entry['id'],'effective':dict(trial.effective),'provenance':dict(trial.provenance),
+                                    'execution':candidate_spec['execution'],'model_revision':candidate_spec['model_revision']})
+                            else:errors.append(entry['id']+': '+'; '.join(i.message for i in trial.issues if i.severity=='error'));case=case or trial
+                        if not candidates:case.issues.append(Issue('no_compatible_worker','No worker can run this combination: '+' | '.join(errors)))
+                        case._worker_options=candidates
+                    planned.append(case)
             record = planned[0]
             record.planned_runs = [{'effective': dict(case.effective), 'provenance': dict(case.provenance),
-                'template': case.template, 'experiment': case._experiment} for case in planned]
+                'template': case.template, 'experiment': case._experiment, 'worker_options':getattr(case,'_worker_options',None)} for case in planned]
             for case in planned[1:]:
                 record.issues.extend(issue for issue in case.issues if issue not in record.issues)
             checked.append(record)
-        return self._remember_preview(checked, spec, connection, catalogue, data, rating_filter, rating_evidence)
+        data['_pool']=[e for e,r in pool] if pool else None
+        result=self._remember_preview(checked, spec, connection, catalogue, data, rating_filter, rating_evidence)
+        result['workers']=[{'id':e['id'],'busy':r['busy']} for e,r in pool] if pool else [{'id':connection_key(connection)}]
+        return result
+
+    def worker_parameters(self,data,worker,inventory):
+        parameters=dict(DEFAULT_PARAMETERS)
+        if data['connection']['backend']=='comfyui' and inventory:
+            from client import resolve
+            nodes=inventory['nodes'];graph=json.loads((Path(__file__).resolve().parents[2]/'_99_tools/_workers_comfyui/_workflows/music-full.json').read_text())
+            for field,node,key,graph_id in [('text_encoder','CLIPLoader','clip_name','1'),('dit','UNETLoader','unet_name','4'),('sampler','KSampler','sampler_name','6'),('scheduler','KSampler','scheduler','6')]:
+                declaration=nodes.get(node,{}).get('input',{}).get('required',{}).get(key,[[]]);values=declaration[0]
+                if not isinstance(values,list) or not values:continue
+                advertised=declaration[1].get('default') if len(declaration)>1 and isinstance(declaration[1],dict) else None
+                preferred=advertised or graph[graph_id]['inputs'][key]
+                parameters[field]=resolve(values,None,field,preferred) if field in {'dit','text_encoder'} else preferred if preferred in values else values[0]
+        parameters.update({k:v for k,v in (worker or {}).get('defaults',{}).items() if v not in ('',None)})
+        parameters.update({k:v for k,v in data.get('parameters',{}).items() if v not in ('',None) and data.get('parameter_sources',{}).get(k)!='worker'})
+        return parameters
+
+    @staticmethod
+    def parameter_sources(spec,data):
+        from .parameters import PARAMETERS
+        for field,source in data.get('parameter_sources',{}).items():
+            if field not in PARAMETERS:raise ValueError('Unknown parameter source: '+field)
+            if source=='control':order=['defaults','preset','template','yaml','batch','rerun']
+            elif source=='worker':order=['preset','template','defaults','rerun']
+            elif source=='yaml':continue
+            else:raise ValueError('Unknown parameter priority')
+            spec.setdefault('field_precedence',{})[field]=order
+            if source=='control' and field in data.get('parameters',{}):spec.setdefault('batch',{})[field]=data['parameters'][field]
 
     def _preview_case(self, item, spec, styles, reference_root, data, template_id, overrides, caption_index, combination_index, repeat_index):
             request = deepcopy(spec)
@@ -241,6 +295,8 @@ class GenerationService:
                 if explicit:
                     request.setdefault('field_precedence', {}).update({key: ['defaults', 'preset', 'yaml', 'template', 'batch', 'rerun'] for key in ('caption', 'cluster', 'style')})
             overrides = dict(overrides)
+            for key,value in list(overrides.items()):
+                if value=='auto' and key not in {'encoder_seed','sampler_seed'}:overrides[key]=spec['defaults'][key]
             if (data.get('experiments') or {}).get('seed_policy') == 'randomize':
                 for key in ('encoder_seed', 'sampler_seed'):
                     overrides.setdefault(key, 'auto')
@@ -285,6 +341,7 @@ class GenerationService:
             token = uuid.uuid4().hex
             self.previews[token] = {'created': now, 'checked': checked, 'spec': spec, 'connection': connection,
                 'launcher': (data.get('_worker') or {}).get('launcher'),
+                'workers':data.get('_pool'),
                 'root': catalogue.root, 'layout': data.get('layout', 'single'),
                 'selection': {key: data.get(key) for key in ('files', 'all_inputs', 'songs', 'albums', 'order', 'rating_filter', 'parameter_priority', 'template_id', 'catalogue_captions', 'caption_mode', 'caption_count', 'caption_cluster', 'caption_style', 'experiments')}}
             if rating_evidence is not None:
@@ -357,9 +414,15 @@ class GenerationService:
                     self.review.config.values['input_directories'] = [*directories, str(self.generated.resolve())]
                     self.review.config.validate()
                     self.review.config.save()
-            result = self.launch({'manifest': str(manifest), 'batch_id': batch_id, 'connection': preview['connection'],
-                                  'launcher': preview.get('launcher'),
-                                  'install': preview['connection']['auto_setup']})
+            if preview.get('workers'):
+                eligible={o['worker_id'] for r in preview['checked'] if r.ready for c in r.planned_runs or [] for o in c.get('worker_options') or []}
+                results=[self.launch({'manifest':str(manifest),'batch_id':batch_id,'connection':w['connection'],
+                    'launcher':w.get('launcher'),'install':w['connection']['auto_setup'],'worker_id':w['id']}) for w in preview['workers'] if w['id'] in eligible]
+                result={'batch_id':batch_id,'tasks':results}
+            else:
+                result = self.launch({'manifest': str(manifest), 'batch_id': batch_id, 'connection': preview['connection'],
+                                      'launcher': preview.get('launcher'),
+                                      'install': preview['connection']['auto_setup']})
             self.review.scan_event.set()
             return result
 
@@ -375,18 +438,34 @@ class GenerationService:
             state = json.loads((folder / 'state.json').read_text()) if (folder / 'state.json').is_file() else {'status': 'starting'}
             active = self.active(folder.name)
             item = {'id': folder.name, 'connection': task['connection'], 'batch_id': task.get('batch_id'), **state,
-                    'active': active, 'manifest': task.get('manifest')}
+                    'active': active, 'manifest': task.get('manifest'),'worker_id':task.get('worker_id'),
+                    'created_at':folder.stat().st_ctime}
             log = folder / 'controller.log'
             if log.is_file():
                 with log.open('rb') as stream:
-                    stream.seek(max(0, log.stat().st_size - 24000))
+                    item['log_end']=log.stat().st_size;item['log_start']=max(0,item['log_end']-24000)
+                    stream.seek(item['log_start'])
                     item['log'] = stream.read().decode('utf-8', errors='replace')
             if task.get('batch_id') and self.shared_ready():
                 item['runs'] = self.review.db.all('SELECT id,title,status,cluster,style FROM generation_runs WHERE batch_id=? ORDER BY rowid', (task['batch_id'],))
+                item['batch_progress']={'complete':sum(r['status']=='succeeded' for r in item['runs']),'total':len(item['runs'])}
                 item['outputs'] = self.review.db.all("SELECT a.run_id,a.kind,a.uri FROM generation_artifacts a JOIN generation_runs r ON r.id=a.run_id WHERE r.batch_id=?", (task['batch_id'],))
                 attempts_root = Path(task['manifest']).parent / 'attempts'
                 completed = self.review.db.all("SELECT a.id FROM generation_attempts a JOIN generation_runs r ON r.id=a.run_id WHERE r.batch_id=? AND r.status='succeeded'", (task['batch_id'],))
                 item['cleanup_pending'] = any(attempts_root.glob('*/cleanup-pending.json')) or any((attempts_root / row['id'] / 'audio.flac').is_file() for row in completed)
+                if task.get('worker_id'):
+                    def owns(attempt_id):
+                        try:
+                            target=json.loads((attempts_root/attempt_id/'request.json').read_text())['execution']['diffusion']
+                            return target['backend']+'|'+(target.get('address') or '')==task['worker_id']
+                        except (OSError,ValueError,KeyError):return False
+                    attempts=self.review.db.all('SELECT a.id,a.run_id FROM generation_attempts a JOIN generation_runs r ON r.id=a.run_id WHERE r.batch_id=? ORDER BY a.started_at DESC,a.rowid DESC',(task['batch_id'],))
+                    latest={}
+                    for attempt in attempts:latest.setdefault(attempt['run_id'],attempt['id'])
+                    frozen=json.loads(Path(task['manifest']).read_text())
+                    eligible={r['id'] for r in frozen['runs'] if any(o['worker_id']==task['worker_id'] for o in r.get('worker_options',[]))}
+                    item['runs']=[r for r in item['runs'] if (owns(latest[r['id']]) if r['id'] in latest else r['id'] in eligible)]
+                    item['cleanup_pending']=any(owns(p.parent.name) for p in attempts_root.glob('*/cleanup-pending.json')) or any(owns(r['id']) and (attempts_root/r['id']/'audio.flac').is_file() for r in completed)
                 if not active and item['status'] in {'starting', 'running', 'checking', 'preparing'}:
                     statuses = {run['status'] for run in item['runs']}
                     item['status'] = 'interrupted' if 'running' in statuses else 'succeeded' if statuses == {'succeeded'} else 'stopped'

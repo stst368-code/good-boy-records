@@ -42,6 +42,7 @@ def main(argv=None):
     p = sub.add_parser("execute", help="Run frozen jobs locally or on a dedicated RunPod")
     p.add_argument("manifest", type=Path)
     p.add_argument("--worker-python", type=Path)
+    p.add_argument("--worker-id", help="Saved backend|address identity for a shared app batch")
     p.add_argument("--limit", type=int, default=1, help="Maximum jobs in this invocation (default: 1)")
     p.add_argument("--retry-failed", action="store_true")
     p.add_argument("--resume-remote", action="store_true", help="Collect the existing remote attempt without starting a new job")
@@ -60,7 +61,7 @@ def main(argv=None):
             else:
                 result = execute(args.manifest, worker_python=args.worker_python, limit=args.limit,
                                  retry_failed=args.retry_failed, timezone_name=args.timezone,
-                                 runpod_identity=args.identity_file, resume_remote=args.resume_remote)
+                                 runpod_identity=args.identity_file, resume_remote=args.resume_remote,worker_id=args.worker_id)
             print(json_text(result))
             if result["status"] == "failed":
                 raise SystemExit(1)

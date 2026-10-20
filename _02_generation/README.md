@@ -234,6 +234,29 @@ win over ordinary YAML/form priorities; review rerun overrides remain final.
 Every run retains its effective controls, template identity and experiment
 indices. Automatic seeds are frozen separately per run before dispatch.
 
+The app groups controls into Models, Text conditioning, Diffusion and Queue/output.
+Each numeric field selects YAML/worker, worker default, fixed value, list or range.
+Encoder/DiT and sampler/scheduler choices use dropdown pairs; values within a row
+stay linked. Separate groups combine with numeric ranges. An API experiment can
+express these as `groups: [[{sampler: "euler", scheduler: "simple"}, ...]]`;
+fields cannot appear in two groups or in both a group and a sweep.
+
+All available workers share the checked queue. A frozen run lists compatible
+worker alternatives, including each worker's model choices and execution settings.
+The shared SQLite claim transaction selects one alternative and records its actual
+controls. Workers take the next compatible job after finishing a song; faster
+workers can take more jobs. Disconnected/uncertain attempts stay attached to their
+original worker and require explicit reconnect/retry. No extra database is used.
+
+Model and sampler selection initially uses each worker's defaults/available choices.
+Choose YAML mode to require the source choices, or a listed pair to constrain the
+experiment. Explicit missing checkpoints are errors; blank models resolve before
+dispatch. The source YAML is never changed.
+
+Controller events include UTC timestamps and each run's start/attempt identity.
+Clear log view is a browser display action; Show full logs restores the retained
+text, and new events remain visible after clearing.
+
 Outputs live in `_02_generation/_generated`, as unique generation bundles,
 optionally grouped by track or album. Review moves the full bundle into the
 review archive and updates artifact locations; it leaves no second audio copy.
