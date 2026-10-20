@@ -145,3 +145,16 @@ An additive, idempotent `writing_tasks` table in the existing shared database st
 requests, reference hashes, revisions, model/token/timing data and publication state. It
 reuses `worker_sessions`; unavailable GPU/VRAM measurements remain null. No legacy-data
 re-import or second database is required. Text quality still needs evaluation with your model.
+
+Generation has separate New batch and Queue views. The queue groups each batch once
+under Active, Completed or Failed/cancelled. Expand Tracks & configurations for
+individual runs, their selected controls, worker and live stage; caption and lyric
+drawers load only when opened. Technical logs remain available in a separate drawer.
+Queued configurations cancel immediately. An active native local run stops only its
+own child process. New ComfyUI servers use the atomic ID-specific cancel API; old
+servers can remove an owned queued prompt, or finish an active generation before
+discarding its output. Older dedicated native releases also finish before discarding.
+No global Comfy interrupt or queue clear is sent. Unknown remote state remains
+reconnectable. Cancelled output cleanup retains checksum receipts and no review copy.
+Status snapshots use unique temporary files and bounded retries for Windows sharing
+locks. A temporary status-file lock does not fail inference; busy workers wait.

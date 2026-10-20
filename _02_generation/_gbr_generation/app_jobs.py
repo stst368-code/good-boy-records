@@ -17,17 +17,23 @@ from _gbr_worker.hardware import gpu_lock
 from _gbr_worker.runpod import RunpodClient
 from _gbr_worker.serverless import ServerlessClient
 from _gbr_generation.executor import WORKER, cleanup_outputs, default_python, execute
-from _gbr_generation.planner import verify_plan
+from _gbr_generation.planner import verify_plan,open_database
+from contextlib import closing
+from _gbr_generation.job_state import atomic_state,read_state
+_state_warnings=set()
 
 
 def write_state(folder, status, **extra):
     path = folder / 'state.json'
-    temporary = folder / 'state.tmp'
     timestamp=datetime.now(timezone.utc).isoformat(timespec='milliseconds')
-    previous=json.loads(path.read_text()) if path.is_file() else {}
+    previous=read_state(path)
     if previous.get('status')!=status:print(f'[{timestamp}] {status.replace("_"," ")}'+(' · '+str(extra.get('error')) if extra.get('error') else ''),flush=True)
-    temporary.write_text(canonical({'status': status,'updated_at':timestamp, **extra}), encoding='utf-8')
-    temporary.replace(path)
+    saved=atomic_state(path,{'status':status,'updated_at':timestamp,**extra})
+    if saved:_state_warnings.discard(str(path))
+    elif str(path) not in _state_warnings:
+        _state_warnings.add(str(path))
+        print('Status file is temporarily locked; generation continues. The dashboard will refresh from the shared database.',file=sys.stderr,flush=True)
+    return saved
 
 
 def prepare_worker(connection, *, install=False):
@@ -57,7 +63,7 @@ def prepare_worker(connection, *, install=False):
 
 
 @contextmanager
-def controller_slot(folder, connection):
+def controller_slot(folder, connection,needed=lambda:True):
     identity = 'gbr-controller:' + connection['backend'] + ':' + (connection.get('address') or '')
     lock = gpu_lock(identity)
     while True:
@@ -67,7 +73,7 @@ def controller_slot(folder, connection):
         except RuntimeError as error:
             if 'Another GBR worker' not in str(error):
                 raise
-            if (folder / 'pause').exists():
+            if (folder / 'pause').exists() or not needed():
                 yield False
                 return
             write_state(folder, 'waiting_worker')
@@ -80,15 +86,31 @@ def controller_slot(folder, connection):
 
 
 def run_task(path):
+    try:
+        with gpu_lock('gbr-task:'+str(Path(path).resolve())):return _run_task(path)
+    except RuntimeError as error:
+        if 'Another GBR worker' not in str(error):raise
+        print('This job already has an active controller; no second controller was started.',flush=True)
+        return 0
+
+
+def _run_task(path):
     from _gbr_layout import task_paths
     task = task_paths(json.loads(Path(path).read_text(encoding='utf-8')))
     folder = Path(path).parent
     connection = task['connection']
     try:
+        manifest=verify_plan(task['manifest']) if task.get('manifest') else None
+        def needed():
+            if not manifest or task.get('cleanup'):return True
+            with closing(open_database(manifest['database'])) as db:
+                states={r[0] for r in db.execute('SELECT status FROM generation_runs WHERE batch_id=?',(manifest['batch_id'],))}
+            return bool(states & ({'prepared','running','cancel_requested'}|({'failed'} if task.get('retry_failed') else set())))
+        if not needed():write_state(folder,'queue_complete');return 0
         # Multiple controller processes cannot run overlapping batches on the same target.
-        with controller_slot(folder, connection) as acquired:
+        with controller_slot(folder, connection,needed) as acquired:
             if not acquired:
-                write_state(folder, 'paused')
+                write_state(folder, 'paused' if (folder/'pause').exists() else 'queue_complete')
                 return 0
             if task.get('cleanup'):
                 write_state(folder, 'cleaning')
@@ -121,13 +143,14 @@ def run_task(path):
                 write_state(folder, 'running', batch_id=manifest['batch_id'])
                 result = execute(task['manifest'], worker_python=connection.get('worker_python') or None,
                     runpod_identity=connection.get('identity_file') or None, limit=1,
-                    retry_failed=task.get('retry_failed', False), resume_remote=task.get('resume', False),worker_id=task.get('worker_id'))
+                    retry_failed=task.get('retry_failed', False), resume_remote=task.get('resume', False),worker_id=task.get('worker_id'),
+                    progress=lambda **p:write_state(folder,'running',batch_id=manifest['batch_id'],**p))
                 print(canonical(result), flush=True)
                 if not result['attempts']:
                     write_state(folder, 'queue_complete' if task.get('worker_id') else result['status'], batch_id=manifest['batch_id'])
                     return 1 if result['status'] == 'failed' else 0
                 # A failed or disconnected attempt stops the queue; only explicit actions retry it.
-                if result['attempts'][0]['status'] != 'succeeded':
+                if result['attempts'][0]['status'] not in {'succeeded','cancelled'}:
                     write_state(folder, result['status'], batch_id=manifest['batch_id'], reconnect=result['status'] == 'running')
                     return 3 if result['status'] == 'running' else 1
                 if result['attempts'][0]['run_id'] in attempted:

@@ -36,7 +36,7 @@ def inventory():
 
 
 @contextmanager
-def server(drop_ack=False,extensions=True,unknown_code=404,prompt_code=None,busy=False,nodes_override=None,api_prefix='',browser_headers=False):
+def server(drop_ack=False,extensions=True,unknown_code=404,prompt_code=None,busy=False,nodes_override=None,api_prefix='',browser_headers=False,holding=None,targeted_cancel=False,pending=False,cancel_output=False):
     output=io.BytesIO();wave=np.sin(np.arange(4410)*.05)*.1;sf.write(output,np.stack([wave,wave],axis=1),44100,format='FLAC',subtype='PCM_24');audio=output.getvalue();state={'submissions':0,'acked':False,'requests':[]}
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
@@ -58,6 +58,10 @@ def server(drop_ack=False,extensions=True,unknown_code=404,prompt_code=None,busy
                 self.respond({'prompt_id':'owned-prompt'})
             elif self.path=='/gbr/ack' and extensions:
                 assert value['sha256']==hashlib.sha256(audio).hexdigest();state['acked']=True;self.respond({'acknowledged':True})
+            elif self.path=='/api/jobs/owned-prompt/cancel' and targeted_cancel:
+                state['cancelled']=True;self.respond({'cancelled':True})
+            elif self.path=='/queue' and value.get('delete')==['owned-prompt']:
+                state['cancelled']=True;self.respond({'deleted':True})
             else:self.send_response(unknown_code);self.end_headers()
         def respond(self,data):
             raw=json.dumps(data).encode();self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
@@ -67,9 +71,13 @@ def server(drop_ack=False,extensions=True,unknown_code=404,prompt_code=None,busy
             if self.path=='/object_info':self.respond(nodes_override or inventory())
             elif self.path=='/gbr/capabilities' and extensions:self.respond({'version':2,'verified_output_cleanup':True,'checkpoint_sha256':False})
             elif self.path=='/system_stats':self.respond({'system':{'comfyui_version':'test-boundary'},'devices':[{'name':'test GPU','vram_total':123456789,'vram_free':100000000}]})
-            elif self.path=='/queue':self.respond({'queue_running':[[0,'another-job',{},{}]] if busy else [],'queue_pending':[]})
+            elif self.path=='/queue':
+                own=[[1,'owned-prompt',{}, {'gbr_attempt_id':state['attempt']}]] if state.get('attempt') and holding and not holding.is_set() and not state.get('cancelled') else []
+                self.respond({'queue_running':([[0,'another-job',{},{}]] if busy else [])+([] if pending else own),'queue_pending':own if pending else []})
             elif self.path.startswith('/history'):
+                if holding and not holding.is_set() and not state.get('cancelled'):self.respond({});return
                 history={'prompt':[0,'owned-prompt',{}, {'gbr_attempt_id':state['attempt']}],'status':{'status_str':'success','completed':True,'messages':[['execution_start',{'timestamp':1792400000000}],['execution_cached',{'nodes':['1','2']}],['execution_success',{'timestamp':1792400001500}]]},'outputs':{'9':{'audio':[{'filename':state['attempt']+'_00001_.flac','subfolder':'gbr','type':'output'}]}}}
+                if state.get('cancelled') and not cancel_output:history.update(status={'status_str':'error','completed':False},outputs={})
                 self.respond({'owned-prompt':history})
             elif self.path.startswith('/view?'):
                 self.send_response(200);self.send_header('Content-Length',str(len(audio)));self.end_headers();self.wfile.write(audio)

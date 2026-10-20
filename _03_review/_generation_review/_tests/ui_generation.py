@@ -171,16 +171,11 @@ def main():
                 assert source.read_bytes() == original
                 artifacts = service.db.all('SELECT * FROM generation_artifacts')
                 assert len(artifacts) == 4 and all(Path(row['uri']).is_relative_to(generated) for row in artifacts)
-                page.locator('#genJobs details summary').first.click()
-                assert 'CPU boundary fixture' in page.locator('#genJobs pre').first.inner_text()
-                page.locator('#genClearLogs').click()
+                page.locator('#genJobs summary',has_text='Technical log').first.click()
+                page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('CPU boundary fixture')")
+                page.locator('#genJobs button',has_text='Clear log view').first.click()
                 page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('Log view cleared')")
-                logfile=next((generation.runtime/'app_jobs').glob('*/controller.log'))
-                with logfile.open('a') as stream:stream.write('\n[2026-10-20T17:00:01.000+00:00] New event after clear\n')
-                page.locator('#genRefreshJobs').click()
-                page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('New event after clear')")
-                assert 'CPU boundary fixture' not in page.locator('#genJobs pre').first.inner_text()
-                page.locator('#genRestoreLogs').click()
+                page.locator('#genJobs button',has_text='Show full log').first.click()
                 page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('CPU boundary fixture')")
                 page.locator('#reviewTab').click()
                 page.wait_for_selector('#reviewCard:not([hidden])')
@@ -195,6 +190,7 @@ def main():
                 assert len(list(service.config.archive.rglob('*.*'))) == 4
                 assert source.read_bytes() == original
                 page.locator('#generationTab').click()
+                page.locator('#genSetupTab').click()
                 with comfy_server() as (url,comfy):
                     assert page.locator('#genBackend').count() == 0
                     page.locator('#genWorkerSettings').click()

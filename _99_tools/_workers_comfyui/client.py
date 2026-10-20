@@ -106,6 +106,8 @@ class Client:
         self.request('/gbr/ack',{'attempt_id':job['attempt_id'],'file':ref['file'],'sha256':ref['download_sha256']})
     def run(self,job,directory,resume=False):
         from _gbr_worker.runpod import RemotePending
+        from _gbr_worker.control import Cancelled,check_cancel
+        cancelled=getattr(self,'cancelled',None);progress=getattr(self,'progress',lambda *a,**k:None)
         directory=Path(directory);journal=directory/'comfy.json'
         def save(data):
             temporary=journal.with_suffix('.tmp');temporary.write_text(canonical(data),encoding='utf-8');temporary.replace(journal)
@@ -115,6 +117,7 @@ class Client:
         try:
             if journal.is_file():ref=json.loads(journal.read_text())
             else:
+                check_cancel(cancelled)
                 prepared=self.prepare(job);compiled=prepared['compiled'];identity=prepared['identity'];hardware=prepared['hardware'];system=prepared['system']
                 ref={'state':'submitting','attempt_id':job['attempt_id'],'prompt':compiled['prompt'],'workflow_sha256':compiled['workflow_sha256'],'models':identity,'hardware':hardware,'versions':system,'client_id':uuid.uuid4().hex}
                 save(ref)
@@ -136,17 +139,58 @@ class Client:
                 if len(set(candidates))!=1:raise RemotePending('Submission acknowledgement missing; inspect Comfy queue/history. This attempt was not submitted again.')
                 ref['prompt_id']=candidates[0];save(ref)
             deadline=time.monotonic()+7200
+            cancel_sent=False;targeted_available=True
             while time.monotonic()<deadline:
+                if cancelled and cancelled() and not cancel_sent:
+                    queue=self.request('/queue')
+                    owned=[row for row in [*queue.get('queue_running',[]),*queue.get('queue_pending',[])] if row[1]==ref['prompt_id'] and row[3].get('gbr_attempt_id')==job['attempt_id']]
+                    if not owned:
+                        prior=self.request('/history/'+ref['prompt_id']).get(ref['prompt_id'],{}).get('prompt',[])
+                        if len(prior)<4 or prior[3].get('gbr_attempt_id')!=job['attempt_id']:raise RemotePending('Cannot verify cancellation ownership; reconnect to the saved attempt')
+                    # The modern ID-scoped API is atomic. Never fall back to
+                    # the old global /interrupt endpoint on an older server.
+                    if targeted_available:
+                        try:
+                            self._prefix(45)
+                            with self._open('/api/jobs/'+ref['prompt_id']+'/cancel',{},timeout=15) as response:reply=json.load(response)
+                            cancel_sent=bool(reply.get('cancelled'))
+                        except HTTPError as error:
+                            if error.code not in (404,405,501):raise
+                            targeted_available=False
+                        except (ValueError,UnicodeDecodeError):targeted_available=False
+                    if not targeted_available:
+                        queue=self.request('/queue')
+                        own=[row for row in queue.get('queue_pending',[]) if row[1]==ref['prompt_id'] and row[3].get('gbr_attempt_id')==job['attempt_id']]
+                        if own:
+                            self._prefix(45)
+                            with self._open(self.prefix+'/queue',{'delete':[ref['prompt_id']]}) as response:response.read()
+                            cancel_sent=True
+                        else:progress('cancel_after_generation',message='This server cannot safely interrupt one prompt; its output will be discarded when it finishes.')
+                    if cancel_sent:progress('cancelling')
                 history=self.request('/history/'+ref['prompt_id']).get(ref['prompt_id'])
+                if cancel_sent:
+                    queue=self.request('/queue')
+                    if not any(row[1]==ref['prompt_id'] for row in [*queue.get('queue_running',[]),*queue.get('queue_pending',[])]):
+                        # Completion can win the cancellation race. Fetch the
+                        # owned FLAC so normal verified discard/ack removes it.
+                        files=[f for output in (history or {}).get('outputs',{}).values() for f in output.get('audio',[]) if f.get('filename','').endswith('.flac')]
+                        if len(files)==1:ref['file']=files[0];break
+                        raise Cancelled('ComfyUI confirmed this prompt is no longer running or queued')
                 if history:
-                    if history.get('status',{}).get('status_str')=='error':raise RuntimeError('Comfy execution failed: '+canonical(history.get('status')))
+                    if history.get('status',{}).get('status_str')=='error':
+                        check_cancel(cancelled)
+                        raise RuntimeError('Comfy execution failed: '+canonical(history.get('status')))
                     if history.get('status',{}).get('completed'):
                         files=[f for output in history.get('outputs',{}).values() for f in output.get('audio',[]) if f.get('filename','').endswith('.flac')]
                         if len(files)!=1:raise ValueError('Expected one generated FLAC in Comfy history')
                         ref['file']=files[0];break
+                queue=self.request('/queue')
+                running=any(row[1]==ref['prompt_id'] for row in queue.get('queue_running',[]))
+                if not (cancelled and cancelled()):progress('comfy_generating' if running else 'comfy_queued')
                 time.sleep(1)
             else:raise RemotePending('Comfy prompt is still pending; reconnect to the saved prompt ID')
             file=ref['file']
+            progress('downloading')
             if file.get('type','output')!='output' or Path(file['filename']).name!=file['filename'] or '..' in Path(file.get('subfolder','')).parts or '\\' in file.get('subfolder','') or not file.get('subfolder','').startswith('gbr') or not file['filename'].startswith(job['attempt_id']):raise ValueError('Comfy returned a file outside this attempt namespace')
             output=directory/'audio.flac';temporary=directory/'download.part'
             self._prefix(45)

@@ -8,11 +8,13 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import uuid
 
 from .planner import json_text, open_database, sha, verify_plan, write_completed_yaml, write_new
 from .yaml_document import YamlDocument
+from .cancellation import discard as discard_cancelled,verify as verify_cancelled
 from _gbr_layout import request_paths
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,6 +22,7 @@ WORKER = ROOT / "_99_tools" / "_workers_infdit"
 sys.path.insert(0, str(WORKER))
 sys.path.insert(0, str(ROOT / "_98_database"))
 from _gbr_worker.contract import PROTOCOL, execution_target, file_sha, validate_job
+from _gbr_worker.control import Cancelled,check_cancel
 from _gbr_worker.runpod import RemotePending, RunpodClient
 from _gbr_worker.serverless import ServerlessClient
 sys.path.insert(0,str(ROOT/"_99_tools/_workers_comfyui"))
@@ -261,7 +264,7 @@ def recover(manifest_path, run_id, *, remote_stopped=False):
             record_output(conn, run, state, marker)
             conn.execute("UPDATE generation_attempts SET status='succeeded',error=NULL WHERE id=?", (marker["attempt_id"],))
             return {"run_id": run_id, "status": "succeeded", "output": state["output_directory"]}
-        if conn.execute("SELECT status FROM generation_runs WHERE id=?", (run_id,)).fetchone()[0] != "running":
+        if conn.execute("SELECT status FROM generation_runs WHERE id=?", (run_id,)).fetchone()[0] not in {"running","publishing","cancel_requested"}:
             raise ValueError("Only an interrupted running job requires recovery")
         conn.execute("UPDATE generation_runs SET status='failed' WHERE id=?", (run_id,))
         return {"run_id": run_id, "status": "failed", "retry": "execute --retry-failed"}
@@ -285,6 +288,17 @@ def cleanup_outputs(manifest_path, *, runpod_identity=None, worker_id=None):
                 raise ValueError('Cleanup reference differs from the frozen attempt')
             state = conn.execute('SELECT status FROM generation_runs WHERE id=?', (run['id'],)).fetchone()
             artifacts = conn.execute('SELECT uri,sha256 FROM generation_artifacts WHERE run_id=?', (run['id'],)).fetchall()
+            if state and state['status']=='cancelled' and (directory/'cancelled-output.json').is_file():
+                verify_cancelled(directory)
+                if pending.is_file():
+                    backend,address=execution_target(job['execution'])
+                    if backend=='comfyui':client=ComfyClient(address)
+                    elif backend=='runpod_serverless':client=ServerlessClient(address)
+                    elif backend=='runpod_dedicated':client=RunpodClient(address,runpod_identity,release=json.loads((directory/'remote.json').read_text()).get('release'))
+                    else:client=None
+                    if client:client.acknowledge(job,directory)
+                    pending.unlink()
+                cleaned.append(job['attempt_id']);continue
             if not state or state['status'] != 'succeeded':
                 continue
             if len(artifacts) < 4 or not all(
@@ -321,7 +335,7 @@ def cleanup_outputs(manifest_path, *, runpod_identity=None, worker_id=None):
 
 
 def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, timezone_name="Europe/London",
-            launcher=None, runpod_identity=None, resume_remote=False, worker_id=None):
+            launcher=None, runpod_identity=None, resume_remote=False, worker_id=None,progress=None):
     from zoneinfo import ZoneInfo
     ZoneInfo(timezone_name)
     if type(limit) is not int or limit < 1:
@@ -358,7 +372,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             conn.execute("BEGIN IMMEDIATE")
             status = conn.execute("SELECT status FROM generation_runs WHERE id=?", (run["id"],)).fetchone()[0]
             backend, address = execution_target(run["execution"])
-            if status == "succeeded" or status == "failed" and not retry_failed:
+            if status in {'succeeded','cancelled'} or status == "failed" and not retry_failed:
                 conn.rollback()
                 continue
             if worker_id:
@@ -367,9 +381,9 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                     saved=json.loads((attempts_root/previous['id']/'request.json').read_text())
                     if saved['execution']!=run['execution'] or saved['parameters']!=run['effective']:
                         conn.rollback();continue
-                if status=='running' and not resume_remote:
+                if status in {'running','publishing','cancel_requested'} and not resume_remote:
                     conn.rollback();continue
-            resuming = status == "running" and resume_remote and backend in {'runpod_dedicated', 'runpod_serverless', 'comfyui'}
+            resuming = status in {'running','cancel_requested'} and resume_remote and backend in {'runpod_dedicated', 'runpod_serverless', 'comfyui'}
             if resume_remote and not resuming:
                 conn.rollback()
                 continue
@@ -426,8 +440,23 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                 conn.execute("UPDATE generation_runs SET status='running',started_at=?,effective_json=? WHERE id=?", (started,json_text(run['effective']), run["id"]))
             conn.commit()
             print(f'[{now()}] Starting {run["title"]} · run {run["id"][:8]} · attempt {attempt_id[:8]} · {backend} {address or "local"}',flush=True)
-            clock, error, marker, pending = time.perf_counter(), None, None, False
+            clock, error, marker, pending, was_cancelled = time.perf_counter(), None, None, False, False
+            client=None
+            def cancelled():
+                with closing(open_database(manifest['database'])) as reader:
+                    return reader.execute('SELECT status FROM generation_runs WHERE id=?',(run['id'],)).fetchone()[0] in {'cancel_requested','cancelled'}
+            def notify(stage,**data):
+                update={'run_id':run['id'],'attempt_id':attempt_id,'stage':stage,**data}
+                previous=getattr(notify,'last',{})
+                if progress and update!=previous:
+                    if stage==previous.get('stage') and time.monotonic()-getattr(notify,'at',0)<.5:return
+                    progress(**update);notify.last=update;notify.at=time.monotonic()
+            def remote_client(client):
+                client.cancelled=cancelled;client.progress=notify
+                return client
             try:
+                if not resuming:check_cancel(cancelled)
+                notify('starting_worker')
                 if publication is not None:
                     print('Reusing verified worker audio; retrying metadata/publication without inference.', file=sys.stderr)
                     if not launcher and backend == 'runpod_dedicated':
@@ -441,26 +470,41 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                     launcher(python, directory / "request.json", directory)
                 elif backend == "runpod_dedicated":
                     reference = json.loads((directory / "remote.json").read_text()) if resuming else {}
-                    client = RunpodClient(address, runpod_identity, release=reference.get("release"))
+                    client = remote_client(RunpodClient(address, runpod_identity, release=reference.get("release")))
                     client.run(job, directory, resume=resuming)
                 elif backend == 'runpod_serverless':
-                    client = ServerlessClient(address)
+                    client = remote_client(ServerlessClient(address))
                     client.run(job, directory, resume=resuming)
                 elif backend=='comfyui':
-                    client=ComfyClient(address)
+                    client=remote_client(ComfyClient(address))
                     client.run(job,directory,resume=resuming)
                 else:
                     with (directory / "stderr.log").open("x", encoding="utf-8") as log:
                         process = subprocess.Popen([str(python), "-u", str(WORKER / "worker.py"), "run", str(directory / "request.json")],
                                                    stdout=log, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+                        stopped=threading.Event()
+                        def watch_cancel():
+                            while not stopped.wait(.25) and process.poll() is None:
+                                if cancelled():
+                                    process.terminate()
+                                    try:process.wait(timeout=3)
+                                    except subprocess.TimeoutExpired:process.kill()
+                                    return
+                        watcher=threading.Thread(target=watch_cancel,daemon=True);watcher.start()
                         try:
+                            stage='starting_worker'
                             for line in process.stderr:
                                 log.write(line)
                                 log.flush()
                                 print(line, end="", file=sys.stderr, flush=True)
+                                event=re.search(r'\] stage_start (\w+)',line)
+                                if event:stage=event[1];notify(stage)
+                                step=re.search(r'(\d+)%.*?(\d+)/(\d+)',line)
+                                if step:notify(stage,step=int(step[2]),steps=int(step[3]))
                             return_code = process.wait()
+                            check_cancel(cancelled)
                         except BaseException:
-                            process.terminate()
+                            if process.poll() is None:process.terminate()
                             try:
                                 process.wait(timeout=15)
                             except subprocess.TimeoutExpired:
@@ -468,6 +512,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                                 process.wait()
                             raise
                         finally:
+                            stopped.set();watcher.join(timeout=4)
                             process.stderr.close()
                         if return_code:
                             detail = ""
@@ -478,6 +523,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                             except (OSError, ValueError, AttributeError):
                                 pass
                             raise RuntimeError(f"Worker exited {return_code}: {detail}; see {directory / 'stderr.log'}")
+                check_cancel(cancelled)
                 result = json.loads((directory / "result.json").read_text(encoding="utf-8"))
                 if result.get("status") != "succeeded" or result.get("run_id") != run["id"] or result.get("attempt_id") != attempt_id or result.get("protocol") != PROTOCOL:
                     raise ValueError(result.get("error", "Invalid/failed worker result"))
@@ -489,6 +535,11 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                         raise ValueError('Publication input checksums changed')
                 else:
                     write_new(receipt, json_text(evidence).encode('utf-8'))
+                conn.execute('BEGIN IMMEDIATE')
+                if conn.execute('SELECT status FROM generation_runs WHERE id=?',(run['id'],)).fetchone()[0]=='cancel_requested':
+                    conn.rollback();raise Cancelled('Cancelled before publication')
+                conn.execute("UPDATE generation_runs SET status='publishing' WHERE id=?",(run['id'],));conn.commit()
+                notify('publishing')
                 with conn:
                     store_observations(conn, attempt_id, run["id"], read_events(directory))
                 state = dict(conn.execute("SELECT * FROM generation_execution_state WHERE run_id=?", (run["id"],)).fetchone())
@@ -511,6 +562,15 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                 error = f"{type(exc).__name__}: {exc}"
                 marker = None
                 pending = backend in {'runpod_dedicated', 'runpod_serverless', 'comfyui'} and isinstance(exc, (RemotePending, KeyboardInterrupt))
+                was_cancelled=isinstance(exc,Cancelled)
+                if was_cancelled:
+                    # Explicit cancellation authorises discarding this owned result;
+                    # keep a checksum receipt so deferred remote cleanup is verifiable.
+                    try:
+                        if discard_cancelled(directory,job) and client:client.acknowledge(job,directory)
+                    except Exception as cleanup_error:
+                        (directory/'cleanup-pending.json').write_text(json_text({'error':str(cleanup_error),'cancelled':True}))
+                    (directory/'download.part').unlink(missing_ok=True)
                 if isinstance(exc, KeyboardInterrupt):
                     print("Controller interrupted; reconnect with --resume-remote. The pod continues working." if pending
                           else "Local test interrupted; saving available telemetry.", file=sys.stderr)
@@ -523,17 +583,17 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                         conn.execute("UPDATE generation_timing_spans SET completed_at=?,duration_seconds=? WHERE id=?",
                                      (None if pending else ended, None if pending else duration, attempt_id + "-total"))
                     conn.execute("UPDATE generation_attempts SET status=?,completed_at=?,error=? WHERE id=?", (
-                        "running" if pending else "succeeded" if marker else "failed", None if pending else ended, error, attempt_id))
+                        "running" if pending else "cancelled" if was_cancelled else "succeeded" if marker else "failed", None if pending else ended, error, attempt_id))
                     if not marker and not pending:
-                        conn.execute("UPDATE generation_runs SET status='failed' WHERE id=?", (run["id"],))
-                results.append({"run_id": run["id"], "attempt_id": attempt_id, "status": "running" if pending else "succeeded" if marker else "failed",
+                        conn.execute("UPDATE generation_runs SET status=?,completed_at=? WHERE id=?", ('cancelled' if was_cancelled else 'failed',ended,run["id"]))
+                results.append({"run_id": run["id"], "attempt_id": attempt_id, "status": "running" if pending else "cancelled" if was_cancelled else "succeeded" if marker else "failed",
                                 "output": state["output_directory"] if marker else None, "error": error,
                                 "diagnostics": str(directory), **({"resume": "execute --resume-remote"} if pending else {})})
-            if error:
+            if error and not was_cancelled:
                 break
         with conn:
             statuses = [r[0] for r in conn.execute("SELECT status FROM generation_runs WHERE batch_id=?", (manifest["batch_id"],))]
-            batch_status = "succeeded" if all(s == "succeeded" for s in statuses) else "failed" if "failed" in statuses else "running" if "running" in statuses else "prepared"
+            batch_status = "succeeded" if all(s == "succeeded" for s in statuses) else "running" if any(s in {'running','publishing','cancel_requested'} for s in statuses) else "failed" if 'failed' in statuses else "prepared" if 'prepared' in statuses else 'cancelled'
             conn.execute("UPDATE generation_batches SET status=? WHERE id=?", (batch_status, manifest["batch_id"]))
     return {"batch_id": manifest["batch_id"], "status": batch_status, "attempts": results}
 

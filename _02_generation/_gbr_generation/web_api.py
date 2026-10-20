@@ -108,6 +108,8 @@ class Action(Body):
 
 def router(root, review_service, local):
     service = GenerationService(root, review_service)
+    from .jobs import Jobs
+    jobs_service=Jobs(service)
 
     def host_only(request: Request):
         if not local(request):
@@ -210,6 +212,18 @@ def router(root, review_service, local):
     @routes.get('/tasks')
     def tasks():
         return {'tasks': service.tasks()}
+
+    @routes.get('/jobs')
+    def jobs():return jobs_service.listing()
+
+    @routes.get('/jobs/{batch_id}')
+    def job_details(batch_id:str,offset:int=0,limit:int=100):return jobs_service.details(batch_id,offset,limit)
+
+    @routes.get('/jobs/{batch_id}/runs/{run_id}/text')
+    def job_text(batch_id:str,run_id:str):return jobs_service.text(batch_id,run_id)
+
+    @routes.post('/jobs/{batch_id}/runs/{run_id}/cancel')
+    def cancel_run(batch_id:str,run_id:str):return jobs_service.cancel(batch_id,run_id)
 
     @routes.post('/tasks/{task_id}')
     def task_action(task_id: str, body: Action):

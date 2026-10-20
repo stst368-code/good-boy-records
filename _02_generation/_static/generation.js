@@ -1,3 +1,4 @@
+import {initJobs} from "/tools/generation/jobs.js";
 import {workerLabel} from "/tools/generation/workers.js";
 export function initGeneration({api,toast,browse,configureWorkers}) {
   const root=document.getElementById('generationView');
@@ -18,6 +19,19 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
   </section>
   <section class="generation-panel generation-monitor"><h2>Workers</h2><label>Run on<select id="genWorker"><option value="auto">All available workers · shared queue</option></select></label><div class="generation-inline"><button id="genWorkerSettings" type="button">Worker settings</button><button id="genRefreshWorkers" type="button">Refresh availability</button></div><p id="genConnectionStatus" class="subtle small" role="status"></p><section id="genPlan" class="generation-plan" hidden><h2>Batch check</h2><p id="genPlanSummary"></p><div id="genPlanRows"></div><label class="generation-check"><input id="genDropErrors" type="checkbox">Drop errored inputs and run valid tracks</label><button id="genStart" class="primary" type="button">Generate checked tracks</button><button id="genCancelPreview" type="button">Cancel batch</button></section><h2>Jobs</h2><div class="generation-inline"><button id="genRefreshJobs" type="button">Refresh</button><button id="genClearLogs" type="button">Clear log view</button><button id="genRestoreLogs" type="button">Show full logs</button></div><div id="genJobs" class="generation-jobs"></div></section></div>`;
   const $=id=>document.getElementById(id);
+  const grid=root.querySelector('.generation-grid'),setup=grid.firstElementChild,monitor=grid.lastElementChild;
+  setup.id='genSetupPanel';
+  const workerbar=document.createElement('section');workerbar.className='gen-workerbar';
+  while(monitor.firstElementChild&&monitor.firstElementChild.id!=='genPlan')workerbar.append(monitor.firstElementChild);
+  workerbar.firstElementChild.remove();
+  setup.append($('genPlan'));
+  const queue=document.createElement('section');queue.id='genQueuePanel';queue.hidden=true;
+  while(monitor.firstChild)queue.append(monitor.firstChild);
+  const tabs=document.createElement('div');tabs.className='gen-workspace-tabs';tabs.innerHTML='<button id="genSetupTab" type="button" class="active">New batch</button><button id="genQueueTab" type="button">Queue</button>';
+  grid.replaceWith(workerbar,tabs,setup,queue);
+  function showPanel(name){setup.hidden=name!=='setup';queue.hidden=name!=='queue';$('genSetupTab').classList.toggle('active',name==='setup');$('genQueueTab').classList.toggle('active',name==='queue');}
+  $('genSetupTab').onclick=()=>showPanel('setup');$('genQueueTab').onclick=()=>{showPanel('queue');jobs().catch(e=>toast(e.message));};
+  $('genClearLogs').remove();$('genRestoreLogs').remove();
   const state={rows:[],selected:new Set(),catalogueRoot:null,scanSequence:0,workers:[],resolved:null,token:null,preview:null,loaded:false,poll:null,busy:false,revision:0,logCursors:JSON.parse(sessionStorage.getItem('gbr-generation-log-cursors')||'{}'),tasks:[]};
   const guarded=fn=>(...args)=>Promise.resolve(fn(...args)).catch(error=>toast(error.message));
   const numericFields=[['encoder_cfg','genEncoderCfg','Encoder CFG',1.5,'genEncodingControls'],['top_k','genTopK','Top-k',50,'genEncodingControls'],['duration','genDuration','Maximum seconds',360,'genEncodingControls'],['encoder_seed','genEncoderSeed','Encoder seed','auto','genEncodingControls'],['sampler_steps','genSteps','Steps',30,'genDiffusionControls'],['sampler_cfg','genCfg','Diffusion CFG',1.7,'genDiffusionControls'],['sampler_seed','genSamplerSeed','Diffusion seed','auto','genDiffusionControls']];
@@ -203,108 +217,8 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     $("genDropErrors").checked = false;
     paintPlan();
   }
-  async function jobs() {
-    const expanded = new Set(
-      [...$("genJobs").querySelectorAll("details[open]")].map(
-        (item) => item.dataset.task,
-      ),
-    );
-    const result = await api("/generation/tasks");
-    state.tasks=result.tasks;
-    $("genJobs").replaceChildren();
-    for (const task of result.tasks) {
-      const card = document.createElement("article");
-      card.className = "generation-job";
-      const heading = document.createElement("h3");
-      heading.textContent = `${task.batch_id ? "Batch " + task.batch_id.slice(0, 8) : "Worker check"} · ${task.status.replaceAll("_", " ")}`;
-      const detail = document.createElement("p");
-      detail.className = "subtle small";
-      const runs = task.runs || [];
-      const progress=task.batch_progress||{complete:runs.filter(r=>r.status==="succeeded").length,total:runs.length};
-      detail.textContent = `${task.connection.backend.replaceAll("_", " ")}${task.connection.address ? " · " + task.connection.address : ""}${progress.total ? " · " + progress.complete + " / " + progress.total + " complete" : ""}`;
-      card.append(heading, detail);
-      const time=document.createElement("p");time.className="subtle small";time.textContent="Queued "+new Date(task.created_at*1000).toLocaleString()+(task.updated_at?" · Updated "+new Date(task.updated_at).toLocaleString():"");card.append(time);
-      if (task.error) {
-        const error = document.createElement("p");
-        error.className = "error";
-        error.textContent = task.error;
-        card.append(error);
-      }
-      if (task.report?.message) {
-      const message = document.createElement("p");
-      message.className = "subtle small";
-      message.textContent = task.report.message;
-      card.append(message);
-    }
-    const hardware = task.report?.hardware;
-      if (hardware) {
-        const info = document.createElement("p");
-        info.className = "subtle small";
-        info.textContent = `${hardware.gpu_name || "GPU unavailable"} · ${hardware.usable_vram_bytes ? (hardware.usable_vram_bytes / 1024 ** 3).toFixed(1) + " GiB VRAM" : "VRAM not reported"}`;
-        card.append(info);
-      }
-      const actions = document.createElement("div");
-      actions.className = "generation-inline";
-      const options = [];
-      if (task.active && task.batch_id && task.status !== "cleaning")
-        options.push(["pause", "Pause after this song"]);
-      if (!task.active) {
-        if (!task.batch_id) options.push(["continue", "Run check again"]);
-        else if (runs.some((run) => run.status === "running")) {
-          if (task.connection.backend !== "local")
-            options.push(["resume", "Reconnect to existing job"]);
-          else {
-            const note = document.createElement("p");
-            note.className = "subtle small";
-            note.textContent =
-              "The local controller stopped. Check its log and recover the interrupted attempt before retrying.";
-            card.append(note);
-          }
-        } else if (runs.some((run) => run.status === "failed"))
-          options.push(["retry", "Retry failed tracks"]);
-        else if (runs.some((run) => run.status === "prepared"))
-          options.push(["continue", "Continue queue"]);
-        if (task.cleanup_pending)
-          options.push(["cleanup", "Clean temporary files"]);
-      }
-      for (const [action, label] of options) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = label;
-        button.onclick = guarded(async () => {
-          await api(`/generation/tasks/${task.id}`, { action });
-          await jobs();
-        });
-        actions.append(button);
-      }
-      card.append(actions);
-      if (task.outputs?.length) {
-        const location = document.createElement("p");
-        location.className = "generation-output-path";
-        location.textContent =
-          task.outputs.find((item) => item.kind === "audio")?.uri || "";
-        card.append(location);
-      }
-      if (task.log) {
-        const log = document.createElement("details");
-        log.dataset.task = task.id;
-        log.open = expanded.has(task.id);
-        const summary = document.createElement("summary");
-        summary.textContent = "Progress log";
-        const text = document.createElement("pre");
-        const cursor=state.logCursors[task.id]||0,bytes=new TextEncoder().encode(task.log);
-        text.textContent = new TextDecoder().decode(bytes.slice(Math.max(0,cursor-(task.log_start||0)))) || 'Log view cleared. New events will appear here.';
-        const clear=document.createElement('button');clear.type='button';clear.textContent='Clear this log';clear.onclick=()=>{state.logCursors[task.id]=task.log_end;sessionStorage.setItem('gbr-generation-log-cursors',JSON.stringify(state.logCursors));jobs().catch(e=>toast(e.message));};log.append(clear);
-        log.append(summary, text);
-        card.append(log);
-      }
-      $("genJobs").append(card);
-    }
-    if (!result.tasks.length)
-      $("genJobs").textContent = "No generation jobs yet.";
-  }
-  $('genClearLogs').onclick=guarded(async()=>{for(const task of state.tasks)state.logCursors[task.id]=task.log_end||0;sessionStorage.setItem('gbr-generation-log-cursors',JSON.stringify(state.logCursors));await jobs();});
-  $('genRestoreLogs').onclick=guarded(async()=>{state.logCursors={};sessionStorage.removeItem('gbr-generation-log-cursors');await jobs();});
+  const dashboard=initJobs({root:$('genJobs'),api,toast});
+  async function jobs(){return dashboard.refresh();}
   $('genWorker').onchange = guarded(chooseWorker);
   $('genWorkerSettings').onclick = guarded(configureWorkers);
   $('genRefreshWorkers').onclick = guarded(async () => {await reloadWorkers(true); await chooseWorker();});
@@ -346,6 +260,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
         skip_errors: $("genDropErrors").checked,
       });
       invalidate();
+      showPanel('queue');
       await jobs();
       toast("Batch queued. You can continue reviewing.");
     } finally {

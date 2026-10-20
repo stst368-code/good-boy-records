@@ -426,22 +426,24 @@ class GenerationService:
             self.review.scan_event.set()
             return result
 
-    def tasks(self):
+    def tasks(self,include_logs=True):
+        from .job_state import read_state
         items = []
         root = self.runtime / 'app_jobs'
         if not root.is_dir():
             return items
-        for folder in sorted(root.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)[:50]:
+        for index,folder in enumerate(sorted(root.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)):
+            if index>=50 and not self.active(folder.name):continue
             if not folder.is_dir() or not (folder / 'task.json').is_file():
                 continue
             task = task_paths(json.loads((folder / 'task.json').read_text()))
-            state = json.loads((folder / 'state.json').read_text()) if (folder / 'state.json').is_file() else {'status': 'starting'}
+            state = read_state(folder/'state.json',{'status':'starting'})
             active = self.active(folder.name)
             item = {'id': folder.name, 'connection': task['connection'], 'batch_id': task.get('batch_id'), **state,
                     'active': active, 'manifest': task.get('manifest'),'worker_id':task.get('worker_id'),
                     'created_at':folder.stat().st_ctime}
             log = folder / 'controller.log'
-            if log.is_file():
+            if include_logs and log.is_file():
                 with log.open('rb') as stream:
                     item['log_end']=log.stat().st_size;item['log_start']=max(0,item['log_end']-24000)
                     stream.seek(item['log_start'])
@@ -466,10 +468,10 @@ class GenerationService:
                     eligible={r['id'] for r in frozen['runs'] if any(o['worker_id']==task['worker_id'] for o in r.get('worker_options',[]))}
                     item['runs']=[r for r in item['runs'] if (owns(latest[r['id']]) if r['id'] in latest else r['id'] in eligible)]
                     item['cleanup_pending']=any(owns(p.parent.name) for p in attempts_root.glob('*/cleanup-pending.json')) or any(owns(r['id']) and (attempts_root/r['id']/'audio.flac').is_file() for r in completed)
-                if not active and item['status'] in {'starting', 'running', 'checking', 'preparing'}:
+                if not active and item['status'] in {'starting', 'running', 'checking', 'preparing','waiting_worker'}:
                     statuses = {run['status'] for run in item['runs']}
-                    item['status'] = 'interrupted' if 'running' in statuses else 'succeeded' if statuses == {'succeeded'} else 'stopped'
-                    item['reconnect'] = 'running' in statuses and task['connection']['backend'] != 'local'
+                    item['status'] = 'interrupted' if statuses & {'running','publishing','cancel_requested'} else 'succeeded' if statuses == {'succeeded'} else 'stopped'
+                    item['reconnect'] = bool(statuses & {'running','cancel_requested'}) and task['connection']['backend'] != 'local'
             report = folder / 'hardware.json'
             if report.is_file():
                 item['report'] = json.loads(report.read_text())

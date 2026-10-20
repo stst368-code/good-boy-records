@@ -23,4 +23,5 @@ jobs:
       - run: node --input-type=module --check < _04_preparation/_static/preparation.js
       - run: node --input-type=module --check < _04_preparation/_static/timeline.js
       - run: node --input-type=module --check < _02_generation/_static/generation.js
+      - run: node --input-type=module --check < _02_generation/_static/jobs.js
       - run: node --input-type=module --check < _02_generation/_static/workers.js

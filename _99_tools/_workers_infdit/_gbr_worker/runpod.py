@@ -230,6 +230,11 @@ print(json.dumps({'collected':True}))
             raise RemotePending("Remote submission/status is uncertain; reconnect to this attempt. " + str(exc)) from exc
         last_tail = None
         while True:
+            if getattr(self,'progress',None):
+                if getattr(self,'cancelled',None) and self.cancelled():self.progress('cancel_after_generation',message='This dedicated worker release finishes its owned attempt before discarding the output.')
+                else:
+                    phases=re.findall(r'\] stage_start (\w+)',state.get('log_tail',''))
+                    self.progress(phases[-1] if phases else 'dedicated_generating')
             tail = state.get("log_tail")
             if tail and tail != last_tail:
                 fresh = tail[len(last_tail):] if last_tail and tail.startswith(last_tail) else tail[-2048:]

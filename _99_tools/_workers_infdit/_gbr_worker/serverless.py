@@ -112,11 +112,17 @@ class ServerlessClient:
             temporary.write_text(canonical(reference))
             temporary.replace(reference_path)
         while True:
+            if getattr(self,'cancelled',None) and self.cancelled() and reference.get('job_id'):
+                from .control import Cancelled
+                self.api('cancel/'+reference['job_id'],{})
+                confirmed=self.api('status/'+reference['job_id'])
+                if confirmed.get('status') in {'CANCELLED','FAILED','TIMED_OUT'}:raise Cancelled('RunPod confirmed this job stopped')
             try:
                 receipt = store.receipt(object_key)
             except Exception:
                 raise RemotePending('Artifact storage is unavailable; remote work may still be running') from None
             if receipt:
+                if getattr(self,'progress',None):self.progress('downloading')
                 archive = directory / 'worker.tar.download'
                 try:
                     store.download(object_key, archive)
@@ -131,6 +137,7 @@ class ServerlessClient:
             if not job_id:
                 raise RemotePending('Submission response was lost. No replacement was sent; resume after the remote result arrives or inspect the endpoint')
             status = self.api('status/' + job_id)
+            if getattr(self,'progress',None):self.progress('serverless_queued' if status.get('status')=='IN_QUEUE' else 'serverless_generating')
             if status.get('status') in {'FAILED', 'CANCELLED', 'TIMED_OUT'}:
                 raise RuntimeError('RunPod job ended with status ' + status['status'])
             if status.get('status') == 'COMPLETED':
