@@ -91,5 +91,5 @@ export function initYamlEditor({api,toast,browse}){
   $('raw-close').onclick=()=>$('raw').close();$('history-close').onclick=()=>$('history-dialog').close();$('history').onclick=safe(showHistory);
   $('text').oninput=invalidate;$('raw-preview').onclick=async()=>{try{await task(async()=>{const result=await api('/yaml-editor/preview',{directory:root,files:[rawFile.path],text:$('text').value,expected:{[rawFile.path]:rawFile.sha256}});$('raw').close();showPreview(result);});}catch(e){$('raw-error').textContent=e.message;}};
   addOperation();renderFiles();
-  return {open:async()=>{if(!loaded)await scan();}};
+  return {invalidateCatalogue:()=>{loaded=false;invalidate();},open:async()=>{if(!loaded)await scan();}};
 }

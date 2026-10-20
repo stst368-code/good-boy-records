@@ -109,3 +109,29 @@ is retried. Required API failures identify the worker rather than the writing YA
 environment; `--cpu` selects CPU packages. Models download on an explicit job.
 Lighting/lyric annotations use the current working audio hash and never rewrite
 source YAMLs. Artwork stays at brief preparation until the API workflow is supplied.
+
+## Writing and workflow
+
+The workflow tabs are Writing → YAML editor → Generation → Review → Selection → Preparation.
+The desktop workspace is fluid up to 1920 px; the preparation page uses that width too.
+The public GBR site now lives in `_96_website`; startup migrates local website files from
+`_04_website` and `_05_website`, including untracked media, without rewriting their bytes.
+
+Writing connects to a running llama.cpp server under Settings → Writing model settings
+(or Worker settings → Writing model). Binaries remain in `_99_tools/_llama_cpp`; query the
+server's loaded model before sending a brief. No model downloads occur on app startup.
+New songs, lyric/caption rewrites, combined rewrites and translations produce editable
+drafts. Lore and caption references are optional; an empty `_references/_lyrics` folder
+is a valid fallback. Put tagged song examples there as UTF-8 TXT, Markdown or YAML files.
+
+Only adding a reviewed draft to Built changes the active writing collection. New songs
+receive the next song ID; keep-original rewrites receive a new variant ID. Archive-and-replace
+moves the exact original YAML into `_01_writing/_archive/<draft-id>` and retains its IDs.
+Catalogue publication is journalled and can finish after interruption. Unrequested YAML
+fields, structure and line endings are preserved. Saved AI captions use `_llm_templates`
+and `template_source=llm`; existing MiniMax samples and custom templates remain available.
+
+An additive, idempotent `writing_tasks` table in the existing shared database stores drafts,
+requests, reference hashes, revisions, model/token/timing data and publication state. It
+reuses `worker_sessions`; unavailable GPU/VRAM measurements remain null. No legacy-data
+re-import or second database is required. Text quality still needs evaluation with your model.

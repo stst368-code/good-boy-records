@@ -436,6 +436,7 @@ export function initGeneration({ api, toast, browse, configureWorkers }) {
   for (const [id,key] of Object.entries(parameterFields)) $(id).addEventListener('input', () => state.touched.add(key));
   return {
     reloadWorkers,
+    writingChanged(kind) {if(kind==='track')state.catalogueDirty=true;state.templatesDirty=true;invalidate();},
     async open() {
       if (!state.loaded) {
         const prefs = await api("/generation/preferences");
@@ -472,7 +473,10 @@ export function initGeneration({ api, toast, browse, configureWorkers }) {
             "Generation needs the shared platform database. Open GBR through _97_app.",
           );
         await scan();
+        state.catalogueDirty=false;state.templatesDirty=false;
       }
+      if(state.catalogueDirty){await scan();state.catalogueDirty=false;}
+      if(state.templatesDirty){const result=await api('/generation/templates');$('genTemplateList').replaceChildren(...result.templates.map(t=>new Option(t.cluster+' / '+t.style+' · '+t.source,t.id)));state.templatesDirty=false;}
       await jobs();
       clearInterval(state.poll);
       state.poll = setInterval(() => {

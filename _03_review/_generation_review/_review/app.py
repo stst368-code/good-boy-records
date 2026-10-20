@@ -634,6 +634,14 @@ def create_app(config_path, start_worker=True, database_path=None):
     app.include_router(generation_routes)
     app.state.generation = generation
     app.mount('/tools/generation', StaticFiles(directory=generation_root / '_static'), name='generation')
+    writing_root = repo_root / '_01_writing'
+    sys.path.insert(0, str(writing_root))
+    from _gbr_writing.api import router as writing_router
+    writing_routes, writing = writing_router(repo_root, service, local, reviewer_id)
+    app.include_router(writing_routes)
+    app.state.writing = writing
+    service.writing = writing
+    app.mount('/tools/writing', StaticFiles(directory=writing_root / '_static'), name='writing')
     preparation_root = repo_root / '_04_preparation'
     sys.path.insert(0, str(preparation_root))
     from _gbr_preparation.api import router as preparation_router

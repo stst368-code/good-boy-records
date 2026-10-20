@@ -1,10 +1,10 @@
 name: GBR preparation
 on:
   pull_request:
-    paths: ['_04_preparation/**', '_02_generation/**', '_99_tools/_workers_processing/**', '_99_tools/_workers_comfyui/**', '_98_database/_gbr_database/**', '_03_review/_generation_review/_review/**', '.github/workflows/preparation.yml']
+    paths: ['_01_writing/_gbr_writing/**', '_01_writing/_static/**', '_01_writing/_tests/**', '_99_tools/_workers_infdit/_gbr_worker/llama.py', '_gbr_layout.py', '_04_preparation/**', '_02_generation/**', '_99_tools/_workers_processing/**', '_99_tools/_workers_comfyui/**', '_98_database/_gbr_database/**', '_03_review/_generation_review/_review/**', '.github/workflows/preparation.yml']
   push:
     branches: [main]
-    paths: ['_04_preparation/**', '_02_generation/**', '_99_tools/_workers_processing/**', '_99_tools/_workers_comfyui/**', '_98_database/_gbr_database/**', '_03_review/_generation_review/_review/**', '.github/workflows/preparation.yml']
+    paths: ['_01_writing/_gbr_writing/**', '_01_writing/_static/**', '_01_writing/_tests/**', '_99_tools/_workers_infdit/_gbr_worker/llama.py', '_gbr_layout.py', '_04_preparation/**', '_02_generation/**', '_99_tools/_workers_processing/**', '_99_tools/_workers_comfyui/**', '_98_database/_gbr_database/**', '_03_review/_generation_review/_review/**', '.github/workflows/preparation.yml']
 permissions:
   contents: read
 jobs:
@@ -17,7 +17,8 @@ jobs:
           python-version: '3.12'
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: python -m pip install -r _03_review/_generation_review/requirements-dev.txt
-      - run: python -m pytest _04_preparation/_tests -q
+      - run: python -m pytest _01_writing/_tests _04_preparation/_tests _02_generation/_tests/test_layout.py -q
+      - run: node --input-type=module --check < _01_writing/_static/writing.js
       - run: python -m pytest _02_generation/_tests/test_comfy_execution.py _02_generation/_tests/test_workers.py _02_generation/_tests/test_app_jobs.py -q
       - run: node --input-type=module --check < _04_preparation/_static/preparation.js
       - run: node --input-type=module --check < _04_preparation/_static/timeline.js

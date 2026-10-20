@@ -60,3 +60,7 @@
 
 /* Main tools stay reachable as the platform gains stages. */
 @media(max-width:900px){.topbar{flex-wrap:wrap}.topbar nav{width:100%;min-width:0;flex-wrap:wrap;justify-content:flex-start;gap:2px}}
+
+/* Fluid stage workspace; retain the compact phone layout. */
+main,.topbar{width:100%;max-width:1920px}main{padding-left:clamp(14px,2vw,36px);padding-right:clamp(14px,2vw,36px)}.topbar{padding-left:clamp(14px,2vw,36px);padding-right:clamp(14px,2vw,36px)}.topbar nav{flex-wrap:wrap}.topbar .wordmark{flex-shrink:0}
+@media(max-width:850px){.topbar{flex-wrap:wrap}.topbar nav{width:100%;justify-content:flex-start;gap:3px}.topbar nav .tab{flex:1 0 auto}.topbar nav .icon-button{flex:0 0 auto}}

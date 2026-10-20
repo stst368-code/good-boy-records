@@ -208,6 +208,7 @@ def inspect_sources(generation_path, review_path):
 def install_schema(conn):
     conn.executescript(SCHEMA.read_text(encoding="utf-8"))
     conn.executescript(SCHEMA.with_name('processing.sql').read_text(encoding='utf-8'))
+    conn.executescript(SCHEMA.with_name('writing.sql').read_text(encoding='utf-8'))
     conn.execute("INSERT OR IGNORE INTO platform_schema_version VALUES(1,?)", (utc_now(),))
     conn.execute("INSERT OR IGNORE INTO platform_schema_version VALUES(2,?)", (utc_now(),))
     conn.commit()

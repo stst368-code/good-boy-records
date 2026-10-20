@@ -261,6 +261,10 @@ class GenerationService:
             return record
 
     def _remember_preview(self, checked, spec, connection, catalogue, data, rating_filter, rating_evidence):
+        pending_writing = self.writing_publications()
+        for record in checked:
+            if record.item.path.resolve() in pending_writing:
+                record.issues.append(Issue('writing_publication_pending', 'Finish this recipe publication in Writing before generating it'))
         identities = {}
         for record in checked:
             for field in ('cluster', 'style'):
@@ -340,6 +344,8 @@ class GenerationService:
             preview = self.previews.get(token)
             if not preview or time.monotonic() - preview['created'] >= 900:
                 raise ValueError('Generation preview expired; preview the inputs again')
+            if any(r.ready and r.item.path.resolve() in self.writing_publications() for r in preview['checked']):
+                raise ValueError('A selected recipe is being published in Writing; finish that publication and check the batch again')
             manifest = prepare_batch(preview['checked'], preview['spec'], self.runtime / 'batches', self.review.config.database,
                 input_root=preview['root'], error_policy='drop' if skip_errors else 'cancel', selection=preview['selection'],
                 output_root=self.generated, output_layout=preview['layout'])
@@ -420,6 +426,10 @@ class GenerationService:
         try:inventory=Client(address).inventory()
         except OSError as error:raise ValueError('Cannot query ComfyUI pod URL: '+str(error)) from error
         return self.comfy_choices(inventory)
+
+    def writing_publications(self):
+        if not self.review.db.one("SELECT 1 FROM sqlite_master WHERE name='writing_tasks'"):return set()
+        return {Path(json.loads(r['publication_json'])['target']).resolve() for r in self.review.db.all("SELECT publication_json FROM writing_tasks WHERE status='publishing'")}
 
     @staticmethod
     def native_choices():

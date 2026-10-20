@@ -5,9 +5,9 @@ export function workerLabel(worker) {
   return `${name}${c.address ? ' · ' + c.address : ''}${worker.enabled === false ? ' · disabled' : s?.online ? s.busy ? ' · busy' : ' · idle' : s?.online === false ? ' · offline' : ' · unchecked'}`;
 }
 
-export function initWorkers({api, toast, onChange}) {
+export function initWorkers({api, toast, onChange, configureWriting}) {
   const root = document.getElementById('workerSettingsDialog');
-  root.innerHTML = `<div class="dialog-heading"><h2>Worker settings</h2><button id="workersClose" class="close" aria-label="Close worker settings">×</button></div>
+  root.innerHTML = `<div class="dialog-heading"><h2>Worker settings</h2><button id="workersClose" class="close" aria-label="Close worker settings">×</button></div><button id="workerWritingSettings" type="button">Writing model · llama.cpp</button>
   <div class="generation-inline"><label class="flex">Saved worker<select id="workerSaved"></select></label><button id="workerNew" type="button">Add worker</button><button id="workersRefresh" type="button">Query all</button></div>
   <div class="generation-grid"><section class="generation-panel">
     <label>Worker type<select id="workerBackend"><option value="local">Native · this PC</option><option value="comfyui">ComfyUI · local or pod URL</option><option value="runpod_dedicated">RunPod dedicated · SSH</option><option value="runpod_serverless">RunPod Serverless</option></select></label>
@@ -104,6 +104,7 @@ export function initWorkers({api, toast, onChange}) {
     await load(); return entry;
   }
   $('workersClose').onclick = () => root.close();
+  $('workerWritingSettings').onclick = () => {root.close();configureWriting?.();};
   $('workerBackend').onchange = () => {mode(); for (const id of Object.keys(fields)) {if ($(id).tagName === 'SELECT') choices(id, [], '');} report();};
   $('workerAddress').oninput = mode;
   $('workerSaved').onchange = () => fill(entries.find(e => e.id === $('workerSaved').value));

@@ -70,6 +70,21 @@ class DirectoryLayoutTests(unittest.TestCase):
         self.assertEqual(old.read_bytes(), b'old')
         self.assertEqual(new.read_bytes(), b'new')
 
+    def test_website_utilities_96_preserve_legacy_source_and_runtime_bytes(self):
+        for old in ('_04_website','_05_website'):
+            folder = self.root/old
+            folder.mkdir()
+            (folder/(old+'.txt')).write_bytes(old.encode())
+        runtime = self.root/'_05_website/_showcase/song.flac'
+        runtime.parent.mkdir();runtime.write_bytes(b'local media stays intact')
+        migrate(self.root)
+        for old in ('_04_website','_05_website'):
+            self.assertEqual((self.root/'_96_website'/(old+'.txt')).read_bytes(),old.encode())
+            self.assertFalse((self.root/old).exists())
+            self.assertEqual(relocated_path(old+'/build.py',self.root),'_96_website/build.py')
+        self.assertEqual((self.root/'_96_website/_showcase/song.flac').read_bytes(),b'local media stays intact')
+        self.assertEqual(migrate(self.root)['moved_files'],0)
+
     def test_a_live_controller_blocks_data_moves(self):
         import psutil
         process = self.root / '_02_Generation/runtime/app_jobs/task/process.json'
