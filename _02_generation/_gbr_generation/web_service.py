@@ -83,7 +83,7 @@ class GenerationService:
             except (OSError, ValueError, KeyError):
                 pass
         return {'connections': connections, 'worker_id': saved.get('worker_id', 'auto'), 'key_candidates': keys, 'parameters': saved.get('parameters', DEFAULT_PARAMETERS),
-                'input_root': str(self.catalogue_root(saved.get('input_root'))),
+                'controls':saved.get('controls',{}), 'input_root': str(self.catalogue_root(saved.get('input_root'))),
                 'output_root': str(self.generated), 'layout': saved.get('layout', 'single'),
                 'storage_endpoint': saved.get('storage_endpoint', os.environ.get('GBR_S3_ENDPOINT', '')),
                 'storage_bucket': saved.get('storage_bucket', os.environ.get('GBR_S3_BUCKET', '')),
@@ -107,7 +107,7 @@ class GenerationService:
                     connections = [c for c in saved.get('connections', []) if connection_key(c) != connection_key(connection)]
                     saved['connections'] = [*connections, connection]
             saved['input_root'] = str(self.catalogue_root(data.get('input_root', saved.get('input_root'))))
-            for key in ('parameters', 'layout', 'storage_endpoint', 'storage_bucket', 'storage_region', 'worker_id'):
+            for key in ('parameters', 'controls', 'layout', 'storage_endpoint', 'storage_bucket', 'storage_region', 'worker_id'):
                 if key in data:
                     saved[key] = data[key]
             for key, value in data.get('secrets', {}).items():

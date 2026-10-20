@@ -36,7 +36,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
   function refreshChoices(){for(const group of pairs)for(const row of $(group.container).children)for(const [key,label,list] of group.fields){const select=row.querySelector(`[data-field="${key}"]`),old=select.value,values=modelChoices(list);select.replaceChildren(new Option('Worker default','auto'),...values.map(v=>new Option(v,v)));if(old&&old!=='auto'&&!values.includes(old))select.append(new Option('Unavailable · '+old,old));select.value=old||'auto';}}
   function addPair(group,values={}){
     const row=document.createElement('div');row.className='gen-pair-row';
-    for(const [key,label,list] of group.fields){const field=document.createElement('label');field.textContent=label;const select=document.createElement('select');select.dataset.field=key;select.setAttribute('aria-label',label+' combination');select.append(new Option('Worker default','auto'),...modelChoices(list).map(v=>new Option(v,v)));select.value=values[key]||'auto';field.append(select);row.append(field);}
+    for(const [key,label,list] of group.fields){const field=document.createElement('label');field.textContent=label;const select=document.createElement('select');select.dataset.field=key;select.setAttribute('aria-label',label+' combination');select.append(new Option('Worker default','auto'),...modelChoices(list).map(v=>new Option(v,v)));if(values[key]&&values[key]!=='auto'&&![...select.options].some(o=>o.value===values[key]))select.append(new Option('Unavailable · '+values[key],values[key]));select.value=values[key]||'auto';field.append(select);row.append(field);}
     const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.setAttribute('aria-label','Remove combination');remove.onclick=()=>{row.remove();invalidate();};row.append(remove);row.onchange=()=>{$(group.mode).value='pairs';invalidate();};$(group.container).append(row);
   }
   for(const group of pairs){addPair(group);$(group.button).onclick=()=>{addPair(group);$(group.mode).value='pairs';invalidate();};$(group.mode).onchange=invalidate;}
@@ -49,7 +49,16 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     for(const group of pairs)if($(group.mode).value==='pairs'){const rows=[...$(group.container).children].map(row=>Object.fromEntries([...row.querySelectorAll('select')].map(e=>[e.dataset.field,e.value])));if(!rows.length)throw Error('Add a '+group.name.toLowerCase()+' combination.');groups.push(rows);}
     return {sweeps,groups,repetitions:Number($('genRepetitions').value),strategy:$('genStrategy').value,samples:Number($('genSamples').value),seed_policy:$('genSeedPolicy').value};
   }
-  function preferences(){return {worker_id:$('genWorker').value,input_root:$('genRoot').value,parameters:parameters(),layout:$('genLayout').value};}
+  const rememberedFields=['genRepetitions','genStrategy','genSamples','genSeedPolicy','genCache','genCaptionMode','genCaptionCount','genTemplate','genCaptionCluster','genCaptionStyle','genOrder'];
+  function controlSettings(){return {version:1,numeric:Object.fromEntries(numericFields.map(([key,id])=>[key,{mode:$(id+'Mode').value,value:$(id).value,list:$(id+'List').value,range:[...$(id+'Range').querySelectorAll('input')].map(e=>e.value)}])),pairs:Object.fromEntries(pairs.map(g=>[g.name,{mode:$(g.mode).value,rows:[...$(g.container).children].map(row=>Object.fromEntries([...row.querySelectorAll('select')].map(e=>[e.dataset.field,e.value])))}])),fields:Object.fromEntries(rememberedFields.map(id=>[id,$(id).value]))};}
+  function restoreControls(saved){
+    if(saved?.version!==1)return;
+    for(const [key,id] of numericFields){const value=saved.numeric?.[key];if(!value||!['yaml','worker','fixed','list','range'].includes(value.mode))continue;$(id).value=value.value??$(id).value;$(id+'List').value=value.list||'';[...$(id+'Range').querySelectorAll('input')].forEach((e,i)=>e.value=value.range?.[i]||'');$(id+'Mode').value=value.mode;$(id+'Mode').dispatchEvent(new Event('change'));}
+    for(const group of pairs){const value=saved.pairs?.[group.name];if(!value||!['yaml','worker','pairs'].includes(value.mode))continue;$(group.container).replaceChildren();for(const row of value.rows||[])addPair(group,row);$(group.mode).value=value.mode;}
+    for(const id of rememberedFields)if(saved.fields?.[id]!=null)$(id).value=saved.fields[id];
+    invalidate();
+  }
+  function preferences(){return {worker_id:$('genWorker').value,input_root:$('genRoot').value,parameters:parameters(),controls:controlSettings(),layout:$('genLayout').value};}
   function invalidate(){state.revision++;state.token=null;state.preview=null;$('genPlan').hidden=true;estimate();}
   function estimate(){for(const group of pairs)$(group.container).hidden=$(group.mode).value!=='pairs';try{const e=experiments();let n=e.groups.reduce((n,g)=>n*g.length,1);for(const value of Object.values(e.sweeps))n*=typeof value==='object'?Math.max(0,Math.floor((Number(value.stop)-Number(value.start))/Number(value.step)+1+1e-8)):value.split(',').length;if(e.strategy==='sample')n=e.samples;const captions=$('genTemplate').value.trim()||$('genCaptionMode').value!=='random'?1:Number($('genCaptionCount').value);$('genEstimate').textContent=`Estimated ${state.selected.size*captions*n*e.repetitions} generations · ${state.selected.size} tracks × ${captions} captions × ${n} combinations × ${e.repetitions} repeats. Each job runs once on a compatible worker.`;}catch{$('genEstimate').textContent='Complete the selected ranges and combinations to estimate the batch.';}$('genSamplesLabel').hidden=$('genStrategy').value!=='sample';}
   async function save(){return api('/generation/preferences',preferences());}
@@ -365,6 +374,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
           `Inbox: ${prefs.output_root}. Each generation keeps its FLAC, completed YAML, source and report together until review.`;
         await reloadWorkers(true);
         if (state.workers.some(w => w.id === prefs.worker_id)) $('genWorker').value = prefs.worker_id;
+        restoreControls(prefs.controls);
         $("genLayout").value = prefs.layout;
         const templates = await api("/generation/templates");
         for (const item of templates.templates) {

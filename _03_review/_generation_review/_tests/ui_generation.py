@@ -150,6 +150,11 @@ def main():
                 page.locator('#genPreview').click()
                 page.wait_for_selector('#genPlan:not([hidden])')
                 assert '24 generations' in page.locator('#genPlanSummary').inner_text()
+                page.reload();page.locator('#generationTab').click();page.wait_for_selector('.generation-file')
+                assert page.locator('#genCfgMode').input_value()=='range'
+                assert page.locator('#genStepsMode').input_value()=='list'
+                assert page.locator('#genStepsList').input_value()=='20,30'
+                page.locator('#genSelectVisible').click()
                 assert not boundary.calls
                 page.locator('#genRepetitions').fill('1')
                 page.locator('#genCaptionCount').fill('1')

@@ -33,6 +33,7 @@ class Preferences(Body):
     worker_id: str | None = Field(default=None, max_length=2100)
     input_root: str | None = None
     parameters: dict | None = None
+    controls: dict | None = None
     layout: Literal['single', 'track', 'album'] = 'single'
     storage_endpoint: str = Field(default='', max_length=2000)
     storage_bucket: str = Field(default='', max_length=2000)
