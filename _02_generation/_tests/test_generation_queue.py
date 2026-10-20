@@ -119,7 +119,7 @@ def test_per_field_sources_and_timestamped_log_view_metadata():
 
 
 def test_uncertain_shared_prompt_stays_with_its_worker_and_reconnects_once():
-    with app() as f,server(drop_ack=True) as (a,sa),server() as (b,sb):
+    with app() as f,server(drop_ack=True,browser_headers=True) as (a,sa),server() as (b,sb):
         wa,wb=configured(f,a),configured(f,b)
         p=f.preview(connection=None,worker_id='auto',caption_mode='yaml');f.generation.start(p['token']);path=f.launched[0]['manifest']
         first=execute(path,worker_id=wa['id']);assert first['status']=='running'
@@ -130,6 +130,10 @@ def test_uncertain_shared_prompt_stays_with_its_worker_and_reconnects_once():
         listed={item['worker_id']:item for item in f.generation.tasks()}
         assert len(listed[wa['id']]['runs'])==1 and not listed[wb['id']]['runs']
         assert not listed[wb['id']]['reconnect']
+        from client import HEADERS
+        with patch.dict(HEADERS,{'User-Agent':'Python-urllib/test'}):
+            blocked=execute(path,worker_id=wa['id'],resume_remote=True)
+            assert blocked['status']=='running' and sa['submissions']==1
         result=execute(path,worker_id=wa['id'],resume_remote=True)
         assert result['status']=='succeeded',result
         assert sa['submissions']==1 and sb['submissions']==0
@@ -138,12 +142,16 @@ def test_uncertain_shared_prompt_stays_with_its_worker_and_reconnects_once():
 def test_available_models_and_advertised_defaults_are_used_but_explicit_missing_models_fail():
     nodes=inventory();names=['minimax_music3_text_encoder_int8.safetensors','minimax_music3_text_encoder_fp8.safetensors']
     nodes['CLIPLoader']['input']['required']['clip_name']=[names,{'default':names[1]}]
+    vaes=['minimax_music3_vae_low.safetensors','minimax_music3_vae_full.safetensors']
+    nodes['VAELoader']['input']['required']['vae_name']=[vaes,{'default':vaes[1]}]
     with app() as f,server(nodes_override=nodes) as (address,state):
         entry=configured(f,address)
         p=f.preview(connection=None,worker_id=entry['id'],caption_mode='yaml')
         assert p['ready']==1 and p['inputs'][0]['effective']['text_encoder']==names[1],p
         bad=f.preview(connection=None,worker_id=entry['id'],caption_mode='yaml',parameters={'text_encoder':'missing.safetensors'},parameter_sources={'text_encoder':'control'})
         assert bad['invalid']==1 and not state['submissions']
+        f.generation.start(p['token']);result=execute(f.launched[0]['manifest'])
+        assert result['status']=='succeeded' and state['prompt']['7']['inputs']['vae_name']==vaes[1]
 
 
 def test_actual_403_returns_actionable_proxy_error_without_posting():

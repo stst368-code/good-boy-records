@@ -13,6 +13,8 @@ ROOT=Path(__file__).parent
 HEADERS={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36',
          'Accept':'application/json, text/plain, */*','Cache-Control':'no-cache','Pragma':'no-cache'}
 
+class ComfyConnectionError(ValueError):pass
+
 
 def base_url(address):
     # Reuse the preflight's credential/path validation without making a request.
@@ -50,11 +52,11 @@ class Client:
                 if error.code==403:
                     detail=error.read(4096).decode('utf-8',errors='replace')
                     kind='RunPod/Cloudflare rejected the request' if '1010' in detail or 'cloudflare' in detail.casefold() else 'The worker or proxy denied access'
-                    raise ValueError(f'{kind} (HTTP 403 at {error.url}). Use the full HTTP service URL from RunPod Connect, including -8188 (or the exposed ComfyUI port), and verify it opens in your browser. Authentication/access rules must be resolved on the worker.') from None
+                    raise ComfyConnectionError(f'{kind} (HTTP 403 at {error.url}). Use the full HTTP service URL from RunPod Connect, including -8188 (or the exposed ComfyUI port), and verify it opens in your browser. Authentication/access rules must be resolved on the worker.') from None
                 if error.code not in (404,405):raise
                 last=error
             except (ValueError,UnicodeDecodeError) as error:last=error
-        raise ValueError('No ComfyUI API at '+self.address+' or its /api route: '+str(last)) from last
+        raise ComfyConnectionError('No ComfyUI API at '+self.address+' or its /api route: '+str(last)) from last
     def request(self,path,data=None,timeout=45):
         self._prefix(timeout)
         with self._open(self.prefix+path,data,timeout) as response:return json.load(response)
@@ -75,9 +77,11 @@ class Client:
         def choices(node,key):
             try:return nodes[node]['input']['required'][key][0]
             except KeyError:raise ValueError('Missing Comfy node/input: '+node+'/'+key) from None
+        vae_options=nodes.get('VAELoader',{}).get('input',{}).get('required',{}).get('vae_name',[[]])
+        vae_default=(vae_options[1].get('default') if len(vae_options)>1 and isinstance(vae_options[1],dict) else None) or graph['7']['inputs']['vae_name']
         p=job['parameters'];values={k:p[k] for k in ['caption','encoder_seed','duration','encoder_cfg','top_k','sampler_seed','sampler_steps','sampler_cfg','sampler','scheduler']}
         values.update(lyrics=job['lyrics'],text_encoder=resolve(choices('CLIPLoader','clip_name'),p['text_encoder'],'text encoder'),dit=resolve(choices('UNETLoader','unet_name'),p['dit'],'DiT'),
-            vae=resolve(choices('VAELoader','vae_name'),graph['7']['inputs']['vae_name'],'VAE'),output_prefix='gbr/'+job['attempt_id'])
+            vae=resolve(choices('VAELoader','vae_name'),None,'VAE',vae_default),output_prefix='gbr/'+job['attempt_id'])
         compiled=compile_workflow(graph,bindings,values,nodes)
         identity={k:values[k] for k in ['text_encoder','dit','vae']};identity.update(identity_kind='workflow-and-checkpoint-names',checkpoint_sha256=None,node_classes=compiled['node_classes'])
         identity['source_workflow_sha256']=compiled['source_workflow_sha256']
@@ -170,6 +174,7 @@ class Client:
         except HTTPError as error:
             if error.code in (400,422):raise ValueError('Comfy rejected request: '+error.read().decode('utf-8',errors='replace')[-4000:]) from error
             raise RemotePending('Comfy HTTP connection failed; reconnect to the saved attempt: '+str(error)) from error
+        except ComfyConnectionError as error:raise RemotePending('Comfy connection failed; the saved attempt was not resubmitted: '+str(error)) from error
         except (OSError,URLError,TimeoutError) as error:raise RemotePending('Comfy connection lost; reconnect to this attempt without resubmitting: '+str(error)) from error
         finally:
             (directory/'download.part').unlink(missing_ok=True)
