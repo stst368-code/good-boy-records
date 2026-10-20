@@ -170,8 +170,11 @@ def publish_bundle(directory, run, state, result, source, attempt_id, timezone_n
         raise ValueError("Worker model revision mismatch")
     audio = directory / "audio.flac"
     info = sf.info(str(audio))
-    if info.format != "FLAC" or info.subtype != "PCM_24" or info.channels != 2 or info.samplerate != 44100 or info.frames <= 0:
-        raise ValueError("Worker audio is not a nonempty 44.1 kHz stereo PCM_24 FLAC")
+    original_format={'format':info.format,'subtype':info.subtype,'channels':info.channels,'sample_rate':info.samplerate,'frames':info.frames}
+    canonical=info.subtype=='PCM_24' and info.channels==2 and info.samplerate==44100
+    comfy=execution_target(run['execution'])[0]=='comfyui'
+    if info.format!='FLAC' or info.frames<=0 or not canonical and (not comfy or info.channels not in (1,2) or info.subtype not in ('PCM_S8','PCM_16','PCM_24')):
+        raise ValueError('Worker audio must be a nonempty 44.1 kHz stereo PCM_24 FLAC; received '+json_text(original_format).strip())
     with sf.SoundFile(str(audio)) as handle:
         import numpy as np
         for block in handle.blocks(blocksize=65536, dtype="float32"):
@@ -194,15 +197,36 @@ def publish_bundle(directory, run, state, result, source, attempt_id, timezone_n
         write_completed_yaml(source, result["actual_parameters"], bundle / (stem + ".yaml"), succeeded=True,
                              completed_at=completed_at, timezone_name=timezone_name)
         write_new(bundle / "source.yaml", source)
-        shutil.copyfile(audio, bundle / (stem + ".flac"))
+        destination=bundle/(stem+'.flac')
+        if canonical:shutil.copyfile(audio,destination)
+        elif info.samplerate==44100:
+            # Integer PCM promotion adds no detail and changes no sample values.
+            # Duplicate a mono channel without changing its gain.
+            with sf.SoundFile(audio) as incoming,sf.SoundFile(destination,'w',samplerate=44100,channels=2,format='FLAC',subtype='PCM_24') as outgoing:
+                for block in incoming.blocks(blocksize=65536,dtype='int32',always_2d=True):
+                    outgoing.write(np.repeat(block,2,axis=1) if info.channels==1 else block)
+        else:
+            ffmpeg=shutil.which('ffmpeg')
+            if not ffmpeg:raise ValueError('Comfy FLAC needs sample-rate conversion from '+str(info.samplerate)+' Hz. Install FFmpeg, then Retry failed; the saved audio is retained and inference will not repeat.')
+            filters=(['pan=stereo|c0=c0|c1=c0'] if info.channels==1 else [])+['aresample=44100']
+            converted=subprocess.run([ffmpeg,'-nostdin','-v','error','-i',str(audio),'-map','0:a:0','-af',','.join(filters),'-c:a','flac','-sample_fmt','s32','-bits_per_raw_sample','24','-n',str(destination)],capture_output=True,text=True)
+            if converted.returncode:raise ValueError('Comfy audio conversion failed; saved worker audio retained: '+converted.stderr[-2000:])
+        exported=sf.info(destination)
+        if (exported.format,exported.subtype,exported.channels,exported.samplerate)!=('FLAC','PCM_24',2,44100) or exported.frames<=0:
+            raise ValueError('Canonical FLAC conversion failed verification; saved worker audio retained')
         metadata = {**run["effective"], "song_id": run["song_id"], "variant_id": run["variant_id"], "title": run["title"],
                     "gbr_run_id": run["id"], "gbr_attempt_id": attempt_id, "gbr_source_sha256": run["source_sha256"],
                     "generation_timestamp": result["completed_at"],
                     "generation_source": ("gbr_" if execution_target(run["execution"])[0]=="comfyui" else "gbr_native_") + execution_target(run["execution"])[0],
                     "genre": run["effective"].get("style"),
                     "model_revision": result["models"]["revision"], "hardware": result.get("hardware"),
-                    "audio_duration_seconds": info.duration}
+                    "audio_duration_seconds": exported.duration,'worker_audio_format':original_format,
+                    'audio_format':{'format':'FLAC','subtype':'PCM_24','channels':2,'sample_rate':44100,'frames':exported.frames}}
         tags = FLAC(str(bundle / (stem + ".flac")))
+        if not canonical:
+            original_tags=FLAC(str(audio))
+            for key,value in (original_tags.tags or {}).items():tags[key]=value
+            for picture in original_tags.pictures:tags.add_picture(picture)
         tags["GBR_METADATA"] = json_text(metadata)
         tags["GBR_YAML"] = (bundle / (stem + ".yaml")).read_bytes().decode("utf-8-sig")
         tags.save()
@@ -211,6 +235,7 @@ def publish_bundle(directory, run, state, result, source, attempt_id, timezone_n
                   "source_sha256": run["source_sha256"], "completed_at": result["completed_at"],
                   "files": files, "worker_result": result, "yaml_timezone": timezone_name}
         marker['worker_audio_sha256'] = file_sha(audio)
+        marker['audio_conversion']={'original':original_format,'output':metadata['audio_format'],'converted':not canonical,'resampled':info.samplerate!=44100,'mono_duplicated':info.channels==1}
         write_new(bundle / "generation.json", json_text(marker).encode("utf-8"))
         final.parent.mkdir(parents=True, exist_ok=True)
         # Stage in the destination parent so publication is atomic across output-drive choices.

@@ -36,8 +36,8 @@ def inventory():
 
 
 @contextmanager
-def server(drop_ack=False,extensions=True,unknown_code=404,prompt_code=None,busy=False,nodes_override=None,api_prefix='',browser_headers=False,holding=None,targeted_cancel=False,pending=False,cancel_output=False):
-    output=io.BytesIO();wave=np.sin(np.arange(4410)*.05)*.1;sf.write(output,np.stack([wave,wave],axis=1),44100,format='FLAC',subtype='PCM_24');audio=output.getvalue();state={'submissions':0,'acked':False,'requests':[]}
+def server(drop_ack=False,extensions=True,unknown_code=404,prompt_code=None,busy=False,nodes_override=None,api_prefix='',browser_headers=False,holding=None,targeted_cancel=False,pending=False,cancel_output=False,audio_subtype="PCM_24",sample_rate=44100,channels=2):
+    output=io.BytesIO();wave=np.sin(np.arange(4410)*.05)*.1;sf.write(output,np.stack([wave]*channels,axis=1),sample_rate,format='FLAC',subtype=audio_subtype);audio=output.getvalue();state={'submissions':0,'acked':False,'requests':[],'audio':audio}
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def route(self):
@@ -136,4 +136,48 @@ def test_stock_comfy_405_optional_routes_publish_once_and_retain_cleanup_receipt
             assert len(list((manifest.parent/'attempts').rglob('cleanup-pending.json')))==1
             assert fixture.source.read_bytes()==fixture.original
             assert not execute(manifest)['attempts']
+    finally:fixture.doCleanups()
+
+
+@pytest.mark.parametrize('subtype,rate,channels',[('PCM_16',44100,2),('PCM_24',44100,1),('PCM_24',48000,2)])
+def test_comfy_flac_is_normalised_at_publication_without_extra_audio(subtype,rate,channels):
+    fixture=test_execution.ExecutionTests('runTest');fixture.setUp()
+    try:
+        with server(audio_subtype=subtype,sample_rate=rate,channels=channels) as (address,state):
+            fixture.spec.setdefault('batch',{}).update(sampler='euler',scheduler='simple',text_encoder='bf16',dit='fp32')
+            fixture.spec['execution']={'conditioning':{'backend':'comfyui','address':address},'diffusion':{'backend':'comfyui','address':address},'encoding_cache':'prefer'}
+            fixture.spec.pop('model_revision',None)
+            manifest=fixture.prepare();result=execute(manifest)
+            assert result['status']=='succeeded',result
+            output=Path(result['attempts'][0]['output']);audio=next(output.glob('*.flac'));info=sf.info(audio)
+            assert (info.samplerate,info.channels,info.subtype)==(44100,2,'PCM_24')
+            original,sr=sf.read(io.BytesIO(state['audio']),dtype='int32',always_2d=True)
+            actual,_=sf.read(audio,dtype='int32',always_2d=True)
+            if rate==44100:assert np.array_equal(actual,np.repeat(original,2,axis=1) if channels==1 else original)
+            else:assert abs(info.duration-len(original)/sr)<1/44100
+            marker=json.loads((output/'generation.json').read_text());assert marker['audio_conversion']['original']['subtype']==subtype
+            assert marker['audio_conversion']['resampled']==(rate!=44100)
+            assert marker['worker_audio_sha256']==hashlib.sha256(state['audio']).hexdigest()
+            assert state['submissions']==1 and state['acked'] and fixture.source.read_bytes()==fixture.original
+            assert not list(manifest.parent.glob('attempts/*/audio.flac'))
+            assert len(list((manifest.parent/'outputs').rglob('*.flac')))==1
+    finally:fixture.doCleanups()
+
+
+def test_saved_comfy_flac_format_failure_retries_publication_without_inference():
+    from unittest.mock import patch
+    fixture=test_execution.ExecutionTests('runTest');fixture.setUp()
+    try:
+        with server(sample_rate=48000) as (address,state):
+            fixture.spec.setdefault('batch',{}).update(sampler='euler',scheduler='simple',text_encoder='bf16',dit='fp32')
+            fixture.spec['execution']={'conditioning':{'backend':'comfyui','address':address},'diffusion':{'backend':'comfyui','address':address},'encoding_cache':'prefer'}
+            fixture.spec.pop('model_revision',None);manifest=fixture.prepare()
+            with patch('_gbr_generation.executor.shutil.which',return_value=None):failed=execute(manifest)
+            assert failed['status']=='failed' and 'Install FFmpeg' in failed['attempts'][0]['error']
+            assert len(list(manifest.parent.glob('attempts/*/audio.flac')))==1
+            recovered=execute(manifest,retry_failed=True)
+            assert recovered['status']=='succeeded',recovered
+            assert state['submissions']==1 and state['acked']
+            assert recovered['attempts'][0]['attempt_id']==failed['attempts'][0]['attempt_id']
+            assert not list(manifest.parent.glob('attempts/*/audio.flac'))
     finally:fixture.doCleanups()

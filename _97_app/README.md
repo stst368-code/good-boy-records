@@ -158,3 +158,9 @@ No global Comfy interrupt or queue clear is sent. Unknown remote state remains
 reconnectable. Cancelled output cleanup retains checksum receipts and no review copy.
 Status snapshots use unique temporary files and bounded retries for Windows sharing
 locks. A temporary status-file lock does not fail inference; busy workers wait.
+
+ComfyUI FLACs are converted during publication to 44.1 kHz stereo PCM_24. Bit-depth
+promotion preserves existing samples; mono is duplicated without gain changes.
+Other sample rates use FFmpeg. Original and final formats are recorded in the bundle
+report, and original FLAC tags are preserved. A format/publication failure retains
+the verified worker audio: Retry failed republishes that attempt without inference.
