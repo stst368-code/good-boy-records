@@ -1,37 +1,39 @@
 // Shared, catalogue-backed controls. Empty filter selection means unrestricted.
-export function toggleChoices(root,{label,any='Any',onChange=()=>{},max=Infinity,count='total'}={}){
-  let rows=[],selected=new Set();root.classList.add('choice-panel');
+export function toggleChoices(root,{label,any='Any',onChange=()=>{},max=Infinity,count='total',contentOnly=false}={}){
+  let rows=[],selected=new Set(),labels={};root.classList.add('choice-panel');
   const heading=document.createElement('div');heading.className='choice-heading';
   const name=document.createElement('strong');name.textContent=label;
   const reset=document.createElement('button');reset.type='button';reset.className='quiet-button';reset.textContent=any;
   const summary=document.createElement('span');summary.className='subtle small';summary.setAttribute('role','status');
   const list=document.createElement('div');list.className='choice-list';list.setAttribute('role','group');list.setAttribute('aria-label',label);
-  heading.append(name,summary,reset);root.append(heading,list);
+  const stale=document.createElement('div');stale.className='choice-stale-list';
+  heading.append(name,summary,reset);root.append(heading,list,stale);
   function paint(){
     reset.setAttribute('aria-pressed',String(!selected.size));summary.textContent=selected.size?selected.size+' selected':'';
     for(const button of list.querySelectorAll('button')){button.setAttribute('aria-pressed',String(selected.has(button.dataset.value)));button.disabled=!selected.has(button.dataset.value)&&selected.size>=max;}
   }
   function render(){
-    list.replaceChildren();const known=new Set(rows.map(r=>r.value));
-    for(const row of [...rows,...[...selected].filter(v=>!known.has(v)).map(value=>({value,label:value+' · unavailable'}))]){
+    list.replaceChildren();stale.replaceChildren();const visible=rows.filter(row=>!contentOnly||row[count]>0),known=new Set(visible.map(r=>r.value));
+    for(const row of [...visible,...(contentOnly?[]:[...selected].filter(v=>!known.has(v)).map(value=>({value,label:value+' · unavailable'})))]){
       const b=document.createElement('button');b.type='button';b.className='choice-toggle';b.dataset.value=row.value;
       b.setAttribute('aria-label',label+': '+(row.label||row.value));b.textContent=row.label||row.value;
       if(row[count]!==undefined){const n=document.createElement('span');n.className='choice-count';n.textContent=row[count];b.append(n);}
       b.onclick=()=>{selected.has(row.value)?selected.delete(row.value):selected.add(row.value);paint();onChange();};list.append(b);
     }
-    if(!list.children.length){const empty=document.createElement('span');empty.className='subtle small';empty.textContent='No choices in this catalogue';list.append(empty);}
+    if(contentOnly)for(const value of selected)if(!known.has(value)){const b=document.createElement('button');b.type='button';b.className='choice-stale quiet-button';b.textContent=(labels[value]||value)+' · no matching content ×';b.setAttribute('aria-label','Clear '+label+': '+(labels[value]||value));b.onclick=()=>{selected.delete(value);render();onChange();};stale.append(b);}
+    if(!list.children.length){const empty=document.createElement('span');empty.className='subtle small';empty.textContent=contentOnly?'No matching content':'No choices in this catalogue';list.append(empty);}
     paint();
   }
   reset.onclick=()=>{selected.clear();render();onChange();};
-  return {values:()=>[...selected],load(values,chosen){rows=values.map(v=>typeof v==='string'?{value:v}:v);if(chosen!==undefined)selected=new Set(chosen);render();},
+  return {values:()=>[...selected],load(values,chosen,selectedLabels={}){rows=values.map(v=>typeof v==='string'?{value:v}:v);labels={...labels,...selectedLabels,...Object.fromEntries(rows.map(r=>[r.value,r.label||r.value]))};if(chosen!==undefined)selected=new Set(chosen);render();},
     set(values){selected=new Set(values);render();},legacy(text){return rows.filter(r=>r.value.toLowerCase().includes(text.toLowerCase())).map(r=>r.value);}};
 }
 
-export function selectChoices(select,values,{empty='Any',value=select.value,keep=true}={}){
+export function selectChoices(select,values,{empty='Any',value=select.value,keep=true,disabledMissing=false}={}){
   const rows=values.map(v=>typeof v==='string'?{value:v,label:v}:v),seen=new Set();
   select.replaceChildren(new Option(empty,''));
   for(const row of rows)if(row.value&&!seen.has(row.value)){seen.add(row.value);select.append(new Option(row.label||row.value,row.value));}
-  if(value&&!seen.has(value)&&keep)select.append(new Option(value+' · saved value',value));
+  if(value&&!seen.has(value)&&keep){const option=new Option(value+(disabledMissing?' · no matching content':' · saved value'),value);option.disabled=disabledMissing;select.append(option);}
   select.value=seen.has(value)||keep?value:'';
 }
 

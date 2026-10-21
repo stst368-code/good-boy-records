@@ -95,3 +95,101 @@ def test_selection_options_and_exact_filters_use_style_primary_and_exclude_unsel
     assert result.json()['items'][0]['genre'] == 'Punk Blues'
     complete(service,items[3][2])
     assert 'Synth' in {r['value'] for r in client.get('/api/review/options?scope=selection').json()['genres']}
+
+
+def test_song_identity_groups_arbitrary_and_legacy_suffixes_without_prefix_collisions(service):
+    catalogue=service.config.path.parent/'catalogue';catalogue.mkdir()
+    (catalogue/'track_list.csv').write_text('song_id,song_name,filename\n17,paws off the velvet,paws-off-the-velvet.yaml\n18,paws off,paws-off.yaml\n')
+    (catalogue/'variant_list.csv').write_text('song_id,variant_id,song_name,filename\n17,2,velvet punk,velvet-punk.yaml\n')
+    titles=[('paws-off-the-velvet-v1_CFG-1.90_STEP-30_SEED-7',17),
+            ('anything-at-all-on-the-end',17),
+            ('paws-off-the-velvet-v3_CFG-1.70_STEP-40_SEED-42',None),
+            ('paws-off-v2_CFG-1.90_STEP-30_SEED-7',None),
+            ('velvet-punk-localized-caption',None)]
+    files=[]
+    for i,(title,sid) in enumerate(titles):
+        files.append(track(service,'identity-'+str(i),frequency=200+i*50,metadata=f'title: {title}\ncluster: Rock\nstyle: Punk\n'+(f'song_id: {sid}\nvariant_id: 1\n' if sid else '')))
+    originals={path.with_suffix('.yaml'):path.with_suffix('.yaml').read_bytes() for path,_,_ in files}
+    service,client=client_for(service);service.song_catalogue_root=lambda:catalogue
+    options=client.get('/api/review/options').json()
+    assert [(r['value'],r['label'],r['remaining']) for r in options['titles']]==[('song:18','paws off',1),('song:17','paws off the velvet',4)]
+    for choice in ['song:17','paws off the velvet','paws-off-the-velvet',titles[0][0],titles[2][0]]:
+        response=client.post('/api/queue/counts',json={'titles':[choice]},headers=WRITE)
+        assert response.json()['remaining']==4,(choice,response.text)
+    assert client.post('/api/queue/counts',json={'titles':['paws off']},headers=WRITE).json()['remaining']==1
+    assert client.get('/api/queue/counts',params={'song':titles[0][0]}).json()['remaining']==4
+    assert client.get('/api/queue/counts',params={'song':'paws-off'}).json()['remaining']==1
+    restored=client.post('/api/review/options',json={'titles':[titles[0][0]]},headers=WRITE).json()
+    assert restored['selection']['titles']==['song:17']
+    assert restored['labels']['song:17']=='paws off the velvet'
+    for _,_,gid in files[:2]:complete(service,gid)
+    published=client.get('/api/publishing',params={'bucket':'','titles':'song:17'}).json()['items']
+    assert {row['generation_id'] for row in published}=={row[2] for row in files[:2]}
+    assert all(path.read_bytes()==raw for path,raw in originals.items())
+    assert service.db.one('SELECT COUNT(*) n FROM reviews')['n']==2
+
+
+def test_legacy_names_strip_known_run_suffixes_and_keep_distinct_song_titles(service):
+    for i,title in enumerate(['paws-off-the-velvet-v1_CFG-1.90_STEP-30_SEED-7','paws-off-the-velvet-v2',
+                              'Ball','Ball Again','Summer of 69','Step By Step']):
+        track(service,'legacy-'+str(i),frequency=250+i*25,metadata=f'title: {title}\n')
+    service,client=client_for(service);service.song_catalogue_root=lambda:None
+    options=client.get('/api/review/options').json()
+    assert {row['value'] for row in options['titles']}=={'paws-off-the-velvet','Ball','Ball Again','Summer of 69','Step By Step'}
+    assert client.post('/api/queue/counts',json={'titles':['paws-off-the-velvet']},headers=WRITE).json()['remaining']==2
+    assert client.post('/api/queue/counts',json={'titles':['Ball']},headers=WRITE).json()['remaining']==1
+
+
+def test_queue_facets_hide_reviewed_missing_and_empty_directories_while_rated_and_selection_keep_content(service):
+    items=seed(service);sub=service.config.inputs[0]/'pending';sub.mkdir()
+    empty=service.config.inputs[0]/'empty';empty.mkdir()
+    service.db.execute('UPDATE generations SET original_directory=? WHERE id=?',(str(sub),items[2][2]))
+    for _,_,gid in items[:2]:complete(service,gid)
+    items[3][0].unlink()  # An old database entry is not available audio content.
+    service,client=client_for(service)
+    options=client.get('/api/review/options').json()
+    assert options['titles']==[{'value':'Other','total':1,'remaining':1}]
+    assert {row['value'] for row in options['clusters']}=={'Rock'}
+    assert {row['value'] for row in options['genres']}=={'Jazz'}
+    assert str(sub) in options['directories'] and str(empty) not in options['directories']
+    assert client.get('/api/queue/counts').json()['remaining']==1
+    assert {row['value'] for row in client.get('/api/review/options?scope=rated').json()['titles']}=={'Ball','Ball Again'}
+    assert {row['value'] for row in client.get('/api/review/options?scope=selection').json()['titles']}=={'Ball','Ball Again'}
+    complete(service,items[2][2])
+    finished=client.get('/api/review/options').json()
+    assert all(finished[key]==[] for key in ('titles','clusters','genres','directories'))
+    assert client.get('/api/queue/counts').json()['remaining']==0
+    exhausted=client.post('/api/review/options',json={'titles':['Other'],'clusters':['Rock']},headers=WRITE).json()
+    assert exhausted['titles']==[] and exhausted['selection']['titles']==['Other']
+
+
+def test_facets_only_offer_nonempty_combinations_and_do_not_change_the_saved_queue(service):
+    items=seed(service);sub=service.config.inputs[0]/'rock-only';sub.mkdir()
+    service.db.execute('UPDATE generations SET original_directory=? WHERE id=?',(str(sub),items[0][2]))
+    service,client=client_for(service)
+    filters={'titles':['Ball'],'clusters':['Rock'],'genres':['Punk']}
+    before=service.db.one('SELECT * FROM sessions WHERE reviewer_id=?',(service.default_reviewer_id,))
+    response=client.post('/api/review/options',json=filters,headers=WRITE)
+    assert response.status_code==200,response.text
+    options=response.json()
+    assert [r['value'] for r in options['titles']]==['Ball']
+    assert [r['value'] for r in options['clusters']]==['Rock']
+    assert [r['value'] for r in options['genres']]==['Punk']
+    assert options['directories']==sorted([str(sub),str(service.config.inputs[0])])
+    assert all(row['remaining']>0 for key in ('titles','clusters','genres') for row in options[key])
+    assert service.db.one('SELECT * FROM sessions WHERE reviewer_id=?',(service.default_reviewer_id,))==before
+    assert client.post('/api/review/options',json=filters).status_code==403
+
+
+def test_selection_bucket_status_and_bookmark_filters_only_offer_existing_content(service):
+    items=seed(service);complete(service,items[0][2]);complete(service,items[1][2],values=(4,4,4,4))
+    service,client=client_for(service);rid=service.default_reviewer_id
+    service.set_flags(items[0][2],rid,distribution=True,bookmarked=True)
+    options=client.post('/api/review/options?scope=selection&bucket=5',json={},headers=WRITE).json()
+    assert options['buckets']==[5,4]
+    assert options['statuses']==['selected'] and options['has_bookmarks']
+    assert [row['value'] for row in options['titles']]==['Ball']
+    narrow=client.post('/api/review/options?scope=selection&bucket=4&bookmarked=true',json={},headers=WRITE).json()
+    assert narrow['titles']==[] and narrow['statuses']==['selected'] and narrow['has_bookmarks']
+    assert narrow['buckets']==[5]
+    assert client.post('/api/review/options?scope=selection&status=rejected',json={},headers=WRITE).json()['titles']==[]

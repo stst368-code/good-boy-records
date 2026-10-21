@@ -65,6 +65,15 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     for(const group of pairs)if($(group.mode).value==='pairs'){const rows=[...$(group.container).children].map(row=>Object.fromEntries([...row.querySelectorAll('select')].map(e=>[e.dataset.field,e.value])));if(!rows.length)throw Error('Add a '+group.name.toLowerCase()+' combination.');groups.push(rows);}
     return {sweeps,groups,repetitions:Number($('genRepetitions').value),strategy:$('genStrategy').value,samples:Number($('genSamples').value),seed_policy:$('genSeedPolicy').value};
   }
+  let ratingOptionsSequence=0;
+  async function ratingOptions(){
+    const sequence=++ratingOptionsSequence;
+    const options=await api('/review/options?scope=rated',{clusters:$('genRatingCluster').value?[$('genRatingCluster').value]:[],genres:$('genRatingStyle').value?[$('genRatingStyle').value]:[]});
+    if(sequence!==ratingOptionsSequence)return;
+    selectChoices($('genRatingCluster'),options.clusters,{empty:'Any cluster',disabledMissing:true});
+    selectChoices($('genRatingStyle'),options.genres,{empty:'Any style',disabledMissing:true});
+  }
+  for(const id of ['genRatingCluster','genRatingStyle'])$(id).addEventListener('change',guarded(ratingOptions));
   const captionPicker=initCaptions({root:$('genCaptionClusters'),onChange:invalidate});
   const rememberedFields=['genRepetitions','genStrategy','genSamples','genSeedPolicy','genCache','genCaptionMode','genCaptionCount','genOrder'];
   function controlSettings(){return {version:1,caption_pool:captionPicker.snapshot(),numeric:Object.fromEntries(numericFields.map(([key,id])=>[key,{mode:$(id+'Mode').value,value:$(id).value,list:$(id+'List').value,range:[...$(id+'Range').querySelectorAll('input')].map(e=>e.value)}])),pairs:Object.fromEntries(pairs.map(g=>[g.name,{mode:$(g.mode).value,rows:[...$(g.container).children].map(row=>Object.fromEntries([...row.querySelectorAll('select')].map(e=>[e.dataset.field,e.value])))}])),fields:Object.fromEntries(rememberedFields.map(id=>[id,$(id).value]))};}
@@ -287,9 +296,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     reloadWorkers,
     writingChanged(kind) {if(kind==='track')state.catalogueDirty=true;state.templatesDirty=true;invalidate();},
     async open() {
-      const reviewOptions=await api('/review/options');
-      selectChoices($('genRatingCluster'),reviewOptions.clusters,{empty:'Any cluster'});
-      selectChoices($('genRatingStyle'),reviewOptions.genres,{empty:'Any style'});
+      await ratingOptions();
       if (!state.loaded) {
         const prefs = await api("/generation/preferences");
         $("genRoot").value = prefs.input_root;

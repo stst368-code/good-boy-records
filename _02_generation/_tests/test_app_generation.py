@@ -50,6 +50,28 @@ class GenerationAppTests(unittest.TestCase):
         self.launch = patch.object(self.generation, 'launch', side_effect=launch).start()
         self.addCleanup(patch.stopall)
 
+    def test_filter_lists_only_offer_existing_album_inputs_and_nonempty_templates(self):
+        import csv
+        refs=self.root/'_01_writing/_references'
+        (refs/'styles.csv').write_text('ID,cluster,style_primary,template\nlive,Rock,Punk,live.txt\nempty,Jazz,Choral,empty.txt\nmissing,Pop,Ballad,missing.txt\n')
+        (refs/'live.txt').write_text('A real caption')
+        (refs/'empty.txt').write_text('  \n')
+        templates=self.client.get('/api/generation/templates')
+        self.assertEqual(templates.status_code,200,templates.text)
+        self.assertEqual([row['id'] for row in templates.json()['templates']],['live'])
+        path=self.built/'track_list.csv'
+        with path.open(newline='') as handle:
+            reader=csv.DictReader(handle);fields=list(reader.fieldnames);rows=list(reader)
+        if 'album_name' not in fields:fields.append('album_name')
+        for row in rows:row['album_name']='Live album'
+        rows.append({**dict.fromkeys(fields,''),'song_id':'2','filename':'missing.yaml','album_name':'Empty album'})
+        with path.open('w',newline='') as handle:
+            writer=csv.DictWriter(handle,fieldnames=fields);writer.writeheader();writer.writerows(rows)
+        catalogue=self.client.get('/api/generation/catalogue',params={'root':str(self.built)})
+        self.assertEqual(catalogue.status_code,200,catalogue.text)
+        self.assertEqual(catalogue.json()['albums'],['Live album'])
+        self.assertEqual(self.source.read_bytes(),self.original)
+
     def preview(self, **extra):
         body = {'input_root': str(self.built), 'all_inputs': True, 'connection': {'backend': 'local'}}
         body.update(extra)

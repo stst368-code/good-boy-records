@@ -140,9 +140,17 @@ def router(root, review_service, local):
 
     @routes.get('/templates')
     def templates():
-        _, catalogue = service.styles()
-        return {'templates': [{'id': row['ID'], 'cluster': row['cluster'], 'style': row['style_primary'],
-                              'source': row.get('template_source'),'version':row.get('version') or row.get('template_version')} for row in catalogue.rows]}
+        root, catalogue = service.styles()
+        rows=[]
+        for row in catalogue.rows:
+            path=(root/row['template'].replace('\\','/')).resolve()
+            if not path.is_relative_to(root.resolve()) or not row['cluster'] or not row['style_primary']:continue
+            try:
+                if not path.is_file() or not path.read_text(encoding='utf-8-sig').strip():continue
+            except (OSError,UnicodeError):continue
+            rows.append({'id':row['ID'],'cluster':row['cluster'],'style':row['style_primary'],
+                         'source':row.get('template_source'),'version':row.get('version') or row.get('template_version')})
+        return {'templates':rows}
 
     @routes.get('/workers')
     def workers(refresh: bool = False):
