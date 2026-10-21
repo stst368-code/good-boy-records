@@ -164,3 +164,10 @@ promotion preserves existing samples; mono is duplicated without gain changes.
 Other sample rates use FFmpeg. Original and final formats are recorded in the bundle
 report, and original FLAC tags are preserved. A format/publication failure retains
 the verified worker audio: Retry failed republishes that attempt without inference.
+
+Review excludes generation runtime/staging audio even when a parent folder is scanned.
+Use `_02_generation/_generated` as the input. Current `style_primary`/`style` fields
+drive the displayed genre and queue filters. Older scratch entries retain their IDs
+and reviews, but display the completed recipe of the exact same decoded recording
+when available. Existing `audio__...` archive names caused by such entries are repaired
+on scan through the verified move journal; YAML bytes and review history stay intact.

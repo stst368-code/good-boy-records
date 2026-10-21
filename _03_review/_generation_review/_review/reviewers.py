@@ -6,6 +6,7 @@ import uuid
 from contextlib import closing
 from datetime import datetime
 from .util import now, dumps, inside
+from .metadata_identity import worker_intermediate
 
 
 class Conflict(Exception):
@@ -60,12 +61,13 @@ class ReviewerQueues:
         join = ""
         if filters.get("genre"):
             join = "JOIN generation_metadata m ON m.generation_id=g.id"
-            genre = "COALESCE(NULLIF(json_extract(m.parsed_json,'$.genre'),''),NULLIF(json_extract(m.parsed_json,'$.intended_genre'),''),NULLIF(json_extract(m.parsed_json,'$.cluster'),''),s.genre)"
+            genre = "COALESCE(NULLIF(json_extract(m.parsed_json,'$.style_primary'),''),NULLIF(json_extract(m.parsed_json,'$.style'),''),NULLIF(json_extract(m.parsed_json,'$.genre'),''),NULLIF(json_extract(m.parsed_json,'$.intended_genre'),''),NULLIF(json_extract(m.parsed_json,'$.cluster'),''),s.genre)"
         rows = [dict(r) for r in c.execute(f"""SELECT g.id,g.audio_id,g.generation_timestamp,g.created_at,g.original_directory,s.title,{genre} AS genre
             FROM generations g JOIN songs s ON s.id=g.song_id {join}
             WHERE NOT EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id)
             AND NOT EXISTS(SELECT 1 FROM queue_skips k WHERE k.audio_id=g.audio_id AND k.session_id=?)
             ORDER BY g.rowid""", (session["id"],))]
+        rows=[r for r in rows if r['id']==session.get('opened_generation_id') or not worker_intermediate(r['original_directory'])]
         opened = next((r for r in rows if r['id'] == session.get('opened_generation_id')), None)
         rows = [r for r in rows if (not filters.get("song") or filters["song"].casefold() in r["title"].casefold())
                 and (not filters.get("genre") or filters["genre"].casefold() in str(r["genre"]).casefold())
@@ -93,12 +95,13 @@ class ReviewerQueues:
     def count_scope(self, c, session, overrides=None):
         filters = {**json.loads(session['filters_json']), **(overrides or {})}
         rows = c.execute('''SELECT g.audio_id,g.original_directory,s.title,
-            COALESCE(NULLIF(json_extract(m.parsed_json,'$.genre'),''),NULLIF(json_extract(m.parsed_json,'$.intended_genre'),''),NULLIF(json_extract(m.parsed_json,'$.cluster'),''),s.genre) AS genre,
+            COALESCE(NULLIF(json_extract(m.parsed_json,'$.style_primary'),''),NULLIF(json_extract(m.parsed_json,'$.style'),''),NULLIF(json_extract(m.parsed_json,'$.genre'),''),NULLIF(json_extract(m.parsed_json,'$.intended_genre'),''),NULLIF(json_extract(m.parsed_json,'$.cluster'),''),s.genre) AS genre,
             EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id) AS reviewed,
             EXISTS(SELECT 1 FROM queue_skips k WHERE k.audio_id=g.audio_id AND k.session_id=?) AS skipped
             FROM generations g JOIN songs s ON s.id=g.song_id LEFT JOIN generation_metadata m ON m.generation_id=g.id''', (session['id'],))
         seen, reviewed, skipped = set(), set(), set()
         for row in rows:
+            if worker_intermediate(row['original_directory']):continue
             if (filters.get('directory') and not inside(row['original_directory'], filters['directory'])
                     or filters.get('song') and filters['song'].casefold() not in row['title'].casefold()
                     or filters.get('genre') and filters['genre'].casefold() not in str(row['genre']).casefold()):

@@ -20,6 +20,7 @@ jobs:
       - run: python -m pytest _01_writing/_tests _04_preparation/_tests _02_generation/_tests/test_layout.py -q
       - run: node --input-type=module --check < _01_writing/_static/writing.js
       - run: python -m pytest _02_generation/_tests -q
+      - run: python -m pytest _03_review/_generation_review/_tests -q
       - run: node --input-type=module --check < _04_preparation/_static/preparation.js
       - run: node --input-type=module --check < _04_preparation/_static/timeline.js
       - run: node --input-type=module --check < _02_generation/_static/generation.js

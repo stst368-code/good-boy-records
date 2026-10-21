@@ -8,6 +8,7 @@ from pathlib import Path
 from .indexer import audio_identity
 from .util import digest, now, dumps, slug, inside
 from .native_archive import extend_plan, commit_paths, remove_empty_bundles
+from .metadata_identity import worker_intermediate,archive_naming
 
 
 def verified_copy(source, destination, expected, operation_id):
@@ -56,19 +57,21 @@ class Archiver:
 
     def available(self, audio_id):
         a = self.db.one("SELECT * FROM audio WHERE id=?", (audio_id,))
-        if a and a["archive_path"] and Path(a["archive_path"]).is_file():
+        if a and a["archive_path"] and not worker_intermediate(a['archive_path']) and Path(a["archive_path"]).is_file():
             return Path(a["archive_path"])
         for m in self.db.all("SELECT * FROM media_files WHERE audio_id=? AND storage_state IN ('input','archived') ORDER BY id", (audio_id,)):
-            if Path(m["path"]).is_file():
+            if not worker_intermediate(m['path']) and Path(m["path"]).is_file():
                 return Path(m["path"])
         return None
 
     def plan(self, op):
         a = self.db.one("SELECT * FROM audio WHERE id=?", (op["audio_id"],))
-        gs = self.db.all("""SELECT g.*,m.yaml_sha256,m.raw_yaml_bytes,m.yaml_archive_path,s.title
+        gs = self.db.all("""SELECT g.*,m.yaml_sha256,m.raw_yaml_bytes,m.yaml_archive_path,m.parsed_json,s.title
           FROM generations g JOIN generation_metadata m ON m.generation_id=g.id
           JOIN songs s ON s.id=g.song_id WHERE g.audio_id=? ORDER BY g.created_at,g.id""", (a["id"],))
-        base = a["archive_stem"] or slug(gs[0]["title"]) + "__" + a["pcm_sha256"][:8]
+        naming_title,placeholder=archive_naming(gs)
+        stale_stem=placeholder and naming_title!=gs[0]['title'] and (a['archive_stem'] or '').startswith(slug(gs[0]['title'])+'__')
+        base = (None if stale_stem else a["archive_stem"]) or slug(naming_title) + "__" + a["pcm_sha256"][:8]
         folder = self.config.archive / str(op["bucket"])
         preparation = getattr(self, 'preparation_root', None)
         if op.get('operation_type') == 'prepare':
@@ -84,7 +87,7 @@ class Archiver:
         expected_audio = digest(source_audio)
         # Extend identifiers instead of accepting or overwriting unrelated files.
         for length in [8, 12, 16, 32, 64, 80]:
-            stem = base if length == 8 else slug(gs[0]["title"]) + "__" + a["pcm_sha256"][:length]
+            stem = base if length == 8 else slug(naming_title) + "__" + a["pcm_sha256"][:length]
             if length == 80:
                 stem += "_" + op["id"][:8]
             target = folder / (stem + ".flac")
@@ -167,6 +170,7 @@ class Archiver:
             # Only remove sources whose exact bytes still match the indexed version.
             for original in plan["originals"] + plan["items"]:
                 source = Path(original["source"])
+                if worker_intermediate(source):continue
                 writing = Path(__file__).resolve().parents[3] / '_01_writing'
                 if source.resolve().is_relative_to(writing.resolve()):
                     continue
