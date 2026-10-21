@@ -1,0 +1,322 @@
+title: paws-off-the-velvet
+version: 2
+model: acestep 1.5 merge SFT turbo TA 0.5
+state: active
+genre: funk
+inspiration: original
+duration: 293.0
+cover: paws-off-the-velvet-v2.png
+caption: |
+  1970s psychedelic funk, sophisticated soul funk, disco-funk, charismatic female soul vocals, silky confident lead vocal, playful spoken character vocals, male and female call-and-response, stacked soul backing harmonies, deep syncopated electric bass, funky wah-wah guitar, clavinet groove, Rhodes electric piano, tight acoustic drums, hand percussion, punchy brass section, sweeping orchestral strings, horn stabs, bass breakdown, psychedelic phaser effects, playful stop-start arrangement, extended funk vamp, seductive groove, witty theatrical performance, warm analog tape saturation, vintage studio production, rich live instrumentation, 106 bpm
+lyrics: |
+  [Intro - wah-wah guitar, clavinet, deep syncopated bass]
+
+  [Female Spoken Vocal]
+  Mm.
+
+  You can sit there.
+
+  Not there.
+
+  That's my spot.
+
+  [Pitched Male Voice]
+  Doja...
+
+  [Female]
+  Paws off.
+
+  [Groove Drops]
+
+  [Verse 1 - silky female soul vocal]
+  Golden in the doorway
+  Sunlight on my hair
+  Everybody looking
+  Like I wouldn't know they're there
+
+  I don't need your calling
+  I don't come for free
+  If you want some golden loving
+  Bring an offering to me
+
+  Scratch a little higher
+  Maybe to the right
+  Keep it going, human
+  You might earn your place tonight
+
+  [Backing Vocals]
+  Paws off!
+  Unless she says so!
+
+  [Female]
+  That's right.
+
+  [Pre-Chorus - strings and horns enter]
+  I got four paws
+  One crown
+  Whole house
+  Locked down
+
+  If you're wondering who owns it
+
+  Baby, look around
+
+  [Chorus - lush female harmonies, brass hits]
+  Paws off the velvet
+  That's the princess's chair
+
+  Paws off the velvet
+  Don't you put your body there
+
+  I might want attention
+  I might want to be alone
+
+  Either way the simple fact is
+
+  Everything I see is owned
+
+  [Backing Vocals]
+  Everything!
+
+  [Female]
+  Everything.
+
+  [Verse 2 - bass-led funk groove]
+  Then I hear a rumble
+  Coming down the hall
+  Here comes Mister Bam Bam
+  With his favourite tennis ball
+
+  Big lips
+  Wet face
+  Absolutely no grace
+
+  Hit the corner sideways
+  Nearly rearranged the place
+
+  [Bam Bam - enthusiastic male spoken vocal]
+  Doja!
+
+  [Doja]
+  No.
+
+  [Bam Bam]
+  Ball?
+
+  [Doja]
+  No.
+
+  [Bam Bam]
+  Mama?
+
+  [Doja]
+  Maybe.
+
+  [Bam Bam]
+  BALL?
+
+  [Doja]
+  Good lord.
+
+  [Horn Break]
+
+  [Verse 2B - male/female call and response]
+  [Bam Bam]
+  I got love for everybody!
+
+  [Doja]
+  We know.
+
+  [Bam Bam]
+  I got places I can go!
+
+  [Doja]
+  Then go.
+
+  [Bam Bam]
+  Throw it to the garden
+  I'll retrieve it through the snow!
+
+  [Doja]
+  Just don't bring Teddy.
+
+  [Music Stops]
+
+  [Bam Bam]
+  Fluff Teddy.
+
+  [Full Band Hit]
+
+  [Chorus]
+  Paws off the velvet
+  That's the princess's chair
+
+  Paws off the velvet
+  There's enough Bam Bam everywhere
+
+  One of us has standards
+  One's a hurricane of gold
+
+  [Backing Vocals]
+  Which is which?
+
+  [Doja]
+  If you have to ask
+  You're not as clever as you're told
+
+  [Instrumental - wah guitar and clavinet trading solos]
+
+  [Bridge - psychedelic breakdown, phaser, dreamy strings]
+  [Doja - soft]
+  Sometimes when the lights go down
+  And everybody's sleeping
+  I hear him dreaming by the door
+  His giant paws still leaping
+
+  And maybe he's an idiot
+  And maybe he's obscene
+
+  But every proper princess
+  Needs a slobber-covered team
+
+  [Backing Vocals]
+  Awwww...
+
+  [Doja]
+  Don't make this weird.
+
+  [Bass Break]
+
+  [Final Chorus - full horns, strings, stacked soul vocals]
+  Paws off the velvet
+  Let the golden people through
+
+  Paws off the velvet
+  Unless I've summoned you
+
+  Mama's got the treat bag
+  Bam Bam's got the ball
+
+  I've got every single chair
+  So who's really got it all?
+
+  [Backing Vocals]
+  DOJA!
+
+  [Doja]
+  Correct.
+
+  [Outro Vamp - bass, clavinet, wah guitar]
+
+  Paws off
+  Paws off
+  P-p-p-paws off
+
+  [Bam Bam]
+  Ball!
+
+  Paws off
+  Paws off
+  Keep your paws off
+
+  [Bam Bam]
+  Ball!
+
+  [Doja]
+  Somebody throw it before he explodes.
+
+  [Backing Vocals]
+  Paws off!
+
+  [Doja]
+  Woof.
+generation:
+  source_file: PAWS-OFF-THE-VELVET_V2_STEP-64_CFG-7.0_APG--0.75_P0_KSDD-926907_LLMSDD-90817_00001_.flac
+  source_sha256: fe7e7d514458aff74cfcd438f05e4cc1a24e50bbf69db2bff9144278b123f334
+  source_file_mtime_utc: '2026-08-20T13:16:28Z'
+  source_filename_version_label: 2
+  actual_audio_duration_seconds: 293.0
+  requested_duration_seconds: 293.0
+  model_file: acestep_v1.5_merge_sft_turbo_ta_0.5.safetensors
+  text_encoder_files:
+  - qwen_0.6b_ace15.safetensors
+  - qwen_4b_ace15.safetensors
+  vae_file: ace_1.5_vae.safetensors
+  bpm: 106
+  time_signature: '4'
+  keyscale: F# major
+  language: en
+  batch_size: 1
+  seeds:
+    sampler_seed_from_output_filename: 926907
+    language_model_seed_from_output_filename: 90817
+    sampler_random_node_seed_parameter: 761292536728809
+    language_model_random_node_seed_parameter: 750018781626197
+  prompt_variant:
+    index: 0
+    cycler_node_id: 1525:1500
+    cycler_seed: 166
+    cycle_mode: sequential
+    variant_count: 1
+  text_conditioning:
+    generate_audio_codes: true
+    lm_cfg_scale: 2.0
+    lm_temperature: 0.85
+    lm_top_p: 0.9
+    lm_top_k: 0
+    lm_min_p: 0.0
+    lm_negative_prompt: modern disco house, EDM, synthwave, 1980s synth-funk, trap drums, 808 bass, rock distortion, digital production, aggressive
+      modern compression
+  sampler:
+    steps: 64
+    cfg: 7.0
+    name: euler
+    scheduler: normal
+    denoise: 1.0
+    infer_method: ode
+    guidance_mode: apg
+    apg_eta: 0.0
+    apg_momentum: -0.75
+    apg_norm_threshold: 2.5
+    guidance_interval: 0.5
+    guidance_interval_decay: 0.0
+    min_guidance_scale: 3.0
+    guidance_scale_text: -1.0
+    guidance_scale_lyric: -1.0
+    omega_scale: 0.0
+    erg_scale: 0.0
+    cfg_interval_start: 0.0
+    cfg_interval_end: 1.0
+    shift: 3.0
+    latent_shift: 0.0
+    latent_rescale: 1.0
+    voice_boost: 0.0
+    fade_in_duration: 0.0
+    fade_out_duration: 0.0
+    use_tiled_vae: true
+  audio_encoding:
+    format: flac
+    duration: 293.0
+    container_bit_rate: 791350
+    encoder: Lavf62.3.100
+    codec: flac
+    codec_long_name: FLAC (Free Lossless Audio Codec)
+    sample_rate_hz: 48000
+    channels: 2
+    channel_layout: stereo
+    bits_per_sample: 16
+    stream_bit_rate: null
+    stream_encoder: null
+  comfyui:
+    workflow_id: 21f1e338-b264-45bd-958b-fb8ed0405728
+    workflow_revision: 0
+    workflow_version: 0.4
+    frontend_version: 1.42.11
+    workflow_renderer_version: null
+  selected_graph_branch:
+    text_encoder_node_id: 1525:1502
+    generate_node_id: 1525:1497
+    prompt_cycler_node_id: 1525:1500
+    save_node_id: 1525:6825
+  caption_source: embedded_prompt_cycler_P0
+  lyrics_source: embedded_literal
