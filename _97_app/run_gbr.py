@@ -40,7 +40,7 @@ def main(argv=None):
             migrate(ROOT)
         except (OSError, ValueError, RuntimeError, sqlite3.Error) as exc:
             raise SystemExit(str(exc)) from exc
-    if (not argv or argv[0] not in COMMANDS or argv[0] == 'test-generation') and '--help' not in argv and '-h' not in argv:
+    if (not argv or argv[0] not in COMMANDS or argv[0] in {'test-generation', 'cleanup-generations'}) and '--help' not in argv and '-h' not in argv:
         from dependencies import bootstrap
         delegated = bootstrap(ROOT, argv)
         if delegated is not None:
@@ -51,7 +51,7 @@ def main(argv=None):
         except (OSError, ValueError, RuntimeError, sqlite3.Error) as exc:
             raise SystemExit(str(exc)) from exc
     parser = argparse.ArgumentParser(description=__doc__, epilog=(
-        "Device commands: setup-generation, doctor-generation, setup-runpod, doctor-runpod, test-generation, init-db, migrate, check-references, plan-r2, check-comfy, doctor-processing, setup-processing. "
+        "Device commands: setup-generation, doctor-generation, setup-runpod, doctor-runpod, test-generation, init-db, migrate, check-references, plan-r2, check-comfy, doctor-processing, setup-processing, cleanup-generations. "
         "Use COMMAND --help for options. init-db creates an empty DB; migrate imports existing history."))
     parser.add_argument("--config", type=Path, default=REVIEW_ROOT / "config.json")
     parser.add_argument("--database", type=Path, default=ROOT / "_98_database" / "gbr.sqlite3")

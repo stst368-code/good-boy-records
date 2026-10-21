@@ -4,8 +4,25 @@ import math
 import os
 from pathlib import Path
 import shutil
+import re
 import subprocess
 import sys
+
+
+def limiter_filters(ffmpeg, limit_db, sample_rate):
+    """Query the installed build; older alimiter needs explicit lookahead compensation."""
+    help_result = subprocess.run([ffmpeg, '-hide_banner', '-h', 'filter=alimiter'],
+                                 capture_output=True, text=True, check=True)
+    options = help_result.stdout + help_result.stderr
+    limiter = f'alimiter=limit={10**(limit_db/20)}:level=0:attack=5'
+    if re.search(r'^\s+latency\s', options, re.M):
+        return [f'aformat=sample_rates={sample_rate}', limiter + ':latency=1'], 'native'
+    # alimiter's ring buffer delays by floor(rate * attack_ms / 1000) - 1.
+    # Flush the tail before trimming that exact number of samples. Compensation
+    # precedes fades/preview trimming so lyric and lighting timestamps stay fixed.
+    delay = max(0, int(sample_rate * 5 / 1000) - 1)
+    return [f'aformat=sample_rates={sample_rate}', f'apad=pad_len={delay}', limiter,
+            f'atrim=start_sample={delay}', 'asetpts=PTS-STARTPTS'], 'explicit_samples'
 
 
 def render(request):
@@ -40,9 +57,11 @@ def render(request):
         graph+=f'[tone][{3 if request.get("stems") else 1}:a]afir=dry=1:wet=1:irgain=1:irfmt=mono:{normalise}[room];'
         source='room'
     else:source='tone'
-    final=[]
+    final=[];limiter_compensation=None
     if mix['limiter_db'] is not None:
-        final.append(f"alimiter=limit={10**(mix['limiter_db']/20)}:level=0:latency=1")
+        sample_rate=sf.info(request['stems']['vocals'] if request.get('stems') else request['source']).samplerate
+        limiter,limiter_compensation=limiter_filters(ffmpeg,mix['limiter_db'],sample_rate)
+        final.extend(limiter)
     if mix['fade_in']:final.append(f"afade=t=in:st=0:d={min(duration,mix['fade_in'])}")
     if mix['fade_out']:final.append(f"afade=t=out:st={max(0,duration-mix['fade_out'])}:d={min(duration,mix['fade_out'])}")
     # Fades use whole-recording time before audition trimming; preview and master share a chain.
@@ -68,7 +87,7 @@ def render(request):
         if not np.isfinite(block).all():raise ValueError('Rendered audio contains invalid samples')
         peak=max(peak,float(np.max(np.abs(block))));squares+=float(np.sum(block**2));samples+=block.size
     return {'output':str(output),'artifact_kind':'preview_audio' if request['kind']=='mix_preview' else 'master_candidate',
-            'software':{'ffmpeg':version if not bypass else None,'processing_engine':'bypass' if bypass else 'ffmpeg','numpy':np.__version__,'soundfile':sf.__version__},
+            'software':{'ffmpeg':version if not bypass else None,'processing_engine':'bypass' if bypass else 'ffmpeg','limiter_compensation':limiter_compensation,'numpy':np.__version__,'soundfile':sf.__version__},
             'measurements':{'duration':info.duration,'sample_rate':info.samplerate,'channels':info.channels,'subtype':info.subtype,
                 'sample_peak_dbfs':20*math.log10(peak) if peak>0 else None,
                 'rms_dbfs':10*math.log10(squares/samples) if squares>0 and samples else None,
@@ -118,3 +137,4 @@ def main():
 
 if __name__=='__main__':
     main()
+
