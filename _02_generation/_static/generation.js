@@ -1,3 +1,4 @@
+import {selectChoices} from "/static/choices.js";
 import {initCaptions} from "/tools/generation/captions.js";
 import {initJobs} from "/tools/generation/jobs.js";
 import {workerLabel} from "/tools/generation/workers.js";
@@ -10,7 +11,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     <h2>Tracks</h2><label>Writing catalogue<div class="generation-inline"><input id="genRoot"><button id="genBrowse" type="button">Browse</button><button id="genScan" type="button">Load</button></div></label>
     <div class="generation-inline"><label class="flex">Find a song or file<input id="genSearch" type="search"></label><label>Album<select id="genAlbum"><option value="">All albums</option></select></label></div>
     <div class="generation-inline"><button id="genSelectVisible" type="button">Select shown</button><button id="genClear" type="button">Clear</button><span id="genSelected" class="subtle small"></span></div><div id="genFiles" class="generation-files" aria-label="Writing inputs"></div>
-    <details><summary>Selection and order</summary><label>Run order<select id="genOrder"><option value="selection">Selection order</option><option value="filename">Filename</option><option value="album">Album track order</option></select></label><label class="generation-check"><input id="genLowRated" type="checkbox">Only tracks with low saved ratings</label><div class="generation-fields"><label>Mean rating at or below<input id="genRatingMax" type="number" min="0" max="5" step="0.1" value="3"></label><label>Review cluster<input id="genRatingCluster" placeholder="Any cluster"></label><label>Review style<input id="genRatingStyle" placeholder="Any style"></label></div></details>
+    <details><summary>Selection and order</summary><label>Run order<select id="genOrder"><option value="selection">Selection order</option><option value="filename">Filename</option><option value="album">Album track order</option></select></label><label class="generation-check"><input id="genLowRated" type="checkbox">Only tracks with low saved ratings</label><div class="generation-fields"><label>Mean rating at or below<input id="genRatingMax" type="number" min="0" max="5" step="0.1" value="3"></label><label>Review cluster<select id="genRatingCluster"><option value="">Any cluster</option></select></label><label>Review style<select id="genRatingStyle"><option value="">Any style</option></select></label></div></details>
     <div class="generation-modules">
     <div class="generation-stage-column"><section class="generation-module"><h2>1 · Models</h2><label>Encoder / DiT selection<select id="genModelsMode"><option value="yaml">YAML, then worker defaults / available models</option><option value="worker" selected>Worker defaults / available models</option><option value="pairs">Test listed encoder + DiT pairs</option></select></label><div id="genModelPairs" class="gen-pairs"></div><button id="genAddModelPair" type="button">+ Encoder / DiT pair</button></section>
     <section class="generation-module"><h2>2 · Text conditioning</h2><div id="genEncodingControls" class="generation-fields"></div><div class="generation-fields"><label>Caption source<select id="genCaptionMode"><option value="random">Random templates</option><option value="yaml">YAML caption</option><option value="catalogue">Catalogue style</option></select></label><label>Captions per track<input id="genCaptionCount" type="number" min="1" max="1000" value="1"></label></div><div id="genCaptionPool"><h3 class="caption-pool-title">Template clusters</h3><div id="genCaptionClusters"></div></div></section>
@@ -286,6 +287,9 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     reloadWorkers,
     writingChanged(kind) {if(kind==='track')state.catalogueDirty=true;state.templatesDirty=true;invalidate();},
     async open() {
+      const reviewOptions=await api('/review/options');
+      selectChoices($('genRatingCluster'),reviewOptions.clusters,{empty:'Any cluster'});
+      selectChoices($('genRatingStyle'),reviewOptions.genres,{empty:'Any style'});
       if (!state.loaded) {
         const prefs = await api("/generation/preferences");
         $("genRoot").value = prefs.input_root;

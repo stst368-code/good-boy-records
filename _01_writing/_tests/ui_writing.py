@@ -34,7 +34,7 @@ def main():
             page.locator('#writingTab').click();page.locator('#writeSettings').click();page.locator('#writeEndpoint').fill(endpoint)
             page.locator('#writeQuery').click();page.wait_for_function("()=>document.getElementById('writeSettingsStatus').textContent.includes('Connected')")
             page.locator('#writeModel').select_option('writing-fixture');page.locator('#writeSettingsSave').click();page.locator('#writeSettingsClose').click()
-            page.locator('#writeCluster').fill('Rock');page.locator('#writeStyle').fill('Punk')
+            page.locator('#writeCluster').select_option('Rock');page.locator('#writeStyle').select_option('Punk')
             page.locator('#writeBrief').fill('A punk story about Bam Bam and a ball that becomes a star.')
             page.locator('#writeGenerate').click();page.wait_for_selector('#writeDraft:not([hidden])')
             assert page.locator('#writeTitle').input_value()=='ball-supernova'
@@ -48,7 +48,7 @@ def main():
             page.locator('summary',has_text='Save caption as an LLM style template').click();page.locator('#writeTemplateName').fill('punk-llm-browser');page.locator('#writeTemplateSave').click()
             page.wait_for_function("()=>document.getElementById('toast').textContent.includes('LLM template saved')")
             page.locator('#generationTab').click();page.wait_for_function("()=>document.querySelectorAll('.generation-file').length===2")
-            page.wait_for_function("()=>[...document.getElementById('genTemplateList').options].some(o=>o.value==='punk-llm-browser')")
+            page.wait_for_function("()=>[...document.querySelectorAll('.caption-versions select option')].some(o=>o.value==='punk-llm-browser')")
             page.locator('#writingTab').click()
             page.locator('#writeKind').select_option('caption')
             page.get_by_label('Select writing _yaml/gbr-local-smoke.yaml',exact=True).check()
@@ -68,3 +68,4 @@ def main():
         except StopIteration:pass
 
 if __name__=='__main__':main()
+

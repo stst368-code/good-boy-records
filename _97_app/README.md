@@ -190,3 +190,14 @@ batch's existing database policy; source YAMLs and the base manifest are unchang
 Before updating a batch managed by an older single-worker controller, Pause after
 the current song and Continue from the updated app. That upgrades the controller
 without rerunning completed songs; an active older controller is never disturbed.
+
+Review Queue options and Publishing Selection use live track-name, cluster and style
+buttons. Choices combine within a group and narrow across groups; an empty group
+means Any. Queue choices persist per reviewer, and preview counts use the same exact
+filters as playback. Lists refresh from recorded metadata and the chosen directory;
+old substring sessions remain compatible until reapplied as explicit choices.
+Generation's rating filters, Writing's cluster/style/language and caption references,
+and YAML editor metadata/field/template selectors use their existing catalogues.
+Worker SSH keys use discovered file choices with an explicit Other key file option.
+Text entry remains available for authored content, new field names/values and paths.
+These controls add no tables or database migrations.

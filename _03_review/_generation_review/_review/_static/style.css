@@ -64,3 +64,9 @@
 /* Fluid stage workspace; retain the compact phone layout. */
 main,.topbar{width:100%;max-width:1920px}main{padding-left:clamp(14px,2vw,36px);padding-right:clamp(14px,2vw,36px)}.topbar{padding-left:clamp(14px,2vw,36px);padding-right:clamp(14px,2vw,36px)}.topbar nav{flex-wrap:wrap}.topbar .wordmark{flex-shrink:0}
 @media(max-width:850px){.topbar{flex-wrap:wrap}.topbar nav{width:100%;justify-content:flex-start;gap:3px}.topbar nav .tab{flex:1 0 auto}.topbar nav .icon-button{flex:0 0 auto}}
+
+/* Reusable vocabulary controls: bounded lists keep the surrounding page compact. */
+.catalogue-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:10px 0}.choice-panel{min-width:0}.choice-heading{display:flex;align-items:center;gap:7px;margin-bottom:6px;font-size:12px}.choice-heading strong{font-weight:500}.choice-heading .quiet-button{margin-left:auto;min-height:34px;font-size:11px;padding:4px 8px}.choice-list{display:flex;align-content:flex-start;flex-wrap:wrap;gap:5px;max-height:220px;overflow-y:auto;overscroll-behavior:contain;padding:2px 3px 4px 1px}.choice-toggle{min-height:36px;padding:6px 9px;font-size:11px;text-align:left;max-width:100%;overflow-wrap:anywhere;display:flex;align-items:center;gap:7px}.choice-toggle[aria-pressed=true],.choice-heading button[aria-pressed=true]{border-color:var(--gold);background:var(--gold-dark);color:var(--gold);box-shadow:inset 0 0 7px #d6a75518}.choice-count{font-size:10px;opacity:.65}.selection-choices{padding:8px 0;border-bottom:1px solid var(--line)}#queueDialog{width:min(1050px,calc(100vw - 28px));max-width:1050px}select[multiple]{min-height:120px}.catalogue-filters .choice-heading{flex-wrap:wrap}
+@media(max-width:650px){.catalogue-filters{grid-template-columns:1fr}.choice-list{max-height:150px}.choice-toggle{min-height:42px}#queueDialog{padding:16px}.choice-heading .quiet-button{min-height:38px}}
+
+@media(max-width:360px){.rating-values{gap:5px}.rating-anchors{--rating-gap:5px}}
