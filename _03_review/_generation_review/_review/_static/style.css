@@ -70,3 +70,5 @@ main,.topbar{width:100%;max-width:1920px}main{padding-left:clamp(14px,2vw,36px);
 @media(max-width:650px){.catalogue-filters{grid-template-columns:1fr}.choice-list{max-height:150px}.choice-toggle{min-height:42px}#queueDialog{padding:16px}.choice-heading .quiet-button{min-height:38px}}
 
 @media(max-width:360px){.rating-values{gap:5px}.rating-anchors{--rating-gap:5px}}
+
+.choice-stale-list{display:grid;gap:4px;margin-top:4px}.choice-stale{font-size:11px;text-align:left;color:var(--muted);min-height:36px;overflow-wrap:anywhere}.choice-stale-list:empty{display:none}

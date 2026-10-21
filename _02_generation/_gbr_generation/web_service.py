@@ -138,7 +138,7 @@ class GenerationService:
             rows.append({**item.summary(), 'relative': str(item.path.relative_to(catalogue.root)), 'title': title,
                          'album': item.metadata.get('album_name') or '', 'exists': item.path.is_file()})
         return {'root': str(catalogue.root), 'inputs': rows,
-                'albums': sorted({row['album'] for row in rows if row['album']})}
+                'albums': sorted({row['album'] for row in rows if row['album'] and row['exists']})}
 
     def preview(self, data):
         if not self.shared_ready():

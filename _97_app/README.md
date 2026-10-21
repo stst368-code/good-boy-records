@@ -194,8 +194,15 @@ without rerunning completed songs; an active older controller is never disturbed
 Review Queue options and Publishing Selection use live track-name, cluster and style
 buttons. Choices combine within a group and narrow across groups; an empty group
 means Any. Queue choices persist per reviewer, and preview counts use the same exact
-filters as playback. Lists refresh from recorded metadata and the chosen directory;
-old substring sessions remain compatible until reapplied as explicit choices.
+filters as playback. Song IDs and the master/variant catalogues group generation,
+version, caption and filename suffixes under one song; legacy records fall back to
+recognised run suffixes. Original titles, YAMLs, IDs and history are retained.
+Lists are faceted: each choice has content matching the other active filters.
+Review offers only unreviewed, available recordings, including its directory list;
+completed songs/clusters disappear. Selection facets use reviewed/flagged/bookmarked
+content and actual buckets/statuses; rerun facets use saved ratings. Exhausted active
+selections remain clearable without widening a queue automatically. The open Review
+chooser refreshes every five seconds. Old text selections resolve to the same songs.
 Generation's rating filters, Writing's cluster/style/language and caption references,
 and YAML editor metadata/field/template selectors use their existing catalogues.
 Worker SSH keys use discovered file choices with an explicit Other key file option.

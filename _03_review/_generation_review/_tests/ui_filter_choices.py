@@ -15,6 +15,7 @@ ROOT=Path(__file__).resolve().parents[3]
 for folder in ('_01_writing/_tests','_01_writing','_02_generation/_tests','_03_review/_generation_review'):
     sys.path.insert(0,str(ROOT/folder))
 import test_writing
+from conftest import complete
 
 
 def main():
@@ -55,10 +56,10 @@ def main():
             assert page.locator('#filterSong .choice-toggle[aria-pressed=true]').count()==1
             assert page.locator('#filterCluster .choice-toggle[aria-pressed=true]').count()==1
             # Switching the directory updates the actual options and counts without losing chosen values.
-            page.locator('#filterDirectory').select_option(str(sub));page.wait_for_function("()=>document.getElementById('queuePreviewCount').textContent.startsWith('0 left')")
+            assert page.locator('#filterDirectory option').evaluate_all('(items)=>items.filter(o=>!o.disabled).every(o=>!o.value.endsWith("/sub"))')
             page.locator('#filterSong').get_by_role('button',name='Any track',exact=True).click()
             page.locator('#filterGenre').get_by_role('button',name='Any style',exact=True).click()
-            page.wait_for_function("()=>document.getElementById('queuePreviewCount').textContent.startsWith('1 left')")
+            page.locator('#filterDirectory').select_option(str(sub));page.wait_for_function("()=>document.getElementById('queuePreviewCount').textContent.startsWith('1 left')")
             page.set_viewport_size({'width':390,'height':844});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
             assert page.locator('#queueDialog').evaluate('(d)=>d.scrollWidth<=d.clientWidth')
             if args.screenshots:page.screenshot(path=str(Path(args.screenshots)/'review-choices-mobile.png'),full_page=True)
@@ -75,7 +76,8 @@ def main():
             assert page.locator('.candidate-title h3').inner_text()=='Other'
             page.set_viewport_size({'width':1600,'height':1000});page.locator('#generationTab').click();page.wait_for_selector('.generation-file')
             assert page.locator('#genRatingCluster option[value=Rock]').count()==1
-            assert page.locator('#genRatingStyle option[value=Punk]').count()==1
+            assert page.locator('#genRatingStyle option[value=Jazz]').count()==1
+            assert page.locator('#genRatingStyle option[value=Punk]').count()==0
             page.locator('#writingTab').click();page.wait_for_selector('#writeCluster option[value=Rock]',state='attached')
             page.locator('#writeCluster').select_option('Rock');page.locator('#writeStyle').select_option('Punk')
             assert page.locator('#writeLanguage').input_value()=='en'
@@ -95,9 +97,37 @@ def main():
             operation.locator('[data-role=template_fields]').select_option(['language','explicit'])
             assert len(operation.locator('[data-role=template_fields]').evaluate('(s)=>[...s.selectedOptions].map(o=>o.value)'))==2
             page.locator('#settingsButton').click();page.locator('#openWorkerSettings').click();page.wait_for_selector('#workerSettingsDialog[open]');page.locator('#workerBackend').select_option('runpod_dedicated');page.locator('#workerKeyChoice').select_option('@other');page.locator('#workerKey').fill('/example/private-key');assert page.locator('#workerKey').is_visible();page.locator('#workerKeyChoice').select_option('');assert not page.locator('#workerKey').is_visible();page.locator('#workersClose').click()
+            # Reproduce the screenshot: IDs, variants and arbitrary run suffixes group once.
+            catalogue=f.root/'review-catalogue';catalogue.mkdir()
+            (catalogue/'track_list.csv').write_text('song_id,song_name,filename\n17,paws off the velvet,paws-off-the-velvet.yaml\n18,paws off,paws-off.yaml\n')
+            service.song_catalogue_root=lambda:catalogue
+            only=inp/'velvet-only';only.mkdir();generated=[]
+            for i,(title,sid) in enumerate([('paws-off-the-velvet-v1_CFG-1.90_STEP-30_SEED-7',17),('paws-off-the-velvet-v3_CFG-1.70_STEP-30_SEED-42',None),('arbitrary-caption-and-configuration-tail',17),('paws-off-v2_CFG-1.90_STEP-30_SEED-7',18)]):
+                folder=only if i<3 else inp;path=folder/(title+'.flac');t=np.arange(16000*12)/16000
+                sf.write(path,.1*np.sin(2*np.pi*(700+i*50)*t),16000,subtype='PCM_24')
+                path.with_suffix('.yaml').write_text(f'title: {title}\ncluster: Rock\nstyle: Punk\n'+(f'song_id: {sid}\n' if sid else ''))
+                aid=service.indexer.index(path);gid=service.db.one('SELECT id FROM generations WHERE audio_id=?',(aid,))['id']
+                if i<3:generated.append(gid)
+            page.locator('#reviewTab').click();page.locator('#queueButton').click();page.wait_for_selector('#queueDialog[open]')
+            for id,label in [('filterSong','Any track'),('filterCluster','Any cluster'),('filterGenre','Any style')]:page.locator('#'+id).get_by_role('button',name=label,exact=True).click()
+            page.locator('#filterDirectory').select_option('')
+            velvet=page.locator('#filterSong').get_by_role('button',name='Track names: paws off the velvet',exact=True)
+            velvet.wait_for();assert velvet.count()==1 and velvet.locator('.choice-count').inner_text()=='3'
+            assert page.locator('#filterSong .choice-toggle').filter(has_text='CFG').count()==0
+            velvet.click();page.wait_for_function("()=>document.getElementById('queuePreviewCount').textContent.startsWith('3 left')")
+            if args.screenshots:page.screenshot(path=str(Path(args.screenshots)/'song-groups-and-facets.png'),full_page=True)
+            for gid in generated:complete(service,gid)
+            page.wait_for_function("()=>document.getElementById('queuePreviewCount').textContent.startsWith('0 left')",timeout=15000)
+            assert page.locator('#filterSong').get_by_role('button',name='Track names: paws off the velvet',exact=True).count()==0
+            assert page.locator('#filterSong .choice-stale').count()==1
+            assert page.locator('#filterSong .choice-toggle .choice-count').evaluate_all('(items)=>items.every(i=>Number(i.textContent)>0)')
+            page.locator('#filterSong').get_by_role('button',name='Any track',exact=True).click()
+            page.wait_for_function("()=>!document.querySelector('#filterSong .choice-stale')")
+            assert page.locator('#filterDirectory option').evaluate_all('(items)=>items.filter(o=>!o.disabled).every(o=>!o.value.endsWith("/velvet-only"))')
+            page.set_viewport_size({'width':390,'height':844});assert page.locator('#queueDialog').evaluate('(d)=>d.scrollWidth<=d.clientWidth')
             assert f.source.read_bytes()==f.original
             assert not errors,errors
-            browser.close();print(json.dumps({'exact_review_toggles_counts_and_restore':'passed','directory_scope':'passed','fourth_rating_submission':'passed','selection_choices':'passed','writing_generation_editor_lists':'passed','desktop_mobile':'passed','js_errors':errors}))
+            browser.close();print(json.dumps({'exact_review_toggles_counts_and_restore':'passed','directory_scope':'passed','fourth_rating_submission':'passed','selection_choices':'passed','writing_generation_editor_lists':'passed','catalogue_suffix_grouping':'passed','exhausted_choices_and_directory_removal':'passed','desktop_mobile':'passed','js_errors':errors}))
     finally:
         server.should_exit=True;thread.join(timeout=10);service.close()
         try:next(fixture)

@@ -336,17 +336,20 @@ def create_app(config_path, start_worker=True, database_path=None):
             raise ValueError('Directory must be within a configured input directory')
         return service.queues.counts(reviewer_id(request), body.model_dump(exclude={'order','direction','return_skipped'}))
 
-    @app.get('/api/review/options')
-    def review_options(request: Request, directory: str = '', scope: Literal['queue','selection'] = 'queue'):
-        rid = reviewer_id(request)
-        if directory and not any(inside(directory, p) for p in config.inputs):
+    def filter_options(request, filters, scope, bucket, status, bookmarked):
+        if filters.get('directory') and not any(inside(filters['directory'], p) for p in config.inputs):
             raise ValueError('Directory must be within a configured input directory')
-        allowed = None
-        if scope == 'selection':
-            allowed = {r['generation_id'] for r in service.db.all("""SELECT generation_id FROM analytics_dataset
-                WHERE review_id IS NOT NULL OR publishing_status='selected' OR EXISTS(
-                SELECT 1 FROM bookmarks b WHERE b.generation_id=analytics_dataset.generation_id AND b.reviewer_id=?)""", (rid,))}
-        return filtering.options(service.db, directory, allowed)
+        return filtering.options(service, reviewer_id(request), filters, scope, bucket, status, bookmarked)
+
+    @app.get('/api/review/options')
+    def review_options(request: Request, directory: str = '', scope: Literal['queue','selection','rated'] = 'queue',
+                       bucket: str = '', status: str = '', bookmarked: bool = False):
+        return filter_options(request, {'directory':directory}, scope, bucket, status, bookmarked)
+
+    @app.post('/api/review/options')
+    def scoped_review_options(body: QueueBody, request: Request, scope: Literal['queue','selection','rated'] = 'queue',
+                              bucket: str = '', status: str = '', bookmarked: bool = False):
+        return filter_options(request, body.model_dump(exclude={'order','direction','return_skipped'}), scope, bucket, status, bookmarked)
 
     @app.get("/api/queue/back")
     def previous_track(request: Request):
@@ -458,37 +461,20 @@ def create_app(config_path, start_worker=True, database_path=None):
     def candidates(request: Request, bucket: str = "5", status: str = "", song: str = "", limit: int = 100, offset: int = 0, bookmarked: bool = False,
                    titles: list[str] | None = Query(default=None,max_length=10000), clusters: list[str] | None = Query(default=None,max_length=10000), genres: list[str] | None = Query(default=None,max_length=10000)):
         rid = reviewer_id(request)
-        bucket = None if bucket in ("", "all") else int(bucket)
-        if bucket is not None and not 0 <= bucket <= 5:
-            raise ValueError("Invalid bucket")
         limit, offset = max(1, min(limit, 300)), max(offset, 0)
-        where = "(review_id IS NOT NULL OR publishing_status='selected' OR EXISTS(SELECT 1 FROM bookmarks b WHERE b.generation_id=analytics_dataset.generation_id AND b.reviewer_id=?))"
-        args = [rid]
-        if bookmarked:
-            where += ' AND EXISTS(SELECT 1 FROM bookmarks b WHERE b.generation_id=analytics_dataset.generation_id AND b.reviewer_id=?)'
-            args.append(rid)
-        for key, value in [("bucket", bucket), ("publishing_status", status or None)]:
-            if value is not None:
-                where += " AND " + key + "=?"
-                args.append(value)
-        expressions = {key: value.replace('m.parsed_json','generation_metadata_json').replace('s.title','title').replace('s.genre','genre')
-                       for key,value in (('title',filtering.TITLE),('genre',filtering.GENRE),('cluster',filtering.CLUSTER))}
-        if song:
-            where += ' AND ' + expressions['title'] + ' LIKE ?'
-            args.append("%" + song + "%")
-        for values, expression in ((titles, expressions['title']), (clusters, expressions['cluster']), (genres, expressions['genre'])):
-            if values:
-                where += ' AND ' + expression + ' IN (' + ','.join('?' for _ in values) + ')'
-                args.extend(values)
-        # Selection view contains statuses and archive categories, not model details.
-        items = service.db.all(f"SELECT generation_id,{expressions['title']} AS title,{expressions['genre']} AS genre,song_id,publishing_status,external_reference,bucket,reviewer_id,review_id FROM analytics_dataset WHERE " + where + " ORDER BY title,generation_id LIMIT ? OFFSET ?", (*args, limit, offset))
+        names = filtering.song_names(service)
+        filters = filtering.prepare({'song':song,'titles':titles or [],'clusters':clusters or [],'genres':genres or []}, names)
+        rows = [row for row in filtering.publishing_rows(service,rid,bucket,status,bookmarked,names) if filtering.matches(row,filters)]
+        rows.sort(key=lambda row:(row['title'].casefold(),row['generation_id']))
+        columns = ('generation_id','title','genre','song_id','publishing_status','external_reference','bucket','reviewer_id','review_id')
+        items = [{key:row[key] for key in columns} for row in rows[offset:offset+limit]]
         for item in items:
             own = service.db.one('SELECT r.id FROM latest_reviewer_reviews r JOIN generations g ON g.audio_id=r.audio_id WHERE g.id=? AND r.reviewer_id=?', (item['generation_id'], rid))
             item["can_reassess"] = bool(own)
             item.pop('reviewer_id')
             item['can_review'] = not item['review_id']
             item['flags'] = service.track_flags(item['generation_id'], rid)
-        return {"items": items, "offset": offset, "has_more": len(items) == limit}
+        return {"items": items, "offset": offset, "has_more": offset+limit < len(rows)}
 
     @app.post("/api/publishing/{gid}")
     def publish_status(gid: str, body: PublishingBody):
@@ -664,6 +650,7 @@ def create_app(config_path, start_worker=True, database_path=None):
     generation_routes, generation = generation_router(repo_root, service, local)
     app.include_router(generation_routes)
     app.state.generation = generation
+    service.song_catalogue_root = generation.catalogue_root
     app.mount('/tools/generation', StaticFiles(directory=generation_root / '_static'), name='generation')
     writing_root = repo_root / '_01_writing'
     sys.path.insert(0, str(writing_root))
