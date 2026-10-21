@@ -31,9 +31,10 @@ class Jobs:
         tasks=self.controllers();by_batch={}
         for task in tasks:
             if task.get('batch_id'):by_batch.setdefault(task['batch_id'],[]).append(task)
-        batches=self.g.review.db.all("SELECT id,created_at,status FROM generation_batches WHERE status NOT IN ('succeeded','failed','cancelled') OR id IN (SELECT id FROM generation_batches ORDER BY created_at DESC LIMIT 100) ORDER BY created_at DESC")
+        batches=self.g.review.db.all("SELECT id,created_at,status,selection_json,policy_json FROM generation_batches WHERE status NOT IN ('succeeded','failed','cancelled') OR id IN (SELECT id FROM generation_batches ORDER BY created_at DESC LIMIT 100) ORDER BY created_at DESC")
         result=[]
         for batch in batches:
+            policy=json.loads(batch.pop('policy_json'));selection=json.loads(batch.pop('selection_json'))
             counts=Counter(r['status'] for r in self.g.review.db.all('SELECT status FROM generation_runs WHERE batch_id=?',(batch['id'],)))
             workers=by_batch.get(batch['id'],[]);active=any(t['active'] for t in workers)
             if active and (counts['prepared'] or any(counts[s] for s in LIVE)):section='active';status='running' if any(counts[s] for s in LIVE) else 'queued'
@@ -42,7 +43,11 @@ class Jobs:
             elif counts['prepared']:section='active';status='paused' if any(t['status']=='paused' for t in workers) else 'queued'
             elif counts['cancelled']:section='failed';status='cancelled'
             else:section='completed';status='completed'
-            result.append({**batch,'status':status,'section':section,'counts':dict(counts),'total':sum(counts.values()),
+            known={t.get('worker_id') or identity(t['connection']) for t in workers}
+            available=[{'id':e['id'],'connection':e['connection']} for e in self.g.workers.entries() if e['enabled'] and e['id'] not in known] if counts['prepared'] else []
+            automatic=policy.get('automatic_workers',selection.get('worker_id') in {'auto','all'} or selection.get('worker_id') is None and any(t.get('worker_id') for t in workers))
+            result.append({**batch,'status':status,'section':section,'counts':dict(counts),'total':sum(counts.values()),'available_workers':available,'automatic_workers':automatic,
+                'worker_notices':[{'worker_id':wid,'message':message} for (bid,wid),message in list(self.g.dispatcher.notices.items()) if bid==batch['id']],
                 'workers':[{**{k:t.get(k) for k in ('id','worker_id','connection','status','active','run_id','stage','step','steps','message','updated_at','error','report','cleanup_pending')},'current_title':next((r['title'] for r in t.get('runs',[]) if r['id']==t.get('run_id')),None)} for t in workers]})
         return {'jobs':result,'history_limit':100}
 
@@ -75,11 +80,12 @@ class Jobs:
                     extra={k:current.get(k) for k in ('step','steps','message') if current.get('run_id')==row['id']}
             elif row['status']=='prepared' and controllers and all(t['status']=='waiting_worker' for t in controllers):stage='waiting_worker'
             options=frozen.get(row['id'],{}).get('worker_options') or []
+            eligible=set(o['worker_id'] for o in options)
+            eligible.update(c.get('worker_id') or identity(c['connection']) for c in controllers if any(r['id']==row['id'] for r in c.get('runs',[])))
             if not worker and not attempt:
-                if len(options)==1:worker=options[0]['worker_id']
-                elif len(controllers)==1:worker=controllers[0].get('worker_id') or identity(controllers[0]['connection'])
+                if len(eligible)==1:worker=next(iter(eligible))
             result.append({**row,'parameters':parameters,'attempt':attempt,'worker':worker,'stage':stage or row['status'],**extra,
-                'eligible_workers':[o['worker_id'] for o in options], 'can_cancel':row['status'] in {'prepared','running','failed'},
+                'eligible_workers':sorted(eligible), 'can_cancel':row['status'] in {'prepared','running','failed'},
                 'error':attempt.get('error') if attempt and row['status']=='failed' else None})
         return {'runs':result,'offset':offset,'total':len(frozen),'has_more':offset+len(rows)<len(frozen)}
 

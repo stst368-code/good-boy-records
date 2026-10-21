@@ -145,7 +145,9 @@ def create_app(config_path, start_worker=True, database_path=None):
     async def lifespan(app):
         if start_worker:
             service.start()
+            app.state.generation.dispatcher.start()
         yield
+        app.state.generation.dispatcher.close()
         service.close()
 
     app = FastAPI(title="GBR", version="1.6.2", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)

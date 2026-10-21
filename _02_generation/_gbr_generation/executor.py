@@ -367,13 +367,9 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
         raise ValueError("limit must be a positive integer")
     manifest_path = Path(manifest_path).resolve(strict=True)
     manifest = verify_plan(manifest_path)
-    if any(r.get('worker_options') for r in manifest['runs']):
-        if not worker_id:raise ValueError('This shared batch requires a worker identity')
-        runs=[]
-        for run in manifest['runs']:
-            option=next((o for o in run.get('worker_options',[]) if o['worker_id']==worker_id),None)
-            if option:runs.append({**run,**{k:option[k] for k in ('effective','provenance','execution','model_revision')}})
-        manifest={**manifest,'runs':runs}
+    from .assignments import runs_for
+    runs,worker_id=runs_for(manifest_path,manifest,worker_id)
+    manifest={**manifest,'runs':runs}
     # Resolving a venv's interpreter symlink would select its base environment on POSIX.
     python = Path(worker_python or default_python()).expanduser().absolute()
     # Validate every selected job before claiming any or starting inference.
