@@ -30,6 +30,8 @@ def test_broad_and_direct_runtime_inputs_never_index_worker_audio(service):
     assert len(service.db.all('SELECT * FROM generations'))==1 and scratch.exists()
     assert worker_intermediate(r'E:\good-boy-records\_02_Generation\_runtime\attempts\audio.flac')
     assert not worker_intermediate(r'E:\good-boy-records\_02_generation\_generated\song\song.flac')
+    assert not worker_intermediate(r'E:\good-boy-records\_02_generation\_runtime\local_test\batches\b\outputs\song\song.flac')
+    assert worker_intermediate(r'E:\good-boy-records\_02_generation\_runtime\batches\b\attempts\a\outputs\audio.flac')
 
 
 def test_prior_scratch_identity_displays_and_archives_with_published_title_without_rewriting_reviews(service):

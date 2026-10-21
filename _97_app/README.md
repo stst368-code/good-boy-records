@@ -166,7 +166,8 @@ report, and original FLAC tags are preserved. A format/publication failure retai
 the verified worker audio: Retry failed republishes that attempt without inference.
 
 Review excludes generation runtime/staging audio even when a parent folder is scanned.
-Use `_02_generation/_generated` as the input. Current `style_primary`/`style` fields
+Use `_02_generation/_generated` as the input; earlier published runtime `outputs`
+bundles remain readable. Current `style_primary`/`style` fields
 drive the displayed genre and queue filters. Older scratch entries retain their IDs
 and reviews, but display the completed recipe of the exact same decoded recording
 when available. Existing `audio__...` archive names caused by such entries are repaired

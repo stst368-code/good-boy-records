@@ -5,7 +5,13 @@ import json
 def worker_intermediate(path):
     parts=str(path).replace('\\','/').casefold().split('/')
     if any(p.startswith('.gbr-') for p in parts):return True
-    return any(p=='_02_generation' and i+1<len(parts) and parts[i+1] in {'_runtime','runtime'} for i,p in enumerate(parts))
+    for i,p in enumerate(parts):
+        if p=='_02_generation' and i+1<len(parts) and parts[i+1] in {'_runtime','runtime'}:
+            tail=parts[i+2:]
+            # Early CLI versions published complete bundles under outputs.
+            # Keep those readable; an outputs folder inside an attempt is raw.
+            return not ('outputs' in tail and 'attempts' not in tail and 'app_jobs' not in tail)
+    return False
 
 
 def title(meta):
