@@ -75,6 +75,11 @@ def test_prior_scratch_identity_displays_and_archives_with_published_title_witho
     service.db.execute('UPDATE media_files SET path=? WHERE path=?',(str(bad),str(archived)))
     service.db.execute('UPDATE generation_metadata SET yaml_archive_path=? WHERE yaml_archive_path=?',(str(bad_yaml),str(sidecar)))
     reviews=service.db.all('SELECT * FROM reviews');history=service.db.all('SELECT * FROM review_history')
+    archive_setting=service.config.values['archive_directory']
+    service.config.values['archive_directory']='another-archive'
+    service.indexer.repair_archive_names()
+    assert not service.db.all("SELECT * FROM archive_operations WHERE status='pending'")
+    service.config.values['archive_directory']=archive_setting
     assert service.indexer.scan()==0;assert service.indexer.scan()==0
     assert len(service.db.all("SELECT * FROM archive_operations WHERE status='pending'"))==1
     archive_all(service)

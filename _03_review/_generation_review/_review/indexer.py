@@ -215,7 +215,7 @@ class Indexer:
             FROM audio a JOIN latest_reviews r ON r.audio_id=a.id
             WHERE substr(a.archive_stem,1,7)='audio__'""")
         for row in rows:
-            if not row['archive_path'] or not Path(row['archive_path']).is_file():continue
+            if not row['archive_path'] or not inside(row['archive_path'],self.config.archive) or not Path(row['archive_path']).is_file():continue
             gs=self.db.all('''SELECT g.original_directory,g.original_filename,s.title,m.parsed_json
                 FROM generations g JOIN songs s ON s.id=g.song_id JOIN generation_metadata m ON m.generation_id=g.id
                 WHERE g.audio_id=? ORDER BY g.created_at,g.id''',(row['id'],))
