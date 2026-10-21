@@ -6,7 +6,8 @@ from pathlib import Path
 import soundfile as sf
 import yaml
 from mutagen.flac import FLAC
-from .util import digest, dumps, inside, now
+from .util import digest, dumps, inside, now,slug
+from .metadata_identity import worker_intermediate,archive_naming
 
 
 def audio_identity(path):
@@ -109,6 +110,7 @@ class Indexer:
 
     def index(self, path, directory_entries=None):
         path = Path(path).resolve()
+        if worker_intermediate(path):raise ValueError('Worker scratch audio is not a completed recording; choose _02_generation/_generated as the review input')
         before = path.stat()
         sidecar, raw_bytes, raw, meta, embedded, status, error = metadata_for(path, directory_entries)
         yaml_hash = hashlib.sha256(raw_bytes).hexdigest() if raw_bytes is not None else None
@@ -127,7 +129,7 @@ class Indexer:
         if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
             raise ValueError("File is still being written; will retry on next scan")
         title = str(first(meta, "title", "song", "song_title") or re.sub(r"[-_]\d{4,}$", "", path.stem))
-        genre = str(first(meta, "style", "genre", "intended_genre", "cluster") or "Genre unspecified")
+        genre = str(first(meta, "style_primary", "style", "genre", "intended_genre", "cluster") or "Genre unspecified")
         cluster = as_text(meta.get("cluster"))
         song_id = hashlib.sha256(str(first(meta, "song_id", "canonical_song_id") or title.casefold()).encode()).hexdigest()
         generation_id = hashlib.sha256((audio_id + key).encode()).hexdigest()
@@ -187,6 +189,7 @@ class Indexer:
                 self.error(str(root), "Input directory unavailable")
                 continue
             for path in root.rglob("*"):
+                if worker_intermediate(path):continue
                 if any(part.startswith('.gbr-') for part in path.relative_to(root).parts):
                     continue
                 if path.suffix.lower() != ".flac" or not path.is_file() or path.is_symlink():
@@ -202,7 +205,29 @@ class Indexer:
                     indexed += 1
                 except Exception as exc:
                     self.error(str(resolved), str(exc))
+        self.repair_archive_names()
         return indexed
+
+    def repair_archive_names(self):
+        # Correct only demonstrated scratch-title contamination, through the
+        # existing verified move journal. Review/reviewer history is immutable.
+        rows=self.db.all("""SELECT a.id,a.archive_stem,a.archive_path,r.id AS review_id,r.generation_id,r.bucket
+            FROM audio a JOIN latest_reviews r ON r.audio_id=a.id
+            WHERE substr(a.archive_stem,1,7)='audio__'""")
+        for row in rows:
+            if not row['archive_path'] or not inside(row['archive_path'],self.config.archive) or not Path(row['archive_path']).is_file():continue
+            gs=self.db.all('''SELECT g.original_directory,g.original_filename,s.title,m.parsed_json
+                FROM generations g JOIN songs s ON s.id=g.song_id JOIN generation_metadata m ON m.generation_id=g.id
+                WHERE g.audio_id=? ORDER BY g.created_at,g.id''',(row['id'],))
+            name,placeholder=archive_naming(gs)
+            if not placeholder or name==gs[0]['title'] or not row['archive_stem'].startswith(slug(gs[0]['title'])+'__'):continue
+            with self.db.transaction() as c:
+                if c.execute("SELECT 1 FROM archive_operations WHERE audio_id=? AND status IN ('pending','running','failed')",(row['id'],)).fetchone():continue
+                current=c.execute('SELECT id FROM latest_reviews WHERE audio_id=?',(row['id'],)).fetchone()
+                if not current or current['id']!=row['review_id']:continue
+                stamp=now()
+                c.execute('''INSERT INTO archive_operations(id,audio_id,generation_id,review_id,bucket,created_at,updated_at)
+                    VALUES(?,?,?,?,?,?,?)''',(uuid.uuid4().hex,row['id'],row['generation_id'],row['review_id'],row['bucket'],stamp,stamp))
 
     def error(self, path, error):
         self.db.execute("INSERT INTO scan_errors VALUES(?,?,?) ON CONFLICT(path) DO UPDATE SET error=excluded.error,created_at=excluded.created_at",

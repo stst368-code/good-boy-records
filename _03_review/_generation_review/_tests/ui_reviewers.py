@@ -187,9 +187,9 @@ def main():
                 before_b = service.db.one('SELECT * FROM sessions WHERE reviewer_id=?', (br,))
                 a.locator('#queueButton').click()
                 a.wait_for_selector('#queueDialog[open]')
-                assert a.locator('#filterGenre').input_value() == ''
-                assert a.locator('#filterSong').input_value() == ''
-                a.locator('#filterSong').fill('Track')
+                assert a.locator('#filterGenre .choice-toggle[aria-pressed=true]').count() == 0
+                assert a.locator('#filterSong .choice-toggle[aria-pressed=true]').count() == 0
+                a.locator('#filterGenre').get_by_role('button',name='Styles / genres: Chiptune',exact=True).click()
                 a.locator('#order').select_option('alphabetical')
                 a.locator('#queueForm button.primary').click()
                 a.wait_for_selector('#queueDialog[open]', state='hidden')

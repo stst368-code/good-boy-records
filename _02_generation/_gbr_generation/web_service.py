@@ -34,6 +34,8 @@ class GenerationService:
         self.lock = threading.RLock()
         from .workers import Workers
         self.workers = Workers(self)
+        from .dispatch import Dispatcher
+        self.dispatcher=Dispatcher(self)
 
     @property
     def runtime(self):
@@ -182,6 +184,10 @@ class GenerationService:
             spec['field_precedence'] = data['field_precedence']
         self.parameter_sources(spec,data)
         reference_root, styles = self.styles()
+        caption_templates=data.get('caption_templates')
+        if caption_templates is not None and data.get('caption_mode')=='random' and not data.get('template_id'):
+            if not caption_templates:raise ValueError('Turn on at least one caption cluster or template')
+            if set(caption_templates)-set(styles.by_id):raise ValueError('Selected caption templates are no longer in styles.csv; refresh the caption list')
         experiment = data.get('experiments') or {}
         combinations = expand(experiment)
         caption_count = data.get('caption_count', 1)
@@ -209,7 +215,8 @@ class GenerationService:
                 caption_cluster = data.get('caption_cluster') or (rating_filter or {}).get('cluster')
                 caption_style = data.get('caption_style') or (rating_filter or {}).get('style')
                 caption_pool = [key for key, row in styles.by_id.items()
-                        if (not caption_cluster or row['cluster'].casefold() == caption_cluster.strip().casefold())
+                        if (caption_templates is None or key in caption_templates)
+                        and (not caption_cluster or row['cluster'].casefold() == caption_cluster.strip().casefold())
                         and (not caption_style or row['style_primary'].casefold() == caption_style.strip().casefold())]
                 if caption_count > len(caption_pool):
                     raise ValueError(f'Caption pool has {len(caption_pool)} templates; choose fewer captions or broaden the filters')
@@ -237,7 +244,8 @@ class GenerationService:
                     planned.append(case)
             record = planned[0]
             record.planned_runs = [{'effective': dict(case.effective), 'provenance': dict(case.provenance),
-                'template': case.template, 'experiment': case._experiment, 'worker_options':getattr(case,'_worker_options',None)} for case in planned]
+                'template': case.template, 'experiment': case._experiment, 'worker_options':getattr(case,'_worker_options',None),
+                'worker_default_fields':getattr(case,'_worker_defaults',[])} for case in planned]
             for case in planned[1:]:
                 record.issues.extend(issue for issue in case.issues if issue not in record.issues)
             checked.append(record)
@@ -275,6 +283,7 @@ class GenerationService:
 
     def _preview_case(self, item, spec, styles, reference_root, data, template_id, overrides, caption_index, combination_index, repeat_index):
             request = deepcopy(spec)
+            auto_fields={k for k,v in overrides.items() if v=='auto'}
             explicit = bool(template_id)
             if not template_id and (data.get('caption_mode') == 'catalogue' or data.get('caption_mode') is None and data.get('catalogue_captions', True)):
                 try:
@@ -314,6 +323,7 @@ class GenerationService:
                 try:Client(data['connection']['address']).prepare({'parameters':parameters,'lyrics':record.document.values.get('lyrics',''),'attempt_id':'preflight'},data['_comfy_inventory'])
                 except (ValueError,KeyError) as error:record.issues.append(Issue('comfy_preflight',str(error)))
             record._experiment = {'caption': caption_index, 'combination': combination_index, 'repetition': repeat_index, 'overrides': overrides}
+            record._worker_defaults=sorted(k for k,v in record.provenance.items() if k in self.workers.default_fields and (v=='defaults' or k in auto_fields))
             return record
 
     def _remember_preview(self, checked, spec, connection, catalogue, data, rating_filter, rating_evidence):
@@ -343,7 +353,7 @@ class GenerationService:
                 'launcher': (data.get('_worker') or {}).get('launcher'),
                 'workers':data.get('_pool'),
                 'root': catalogue.root, 'layout': data.get('layout', 'single'),
-                'selection': {key: data.get(key) for key in ('files', 'all_inputs', 'songs', 'albums', 'order', 'rating_filter', 'parameter_priority', 'template_id', 'catalogue_captions', 'caption_mode', 'caption_count', 'caption_cluster', 'caption_style', 'experiments')}}
+                'selection': {key: data.get(key) for key in ('worker_id','files', 'all_inputs', 'songs', 'albums', 'order', 'rating_filter', 'parameter_priority', 'template_id', 'catalogue_captions', 'caption_mode', 'caption_count', 'caption_cluster', 'caption_style','caption_templates', 'experiments')}}
             if rating_evidence is not None:
                 self.previews[token]['selection']['review_filter'] = rating_evidence
         return {'token': token, 'inputs': [record.summary() for record in checked], 'ready': sum(record.ready for record in checked),
@@ -408,6 +418,13 @@ class GenerationService:
                 output_root=self.generated, output_layout=preview['layout'])
             del self.previews[token]
             batch_id = manifest.parent.name
+            from .planner import open_database
+            from contextlib import closing
+            with closing(open_database(self.review.config.database)) as db,db:
+                db.execute('BEGIN IMMEDIATE')
+                policy=json.loads(db.execute('SELECT policy_json FROM generation_batches WHERE id=?',(batch_id,)).fetchone()[0])
+                policy['automatic_workers']=bool(preview.get('workers'))
+                db.execute('UPDATE generation_batches SET policy_json=? WHERE id=?',(json_text(policy),batch_id))
             with self.review.config_lock:
                 directories = self.review.config.values['input_directories']
                 if str(self.generated.resolve()) not in {str(p) for p in self.review.config.inputs}:
@@ -422,7 +439,7 @@ class GenerationService:
             else:
                 result = self.launch({'manifest': str(manifest), 'batch_id': batch_id, 'connection': preview['connection'],
                                       'launcher': preview.get('launcher'),
-                                      'install': preview['connection']['auto_setup']})
+                                      'install': preview['connection']['auto_setup'],'worker_id':connection_key(preview['connection'])})
             self.review.scan_event.set()
             return result
 
@@ -465,7 +482,8 @@ class GenerationService:
                     latest={}
                     for attempt in attempts:latest.setdefault(attempt['run_id'],attempt['id'])
                     frozen=json.loads(Path(task['manifest']).read_text())
-                    eligible={r['id'] for r in frozen['runs'] if any(o['worker_id']==task['worker_id'] for o in r.get('worker_options',[]))}
+                    from .assignments import runs_for
+                    eligible={r['id'] for r in runs_for(task['manifest'],frozen,task['worker_id'])[0]}
                     item['runs']=[r for r in item['runs'] if (owns(latest[r['id']]) if r['id'] in latest else r['id'] in eligible)]
                     item['cleanup_pending']=any(owns(p.parent.name) for p in attempts_root.glob('*/cleanup-pending.json')) or any(owns(r['id']) and (attempts_root/r['id']/'audio.flac').is_file() for r in completed)
                 if not active and item['status'] in {'starting', 'running', 'checking', 'preparing','waiting_worker'}:
@@ -496,7 +514,7 @@ class GenerationService:
         if not task.get('manifest'):
             return self.launch(task)
         (folder / 'pause').unlink(missing_ok=True)
-        return self.launch({**task, 'install': bool(task['connection'].get('auto_setup', task.get('install', False))) if action in {'continue', 'retry'} else False,
+        return self.launch({**task,'worker_id':task.get('worker_id') or connection_key(task['connection']), 'install': bool(task['connection'].get('auto_setup', task.get('install', False))) if action in {'continue', 'retry'} else False,
                             'resume': action == 'resume', 'retry_failed': action == 'retry',
                             'cleanup': action == 'cleanup'})
 

@@ -57,6 +57,10 @@ class WorkerChoice(Body):
     worker_id: str = Field(max_length=2100)
 
 
+class AutoWorkers(Body):
+    enabled:StrictBool
+
+
 class WorkerQuery(WorkerChoice):
     activate: StrictBool = False
 
@@ -87,6 +91,7 @@ class Preview(Body):
     caption_count: int = Field(default=1, ge=1, le=1000, strict=True)
     caption_cluster: str | None = Field(default=None, max_length=1000)
     caption_style: str | None = Field(default=None, max_length=1000)
+    caption_templates: list[str] | None = Field(default=None,max_length=10000)
     experiments: dict = Field(default_factory=dict)
     model_revision: str | None = None
     encoding_cache: Literal['prefer', 'require', 'disabled'] = 'prefer'
@@ -137,7 +142,7 @@ def router(root, review_service, local):
     def templates():
         _, catalogue = service.styles()
         return {'templates': [{'id': row['ID'], 'cluster': row['cluster'], 'style': row['style_primary'],
-                              'source': row.get('template_source')} for row in catalogue.rows]}
+                              'source': row.get('template_source'),'version':row.get('version') or row.get('template_version')} for row in catalogue.rows]}
 
     @routes.get('/workers')
     def workers(refresh: bool = False):
@@ -161,6 +166,7 @@ def router(root, review_service, local):
     def query_worker(body: WorkerQuery):
         entry = service.workers.get(body.worker_id)
         service.workers.query(entry, body.activate)
+        service.dispatcher.wake.set()
         return next(e for e in service.workers.list() if e['id'] == entry['id'])
 
     @routes.post('/workers/select')
@@ -224,6 +230,14 @@ def router(root, review_service, local):
 
     @routes.post('/jobs/{batch_id}/runs/{run_id}/cancel')
     def cancel_run(batch_id:str,run_id:str):return jobs_service.cancel(batch_id,run_id)
+
+    @routes.post('/jobs/{batch_id}/workers')
+    def add_batch_worker(batch_id:str,body:WorkerChoice):
+        try:return service.dispatcher.add(batch_id,body.worker_id)
+        except (OSError,RuntimeError) as error:raise ValueError('Cannot assign this worker: '+str(error)) from None
+
+    @routes.post('/jobs/{batch_id}/auto-workers')
+    def auto_batch_workers(batch_id:str,body:AutoWorkers):return service.dispatcher.set_automatic(batch_id,body.enabled)
 
     @routes.post('/tasks/{task_id}')
     def task_action(task_id: str, body: Action):

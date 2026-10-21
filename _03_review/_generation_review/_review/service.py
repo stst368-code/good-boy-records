@@ -13,6 +13,7 @@ from .analysis import Analyzer
 from .archive import Archiver
 from .db import Database
 from .indexer import Indexer, first
+from .metadata_identity import display_metadata
 from .playback import Playback
 from .util import now, dumps, inside
 from .reviewers import ReviewerQueues, Conflict
@@ -119,9 +120,9 @@ class Service:
           JOIN generation_metadata m ON m.generation_id=g.id WHERE g.id=?""", (gid,))
         if not g:
             return None
-        meta = json.loads(g["parsed_json"])
-        intended_genre = first(meta, "genre", "intended_genre", "cluster")
-        result = {"id": gid, "audio_id": g["audio_id"], "title": g["title"],
+        meta = display_metadata(self.db,g)
+        intended_genre = first(meta, "style_primary", "style", "genre", "intended_genre", "cluster")
+        result = {"id": gid, "audio_id": g["audio_id"], "title": str(first(meta,'title','song','song_title') or g["title"]),
                   "genre": str(intended_genre).strip() if intended_genre else "Genre not supplied",
                   "cluster": str(first(meta, "cluster") or "").strip(),
                   "duration": g["duration"], "channels": g["channels"], "analysis_state": g["analysis_state"], "correction": correction}

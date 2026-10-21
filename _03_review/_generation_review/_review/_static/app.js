@@ -3,6 +3,7 @@ import {initYamlEditor} from "/tools/yaml-editor/editor.js";
 import {initGeneration} from "/tools/generation/generation.js";
 import {initWorkers} from "/tools/generation/workers.js";
 import {initWriting} from "/tools/writing/writing.js";
+import {toggleChoices} from "/static/choices.js";
 import {ReviewTags, savedTags} from "/static/tags.js";
 const $=id=>document.getElementById(id);
 const reviewTags=new ReviewTags($("tagGroups"),$("clearTags"));
@@ -198,7 +199,7 @@ function mediaSession(){
 }
 function showView(view){if(view!=='preparation')preparation.close();if(view!=='writing')writing.close();state.view=view;for(const name of ['writing','yaml','generation','review','selection','preparation']){$(name+'View').hidden=view!==name;$(name+'Tab').classList.toggle('active',view===name);}if(view==='review')drawWave();}
 $('reviewTab').onclick=guarded(async()=>{showView('review');if(state.selectionListen||!state.track)await nextTrack();else await refreshFlags();});
-$('selectionTab').onclick=guarded(async()=>{showView('selection');await loadCandidates();});
+$('selectionTab').onclick=guarded(async()=>{showView('selection');await selectionOptions();await loadCandidates();});
 const yamlEditor=initYamlEditor({api,toast,browse:async callback=>{await openDirectory(callback);}});
 const preparation=initPreparation({api,toast});
 $('preparationTab').onclick=guarded(async()=>{audio.pause();showView('preparation');await preparation.open();});
@@ -215,11 +216,31 @@ $('autoplayNext').checked=localStorage.getItem('gbr-autoplay-next')==='true';
 $('autoplayNext').onchange=()=>localStorage.setItem('gbr-autoplay-next',String($('autoplayNext').checked));
 $('skip').onclick=guarded(async()=>{if(state.track&&!state.track.correction&&!state.selectionListen)await api(`/tracks/${state.track.id}/skip`,{});await nextTrack(true);});
 for(const button of document.querySelectorAll('[data-close]'))button.onclick=()=>$(button.dataset.close).close();
+const queueChoices={},selectionChoices={};
+for(const [key,id,label,any] of [['titles','Song','Track names','Any track'],['clusters','Cluster','Clusters','Any cluster'],['genres','Genre','Styles / genres','Any style']]){
+  queueChoices[key]=toggleChoices($('filter'+id),{label,any,count:'remaining',onChange:guarded(previewQueueCounts)});
+  selectionChoices[key]=toggleChoices($('selection'+id),{label,any,onChange:guarded(async()=>{state.offset=0;await loadCandidates();})});
+}
+let queueOptionsSequence=0,queueCountSequence=0,candidateSequence=0;
+async function queueOptions(){
+  const sequence=++queueOptionsSequence,directory=$('filterDirectory').value;
+  const options=await api('/review/options?'+new URLSearchParams({directory}));
+  if(sequence!==queueOptionsSequence)return false;
+  for(const key of Object.keys(queueChoices))queueChoices[key].load(options[key]);return true;
+}
+function queueFields(){return {order:$('order').value,direction:$('direction').value,directory:$('filterDirectory').value,song:'',genre:'',...Object.fromEntries(Object.entries(queueChoices).map(([key,picker])=>[key,picker.values()]))};}
+async function selectionOptions(){const options=await api('/review/options?scope=selection');for(const key of Object.keys(selectionChoices))selectionChoices[key].load(options[key]);}
 $('queueButton').onclick=guarded(async()=>{
-  $('order').value=state.queue.order;$('direction').value=state.queue.direction;$('filterSong').value=state.queue.song;$('filterGenre').value=state.queue.genre;
-  $('filterDirectory').replaceChildren(new Option('All input folders',''));const b=await api('/bootstrap');for(const directory of b.queue_directories||b.input_directories||[])$('filterDirectory').append(new Option(directory,directory));$('filterDirectory').value=state.queue.directory;$('queueDialog').showModal();await previewQueueCounts();
+  $('order').value=state.queue.order;$('direction').value=state.queue.direction;
+  $('filterDirectory').replaceChildren(new Option('All input folders',''));const b=await api('/bootstrap');for(const directory of b.queue_directories||b.input_directories||[])$('filterDirectory').append(new Option(directory,directory));$('filterDirectory').value=state.queue.directory;
+  await queueOptions();
+  for(const [key,legacy] of [['titles','song'],['clusters',null],['genres','genre']]){
+    const previous=state.queue[key],text=legacy&&state.queue[legacy];
+    queueChoices[key].set(previous?.length?previous:text?(queueChoices[key].legacy(text).length?queueChoices[key].legacy(text):[text]):[]);
+  }
+  $('queueDialog').showModal();await previewQueueCounts();
 });
-async function applyQueue(returnSkipped=false){state.queue={order:$('order').value,direction:$('direction').value,song:$('filterSong').value,genre:$('filterGenre').value,directory:$('filterDirectory').value};await api('/queue',{...state.queue,return_skipped:returnSkipped});$('queueDialog').close();await nextTrack();}
+async function applyQueue(returnSkipped=false){const settings=queueFields();await api('/queue',{...settings,return_skipped:returnSkipped});state.queue=settings;$('queueDialog').close();await nextTrack();}
 $('queueForm').onsubmit=guarded(async event=>{event.preventDefault();await applyQueue();});$('resetSkipped').onclick=guarded(()=>applyQueue(true));$('returnSkipped').onclick=guarded(async()=>{await api('/queue',{...state.queue,return_skipped:true});await nextTrack();});
 async function status(){const result=await api('/status');$('systemStatus').textContent=`Background: ${result.worker}. Analysis waiting: ${result.analysis_pending}. File issues: ${result.scan_errors}. Archive retries needed: ${result.archive_failures}.`;if(result.archive_failures&&!state.saveError&&!state.submitting)$('reviewMessage').textContent='Review saved. An archive move needs attention in Settings.';}
 $('settingsButton').onclick=guarded(async()=>{
@@ -233,8 +254,9 @@ for(const [id,path] of [['rescan','/scan'],['rescanEmpty','/scan'],['retryArchiv
 $('backup').onclick=guarded(async()=>{const r=await fetch('/api/backup',{method:'POST',headers:{'X-GBR-Request':'1'}});if(!r.ok)throw new Error('Database backup failed');const url=URL.createObjectURL(await r.blob()),link=document.createElement('a');link.href=url;link.download='gbr-review-backup.sqlite';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Database backup downloaded. Back up the archive separately.');});
 $('signOut').onclick=guarded(async()=>{await api('/logout',{});audio.pause();location.reload();});
 async function loadCandidates(){
-  const q=new URLSearchParams({status:$('selectionStatus').value,song:$('selectionSong').value,offset:state.offset,limit:50,bucket:$('selectionBucket').value,bookmarked:String($('selectionBookmarks').value==='only')});
-  const result=await api('/publishing?'+q);state.candidates=result.items;state.chosen=[];$('compare').disabled=true;$('candidateList').replaceChildren();$('previousPage').disabled=state.offset===0;$('nextPage').disabled=!result.has_more;
+  const sequence=++candidateSequence;const q=new URLSearchParams({status:$('selectionStatus').value,offset:state.offset,limit:50,bucket:$('selectionBucket').value,bookmarked:String($('selectionBookmarks').value==='only')});
+  for(const [key,picker] of Object.entries(selectionChoices))for(const value of picker.values())q.append(key,value);
+  const result=await api('/publishing?'+q);if(sequence!==candidateSequence)return;state.candidates=result.items;state.chosen=[];$('compare').disabled=true;$('candidateList').replaceChildren();$('previousPage').disabled=state.offset===0;$('nextPage').disabled=!result.has_more;
   if(!result.items.length){const p=document.createElement('p');p.className='subtle';p.textContent='No tracks match these filters.';$('candidateList').append(p);return;}
   for(const item of result.items){
     const card=document.createElement('article');card.className='candidate';card.dataset.generationId=item.generation_id;
@@ -254,7 +276,6 @@ async function loadCandidates(){
 }
 $('selectionBookmarks').onchange=guarded(async()=>{if($('selectionBookmarks').value==='only'){$('selectionBucket').value='';$('selectionStatus').value='';}state.offset=0;await loadCandidates();});
 for(const id of ['selectionBucket','selectionStatus'])$(id).onchange=guarded(async()=>{if(id==='selectionStatus'&&$('selectionStatus').value==='selected')$('selectionBucket').value='';state.offset=0;await loadCandidates();});
-let songTimer;$('selectionSong').oninput=()=>{clearTimeout(songTimer);songTimer=setTimeout(guarded(async()=>{state.offset=0;await loadCandidates();}),300);};
 $('previousPage').onclick=guarded(async()=>{state.offset=Math.max(0,state.offset-50);await loadCandidates();});$('nextPage').onclick=guarded(async()=>{state.offset+=50;await loadCandidates();});
 $('compare').onclick=guarded(async()=>{const [a,b]=state.chosen;if(a.song_id!==b.song_id)throw new Error('Choose two versions of the same song.');state.comparison=await api('/comparisons',{generation_a:a.generation_id,generation_b:b.generation_id});$('compareTitle').textContent=state.comparison.title;$('compareResult').textContent='';$('compareDialog').showModal();});
 async function playComparison(slot){if(!state.comparison)return;const time=state.context?.comparison===state.comparison.id?audio.currentTime:0;audio.pause();state.context={comparison:state.comparison.id,slot};audio.src=`/api/comparisons/${state.comparison.id}/${slot}/audio?format=${state.format}`;audio.load();await new Promise(resolve=>audio.addEventListener('loadedmetadata',resolve,{once:true}));audio.currentTime=Math.min(time,Math.max(0,audio.duration-.1));await audio.play();}
@@ -379,11 +400,10 @@ function paintCounts(counts,target='queueCount'){
   $(target).textContent=`${counts.remaining.toLocaleString()} left · ${counts.reviewed.toLocaleString()} / ${counts.total.toLocaleString()} reviewed${counts.skipped?' · '+counts.skipped+' skipped':''}`;
 }
 async function previewQueueCounts(){
-  const query=new URLSearchParams({directory:$('filterDirectory').value,song:$('filterSong').value,genre:$('filterGenre').value});
-  paintCounts(await api('/queue/counts?'+query),'queuePreviewCount');
+  const sequence=++queueCountSequence,result=await api('/queue/counts',queueFields());
+  if(sequence===queueCountSequence)paintCounts(result,'queuePreviewCount');
 }
-$('filterDirectory').onchange=guarded(previewQueueCounts);
-let countTimer;for(const id of ['filterSong','filterGenre'])$(id).oninput=()=>{clearTimeout(countTimer);countTimer=setTimeout(guarded(previewQueueCounts),250);};
+$('filterDirectory').onchange=guarded(async()=>{if(await queueOptions())await previewQueueCounts();});
 
 $('reviewImport').addEventListener('change',guarded(async()=>{
   const file=$('reviewImport').files[0];if(!file)return;

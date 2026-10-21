@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, StrictInt, StrictBool, ConfigDict
@@ -23,6 +23,7 @@ from .config import Config, password_ok
 from .exports import dataset, publishing_manifest, validation
 from .service import Service, Conflict
 from . import tags as review_tags
+from . import filtering
 from .review_transfer import restore as import_reviews
 from .util import atomic_text, now, dumps, inside
 
@@ -71,6 +72,9 @@ class QueueBody(StrictBody):
     direction: Literal["asc", "desc"] = "asc"
     song: str = ""
     genre: str = ""
+    titles: list[str] = Field(default_factory=list, max_length=10000)
+    clusters: list[str] = Field(default_factory=list, max_length=10000)
+    genres: list[str] = Field(default_factory=list, max_length=10000)
     directory: str = ""
     return_skipped: bool = False
 
@@ -145,7 +149,9 @@ def create_app(config_path, start_worker=True, database_path=None):
     async def lifespan(app):
         if start_worker:
             service.start()
+            app.state.generation.dispatcher.start()
         yield
+        app.state.generation.dispatcher.close()
         service.close()
 
     app = FastAPI(title="GBR", version="1.6.2", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -314,7 +320,7 @@ def create_app(config_path, start_worker=True, database_path=None):
     def set_queue(body: QueueBody, request: Request):
         if body.directory and not any(inside(body.directory, p) for p in config.inputs):
             raise ValueError("Directory must be within a configured input directory")
-        service.queue_settings(body.order, body.direction, {"song": body.song, "genre": body.genre, "directory": body.directory}, body.return_skipped, reviewer_id=reviewer_id(request))
+        service.queue_settings(body.order, body.direction, body.model_dump(exclude={'order','direction','return_skipped'}), body.return_skipped, reviewer_id=reviewer_id(request))
         return {"saved": True}
 
     @app.get('/api/queue/counts')
@@ -323,6 +329,24 @@ def create_app(config_path, start_worker=True, database_path=None):
             raise ValueError('Directory must be within a configured input directory')
         overrides = {k: v for k, v in {'directory': directory, 'song': song, 'genre': genre}.items() if v is not None}
         return service.queues.counts(reviewer_id(request), overrides)
+
+    @app.post('/api/queue/counts')
+    def preview_queue_counts(body: QueueBody, request: Request):
+        if body.directory and not any(inside(body.directory, p) for p in config.inputs):
+            raise ValueError('Directory must be within a configured input directory')
+        return service.queues.counts(reviewer_id(request), body.model_dump(exclude={'order','direction','return_skipped'}))
+
+    @app.get('/api/review/options')
+    def review_options(request: Request, directory: str = '', scope: Literal['queue','selection'] = 'queue'):
+        rid = reviewer_id(request)
+        if directory and not any(inside(directory, p) for p in config.inputs):
+            raise ValueError('Directory must be within a configured input directory')
+        allowed = None
+        if scope == 'selection':
+            allowed = {r['generation_id'] for r in service.db.all("""SELECT generation_id FROM analytics_dataset
+                WHERE review_id IS NOT NULL OR publishing_status='selected' OR EXISTS(
+                SELECT 1 FROM bookmarks b WHERE b.generation_id=analytics_dataset.generation_id AND b.reviewer_id=?)""", (rid,))}
+        return filtering.options(service.db, directory, allowed)
 
     @app.get("/api/queue/back")
     def previous_track(request: Request):
@@ -431,7 +455,8 @@ def create_app(config_path, start_worker=True, database_path=None):
         return service.playback.response(path, media_type="audio/flac" if format == "flac" else "audio/wav")
 
     @app.get("/api/publishing")
-    def candidates(request: Request, bucket: str = "5", status: str = "", song: str = "", limit: int = 100, offset: int = 0, bookmarked: bool = False):
+    def candidates(request: Request, bucket: str = "5", status: str = "", song: str = "", limit: int = 100, offset: int = 0, bookmarked: bool = False,
+                   titles: list[str] | None = Query(default=None,max_length=10000), clusters: list[str] | None = Query(default=None,max_length=10000), genres: list[str] | None = Query(default=None,max_length=10000)):
         rid = reviewer_id(request)
         bucket = None if bucket in ("", "all") else int(bucket)
         if bucket is not None and not 0 <= bucket <= 5:
@@ -446,11 +471,17 @@ def create_app(config_path, start_worker=True, database_path=None):
             if value is not None:
                 where += " AND " + key + "=?"
                 args.append(value)
+        expressions = {key: value.replace('m.parsed_json','generation_metadata_json').replace('s.title','title').replace('s.genre','genre')
+                       for key,value in (('title',filtering.TITLE),('genre',filtering.GENRE),('cluster',filtering.CLUSTER))}
         if song:
-            where += " AND title LIKE ?"
+            where += ' AND ' + expressions['title'] + ' LIKE ?'
             args.append("%" + song + "%")
+        for values, expression in ((titles, expressions['title']), (clusters, expressions['cluster']), (genres, expressions['genre'])):
+            if values:
+                where += ' AND ' + expression + ' IN (' + ','.join('?' for _ in values) + ')'
+                args.extend(values)
         # Selection view contains statuses and archive categories, not model details.
-        items = service.db.all("SELECT generation_id,title,genre,song_id,publishing_status,external_reference,bucket,reviewer_id,review_id FROM analytics_dataset WHERE " + where + " ORDER BY title,generation_id LIMIT ? OFFSET ?", (*args, limit, offset))
+        items = service.db.all(f"SELECT generation_id,{expressions['title']} AS title,{expressions['genre']} AS genre,song_id,publishing_status,external_reference,bucket,reviewer_id,review_id FROM analytics_dataset WHERE " + where + " ORDER BY title,generation_id LIMIT ? OFFSET ?", (*args, limit, offset))
         for item in items:
             own = service.db.one('SELECT r.id FROM latest_reviewer_reviews r JOIN generations g ON g.audio_id=r.audio_id WHERE g.id=? AND r.reviewer_id=?', (item['generation_id'], rid))
             item["can_reassess"] = bool(own)

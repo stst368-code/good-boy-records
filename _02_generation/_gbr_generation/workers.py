@@ -158,6 +158,7 @@ def ensure_comfy(connection, launcher, runtime, timeout=60):
 
 
 class Workers:
+    default_fields=DEFAULT_FIELDS
     def __init__(self, generation):
         self.generation = generation
         self.reports = {}
@@ -204,6 +205,7 @@ class Workers:
             saved.pop('connections', None)
             g.review.config.values['generation'] = saved
             g.review.config.save()
+        g.dispatcher.wake.set()
         return entry
 
     def delete(self, identifier):
@@ -222,7 +224,7 @@ class Workers:
         # disconnects. The remote queue supplements this with non-GBR jobs.
         return any(connection_key(t['connection']) == connection_key(connection) and
                    (t.get('active') or any(r['status'] == 'running' for r in t.get('runs', [])))
-                   for t in self.generation.tasks())
+                   for t in self.generation.tasks(include_logs=False))
 
     def inspect(self, entry):
         g = self.generation

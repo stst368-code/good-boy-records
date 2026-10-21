@@ -24,8 +24,10 @@ def select_by_rating(inputs, database, maximum, reviewer_id=None, cluster=None, 
         query = """SELECT g.id AS generation_id,s.title,r.id AS review_id,r.average,
             json_extract(m.parsed_json,'$.song_id') AS catalogue_song_id,
             json_extract(m.parsed_json,'$.variant_id') AS catalogue_variant_id,
-            COALESCE(json_extract(m.parsed_json,'$.cluster'),s.cluster) AS cluster,
-            json_extract(m.parsed_json,'$.style') AS style
+            COALESCE(NULLIF(trim(json_extract(m.parsed_json,'$.cluster')),''),'Cluster not supplied') AS cluster,
+            COALESCE(NULLIF(trim(json_extract(m.parsed_json,'$.style_primary')),''),NULLIF(trim(json_extract(m.parsed_json,'$.style')),''),
+                NULLIF(trim(json_extract(m.parsed_json,'$.genre')),''),NULLIF(trim(json_extract(m.parsed_json,'$.intended_genre')),''),
+                NULLIF(trim(json_extract(m.parsed_json,'$.cluster')),''),s.genre,'Genre not supplied') AS style
             FROM generations g JOIN songs s ON s.id=g.song_id
             JOIN generation_metadata m ON m.generation_id=g.id
             JOIN latest_reviewer_reviews r ON r.audio_id=g.audio_id

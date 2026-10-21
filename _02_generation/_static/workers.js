@@ -1,3 +1,4 @@
+import {selectChoices} from "/static/choices.js";
 export function workerLabel(worker) {
   const c = worker.connection;
   const name = {local: 'Native · this PC', comfyui: 'ComfyUI', runpod_dedicated: 'Pod', runpod_serverless: 'Serverless'}[c.backend];
@@ -12,7 +13,7 @@ export function initWorkers({api, toast, onChange, configureWriting}) {
   <div class="generation-grid"><section class="generation-panel">
     <label>Worker type<select id="workerBackend"><option value="local">Native · this PC</option><option value="comfyui">ComfyUI · local or pod URL</option><option value="runpod_dedicated">RunPod dedicated · SSH</option><option value="runpod_serverless">RunPod Serverless</option></select></label>
     <label id="workerAddressWrap">Worker address<input id="workerAddress"></label>
-    <label id="workerKeyWrap">Private SSH key<input id="workerKey" list="workerKeys"><datalist id="workerKeys"></datalist></label>
+    <div id="workerKeyWrap"><label>Private SSH key<select id="workerKeyChoice"></select></label><label id="workerCustomKey" hidden>Other SSH key file<input id="workerKey"></label></div>
     <label id="workerPythonWrap">Native worker Python <span class="subtle">(optional)</span><input id="workerPython"></label>
     <label id="workerMemoryWrap">Memory mode<select id="workerMemory"><option value="auto">Automatic</option><option value="low_vram">CPU offload</option><option value="resident_stage">Active stage on GPU</option></select></label>
     <label id="workerSetupWrap" class="generation-check"><input id="workerSetup" type="checkbox" checked>Prepare native worker automatically</label>
@@ -26,6 +27,9 @@ export function initWorkers({api, toast, onChange, configureWriting}) {
     <p class="subtle small">Defaults fill untouched Generation controls. YAML priority and explicit experiment values still apply. Models and hardware are queried again when jobs start.</p><p id="workerVae" class="subtle small"></p><p id="workerMessage" class="small" role="status"></p>
   </section></div>`;
   const $ = id => document.getElementById(id);
+  let sshKeys=[];
+  function keyChoices(){selectChoices($('workerKeyChoice'),[...sshKeys,{value:'@other',label:'Other key file…'}],{empty:'SSH default identity',value:$('workerKey').value});$('workerCustomKey').hidden=true;}
+  $('workerKeyChoice').onchange=()=>{$('workerCustomKey').hidden=$('workerKeyChoice').value!=='@other';$('workerKey').value=$('workerKeyChoice').value==='@other'?'':$('workerKeyChoice').value;};
   const fields = {workerEncoder:'text_encoder',workerDit:'dit',workerSampler:'sampler',workerScheduler:'scheduler',workerEncoderCfg:'encoder_cfg',workerTopK:'top_k',workerCfg:'sampler_cfg',workerSteps:'sampler_steps',workerDuration:'duration'};
   let entries = [], current = null, busy = false;
   const guarded = fn => async () => {
@@ -72,7 +76,7 @@ export function initWorkers({api, toast, onChange, configureWriting}) {
   function fill(entry = null) {
     current = entry?.id || null;
     const c = entry?.connection || {backend:'comfyui', memory_profile:'auto', auto_setup:true};
-    $('workerBackend').value = c.backend; $('workerAddress').value = c.address || ''; $('workerKey').value = c.identity_file || '';
+    $('workerBackend').value = c.backend; $('workerAddress').value = c.address || ''; $('workerKey').value = c.identity_file || '';keyChoices();
     $('workerPython').value = c.worker_python || ''; $('workerMemory').value = c.memory_profile || 'auto'; $('workerSetup').checked = c.auto_setup !== false; $('workerEnabled').checked = entry?.enabled !== false;
     const launcher = entry?.launcher || {};
     for (const [id,key] of [['workerStartFile','path'],['workerStartCwd','cwd'],['workerStartPython','python']]) $(id).value = launcher[key] || '';
@@ -119,11 +123,14 @@ export function initWorkers({api, toast, onChange, configureWriting}) {
   $('workerDelete').onclick = guarded(async () => {if (!current) return; await api('/generation/workers/remove', {worker_id:current}); current = null; await load(); fill();});
   return {async open() {
     root.showModal();
+    const controls=[...root.querySelectorAll('input,select,button:not(#workersClose)')];controls.forEach(node=>node.disabled=true);$('workerStatus').textContent='Loading workers…';
+    try {
     const prefs = await api('/generation/preferences');
-    $('workerKeys').replaceChildren(...prefs.key_candidates.map(k => new Option(k,k)));
+    sshKeys=prefs.key_candidates||[];
     for (const [id,key] of [['workerStorageEndpoint','storage_endpoint'],['workerStorageBucket','storage_bucket'],['workerStorageRegion','storage_region']]) $(id).value = prefs[key] || '';
     $('workerApiKey').placeholder = prefs.has_api_key ? 'Configured for this session' : 'RUNPOD_API_KEY is also supported';
     $('workerStorageSecret').placeholder = prefs.has_storage_key ? 'Configured for this session' : '';
     await load(); fill(entries.find(e => e.id === current) || entries.at(-1));
+    } finally {controls.forEach(node=>node.disabled=false);}
   }};
 }

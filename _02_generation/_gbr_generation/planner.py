@@ -239,6 +239,7 @@ def prepare_batch(checked, specification, workspace, database, *, input_root, er
                         'album': record.item.metadata.get('album_name') or '',
                         "execution": execution_options(specification),
                         "worker_options":worker_options,
+                        "worker_default_fields":case.get('worker_default_fields',[]),
                         "model_revision": specification.get("model_revision"),
                         "template": case.get("template"), "experiment": case.get("experiment"), "parent_review_generation_id": parent, "request_id": request_id})
             rendered = json_text(manifest).encode("utf-8")

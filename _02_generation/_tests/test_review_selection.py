@@ -60,6 +60,18 @@ class ReviewSelectionTests(unittest.TestCase):
             conn.commit()
         self.assertEqual(select_by_rating(self.inputs, self.path, 5)[0], [])
 
+    def test_rating_options_accept_current_and_legacy_style_metadata(self):
+        for fields, cluster, style in [({'style_primary':' Punk '},'Cluster not supplied','Punk'),
+                                       ({'genre':'Chiptune','cluster':'Electronic'},'Electronic','Chiptune'),
+                                       ({'style':'','style_primary':'','intended_genre':'Swing'},'Cluster not supplied','Swing')]:
+            with self.subTest(fields=fields):
+                with closing(sqlite3.connect(self.path)) as conn:
+                    conn.execute('UPDATE generation_metadata SET parsed_json=?', (json.dumps({'song_id':1,'variant_id':1,**fields}),))
+                    conn.commit()
+                chosen, evidence = select_by_rating(self.inputs,self.path,3,cluster=cluster,style=style)
+                self.assertEqual([i.song_id for i in chosen],['1'])
+                self.assertEqual(evidence['evidence'][0]['review_ids'],['r2','r3'])
+
     def test_ambiguous_legacy_titles_are_skipped(self):
         with closing(sqlite3.connect(self.path)) as conn:
             conn.execute("UPDATE generation_metadata SET parsed_json='{}'")

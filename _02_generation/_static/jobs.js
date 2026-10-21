@@ -49,6 +49,17 @@ export function initJobs({root,api,toast,onQueued}){
       if(w.current_title)chip.append(node('span','job-current-title',w.current_title));chip.append(actions);if(w.error)chip.append(node('span','error small',w.error));area.append(chip);
     }return area;
   }
+  function assignmentControls(batch){
+    const box=node('div','job-assignment');if(!batch.counts.prepared)return box;
+    const label=node('label','job-auto-workers'),auto=node('input');auto.type='checkbox';auto.checked=!!batch.automatic_workers;auto.setAttribute('aria-label','Automatically add available workers to batch '+batch.id.slice(0,8));
+    auto.onchange=guard(async()=>{auto.disabled=true;try{await api(`/generation/jobs/${batch.id}/auto-workers`,{enabled:auto.checked});await refresh();}finally{auto.disabled=false;}});label.append(auto,node('span','','Automatically join new workers'));box.append(label);
+    const choices=node('select');choices.setAttribute('aria-label','Additional worker for batch '+batch.id.slice(0,8));choices.append(new Option('Choose another worker…',''));
+    for(const worker of batch.available_workers||[])choices.append(new Option(workerName(worker.id),worker.id));
+    const join=button('Add worker',async()=>{if(!choices.value)return;join.disabled=true;join.textContent='Checking worker…';try{const result=await api(`/generation/jobs/${batch.id}/workers`,{worker_id:choices.value});toast(result.status==='already_assigned'?'Worker already assigned.':`Worker added · ${result.eligible} compatible queued configurations`);await refresh();}finally{join.textContent='Add worker';join.disabled=!choices.value;}});join.disabled=true;choices.onchange=()=>{join.disabled=!choices.value;};
+    if(batch.available_workers?.length){const row=node('div','generation-inline job-add-worker');row.append(choices,join);box.append(row);}
+    const note=node('span','subtle small','Queued configurations only; active songs stay with their worker.');box.append(note);
+    for(const notice of batch.worker_notices||[])box.append(node('p','subtle small',workerName(notice.worker_id)+': '+notice.message));return box;
+  }
   function diagnosticDrawer(batch){
     const key=batch.id+'/diagnostics',e=drawer(key,'Technical log'),body=node('div','job-diagnostics');e.append(body);
     const load=guard(async()=>{
@@ -73,7 +84,7 @@ export function initJobs({root,api,toast,onQueued}){
     const e=node('article','job-batch '+batch.section);e.dataset.batch=batch.id;
     const c=batch.counts,header=node('div','job-batch-heading'),title=node('div');title.append(node('h3','',`Batch ${batch.id.slice(0,8)}`),node('span','subtle small',time(batch.created_at)));header.append(title,node('span','job-status '+batch.status,label(batch.status)));e.append(header);
     const completed=c.succeeded||0,ended=completed+(c.cancelled||0)+(c.failed||0),bar=node('progress','job-batch-progress');bar.max=batch.total||1;bar.value=ended;bar.setAttribute('aria-label','Configurations resolved');e.append(bar);
-    const counts=node('div','job-counts');counts.append(node('span','complete',`${completed} / ${batch.total} complete`));for(const [name,n]of [['generating',(c.running||0)+(c.publishing||0)],['queued',c.prepared||0],['cancelled',(c.cancelled||0)+(c.cancel_requested||0)],['failed',c.failed||0]])if(n)counts.append(node('span',name,`${n} ${name}`));e.append(counts,workerControls(batch));
+    const counts=node('div','job-counts');counts.append(node('span','complete',`${completed} / ${batch.total} complete`));for(const [name,n]of [['generating',(c.running||0)+(c.publishing||0)],['queued',c.prepared||0],['cancelled',(c.cancelled||0)+(c.cancel_requested||0)],['failed',c.failed||0]])if(n)counts.append(node('span',name,`${n} ${name}`));e.append(counts,workerControls(batch),assignmentControls(batch));
     const runs=drawer(batch.id+'/runs',`Tracks & configurations · ${batch.total}`);runs.classList.add('job-track-list');
     const page=state.pages.get(batch.id);if(page){for(const run of page.runs)runs.append(runRow(batch,run));if(page.has_more)runs.append(button('Load more configurations',async()=>{await loadRuns(batch.id,true);render();},'job-more'));}else runs.append(node('p','subtle small','Expand to load this batch.'));
     runs.addEventListener('toggle',guard(async()=>{if(runs.open&&!state.pages.has(batch.id)){await loadRuns(batch.id);render();}}));e.append(runs,diagnosticDrawer(batch));return e;
@@ -85,6 +96,7 @@ export function initJobs({root,api,toast,onQueued}){
     const counts=existing.querySelector('.job-counts');counts.replaceChildren(node('span','complete',`${c.succeeded||0} / ${batch.total} complete`));for(const [name,n]of [['generating',(c.running||0)+(c.publishing||0)],['queued',c.prepared||0],['cancelled',(c.cancelled||0)+(c.cancel_requested||0)],['failed',c.failed||0]])if(n)counts.append(node('span',name,`${n} ${name}`));
     const fingerprint=JSON.stringify(batch.workers,(key,value)=>key==='updated_at'?undefined:value);
     if(existing.dataset.workers!==fingerprint){existing.querySelector('.job-workers').replaceWith(workerControls(batch));existing.dataset.workers=fingerprint;}
+    const assignment=JSON.stringify([!!batch.counts.prepared,batch.automatic_workers,batch.available_workers,batch.worker_notices]);if(existing.assignmentSignature!==assignment){existing.querySelector('.job-assignment').replaceWith(assignmentControls(batch));existing.assignmentSignature=assignment;}
     const list=existing.querySelector('.job-track-list'),page=state.pages.get(batch.id);
     if(page){list.querySelector(':scope>p')?.remove();const old=new Map([...list.querySelectorAll(':scope>.job-run')].map(e=>[e.dataset.run,e]));for(const run of page.runs){const row=old.get(run.id);if(!row){list.append(runRow(batch,run));continue;}old.delete(run.id);row.className='job-run '+run.status;const status=row.querySelector('.job-status');status.className='job-status '+run.status;status.textContent=label(run.status);row.querySelector('.job-configuration').textContent=metadata(run);row.querySelector('.job-worker-name').textContent=(run.worker?workerName(run.worker):run.status==='prepared'?'Next available worker':run.status==='cancelled'?'Not dispatched':'Worker not recorded');row.querySelector('.job-stage').textContent=label(run.stage);
       const signature=JSON.stringify(run.parameters);if(row.parameterSignature!==signature){row.querySelector('.job-parameters').replaceWith(parameterList(run.parameters));row.parameterSignature=signature;}
