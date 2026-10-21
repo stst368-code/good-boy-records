@@ -1,0 +1,81 @@
+song_id: 85
+variant_id: 1
+title: lilith
+cluster:
+version:
+explicit: no
+language: ro
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |
+  [intro]
+  Corpul plin de tatuaje, sufletul de cicatrici
+  [verse]
+  Te-ai învățat să dărui foc
+  Nu și cum să-l stingi
+  Printre umbre șterse și fumul
+  Albastru de țigări
+  Îngropi regrete și dezamăgirile de ieri
+  [pre-chorus]  
+  Am greșit, am lăsat-o-n inimă pe Lilith
+  Ea m-a ars, m-a distrus de tot, m-am fript
+  Am toate coastele la loc
+  Dar mă simt incomplet
+  Nu mai am pentru Eva loc în suflet
+  [chorus]
+  Să te pierd, dar nu de tot
+  Pentru că-mi place să mă înec în foc
+  Să mă abțin, dar nu pot
+  Pentru că-mi place să mă înec în foc
+  [post-chorus]
+  Tu ești focul din gheață, viața după moarte
+  [verse]
+  Ultima pe care o vreau
+  Dar prima dintre toate
+  Plăcerea vinovată, picătura din pahar
+  Perfectă niciodată, da' răul necesar
+  Inocență, vină, urât, da' frumos
+  Cel mai frumos paradox, faci totu' pe dos
+  E plictisitor în pace
+  Mă simt necurat și-mi place
+  M-am săturat de tot ce-i bine și ce-i bun
+  Jur! Hai, pierde-mă-n tine acum!
+  Nu vreau să mai fug de rău, te rog, fă-mi-l
+  Dă-mi-l, știu că vrei să mă domini
+  [pre-chorus]
+  Am greșit, am lăsat-o-n inimă pe Lilith
+  Ea m-a ars, m-a distrus de tot, m-am fript
+  Am toate coastele la loc
+  Dar mă simt incomplet
+  Nu mai am pentru Eva loc în suflet
+  [chorus]
+  Să te pierd, dar nu de tot
+  Pentru că-mi place să mă înec în foc
+  Să mă abțin, dar nu pot
+  Pentru că-mi place să mă înec în foc
+  Acum o joci pe Marla Singer
+  Unde te-au rănit, ai lipit un sticker
+  Eu îți dărui dragostea în vers
+  Pentru mine "Times New Roman"
+  Pentru tine "Comic Sans"
+  Nu vreau adevăr, vreau zahăr
+  N-am nevoie de aripi, vreau charter
+  Dragă, mă transformi în cioburi
+  Durere, alcool și droguri
+  [chorus]
+  Să te pierd, dar nu de tot
+  Pentru că-mi place să mă înec în foc
+  Să mă abțin, dar nu pot
+  Pentru că-mi place să mă înec în foc
+  [outro]
