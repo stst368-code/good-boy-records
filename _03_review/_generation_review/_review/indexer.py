@@ -21,6 +21,25 @@ def audio_identity(path):
                                    channels=f.channels, bit_depth=int(re.sub(r"\D", "", f.subtype) or 0))
 
 
+def parse_embedded(embedded):
+    """Interpret original FLAC tags consistently for indexing and explicit repairs."""
+    parsed_embedded, recovered = {}, None
+    for key in ("yaml", "generation_yaml", "gbr_yaml", "prompt_yaml", "metadata", "comment", "description", "gbr_metadata", "generation_metadata"):
+        value = embedded.get(key)
+        if isinstance(value, str):
+            try:
+                obj = yaml.safe_load(value)
+                if isinstance(obj, dict):
+                    parsed_embedded.update(obj)
+                    recovered = value
+            except yaml.YAMLError:
+                pass
+    for key, value in embedded.items():
+        if key not in ("comment", "description", "metadata", "yaml") and isinstance(value, str):
+            parsed_embedded.setdefault(key, value)
+    return parsed_embedded, recovered
+
+
 def metadata_for(path, directory_entries=None):
     candidates = [path.with_suffix(".yaml"), path.with_suffix(".yml"), Path(str(path) + ".yaml"), Path(str(path) + ".yml")]
     if directory_entries is not None:
@@ -38,20 +57,7 @@ def metadata_for(path, directory_entries=None):
             embedded[key.lower()] = values[0] if len(values) == 1 else values
     except Exception as exc:
         errors.append("Embedded metadata: " + str(exc))
-    parsed_embedded, recovered = {}, None
-    for key in ("yaml", "generation_yaml", "gbr_yaml", "prompt_yaml", "metadata", "comment", "description", "gbr_metadata", "generation_metadata"):
-        value = embedded.get(key)
-        if isinstance(value, str):
-            try:
-                obj = yaml.safe_load(value)
-                if isinstance(obj, dict):
-                    parsed_embedded.update(obj)
-                    recovered = value
-            except yaml.YAMLError:
-                pass
-    for key, value in embedded.items():
-        if key not in ("comment", "description", "metadata", "yaml") and isinstance(value, str):
-            parsed_embedded.setdefault(key, value)
+    parsed_embedded, recovered = parse_embedded(embedded)
     raw_bytes = sidecar.read_bytes() if sidecar else (recovered.encode("utf-8") if recovered else None)
     raw = raw_bytes.decode("utf-8-sig", errors="replace") if raw_bytes else None
     parsed = dict(parsed_embedded)
@@ -144,6 +150,10 @@ class Indexer:
                        __import__("datetime").datetime.fromtimestamp(before.st_mtime, __import__("datetime").timezone.utc).isoformat(),
                        path.name, str(path.parent), as_text(first(meta, "source", "generation_source")),
                        as_text(first(meta, "workflow", "workflow_id")), timestamp))
+            # An explicit historical repair can update effective metadata while
+            # preserving its generation ID and all review/telemetry relationships.
+            generation_id = c.execute('SELECT id FROM generations WHERE audio_id=? AND metadata_key=?',
+                                      (audio_id, key)).fetchone()['id']
             params = [as_text(meta.get(k)) for k in ("model", "dit", "text_encoder")]
             params += [number(meta.get("encoder_cfg")), as_text(meta.get("encoder_seed")), number(meta.get("top_k"), True),
                        as_text(meta.get("sampler")), as_text(meta.get("scheduler")), number(meta.get("sampler_cfg")),

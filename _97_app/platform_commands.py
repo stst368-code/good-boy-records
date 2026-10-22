@@ -8,11 +8,16 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 WORKER = ROOT / '_99_tools' / '_workers_infdit'
 COMMANDS = {'setup-generation', 'doctor-generation', 'test-generation', 'setup-runpod', 'doctor-runpod',
-            'migrate', 'init-db', 'check-references', 'plan-r2', 'check-comfy', 'doctor-processing', 'setup-processing'}
+            'migrate', 'init-db', 'check-references', 'plan-r2', 'check-comfy', 'doctor-processing', 'setup-processing', 'cleanup-generations'}
 
 
 def dispatch(arguments):
     command, *tail = arguments
+    if command == 'cleanup-generations':
+        for path in [ROOT/'_02_generation', ROOT/'_03_review/_generation_review', ROOT/'_99_tools/_yaml_editor']:
+            sys.path.insert(0, str(path))
+        from _gbr_yaml_editor.cleanup import main
+        return main(ROOT, tail)
     if command == 'setup-processing':
         return subprocess.call([sys.executable,str(ROOT/'_99_tools/_workers_processing/setup_worker.py'),*tail])
     if command == 'doctor-processing':
