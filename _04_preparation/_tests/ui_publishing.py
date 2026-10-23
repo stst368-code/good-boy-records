@@ -105,9 +105,38 @@ def main():
                     assert not (prep.tracks/aid).exists()
                     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
                     page.close()
+                from test_legacy_showcase import make_legacy
+                publisher.root=root/'repo';writing=publisher.root/'_01_writing/_built';writing.mkdir(parents=True)
+                shutil=__import__('shutil');shutil.copyfile(ROOT/'_01_writing/_built/track_list.csv',writing/'track_list.csv')
+                for width,frequency in [(1440,770),(390,880)]:
+                    candidate=source/f'legacy-{width}.flac';sf.write(candidate,np.stack([.1*np.sin(2*np.pi*frequency*t)]*2,axis=1),44100,subtype='PCM_24')
+                    candidate.with_suffix('.yaml').write_bytes(raw)
+                    aid=review.indexer.index(candidate);current=review.db.one('SELECT id FROM generations WHERE audio_id=?',(aid,))['id']
+                    review.queues.open(review.default_reviewer_id,current);review.review(current,dict(audio_quality=5,composition=4,consistency=4,realism=4),'full',distribution=True)
+                    for op in review.db.all("SELECT * FROM archive_operations WHERE status='pending'"):review.archiver.process(op)
+                    old_source=prep.source(current)[1]
+                    legacy_data=make_legacy((review,prep,publisher,store,current,old_source,raw))
+                    old_root=legacy_data[7];track=legacy_data[8];track['id']=f'legacy-ui-{width}';track['shareToken']='ui'+str(width).zfill(6)
+                    (publisher.root/'_96_website/_data/catalogue.json').write_text(json.dumps({'tracks':[track]}))
+                    bad=old_root/'unmatched';bad.mkdir(exist_ok=True);(bad/'bad.flac').write_bytes(b'invalid audio')
+                    page=browser.new_page(viewport={'width':width,'height':1000});page.on('pageerror',lambda e:errors.append(str(e)))
+                    page.goto(f'http://127.0.0.1:{port}');page.wait_for_selector('#reviewerDialog[open]');page.locator('#knownReviewers button',has_text='Simon').click();page.locator('#publishingTab').click()
+                    page.locator('#pubLegacy summary').click();page.wait_for_function("()=>!document.getElementById('pubLegacyScan').disabled")
+                    page.locator('#pubLegacyScan').click();page.wait_for_function("()=>document.getElementById('pubLegacyStatus').textContent.includes('1 ready · 1 blocked')")
+                    assert page.locator('#pubLegacyRows input[type=checkbox]').count()==1
+                    page.locator('#pubLegacyApply').click();deadline=time.monotonic()+25
+                    while time.monotonic()<deadline:
+                        if review.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(current,))['status']=='published':break
+                        page.wait_for_timeout(100)
+                    assert review.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(current,))['status']=='published'
+                    assert prep.source(current)[1].is_relative_to(prep.showcase)
+                    public=next(t for t in json.loads(store.objects['gbr/v2/catalogue.json'])['tracks'] if t['id']==track['id'])
+                    assert public['shareToken']==track['shareToken'] and public['lyrics_url']
+                    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+                    page.screenshot(path=f'/tmp/gbr-legacy-migration-{width}.png',full_page=True);page.close()
                 browser.close()
             assert not errors,errors
-            print('Browser publishing: desktop/mobile preview, settings, check, publication, share link, withdrawal, discard, artwork attachment and one-action completion passed.')
+            print('Browser publishing: desktop/mobile preview, settings, check, publication, share link, withdrawal, discard, artwork attachment, one-action completion and legacy migration/alignment passed.')
         finally:server.should_exit=True;thread.join(15)
 
 

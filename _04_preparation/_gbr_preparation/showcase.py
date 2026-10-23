@@ -61,11 +61,16 @@ class Showcase:
                 plan={'source':str(source),'destination':str(destination),'items':items,'prepared_id':prepared_id}
                 self.db.execute("INSERT INTO processing_tasks(id,generation_id,kind,status,fingerprint,recipe_json,input_sha256,created_at) VALUES(?,?,'showcase_move','running',?,?,?,?)",(identifier,gid,'showcase:'+row['audio_id'],canonical(plan),row['audio_id'],now()))
             source,destination=Path(plan['source']),Path(plan['destination'])
-            if not source.resolve().is_relative_to(self.prep.tracks.resolve()) or not destination.resolve().is_relative_to(self.root.resolve()):
+            if not self.allowed_source(plan) or not destination.resolve().is_relative_to(self.root.resolve()):
                 raise ValueError('Move journal points outside managed storage')
             try:
                 committed=json.loads(previous['telemetry_json']).get('committed',False) if previous else False
                 if not committed:
+                    active=self.db.one("SELECT 1 FROM processing_tasks t JOIN generations g ON g.id=t.generation_id WHERE g.audio_id=? AND t.id<>? AND t.status IN ('queued','running') AND t.kind<>'release_publish'",(row['audio_id'],identifier))
+                    if active:raise ValueError('Wait for active processing before moving this recording')
+                    if self.db.one("SELECT 1 FROM archive_operations WHERE audio_id=? AND status IN ('pending','running','failed')",(row['audio_id'],)):
+                        raise ValueError('Finish the pending archive operation before moving this recording')
+                    self.db.execute("UPDATE processing_tasks SET status='running',started_at=?,error=NULL WHERE id=?",(now(),identifier))
                     if self.inventory(source)!=plan['items']:raise ValueError('Preparation files changed since completion began; retained sources')
                     for item in plan['items']:
                         relative=Path(item['relative'])
@@ -85,6 +90,12 @@ class Showcase:
                         for item in c.execute("SELECT id,recipe_json FROM processing_tasks WHERE kind<>'showcase_move'").fetchall():
                             before=json.loads(item[1]);after=remap(before,source,destination)
                             if after!=before:c.execute('UPDATE processing_tasks SET recipe_json=? WHERE id=?',(canonical(after),item[0]))
+                        if plan.get('legacy_root'):
+                            c.execute('UPDATE audio SET archive_path=? WHERE id=?',(str(destination/plan['audio_relative']),row['audio_id']))
+                            c.execute('UPDATE generation_metadata SET yaml_archive_path=? WHERE generation_id=?',(str(destination/plan['yaml_relative']),gid))
+                        if plan.get('legacy_public',{}).get('cover'):
+                            cover=plan['legacy_public']['cover'];path=destination/cover['relative']
+                            c.execute('INSERT OR IGNORE INTO generation_artifacts VALUES(?,NULL,?,?,?,?,NULL,?)',(identifier+'-cover','cover_artwork',cover['sha256'],str(path),path.stat().st_size,canonical({'processing_task_id':identifier,'source_generation_id':gid})))
                         c.execute("UPDATE processing_tasks SET telemetry_json=?,status='running',error=NULL WHERE id=?",(canonical({'committed':True,'phase':'cleanup'}),identifier))
                 # A changed/missing destination can never cause source deletion.
                 pending=[]
@@ -101,8 +112,9 @@ class Showcase:
                         except OSError:pass
                     try:source.rmdir()
                     except OSError:pass
-                self.db.execute("UPDATE processing_tasks SET status='done',completed_at=?,error=NULL,telemetry_json=? WHERE id=?",(now(),canonical({'committed':True,'phase':'showcase','folder':str(destination),'cleanup_pending':pending}),identifier))
-                return {'folder':str(destination),'cleanup_pending':pending}
+                bundle=plan.get('bundle',str(destination))
+                self.db.execute("UPDATE processing_tasks SET status='done',completed_at=?,error=NULL,telemetry_json=? WHERE id=?",(now(),canonical({'committed':True,'phase':'showcase','folder':bundle,'cleanup_pending':pending}),identifier))
+                return {'folder':bundle,'cleanup_pending':pending}
             except Exception as exc:
                 self.db.execute("UPDATE processing_tasks SET status='failed',error=? WHERE id=?",(str(exc),identifier))
                 raise
@@ -115,6 +127,14 @@ class Showcase:
             if path.is_file():files.append({'relative':path.relative_to(directory).as_posix(),'sha256':digest(path)})
         return files
 
+    def allowed_source(self,plan):
+        source=Path(plan['source'])
+        if plan.get('legacy_root'):
+            from .legacy_showcase import roots
+            root=Path(plan['legacy_root'])
+            return root in roots(self.publisher.root) and source!=root and source.resolve().is_relative_to(root.resolve())
+        return source.resolve().is_relative_to(self.prep.tracks.resolve())
+
     def reset(self,gid):
         """Return an uncommitted failed move to editing; never touch the source."""
         with self.prep.lock:
@@ -124,7 +144,7 @@ class Showcase:
             if self.db.one("SELECT 1 FROM processing_tasks WHERE generation_id=? AND kind='release_publish' AND status IN ('queued','running')",(gid,)):
                 raise ValueError('Wait for publication to stop before resetting')
             plan=json.loads(row['recipe_json']);source,destination=Path(plan['source']),Path(plan['destination'])
-            if not source.resolve().is_relative_to(self.prep.tracks.resolve()) or not destination.resolve().is_relative_to(self.root.resolve()):
+            if not self.allowed_source(plan) or not destination.resolve().is_relative_to(self.root.resolve()):
                 raise ValueError('Move journal points outside managed storage')
             for item in plan['items']:
                 old,new=source/item['relative'],destination/item['relative']

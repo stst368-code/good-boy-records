@@ -21,6 +21,17 @@ vm.runInNewContext(fs.readFileSync(process.argv[1],'utf8'),context);
  let merged=await context.window.GBRloadReleases(base);
  assert.equal(merged.tracks.length,2);assert.equal(merged.tracks[0].shareToken,'oldTOKEN');assert.equal(merged.easter,base.easter);
  assert.equal(base.tracks.length,1); // no mutation of saved fallback
+ const legacy={...track,id:'old',legacy_id:'old',shareToken:'oldTOKEN'};
+ result={format:'gbr-public-releases-v1',tracks:[legacy]};
+ merged=await context.window.GBRloadReleases(base);
+ assert.equal(merged.tracks.length,1);assert.equal(merged.tracks[0].shareToken,'oldTOKEN');
+ assert.equal(merged.tracks[0].audio.sources.mp3,track.audio.sources.mp3);
+ // Identity survives after the old static entry is removed from a later build.
+ assert.equal((await context.window.GBRloadReleases({tracks:[]})).tracks.length,1);
+ result={format:'gbr-public-releases-v1',tracks:[],withdrawn:['old']};
+ merged=await context.window.GBRloadReleases(base);assert.equal(merged.tracks.length,0);assert.equal(merged.easter,base.easter);
+ result={format:'gbr-public-releases-v1',tracks:[],withdrawn:'old'};
+ assert.equal(await context.window.GBRloadReleases(base),base);
  result={format:'gbr-public-releases-v1',tracks:[track,{...track,displayTitle:'duplicate'}]};
  assert.equal(await context.window.GBRloadReleases(base),base);
  result={format:'gbr-public-releases-v1',tracks:[{...track,audio:{sources:{mp3:'javascript:bad()'}}}]};

@@ -99,6 +99,21 @@ cleanup pending; release the file and retry cleanup. Uncommitted failed moves ca
 be reset if both copies still verify. Existing legacy public URLs and share IDs
 remain supported; re-releasing an indexed legacy recording through Preparation
 uses the new layout. Existing Windows/R2 data is not renamed by pulling code.
+To migrate existing genre-named folders, open **Publishing → Migrate existing
+showcase folders**. Preview the detected local directory, select ready recordings
+and choose whether to align R2. Unmatched audio/YAML, missing IDs, ambiguous or
+shared folders and recordings without current review/publish approval are flagged
+individually. Fix or exclude them; the preview changes no files. Apply verifies
+all bytes, moves the entire selected bundle into the recording's `_source`,
+updates shared database paths and removes verified old copies. Public IDs/share
+tokens, existing covers and public lyric/lighting sidecars are retained. Migrating
+a local directory alone does not change R2. Alignment creates a fresh MP3 and
+sanitised FLAC, then uses the same verified publication path. Raw YAML and private
+companions remain local. Old bucket objects are retained for link compatibility.
+Withdrawals also hide the saved legacy entry; republishing clears that withdrawal.
+Interrupted moves and publication can be retried in release history. No one-time
+script, additional database or manual editing of SQL is required.
+
 The public website consumes the R2 release catalogue directly; do not point the
 legacy YAML catalogue builder at the private completed bundle.
 

@@ -23,6 +23,18 @@ class Settings(BaseModel):
     profile:str=Field(default='',max_length=100)
 
 
+class LegacyPreview(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    directory:str=Field(max_length=2000)
+
+
+class LegacyApply(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    token:str=Field(max_length=64)
+    generations:list[str]=Field(max_length=10000)
+    synchronise:StrictBool=True
+
+
 def router(root,review,preparation,local):
     service=Publisher(root,review,preparation)
     def host(request:Request):
@@ -40,6 +52,14 @@ def router(root,review,preparation,local):
             raise HTTPException(400,error_text(exc)) from exc
     @routes.get('/projects')
     def projects():return service.projects()
+    @routes.get('/legacy')
+    def legacy():return service.legacy.configuration()
+    @routes.post('/legacy/preview')
+    def preview_legacy(body:LegacyPreview):return service.legacy.preview(body.directory)
+    @routes.post('/legacy/apply')
+    def apply_legacy(body:LegacyApply):return service.legacy.start(body.token,body.generations,body.synchronise)
+    @routes.post('/legacy/{identifier}/retry')
+    def retry_legacy(identifier:str):return service.legacy.retry(identifier)
     @routes.post('/research')
     def research():
         try:return service.publish_research()
