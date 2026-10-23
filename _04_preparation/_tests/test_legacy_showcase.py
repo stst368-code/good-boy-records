@@ -168,3 +168,19 @@ def test_migration_api_requires_host_csrf_and_moves_only_selected_recording(lega
         assert result.status_code==200,result.text
         assert wait(review.db,result.json()['tasks'][0])['status']=='done'
         assert not source.exists() and not store.objects
+
+
+def test_legacy_public_genre_survives_missing_new_style_field(legacy):
+    review,prep,publisher,store,gid,source,yaml,root,track=legacy
+    meta=json.loads(review.db.one('SELECT parsed_json FROM generation_metadata WHERE generation_id=?',(gid,))['parsed_json'])
+    meta['style']=None;review.db.execute('UPDATE generation_metadata SET parsed_json=? WHERE generation_id=?',(canonical(meta),gid))
+    track['genre']={'parent_genre':'Rock','child_genre':'Punk'}
+    (publisher.root/'_96_website/_data/catalogue.json').write_text(json.dumps({'tracks':[track]}))
+    preview=scan(legacy);identifier=publisher.legacy.start(preview['token'],[gid],False)['tasks'][0]
+    assert wait(review.db,identifier)['status']=='done'
+    plan=json.loads(review.db.one('SELECT recipe_json FROM processing_tasks WHERE id=?',(identifier,))['recipe_json'])
+    assert 'raw' not in plan['legacy_track'].get('lyrics',{}) and 'generation' not in plan['legacy_track']
+    identifier=publisher.start_prepare(gid,{'include_flac':True})['id'];row=wait(review.db,identifier)
+    assert row['status']=='done',row['error']
+    result=json.loads(row['recipe_json'])['track']
+    assert result['genre']['child_genre']=='Punk' and result['variant']=='punk'

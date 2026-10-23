@@ -352,6 +352,12 @@ class Publisher:
                 old=legacy['legacy_track']
                 track.update(id=old['id'],shareToken=old.get('shareToken') or share_token(old['id'],str(old.get('variant') or old.get('version') or '')))
                 track['legacy_id']=old['id']
+                if not (meta.get('style') or meta.get('style_primary')):
+                    # Old public labels remain useful when a legacy YAML has
+                    # not yet acquired the new cluster/style fields. Do not
+                    # infer style from an unrelated YAML version field.
+                    for key in ('genre','variant','version'):
+                        if key in old:track[key]=old[key]
                 for key in ('story','style','provenance'):
                     if key in old:track[key]=old[key]
                 if track.get('lyrics_url') and old.get('lyrics',{}).get('wordTiming') and not options.get('timed_lyrics'):

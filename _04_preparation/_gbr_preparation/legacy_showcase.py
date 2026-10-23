@@ -49,7 +49,12 @@ class LegacyShowcase:
                 if path.suffix.lower()!='.json':raise ValueError('Unsupported legacy timing format')
                 if not isinstance(json.loads(path.read_text(encoding='utf-8')),dict):raise ValueError('Invalid legacy timing JSON')
             public[role]={'relative':path.relative_to(yaml_path.parent).as_posix(),'sha256':digest(path)}
-        return track,public
+        # Keep the old public identity and presentation fields, not another copy
+        # of lyrics, model settings or worker metadata already held by the DB.
+        identity={k:track[k] for k in ('id','displayTitle','variant','version','shareToken','genre','story','style','provenance') if k in track}
+        timing=track.get('lyrics',{}).get('wordTiming')
+        if timing:identity['lyrics']={'wordTiming':timing}
+        return identity,public
 
     def preview(self,directory):
         self.prep.require()
