@@ -368,7 +368,7 @@ stages:
         body:
           - type: paragraph
             text: >-
-              Attach prepared cover artwork or use the GBR sleeve fallback. Choose the source or a specific master, optional lossless audio, approved lyric timings and the intended light cues. Audition the release before publishing it.
+              Attach finished cover artwork or use the GBR sleeve fallback. Choose the reviewed source or a specific master, check the saved lyric timings and light cues, then press Complete & publish. This prepares the MP3, moves the completed recording into Showcase and synchronises the approved web package to R2.
           - type: stage-link
             stage: publishing
             label: Follow the release into publishing →
@@ -389,7 +389,7 @@ stages:
         body:
           - type: paragraph
             text: >-
-              A saved release preview records the chosen source or master and its public assets. Audio or editorial changes can invalidate that preview. Publication should represent an explicit current choice, not an old approval applied to different files.
+              Completion records the chosen source or master and its public assets. The local Showcase folder is grouped by song ID, variant ID and recording ID, so several performances in the same genre can coexist. Original YAML, processing history, artwork and timing files stay with that recording. The shared database switches to the verified new paths before the old working copies are removed. Publication can also use an auditioned preview; changed audio or editorial choices require a fresh preview.
           - type: paragraph
             text: >-
               A public MP3 is prepared for listening, with optional sanitised lossless FLAC. Raw writing YAML, private review Reasons, worker paths and credentials are excluded from new public release packages.

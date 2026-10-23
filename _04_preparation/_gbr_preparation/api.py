@@ -25,6 +25,11 @@ class Artwork(BaseModel):
     seed: StrictInt=Field(default=0,ge=0,lt=2**63)
 
 
+class ArtworkImport(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    content:str=Field(max_length=14*1024**2)
+
+
 def router(root,review,local):
     service=Preparation(root,review)
     def host(request: Request):
@@ -47,6 +52,13 @@ def router(root,review,local):
 
     @routes.post('/projects/{gid}/artwork')
     def artwork(gid: str,body: Artwork):return service.artwork(gid,body.model_dump())
+
+    @routes.post('/projects/{gid}/artwork/import')
+    def import_artwork(gid:str,body:ArtworkImport):
+        import base64,binascii
+        try:raw=base64.b64decode(body.content,validate=True)
+        except (ValueError,binascii.Error):raise ValueError('Invalid image upload') from None
+        return service.import_artwork(gid,raw)
 
     @routes.post('/projects/{gid}/cleanup-previews')
     def cleanup(gid: str):

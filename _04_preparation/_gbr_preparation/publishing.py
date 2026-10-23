@@ -104,6 +104,8 @@ class Publisher:
         self.secrets_path=self.config_path.with_name('publishing.secrets.json')
         self.pool=ThreadPoolExecutor(max_workers=1,thread_name_prefix='gbr-publishing')
         self.lock=threading.RLock();self.store_factory=store_factory
+        from .showcase import Showcase
+        self.showcase=Showcase(self)
         # Interrupted requests are never replayed automatically. Publish retries
         # reconcile the remote pointer before changing local release state.
         if preparation.enabled:
@@ -185,10 +187,10 @@ class Publisher:
         return row
 
     def projects(self):
-        rows=[p for p in self.prep.projects().get('projects',[]) if p['ready'] and p['status'] in {'selected','published'}]
+        rows=[p for p in self.prep.projects(include_completed=True).get('projects',[]) if p['ready'] and p['status'] in {'selected','published'}]
         for row in rows:
             row['artworks']=self.db.all("SELECT id,kind FROM generation_artifacts WHERE kind IN ('album_artwork','cover_artwork') AND json_extract(metadata_json,'$.source_generation_id')=?",(row['generation_id'],))
-        return {'projects':[{k:p[k] for k in ('generation_id','title','cluster','style','masters','artworks','status')} for p in rows],
+        return {'projects':[{k:p[k] for k in ('generation_id','audio_id','title','cluster','style','masters','artworks','status','completed')} for p in rows],
                 'releases':self.releases()}
 
     def releases(self):
@@ -199,7 +201,23 @@ class Publisher:
             row['title']=recipe.get('track',{}).get('displayTitle') or recipe.get('title','Release')
             row['prepared_id']=recipe.get('prepared_id');row['track']=recipe.get('track')
             row['files']=recipe.get('files',[])
+            row['can_retry']=row['kind']=='release_publish' and row['status'] in {'failed','interrupted'}
+            row['retained']=self.retained_preview(row['id'],row['generation_id'],recipe) if row['kind']=='release_prepare' else False
         return rows
+
+    def retained_preview(self,pid,gid,recipe):
+        if recipe.get('showcase'):return True
+        moves=self.db.all("SELECT recipe_json FROM processing_tasks WHERE kind='showcase_move' AND status<>'cancelled' AND input_sha256=(SELECT audio_id FROM generations WHERE id=?)",(gid,))
+        return any(any(f['relative'].startswith('_release/'+pid+'/') for f in json.loads(m['recipe_json'])['items']) for m in moves)
+
+    def start_complete(self,gid,options):
+        # One explicit action from Preparation. MP3 is always prepared; R2 work
+        # follows the verified local move, without requiring another UI action.
+        self.store()
+        with self.lock:
+            active=self.db.one("SELECT id FROM processing_tasks WHERE generation_id=? AND kind IN ('release_prepare','release_publish') AND status IN ('queued','running')",(gid,))
+            if active:return {'id':active['id']}
+            return self.start_prepare(gid,{**options,'complete_publish':True})
 
     def start_prepare(self,gid,options):
         self.eligible(gid);_,source=self.prep.source(gid,artifact_id=options.get('master_id'))
@@ -233,7 +251,9 @@ class Publisher:
             if len(matches)!=1:raise ValueError('Song ID must match exactly one master catalogue row')
             song=matches[0];title=song.get('song_name') or song.get('title')
             if not title:raise ValueError('Master catalogue title is missing')
-            directory=self.prep.tracks/row['audio_id']/'_release'/identifier;directory.mkdir(parents=True)
+            original=self.prep.source(gid)[1]
+            bundle=original.parent.parent if original.resolve().is_relative_to(self.prep.showcase.resolve()) else self.prep.tracks/row['audio_id']
+            directory=bundle/'_release'/identifier;directory.mkdir(parents=True)
             self.db.execute("UPDATE processing_tasks SET status='running',started_at=? WHERE id=?",(now(),identifier))
             self.progress(identifier,phase='encoding',message='Encoding web audio')
             ffmpeg=shutil.which('ffmpeg')
@@ -318,6 +338,7 @@ class Publisher:
                 c.execute("UPDATE processing_tasks SET status='done',recipe_json=?,telemetry_json=?,completed_at=?,error=NULL WHERE id=?",(canonical(recipe),canonical({'phase':'prepared','message':'Preview ready; nothing uploaded'}),now(),identifier))
                 for index,item in enumerate(files):
                     c.execute('INSERT INTO generation_artifacts VALUES(?,NULL,?,?,?,?,NULL,?)',(identifier+'-'+str(index),'release_asset',item['sha256'],item['path'],item['size'],canonical({'processing_task_id':identifier,'public_key':item['key']})))
+            if options.get('complete_publish'):self.start_publish(identifier)
         except Exception as exc:
             self.db.execute("UPDATE processing_tasks SET status='failed',error=?,completed_at=? WHERE id=?",(error_text(exc),now(),identifier))
             if directory:shutil.rmtree(directory,ignore_errors=True)
@@ -328,6 +349,11 @@ class Publisher:
         if not task:raise ValueError('Prepare and review a release first')
         self.eligible(task['generation_id']);recipe=json.loads(task['recipe_json'])
         if not recipe.get('track'):raise ValueError('Release preview is incomplete')
+        if not recipe.get('showcase') and not all(Path(f['path']).is_file() for f in recipe.get('files',[])):
+            # A move may have committed before its receipt was saved. Its own
+            # journal recovers those paths; pre-upgrade disposable previews do not.
+            if not self.db.one("SELECT 1 FROM processing_tasks WHERE kind='showcase_move' AND input_sha256=(SELECT audio_id FROM generations WHERE id=?) AND status<>'cancelled'",(task['generation_id'],)):
+                raise ValueError('Historical preview files are unavailable; prepare a fresh release to create its local MP3')
         publish_id=uuid.uuid4().hex
         with self.db.transaction() as c:
             active=c.execute("SELECT id FROM processing_tasks WHERE kind='release_publish' AND fingerprint=? AND status IN ('queued','running')",('publish:'+identifier,)).fetchone()
@@ -343,6 +369,20 @@ class Publisher:
             self.eligible(gid);settings=self.settings()
             if recipe['destination']!={k:settings[k] for k in recipe['destination']}:raise ValueError('Publishing destination changed; prepare a new preview')
             self.db.execute("UPDATE processing_tasks SET status='running',started_at=?,error=NULL WHERE id=?",(now(),identifier))
+            if 'showcase' not in recipe:
+                self.progress(identifier,phase='showcase',message='Verifying and moving completed recording')
+                # Clear only disposable, unreferenced mix auditions. Masters,
+                # YAML, corrected timing, light cues and artwork move together.
+                if not self.db.one("SELECT 1 FROM processing_tasks t JOIN generations g ON g.id=t.generation_id WHERE g.audio_id=(SELECT audio_id FROM generations WHERE id=?) AND t.kind='showcase_move'",(gid,)):
+                    self.prep.clean_previews(gid)
+                moved=self.showcase.move(gid,pid)
+                prepared=self.db.one('SELECT * FROM processing_tasks WHERE id=?',(pid,))
+                recipe=json.loads(prepared['recipe_json']);recipe['showcase']=moved
+                self.db.execute('UPDATE processing_tasks SET recipe_json=? WHERE id=?',(canonical(recipe),pid))
+            else:
+                moved=self.showcase.move(gid,pid)
+                recipe['showcase']=moved
+                self.db.execute('UPDATE processing_tasks SET recipe_json=? WHERE id=?',(canonical(recipe),pid))
             store=self.store();existing,etag=store.read(POINTER)
             catalogue=json.loads(existing) if existing else {'format':'gbr-public-releases-v1','tracks':[]}
             if catalogue.get('format')!='gbr-public-releases-v1' or not isinstance(catalogue.get('tracks'),list):raise ValueError('Unknown public catalogue format; retained it')
@@ -383,9 +423,19 @@ class Publisher:
             c.execute("UPDATE publishing_selection SET status='published',published_at=?,external_reference=?,updated_at=? WHERE generation_id=?",(now(),url,now(),gid))
             c.execute("INSERT INTO publishing_history(generation_id,old_status,new_status,external_reference,created_at) VALUES(?,?,'published',?,?)",(gid,old[0] if old else None,url,now()))
             for item in recipe['files']:
-                c.execute("UPDATE generation_artifacts SET uri=? WHERE kind='release_asset' AND json_extract(metadata_json,'$.processing_task_id')=? AND sha256=?",('r2://'+settings['bucket']+'/'+item['key'],pid,item['sha256']))
+                # Keep the one local showcase file as its canonical artifact URI;
+                # the already-recorded public key is its verified R2 location.
+                if not recipe.get('showcase'):
+                    c.execute("UPDATE generation_artifacts SET uri=? WHERE kind='release_asset' AND json_extract(metadata_json,'$.processing_task_id')=? AND sha256=?",('r2://'+settings['bucket']+'/'+item['key'],pid,item['sha256']))
             c.execute("UPDATE processing_tasks SET status='done',completed_at=?,telemetry_json=? WHERE id=?",(now(),canonical({'phase':'published','url':url,'catalogue_url':settings['public_base']+'/'+POINTER}),identifier))
-        # Remove only verified owned web derivatives; source/master/YAML stay put.
+        if recipe.get('showcase'):
+            # Local Showcase is the completed bundle, not a disposable cache.
+            # R2 contains only approved public assets, never its private YAML,
+            # stems, reports, review reasons or intermediate working files.
+            self.progress(identifier,phase='published',url=url,catalogue_url=settings['public_base']+'/'+POINTER,
+                          showcase=recipe['showcase']['folder'],cleanup_pending=recipe['showcase']['cleanup_pending'])
+            return
+        # Compatibility for historical publication receipts.
         cleanup_pending=[]
         for item in recipe['files']:
             path=Path(item['path'])
@@ -404,6 +454,8 @@ class Publisher:
         if self.db.one("SELECT 1 FROM processing_tasks WHERE kind='release_publish' AND status IN ('queued','running') AND json_extract(recipe_json,'$.prepared_id')=?",(pid,)):
             raise ValueError('Wait for active publication before discarding its preview')
         recipe=json.loads(task['recipe_json'])
+        if self.retained_preview(pid,task['generation_id'],recipe):
+            raise ValueError('Completed showcase assets are retained; withdraw the website release instead')
         for item in recipe.get('files',[]):
             path=Path(item['path'])
             if path.is_file():
@@ -442,5 +494,5 @@ class Publisher:
         files=json.loads(row['recipe_json']).get('files',[])
         if not 0<=index<len(files):raise KeyError('Release asset unavailable')
         item=files[index];path=Path(item['path'])
-        if not path.resolve().is_relative_to(self.prep.tracks.resolve()) or not path.is_file() or digest(path)!=item['sha256']:raise KeyError('Preview asset unavailable; published files live on R2')
+        if not any(path.resolve().is_relative_to(p.resolve()) for p in (self.prep.tracks,self.prep.showcase)) or not path.is_file() or digest(path)!=item['sha256']:raise KeyError('Release asset unavailable')
         return path,item['content_type']

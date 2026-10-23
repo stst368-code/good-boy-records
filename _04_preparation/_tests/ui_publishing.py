@@ -21,6 +21,7 @@ def main():
         config=root/'config.json';config.write_text(json.dumps({'input_directories':[str(source)],'database_path':str(db)}))
         app=create_app(config,start_worker=False);review=app.state.service;prep=app.state.preparation;publisher=app.state.publisher
         prep.tracks=root/'_tracks';review.archiver.preparation_root=prep.tracks
+        prep.showcase=root/'_05_showcase';publisher.showcase.root=prep.showcase;review.archiver.showcase_root=prep.showcase
         publisher.config_path=root/'publishing.json';publisher.secrets_path=root/'publishing.secrets.json'
         store=Store();publisher.store_factory=lambda settings:store
         audio=source/'song.flac';t=np.arange(4*44100)/44100;sf.write(audio,np.stack([.1*np.sin(2*np.pi*330*t)]*2,axis=1),44100,subtype='PCM_24')
@@ -61,7 +62,7 @@ def main():
                         # explicitly prepare against the saved bucket before publish.
                         page.get_by_role('button',name='Discard preview').first.click();page.wait_for_function("()=>!document.querySelector('#pubHistory audio')")
                         page.locator('#pubPrepare').click();page.wait_for_selector('#pubHistory audio')
-                        page.get_by_role('button',name='Publish this preview').first.click()
+                        page.get_by_role('button',name='Complete & publish this preview').first.click()
                         page.wait_for_selector('#pubHistory a',timeout=25000)
                         assert '?s=' in page.locator('#pubHistory a').first.get_attribute('href')
                         page.get_by_role('button',name='Withdraw from website').first.click()
@@ -71,9 +72,42 @@ def main():
                     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
                     page.screenshot(path=f'/tmp/gbr-publishing-{width}.png',full_page=True)
                     page.close()
+                for width,frequency in [(1440,550),(390,660)]:
+                    # Exercise the single action in Preparation with fresh
+                    # recordings, not a republish of the earlier receipt.
+                    candidate=source/f'completion-{width}.flac'
+                    sf.write(candidate,np.stack([.1*np.sin(2*np.pi*frequency*t)]*2,axis=1),44100,subtype='PCM_24')
+                    raw=audio.with_suffix('.yaml').read_bytes() if audio.with_suffix('.yaml').exists() else review.db.one('SELECT raw_yaml_bytes FROM generation_metadata LIMIT 1')['raw_yaml_bytes']
+                    candidate.with_suffix('.yaml').write_bytes(raw)
+                    aid=review.indexer.index(candidate);current=review.db.one('SELECT id FROM generations WHERE audio_id=?',(aid,))['id']
+                    review.queues.open(review.default_reviewer_id,current)
+                    review.review(current,dict(audio_quality=5,composition=4,consistency=4,realism=4),'full',distribution=True)
+                    for op in review.db.all("SELECT * FROM archive_operations WHERE status='pending'"):review.archiver.process(op)
+                    page=browser.new_page(viewport={'width':width,'height':1000});page.on('pageerror',lambda e:errors.append(str(e)))
+                    page.goto(f'http://127.0.0.1:{port}');page.wait_for_selector('#reviewerDialog[open]')
+                    page.locator('#knownReviewers button',has_text='Simon').click();page.locator('#preparationTab').click()
+                    page.wait_for_selector('#prepWorkspace:not([hidden])');page.locator('#prepProject').select_option(current)
+                    from PIL import Image
+                    artwork=root/'cover.png';Image.new('RGB',(64,64),'#8f7755').save(artwork)
+                    page.locator('#prepArtworkFile').set_input_files(artwork);page.locator('#prepImportArtwork').click()
+                    page.wait_for_function("()=>document.getElementById('prepReleaseArtwork').value!==''")
+                    page.screenshot(path=f'/tmp/gbr-completion-{width}.png',full_page=True)
+                    page.locator('#prepComplete').click()
+                    page.wait_for_selector('#publishingView:not([hidden])')
+                    page.wait_for_function("()=>document.getElementById('pubHistory').textContent.includes('Publication · published')",timeout=25000)
+                    deadline=time.monotonic()+20
+                    while time.monotonic()<deadline:
+                        if review.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(current,))['status']=='published':break
+                        time.sleep(.03)
+                    assert review.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(current,))['status']=='published'
+                    moved=prep.source(current)[1];assert moved.is_relative_to(prep.showcase)
+                    assert next(moved.parent.glob('*.yaml')).read_bytes()==raw
+                    assert not (prep.tracks/aid).exists()
+                    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+                    page.close()
                 browser.close()
             assert not errors,errors
-            print('Browser publishing: desktop/mobile preparation, audition polling, settings/secrets, connection check, publication, share link, withdrawal and discard passed.')
+            print('Browser publishing: desktop/mobile preview, settings, check, publication, share link, withdrawal, discard, artwork attachment and one-action completion passed.')
         finally:server.should_exit=True;thread.join(15)
 
 

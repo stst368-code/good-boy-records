@@ -48,6 +48,10 @@ def router(root,review,preparation,local):
             raise HTTPException(400,error_text(exc)) from exc
     @routes.post('/projects/{gid}/prepare')
     def prepare(gid:str,body:Prepare):return service.start_prepare(gid,body.model_dump())
+    @routes.post('/projects/{gid}/complete')
+    def complete(gid:str,body:Prepare):return service.start_complete(gid,body.model_dump())
+    @routes.post('/projects/{gid}/reset-completion')
+    def reset(gid:str):return service.showcase.reset(gid)
     @routes.post('/{identifier}/publish')
     def publish(identifier:str):return service.start_publish(identifier)
     @routes.post('/{identifier}/discard')

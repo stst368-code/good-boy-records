@@ -181,6 +181,7 @@ cython_debug/
 .cursorindexingignore
 
 # Media
+/_05_showcase/
 *.mp3
 *.flac
 *.wav

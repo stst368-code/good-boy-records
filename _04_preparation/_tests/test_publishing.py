@@ -101,7 +101,7 @@ def test_real_web_package_strips_private_tags_preserves_source_and_pcm(publicati
     assert not review.db.all('PRAGMA foreign_key_check')
 
 
-def test_success_verified_publication_merges_tracks_and_removes_web_duplicates(publication):
+def test_success_verified_publication_merges_tracks_and_moves_one_local_bundle(publication):
     review,prep,publisher,store,gid,source,yaml=publication
     store.objects[POINTER]=encoded({'format':'gbr-public-releases-v1','tracks':[{'id':'existing','release_id':'previous'}]})
     pid,recipe=prepare(publication)
@@ -110,8 +110,14 @@ def test_success_verified_publication_merges_tracks_and_removes_web_duplicates(p
     assert len(store.checked)==len(recipe['files'])
     assert review.db.one('SELECT status FROM publishing_selection')['status']=='published'
     assert '?s=' in json.loads(row['telemetry_json'])['url']
-    assert source.exists() and all(not Path(item['path']).exists() for item in recipe['files'])
-    assert all(a['uri'].startswith('r2://') for a in review.db.all("SELECT uri FROM generation_artifacts WHERE kind='release_asset'"))
+    moved=prep.source(gid)[1];assert not source.exists() and moved.is_relative_to(prep.showcase)
+    assert moved.read_bytes() and next(moved.parent.glob('*.yaml')).read_bytes()==yaml
+    final=json.loads(review.db.one('SELECT recipe_json FROM processing_tasks WHERE id=?',(pid,))['recipe_json'])
+    assert all(Path(item['path']).is_file() for item in final['files'])
+    assert all(not Path(item['path']).exists() for item in recipe['files'])
+    assert not prep.projects()['projects'] and publisher.projects()['projects'][0]['completed']
+    assert not review.db.all('PRAGMA foreign_key_check')
+    assert all(Path(a['uri']).is_file() for a in review.db.all("SELECT uri FROM generation_artifacts WHERE kind='release_asset'"))
     retry=publisher.start_publish(pid)['id'];assert wait(review.db,retry)['status']=='done'
     assert len(json.loads(store.objects[POINTER])['tracks'])==2
     publisher.start_withdraw(pid)
@@ -121,12 +127,14 @@ def test_success_verified_publication_merges_tracks_and_removes_web_duplicates(p
 
 
 def test_failed_upload_does_not_advance_catalogue_or_publishing_state(publication):
-    review,_,publisher,store,gid,source,_=publication
+    review,prep,publisher,store,gid,source,_=publication
     original=encoded({'format':'gbr-public-releases-v1','tracks':[]});store.objects[POINTER]=original
     pid,recipe=prepare(publication);store.fail_key='.flac'
     row=wait(review.db,publisher.start_publish(pid)['id']);assert row['status']=='failed'
     assert store.objects[POINTER]==original and review.db.one('SELECT status FROM publishing_selection')['status']=='selected'
-    assert source.exists() and all(Path(i['path']).exists() for i in recipe['files'])
+    assert not source.exists() and prep.source(gid)[1].is_relative_to(prep.showcase)
+    final=json.loads(review.db.one('SELECT recipe_json FROM processing_tasks WHERE id=?',(pid,))['recipe_json'])
+    assert all(Path(i['path']).exists() for i in final['files'])
     store.fail_key=None;assert wait(review.db,publisher.start_publish(pid)['id'])['status']=='done'
 
 
@@ -275,3 +283,129 @@ def test_selection_page_withdrawal_removes_the_same_public_entry(publication):
         assert result.status_code==200,result.text
     assert not json.loads(store.objects[POINTER])['tracks']
     assert review.db.one('SELECT status FROM publishing_selection')['status']=='withdrawn'
+
+
+def test_one_action_completes_mp3_showcase_and_r2_without_changing_yaml(publication):
+    review,prep,publisher,store,gid,source,yaml=publication
+    before=source.read_bytes();reviews=review.db.all('SELECT * FROM reviews')
+    pid=publisher.start_complete(gid,{'include_flac':True})['id']
+    assert wait(review.db,pid)['status']=='done'
+    deadline=time.monotonic()+20
+    while time.monotonic()<deadline:
+        job=review.db.one("SELECT id FROM processing_tasks WHERE kind='release_publish'")
+        if job:break
+        time.sleep(.025)
+    assert job and wait(review.db,job['id'])['status']=='done'
+    moved=prep.source(gid)[1]
+    assert moved.read_bytes()==before and next(moved.parent.glob('*.yaml')).read_bytes()==yaml
+    assert not source.exists() and not (prep.tracks/moved.parent.parent.name).exists()
+    final=json.loads(review.db.one('SELECT recipe_json FROM processing_tasks WHERE id=?',(pid,))['recipe_json'])
+    from mutagen.mp3 import MP3
+    mp3=next(Path(f['path']) for f in final['files'] if f['content_type']=='audio/mpeg')
+    assert mp3.is_relative_to(prep.showcase) and abs(MP3(mp3).info.length-1)<.1
+    assert review.db.all('SELECT * FROM reviews')==reviews
+    assert len(json.loads(store.objects[POINTER])['tracks'])==1
+    assert all(not key.endswith(('.yaml','.source.yaml','.generation.json')) for key in store.objects)
+    assert not prep.projects()['projects']
+    with pytest.raises(ValueError,match='Showcase'):prep.submit(gid,'mix_master',{'mix':{}})
+
+
+def test_same_song_variant_and_genre_have_distinct_recording_folders(publication):
+    review,prep,publisher,store,gid,_,yaml=publication
+    first,_=prepare(publication);assert wait(review.db,publisher.start_publish(first)['id'])['status']=='done'
+    inp=review.config.inputs[0];audio=inp/'second.flac';signal=.15*np.sin(2*np.pi*440*np.arange(44100)/44100)
+    sf.write(audio,np.stack([signal,signal],axis=1),44100,subtype='PCM_24');audio.with_suffix('.yaml').write_bytes(yaml)
+    aid=review.indexer.index(audio);second_gid=review.db.one('SELECT id FROM generations WHERE audio_id=?',(aid,))['id']
+    review.queues.open(review.default_reviewer_id,second_gid)
+    review.review(second_gid,dict(audio_quality=5,composition=4,consistency=4,realism=4),'full',distribution=True)
+    for op in review.db.all("SELECT * FROM archive_operations WHERE status='pending'"):review.archiver.process(op)
+    pid=publisher.start_prepare(second_gid,{'include_flac':True})['id'];assert wait(review.db,pid)['status']=='done'
+    assert wait(review.db,publisher.start_publish(pid)['id'])['status']=='done'
+    paths=[prep.source(g)[1] for g in (gid,second_gid)]
+    assert paths[0].parent.parent!=paths[1].parent.parent
+    assert all('_song-13/_variant-2/_recording-' in p.as_posix() for p in paths)
+    assert len({t['id'] for t in json.loads(store.objects[POINTER])['tracks']})==2
+    assert not review.db.all('PRAGMA foreign_key_check')
+
+
+def test_interrupted_local_commit_resumes_verified_copies(publication,monkeypatch):
+    import _gbr_preparation.showcase as module
+    review,prep,publisher,store,gid,source,_=publication
+    pid,_=prepare(publication);original=module.remap
+    def interrupted(*args):raise RuntimeError('simulated process interruption before database commit')
+    monkeypatch.setattr(module,'remap',interrupted)
+    row=wait(review.db,publisher.start_publish(pid)['id']);assert row['status']=='failed'
+    assert source.exists() and prep.source(gid)[1]==source and POINTER not in store.objects
+    monkeypatch.setattr(module,'remap',original)
+    assert wait(review.db,publisher.start_publish(pid)['id'])['status']=='done'
+    assert not source.exists() and prep.source(gid)[1].exists()
+    assert review.db.one("SELECT COUNT(*) n FROM processing_tasks WHERE kind='showcase_move'")['n']==1
+
+
+def test_locked_source_cleanup_is_visible_and_retry_removes_it(publication,monkeypatch):
+    review,prep,publisher,store,gid,source,_=publication
+    pid,_=prepare(publication);unlink=Path.unlink
+    def locked(path,*args,**kwargs):
+        if path==source:raise PermissionError('[WinError 32] playing source')
+        return unlink(path,*args,**kwargs)
+    monkeypatch.setattr(Path,'unlink',locked)
+    row=wait(review.db,publisher.start_publish(pid)['id']);assert row['status']=='done',row['error']
+    assert source.exists() and json.loads(row['telemetry_json'])['cleanup_pending']==[str(source)]
+    monkeypatch.setattr(Path,'unlink',unlink)
+    row=wait(review.db,publisher.start_publish(pid)['id']);assert row['status']=='done'
+    assert not source.exists() and not json.loads(row['telemetry_json'])['cleanup_pending']
+
+
+def test_showcase_move_updates_native_artifact_and_editorial_paths(publication):
+    review,prep,publisher,store,gid,source,_=publication
+    imported=prep.import_artwork(gid,image_bytes())['id'];old=prep.artifact(imported)
+    pid,recipe=prepare(publication,artwork_id=imported)
+    assert wait(review.db,publisher.start_publish(pid)['id'])['status']=='done'
+    assert not old.exists() and prep.artifact(imported).is_relative_to(prep.showcase)
+    assert any(t['artwork_url'] for t in json.loads(store.objects[POINTER])['tracks'])
+    # A later review must not move a completed bundle back into Review.
+    previous=review.db.one('SELECT id FROM latest_reviews')['id']
+    review.review(gid,dict(audio_quality=4,composition=4,consistency=4,realism=4),'full',distribution=True,expected_review_id=previous,reassessment=True)
+    for op in review.db.all("SELECT * FROM archive_operations WHERE status='pending'"):review.archiver.process(op)
+    assert prep.source(gid)[1].is_relative_to(prep.showcase)
+    prep.sync_selection()
+    assert not review.db.one("SELECT 1 FROM archive_operations WHERE operation_type='prepare' AND status='pending'")
+
+
+def image_bytes():
+    from PIL import Image
+    output=io.BytesIO();Image.new('RGB',(64,64),'#b4946b').save(output,format='PNG');return output.getvalue()
+
+
+def test_new_preview_of_completed_recording_stays_in_showcase(publication):
+    review,prep,publisher,store,gid,source,_=publication
+    pid,_=prepare(publication);assert wait(review.db,publisher.start_publish(pid)['id'])['status']=='done'
+    pid,recipe=prepare(publication)
+    assert all(Path(i['path']).is_relative_to(prep.showcase) for i in recipe['files'])
+    assert wait(review.db,publisher.start_publish(pid)['id'])['status']=='done'
+    assert len(json.loads(store.objects[POINTER])['tracks'])==1
+    assert not list(prep.tracks.rglob('*.mp3'))
+
+
+def test_artwork_upload_uses_host_protection_accepts_image_and_rejects_bad_data(publication):
+    import base64
+    from fastapi.testclient import TestClient
+    from PIL import Image
+    review,prep,_,_,gid,_,_=publication
+    app=create_test_app(review,prep)
+    raw=io.BytesIO();Image.fromarray(np.random.default_rng(7).integers(0,256,(256,256,3),dtype=np.uint8)).save(raw,format='PNG')
+    body={'content':base64.b64encode(raw.getvalue()).decode()};assert len(body['content'])>100000
+    route='/api/preparation/projects/'+gid+'/artwork/import'
+    with TestClient(app,base_url='http://127.0.0.1') as client:
+        assert client.post(route,json=body).status_code==403
+        result=client.post(route,json=body,headers={'x-gbr-request':'1'});assert result.status_code==200,result.text
+        assert prep.artifact(result.json()['id']).is_file()
+        result=client.post(route,json={'content':base64.b64encode(b'not an image').decode()},headers={'x-gbr-request':'1'})
+        assert result.status_code==400,result.text
+
+
+def create_test_app(review,prep):
+    from _review.app import create_app
+    app=create_app(review.config.path,start_worker=False)
+    app.state.preparation.tracks=prep.tracks;app.state.preparation.showcase=prep.showcase
+    return app

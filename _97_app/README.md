@@ -79,6 +79,29 @@ history in the same database. FFmpeg is needed for audio renders;
 The [preparation, engine and storage plan](_plans/preparation-and-storage.md)
 identifies the built features and pending GPU/release integrations.
 
+Complete a recording from **Preparation → Complete & publish** after saving its
+lyric/lighting edits and choosing the working source or master and artwork. The
+app always encodes an MP3 of that exact audio. The local bundle moves to
+`_05_showcase/_song-<song_id>/_variant-<variant_id>/_recording-<full-audio-id>/`.
+`_source` holds unchanged original audio/YAML and worker companions; `_derived`
+holds processing outputs; `_release/<preview-id>` holds MP3, sanitised public
+FLAC, cover and approved playback sidecars. Genre is metadata, not a directory
+identity. Different recordings in the same genre cannot overwrite one another.
+The existing shared `processing_tasks` ledger records and resumes verified moves;
+no new database or migration script is required. Closed recordings leave the
+Preparation queue, and revised reviews keep them in Showcase.
+
+Completion synchronises the approved public assets and conditionally updates the
+R2 catalogue. Private source YAML, stems and operational data stay local. An R2
+failure retains the completed bundle; **Publishing → Retry R2 synchronisation**
+resumes without re-encoding or another move. A locked source is reported as
+cleanup pending; release the file and retry cleanup. Uncommitted failed moves can
+be reset if both copies still verify. Existing legacy public URLs and share IDs
+remain supported; re-releasing an indexed legacy recording through Preparation
+uses the new layout. Existing Windows/R2 data is not renamed by pulling code.
+The public website consumes the R2 release catalogue directly; do not point the
+legacy YAML catalogue builder at the private completed bundle.
+
 Configure workers under **Settings → Worker settings** (also accessible from
 Generation). Select a type and address, then **Query models & GPU** to retrieve
 MiniMax encoder/DiT/VAE choices, samplers, queue state and available GPU memory.

@@ -209,6 +209,8 @@ def create_app(config_path, start_worker=True, database_path=None):
                 if request.headers.get("x-gbr-request") != "1" or request.headers.get("sec-fetch-site") == "cross-site" or (origin and urlparse(origin).netloc != request.url.netloc):
                     return JSONResponse({"detail": "Same-origin request header required"}, status_code=403)
                 limit = 64 * 1024 * 1024 if request.url.path == '/api/import/reviews' else 100000
+                if request.url.path.startswith('/api/preparation/projects/') and request.url.path.endswith('/artwork/import'):
+                    limit = 14 * 1024 * 1024 + 1024
                 if int(request.headers.get("content-length", "0")) > limit:
                     return JSONResponse({"detail": "Request too large"}, status_code=413)
             if request.url.path not in ("/api/bootstrap", "/api/login") and not authenticated(request):

@@ -78,7 +78,7 @@ class Archiver:
             if preparation is None:
                 raise ValueError('Preparation storage has not been configured')
             folder = preparation / a['id'] / '_source'
-        elif preparation and a['archive_path'] and Path(a['archive_path']).resolve().is_relative_to(preparation.resolve()):
+        elif a['archive_path'] and any(p and Path(a['archive_path']).resolve().is_relative_to(p.resolve()) for p in (preparation,getattr(self,'showcase_root',None))):
             # A revised rating must not move an in-progress preparation back to Review.
             folder = Path(a['archive_path']).parent
         source_audio = self.available(a["id"])
@@ -137,6 +137,8 @@ class Archiver:
                 "generation_yamls": generation_yamls, "originals": originals}, gs, folder, stem)
 
     def process(self, op):
+        if self.db.one("SELECT 1 FROM sqlite_master WHERE type='table' AND name='processing_tasks'") and self.db.one("SELECT 1 FROM processing_tasks WHERE input_sha256=? AND kind='showcase_move' AND status NOT IN ('done','cancelled')",(op['audio_id'],)):
+            return  # Completion owns these paths; retry this review move later.
         latest = self.db.one("SELECT * FROM latest_reviews WHERE audio_id=?", (op["audio_id"],))
         # A superseded pending review must not undo a later correction.
         if not latest or latest["id"] != op["review_id"]:

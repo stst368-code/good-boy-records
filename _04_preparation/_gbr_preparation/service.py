@@ -56,6 +56,7 @@ class Preparation:
     def __init__(self,root,review):
         self.root,self.review,self.db=Path(root),review,review.db
         self.tracks=self.root/'_04_preparation/_tracks'
+        self.showcase=self.root/'_05_showcase'
         self.references=self.root/'_04_preparation/_references/_artwork'
         self.worker=self.root/'_99_tools/_workers_processing/worker.py'
         self.lock=threading.RLock()
@@ -70,6 +71,7 @@ class Preparation:
                 for statement in sql.split(';'):
                     if statement.strip():c.execute(statement)
             self.review.archiver.preparation_root=self.tracks
+            self.review.archiver.showcase_root=self.showcase
         self.review.preparation=self
 
     def close(self):
@@ -92,7 +94,7 @@ class Preparation:
             FROM generations g JOIN audio a ON a.id=g.audio_id JOIN latest_reviews r ON r.audio_id=g.audio_id
             JOIN publishing_selection p ON p.generation_id=g.id WHERE g.id=? AND p.status IN ('selected','published')''',(gid,)).fetchone()
         if not row:return
-        if row['archive_path'] and Path(row['archive_path']).resolve().is_relative_to(self.tracks.resolve()):return
+        if row['archive_path'] and any(Path(row['archive_path']).resolve().is_relative_to(p.resolve()) for p in (self.tracks,self.showcase)):return
         if c.execute("SELECT 1 FROM archive_operations WHERE audio_id=? AND operation_type='prepare' AND status IN ('pending','running','failed') AND review_id=?",(row['audio_id'],row['review_id'])).fetchone():return
         c.execute('''INSERT INTO archive_operations(id,audio_id,generation_id,review_id,bucket,operation_type,created_at,updated_at)
             VALUES(?,?,?,?,?,'prepare',?,?)''',(uuid.uuid4().hex,row['audio_id'],gid,row['review_id'],row['bucket'],now(),now()))
@@ -103,18 +105,20 @@ class Preparation:
             for row in c.execute("SELECT generation_id FROM publishing_selection WHERE status IN ('selected','published')").fetchall():
                 self.queue_promotion(c,row[0])
 
-    def projects(self):
+    def projects(self,include_completed=False):
         if not self.enabled:return {'enabled':False,'projects':[]}
         rows=self.db.all('''SELECT g.id AS generation_id,g.audio_id,s.title,m.parsed_json,a.duration,a.archive_path,p.status
             FROM publishing_selection p JOIN generations g ON g.id=p.generation_id JOIN songs s ON s.id=g.song_id
             JOIN generation_metadata m ON m.generation_id=g.id JOIN audio a ON a.id=g.audio_id
             WHERE (p.status IN ('selected','published') AND EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id))
                OR a.archive_path LIKE ? ORDER BY p.selected_at,g.id''',(str(self.tracks)+'%',))
+        rows=[r for r in rows if include_completed or not (r['archive_path'] and Path(r['archive_path']).resolve().is_relative_to(self.showcase.resolve()))]
         for row in rows:
             meta=json.loads(row.pop('parsed_json'))
             row.update(cluster=meta.get('cluster'),style=meta.get('style') or meta.get('style_primary'),
                        song_id=meta.get('song_id'),variant_id=meta.get('variant_id'))
-            row['ready']=bool(row['archive_path'] and Path(row['archive_path']).is_file() and Path(row['archive_path']).resolve().is_relative_to(self.tracks.resolve()))
+            row['completed']=bool(row['archive_path'] and Path(row['archive_path']).resolve().is_relative_to(self.showcase.resolve()))
+            row['ready']=bool(row['archive_path'] and Path(row['archive_path']).is_file() and any(Path(row['archive_path']).resolve().is_relative_to(p.resolve()) for p in (self.tracks,self.showcase)))
             row['tasks']=self.tasks(row['generation_id'])
             row['masters']=[{'id':item['id'],'created_at':item['created_at']} for item in self.db.all("SELECT a.id,a.uri,t.created_at FROM generation_artifacts a JOIN processing_tasks t ON t.id=json_extract(a.metadata_json,'$.processing_task_id') WHERE t.generation_id=? AND t.status='done' AND a.kind='master_candidate' ORDER BY t.rowid DESC",(row['generation_id'],)) if Path(item['uri']).is_file()]
             row['promotion']=self.db.one("SELECT id,status,error FROM archive_operations WHERE audio_id=? AND operation_type='prepare' ORDER BY rowid DESC LIMIT 1",(row['audio_id'],))
@@ -128,7 +132,7 @@ class Preparation:
         if not row:raise KeyError('Recording not found')
         source=self.review.archiver.available(row['audio_id'])
         if not source:raise FileNotFoundError('Recording unavailable')
-        if ready and not source.resolve().is_relative_to(self.tracks.resolve()):
+        if ready and not any(source.resolve().is_relative_to(p.resolve()) for p in (self.tracks,self.showcase)):
             raise ValueError('Wait for verified promotion into Stage 4 before processing')
         if artifact_id:
             artifact=self.db.one("SELECT a.* FROM generation_artifacts a JOIN processing_tasks t ON t.id=json_extract(a.metadata_json,'$.processing_task_id') WHERE a.id=? AND t.generation_id=? AND a.kind='master_candidate' AND t.status='done'",(artifact_id,gid))
@@ -151,8 +155,38 @@ class Preparation:
         row=self.db.one('SELECT * FROM generation_artifacts WHERE id=?',(identifier,))
         if not row:raise KeyError('Artifact not found')
         path=Path(row['uri']).resolve()
-        if not path.is_relative_to(self.tracks.resolve()) or not path.is_file():raise FileNotFoundError('Preparation artifact unavailable')
+        if not any(path.is_relative_to(p.resolve()) for p in (self.tracks,self.showcase)) or not path.is_file():raise FileNotFoundError('Preparation artifact unavailable')
         return path
+
+    def editable(self,gid):
+        if self.db.one("SELECT 1 FROM processing_tasks t JOIN generations g ON g.id=t.generation_id WHERE g.audio_id=(SELECT audio_id FROM generations WHERE id=?) AND t.kind='showcase_move' AND t.status<>'cancelled'",(gid,)):
+            raise ValueError('This recording is being completed or lives in Showcase; retry its publication from Publishing')
+
+    def import_artwork(self,gid,raw):
+        import io
+        from PIL import Image, ImageOps
+        self.require()
+        if not raw or len(raw)>10*1024**2:raise ValueError('Choose an image smaller than 10 MiB')
+        with self.lock:
+            self.editable(gid);row,_=self.source(gid)
+            try:
+                with Image.open(io.BytesIO(raw)) as image:
+                    if image.format not in {'PNG','JPEG','WEBP'} or image.width*image.height>25_000_000:
+                        raise ValueError('Choose a PNG, JPEG or WebP image under 25 megapixels')
+                    clean=ImageOps.exif_transpose(image).convert('RGB');output=io.BytesIO();clean.save(output,format='PNG')
+            except (OSError,Image.DecompressionBombError) as exc:
+                raise ValueError('Cannot read this PNG, JPEG or WebP image') from exc
+            content=output.getvalue();sha=hashlib.sha256(content).hexdigest()
+            destination=self.tracks/row['audio_id']/'_derived';destination.mkdir(parents=True,exist_ok=True)
+            path=destination/(sha+'.png')
+            if path.exists():
+                if digest(path)!=sha:raise ValueError('Artwork collision; retained both files')
+            else:
+                with path.open('xb') as stream:stream.write(content);stream.flush();os.fsync(stream.fileno())
+            identifier=self._insert(gid,'artwork_import',{'sha256':sha},row['yaml_sha256'] or row['audio_id'],'done')
+            aid=identifier+'-artwork'
+            self.db.execute('INSERT INTO generation_artifacts VALUES(?,NULL,?,?,?,?,NULL,?)',(aid,'album_artwork',sha,str(path),len(content),canonical({'processing_task_id':identifier,'source_generation_id':gid})))
+            return {'id':aid}
 
     def reference_list(self):
         self.require()
@@ -170,12 +204,14 @@ class Preparation:
         return list(found.values())
 
     def artwork(self,gid,data):
-        self.require();row,_=self.source(gid)
+        self.require();self.editable(gid);row,_=self.source(gid)
         references={r['id'] for r in self.reference_list()}
         if set(data.get('references',[]))-references:raise ValueError('A selected reference is missing or changed')
         recipe=brief(json.loads(row['parsed_json']),data.get('family','comfyui'),data.get('direction',''),data.get('references',[]),data.get('seed',0))
         recipe['source_yaml_sha256']=row['yaml_sha256']
-        identifier=self._insert(gid,'artwork_brief',recipe,row['yaml_sha256'] or row['audio_id'],'done')
+        with self.lock:
+            self.editable(gid)
+            identifier=self._insert(gid,'artwork_brief',recipe,row['yaml_sha256'] or row['audio_id'],'done')
         return {'id':identifier,**recipe}
 
     def _insert(self,gid,kind,recipe,source_hash,status='queued'):
@@ -195,7 +231,7 @@ class Preparation:
         return identifier
 
     def submit(self,gid,kind,data):
-        self.require();row,source=self.source(gid,artifact_id=data.get('input_artifact_id'))
+        self.require();self.editable(gid);row,source=self.source(gid,artifact_id=data.get('input_artifact_id'))
         if kind not in {'mix_preview','mix_master','visuals','lyric_alignment'}:raise ValueError('This processing adapter is not installed')
         recipe={'mix':mix_recipe(data.get('mix',{}))} if kind.startswith('mix_') else {'version':2,'fps':10,'energy':'channel_rms'}
         if kind=='lyric_alignment':
@@ -216,6 +252,7 @@ class Preparation:
         elif kind.startswith('mix_') and (recipe['mix']['vocal_db'] or recipe['mix']['accompaniment_db']):raise ValueError('Enable the separated stems to use vocal/accompaniment faders')
         fingerprint=hashlib.sha256(canonical([gid,kind,recipe,source_hash]).encode()).hexdigest()
         with self.lock:
+            self.editable(gid)
             cached=self.db.one("SELECT id,status FROM processing_tasks WHERE fingerprint=? AND status IN ('queued','running','done') ORDER BY created_at DESC LIMIT 1",(fingerprint,))
             if cached:
                 artifacts=self.db.all("SELECT uri FROM generation_artifacts WHERE json_extract(metadata_json,'$.processing_task_id')=?",(cached['id'],))
@@ -321,6 +358,7 @@ class Preparation:
         row,source=self.source(task['generation_id'],artifact_id=json.loads(task['recipe_json']).get('input_artifact_id'))
         if digest(source)!=task['input_sha256']:raise ValueError('Source changed; start a new processing recipe')
         with self.lock:
+            self.editable(task['generation_id'])
             self.db.execute("UPDATE processing_tasks SET status='interrupted' WHERE id=? AND status IN ('queued','running')",(identifier,))
             new_id=self._insert(task['generation_id'],task['kind'],json.loads(task['recipe_json']),task['input_sha256'])
             self.submitted.add(new_id);self.pool.submit(self._run,new_id)
@@ -367,6 +405,7 @@ class Preparation:
     def save_editorial(self,gid,kind,data):
         self.require()
         with self.lock:
+            self.editable(gid)
             current=self.editorial(gid,data.get('input_artifact_id'))
             key='lyric_task_id' if kind=='lyric_edit' else 'lighting_task_id'
             if data.get('parent_task_id')!=current[key]:raise ValueError('This draft is stale; reload the latest saved revision before editing')
