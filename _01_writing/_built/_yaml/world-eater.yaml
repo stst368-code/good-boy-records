@@ -1,0 +1,68 @@
+song_id: 80
+variant_id: 1
+title: world-eater
+album: weedkiller
+pos: 1
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt: 
+story:
+caption:  |
+lyrics: |
+  [chorus]
+  World eater
+  Big guns, big money, big cleavers
+  World eater
+  It's a big machine, we feed her
+  Cryin' reaper
+  They kill for fun, for leisure
+  World eater
+  I'm sweet like antifreezer
+  [post-chorus]
+  These machines will kiss my bullets
+  Hit the gas pedal, scrap metal, get to runnin'
+  Combat mode, you know the cyborg's comin'
+  These AI hate my flesh, I love it
+  [verse]
+  Mutiny, post-metallic rebellion
+  I wear the king of the wasteland's crown
+  Take 'em all down with me on my descent
+  Oh, sweet revenge
+  [pre-chorus]
+  The wickedest survive
+  Call me Car Crusher, crushin' metal under my boots, woah
+  I'm a sharpshooter, you'll regret lettin' me loose, woah
+  The wickedest survive
+  The wickedest survive
+  The wickedest survive
+  The wickedest survive
+  [chorus]
+  World eater
+  Big guns, big money, big cleavers
+  World eater
+  It's a big machine, we feed her
+  Cryin' reaper
+  They kill for fun, for leisure
+  World eater
+  I'm sweet like antifreezer
+  [post-chorus]
+  These machines will kiss my bullets
+  Hit the gas pedal, scrap metal get to runnin'
+  Combat mode, you know the cyborg's comin'
+  These AI hate my flesh, I love it
+  These machines will kiss my bullets
+  Hit the gas pedal, scrap metal, get to runnin'
+  Combat mode, you know the cyborg's comin'
+  These AI hate my flesh, I love it

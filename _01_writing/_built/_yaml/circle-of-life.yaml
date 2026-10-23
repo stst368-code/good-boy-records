@@ -1,0 +1,88 @@
+song_id: 31
+variant_id: 1
+title: circle-of-life
+album: brasston
+pos: 5
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  … Nants ingonyama bagithi baba
+  Sithi uhm ingonyama
+  Nants ingonyama bagithi baba
+  Sithi uhhmm ingonyama
+  Ingonyama
+  Siyo Nqoba
+  Ingonyama
+  [intro]
+  … Ingonyama nengw' enamabala
+  Ingonyama nengw' enamabala
+  Ingonyama nengw' enamabala
+  Ingonyama nengw' enamabala
+  Ingonyama nengw' enamabala
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (asana)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  [verse]
+  … From the day we arrive on the planet
+  And, blinking, step into the sun
+  There's more to see than can ever be seen
+  More to do than can ever be done
+  There's far too much to take in here
+  More to find than can ever be found
+  But the sun rolling high
+  Through the sapphire sky
+  Keeps great and small on the endless round
+  [chorus]
+  … It's the circle of life
+  And it moves us all
+  Through despair and hope
+  Through faith and love
+  'Til we find our place
+  On the path unwinding
+  In the circle
+  The circle of life
+  [instrumental]
+  [post-chorus]
+  … Ingonyama nengw' enamabala
+  Ingonyama nengw' enamabala
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  Ingonyama nengw' enamabala (se-to-kwa!)
+  [chorus]
+  … It's the circle of life
+  And it moves us all
+  Through despair and hope
+  Through faith and love
+  'Til we find our place
+  On the path unwinding
+  In the circle
+  The circle of life
+  [outro]

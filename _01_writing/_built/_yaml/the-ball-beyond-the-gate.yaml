@@ -1,0 +1,133 @@
+song_id: 26
+variant_id: 1
+title: the-ball-beyond-the-gate
+cluster:
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  Beyond the garden...
+  Beyond the gate...
+  There lies...
+  The ball.
+  [verse]
+  At first light she rises
+  Golden fire upon her crown
+  Doja surveys her kingdom
+  Not a pawprint goes unfound
+  From the fortress of the sofa
+  To the borders of the lawn
+  Every treat belongs unto her
+  By the ancient golden law
+  But a shadow shakes the hallway
+  Something mighty has awoke
+  Bam Bam comes like rolling thunder
+  Through a table made of oak
+  BAM! BAM!
+  One thought burns within him
+  One command controls his fate
+  [pre-chorus]
+  He has heard the sacred bouncing
+  From somewhere beyond the gate!
+  [chorus]
+  THE BALL BEYOND THE GATE!
+  He can hear it calling!
+  THE BALL BEYOND THE GATE!
+  Through the darkness falling!
+  Rain and thunder!
+  Wind and flame!
+  Throw it once
+  He'll run again!
+  No wall can hold him!
+  No law can wait!
+  BAM BAM RIDES
+  FOR THE BALL BEYOND THE GATE!
+  [post-chorus]
+  Woah-oh-oh!
+  Woah-oh-oh!
+  [verse]
+  Doja watches from her kingdom
+  With contempt upon her face
+  "Have some dignity, you creature,
+  There are standards in this place."
+  Bam Bam hears but does not answer
+  For his destiny is clear
+  There are tennis balls in peril
+  And a retriever knows no fear
+  Then a name comes through the darkness
+  And the music falls away
+  Teddy...
+  Bam Bam freezes
+  Doja rises
+  Someone's gonna pay
+  [pre-chorus]
+  Golden fur stands in the moonlight
+  Ancient rivals meet once more
+  Doja sighs and shows her daggers
+  Boys are such a fucking chore.
+  [chorus]
+  THE BALL BEYOND THE GATE!
+  He can hear it calling!
+  THE BALL BEYOND THE GATE!
+  Through the darkness falling!
+  Rain and thunder!
+  Wind and flame!
+  Lose the ball
+  He'll find again!
+  No wall can hold him!
+  No law can wait!
+  BAM BAM RIDES
+  FOR THE BALL BEYOND THE GATE!
+  [solo]
+  [instrumental]
+  Do-ja...
+  Do-ja...
+  [bridge]
+  I need no prophecy
+  I need no throne
+  Every chair within this house
+  Is already mine alone
+  I do not beg for glory
+  I do not chase or wait
+  But Mama has the treat bag...
+  So open up the gate.
+  OPEN THE GATE!
+  [instrumental]
+  [chorus]
+  THE BALL BEYOND THE GATE!
+  NOW THE GOLDENS ARE RUNNING!
+  THE BALL BEYOND THE GATE!
+  AND THE MORNING IS COMING!
+  Golden thunder!
+  Flying mane!
+  Throw it once!
+  THROW IT AGAIN!
+  Doja leads them!
+  Bam won't wait!
+  TWO GOLDENS RIDE
+  FOR THE BALL BEYOND THE GATE!
+  THROW!
+  IT!
+  AGAIN!
+  THROW!
+  IT!
+  AGAIN!
+  [outro]
+  Bam Bam, bring it back.
+  BALL!
+  Woof.

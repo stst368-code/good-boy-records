@@ -1,0 +1,63 @@
+song_id: 84
+variant_id: 1
+title: indigo-puff
+cluster:
+version:
+explicit: no
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |
+  [verse]
+  Indigo puff
+  Take me where the sun shines from my mind
+  Load up the guns
+  And drive towards the place we left behind
+  [chorus]
+  You're the one, you're the one, you're the one
+  Running through my brain
+  It's in my brain
+  You're the one, you're the one, you're the one
+  You're the one, you're the one, you're the one
+  In my heart, in my bones and in my soul
+  You're the one who keeps me on my own
+  [verse]
+  Take it in right
+  And breathe into your hungry appetite
+  Open your mind
+  Now we're higher than the eastern skies
+  [chorus]
+  You're the one, you're the one, you're the one
+  Running through my brain
+  It's in my brain
+  You're the one, you're the one, you're the one
+  You're the one, you're the one, you're the one
+  In my heart, in my bones, in my soul
+  You're the one who keeps me on my own
+  [pre-chorus]
+  I feel the light surrounding me
+  I'm open now and feeling free
+  In time I, in time I, in time I...
+  I see the sound land on my skin
+  A passion moves me from within
+  In time I, in time I, in time I...
+  [chorus]
+  You're the one, you're the one, you're the one
+  Running through my brain
+  It's in my brain
+  You're the one, you're the one, you're the one
+  You're the one, you're the one, you're the one
+  In my heart, in my bones and in my soul
+  You're the one who keeps me on my own
+  [outro]

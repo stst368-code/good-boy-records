@@ -1,0 +1,80 @@
+song_id: 73
+variant_id: 1
+title: dying-star
+album: weedkiller
+pos: 13
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt: 
+story:
+caption:  |
+lyrics: |
+  [verse]
+  The ground reaches out to catch me
+  Softly in her baseball mitt
+  I'm tired of the dirt and grit
+  I want something soft
+  I'm a fish in a bucket, thrashing
+  He tried to take me out, hooks in my mouth
+  Listen to me when I say "ouch"
+  I want something soft
+  [pre-chorus]
+  So I give in to the fall, fall, fall (It's cold out here)
+  I need somethin' soft, down feathers over rocks
+  I died and I land with both of my hands
+  In the mud, the mud
+  It felt like a god how she held me
+  I slept on her shoulder, I gave her my all (Is there anyone?)
+  I bathеd in her waterfalls
+  And continue to fall, fall (I'm еntering the exosphere)
+  [chorus]
+  Burnin' like a dyin' star
+  Invasive weeds rooted in my heart
+  Set in a crooked trajectory
+  The journey here was hard
+  I was almost pulled apart
+  Tryin' to leave his orbit took what's left of me
+  [verse]
+  The forest reaches out to guide me
+  Blue fire paths of will-o'-wisps
+  Illuminate the darkness's old tricks
+  I'm nobody's captive (Mm)
+  I asked him not to kill me politely
+  He drained my magic core, bottled up at the source
+  I washed up on her sea glass shores
+  I'm nobody's captive (Mm)
+  [pre-chorus]
+  It felt like a god how she held me
+  I slept on her shoulder, I gave her my all
+  I bathed in her waterfalls
+  And continue to fall, fall
+  [chorus]
+  Burnin' like a dyin' star
+  Invasive weeds rooted in my heart
+  Set in a crooked trajectory
+  The journey here was hard
+  I was almost pulled apart
+  Tryin' to leave his orbit took what's left of me
+  Burnin' like a dyin' star
+  Invasive weeds rooted in my heart
+  Set in a crooked trajectory
+  The journey here was hard
+  I was almost pulled apart
+  Tryin' to leave his orbit took what's left of me
+  [outro]
+  The ground reaches out to catch me
+  Softly in her baseball mitt
+  I'm tired of the dirt and grit
+  I want something soft

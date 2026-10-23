@@ -1,0 +1,10 @@
+FROM python:3.12-slim-bookworm
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 GBR_SERVERLESS_WORKER=1
+WORKDIR /opt/gbr-worker
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates libgomp1 && rm -rf /var/lib/apt/lists/*
+# Build context: repository root. The same native adapter and pins serve all modes.
+COPY _99_tools/_workers_infdit/ /opt/gbr-worker/
+RUN python install_worker.py --environment /opt/gbr-venv --runtime /opt/gbr-worker/runtime --skip-cuda-check \
+    && /opt/gbr-venv/bin/python -m pip install runpod==1.12.0 \
+    && /opt/gbr-venv/bin/python -m pip check
+CMD ["/opt/gbr-venv/bin/python", "-u", "/opt/gbr-worker/serverless_handler.py"]

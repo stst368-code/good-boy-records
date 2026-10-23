@@ -1,0 +1,74 @@
+song_id: 81
+variant_id: 1
+title: worms
+album: weedkiller
+pos: 3
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt: 
+story:
+caption:  |
+lyrics: |
+  [chorus]
+  The world is burning, I got worms in my brains
+  Gonna bleach my eyebrows, change my name
+  The world is burning and I laugh at the blaze
+  Gonna bleach my eyebrows, change my name
+  Play my life like a video game
+  I don't mind, I'm driving through flames
+  And I'm riding through the desert with a sword on my back
+  I'm in a what-the-fuck monster truck, wanna go fast
+  [verse]
+  Orange juice and toothpaste
+  I roll around in blue paint
+  Thinking of new ways
+  That I can self-sabotage
+  Oh, well, it's too late
+  My host body mutates
+  My head spins, my neck breaks
+  I love a self-sabotage
+  [pre-chorus]
+  (Oh) Brand-new day, got a brand-new grin
+  (Oh) Got a colony of ants undеrneath my skin
+  (Oh) My bones decay, now I'm gеlatin
+  (Oh) I swear I'm better, swear I'm better, Miss Parasite Possessor
+  [Chorus]
+  The world is burning, I got worms in my brains
+  Gonna bleach my eyebrows, change my name
+  The world is burning and I laugh at the blaze
+  Gonna bleach my eyebrows, change my name
+  Play my life like a video game
+  I don't mind, I'm driving through flames
+  And I'm riding through the desert with a sword on my back
+  I'm in a what-the-fuck monster truck, wanna go fast
+  [bridge]
+  If nothing matters, then I'll be fine
+  I keep my besties and big wheelies on my mind
+  I watch it splatter into the sky
+  She's made of red-raspberry jelly and all-American pie
+  [pre-chorus]
+  (Oh) Brand-new day, got a brand-new grin
+  (Oh) Got a colony of ants underneath my skin
+  (Oh) My bones decay, now I'm gelatin
+  I swear I'm better, swear I'm better, Miss Parasite Possessor
+  [chorus]
+  The world is burning, I got worms in my brains
+  Gonna bleach my eyebrows, change my name
+  The world is burning and I laugh at the blaze
+  Gonna bleach my eyebrows, change my name
+  Play my life like a video game
+  I don't mind, I'm driving through flames
+  And I'm riding through the desert with a sword on my back
+  I'm in a what-the-fuck monster truck, wanna go fast

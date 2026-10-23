@@ -1,0 +1,22 @@
+[
+  {"id":"vocal_tone","category":"Vocals","label":"Tone","description":"Vocal timbre and range; flat, harsh or appealing voices.","category_order":0,"sort_order":0},
+  {"id":"vocal_delivery","category":"Vocals","label":"Delivery","description":"Expression, phrasing and breath; natural or robotic delivery.","category_order":0,"sort_order":1},
+  {"id":"vocal_timing","category":"Vocals","label":"Timing","description":"Vocal pacing and alignment with the instruments.","category_order":0,"sort_order":2},
+  {"id":"vocal_clarity","category":"Vocals","label":"Clarity","description":"Intelligibility and separation of lead and backing vocals.","category_order":0,"sort_order":3},
+  {"id":"singer_identity","category":"Vocals","label":"Singer Identity","description":"Stable and appropriate singer identity; unwanted voice changes.","category_order":0,"sort_order":4},
+  {"id":"instrument_timbre","category":"Instruments","label":"Timbre","description":"Instrument sounds and textures; clear, rich, harsh or screeching.","category_order":1,"sort_order":0},
+  {"id":"instrument_performance","category":"Instruments","label":"Performance","description":"Instrumental execution, articulation and rhythmic control.","category_order":1,"sort_order":1},
+  {"id":"instrument_interest","category":"Instruments","label":"Interest","description":"Engaging or dull instrumental parts.","category_order":1,"sort_order":2},
+  {"id":"production_cleanliness","category":"Production","label":"Cleanliness","description":"Positive: clean audio. Negative: unwanted fuzz, distortion or glitches.","category_order":2,"sort_order":0},
+  {"id":"production_fidelity","category":"Production","label":"Fidelity","description":"Fullness and detail; thin, muffled or phone-speaker sound.","category_order":2,"sort_order":1},
+  {"id":"production_dynamics","category":"Production","label":"Dynamics","description":"Controlled loudness and transients; pumping or fluctuating volume.","category_order":2,"sort_order":2},
+  {"id":"production_balance","category":"Production","label":"Balance","description":"Appropriate levels and separation between voices and instruments.","category_order":2,"sort_order":3},
+  {"id":"genre_fit","category":"Musical Style","label":"Genre Fit","description":"How the recording follows the intended genre.","category_order":3,"sort_order":0},
+  {"id":"style_coherence","category":"Musical Style","label":"Coherence","description":"How well its influences fit together, including genre blends.","category_order":3,"sort_order":1},
+  {"id":"arrangement_structure","category":"Arrangement","label":"Structure","description":"Effective verses, choruses, bridges and overall development.","category_order":4,"sort_order":0},
+  {"id":"arrangement_variety","category":"Arrangement","label":"Variety","description":"Positive: effective variety. Negative: excessive repetition.","category_order":4,"sort_order":1},
+  {"id":"arrangement_transitions","category":"Arrangement","label":"Transitions","description":"Section changes, opening and ending; smooth or abrupt.","category_order":4,"sort_order":2},
+  {"id":"arrangement_length","category":"Arrangement","label":"Length","description":"Appropriate pacing and duration; dragging or truncated songs.","category_order":4,"sort_order":3},
+  {"id":"overall_energy","category":"Overall","label":"Energy","description":"Groove, momentum and vitality; lively or lifeless.","category_order":5,"sort_order":0},
+  {"id":"emotional_impact","category":"Overall","label":"Emotional Impact","description":"Emotional connection and passion.","category_order":5,"sort_order":1}
+]

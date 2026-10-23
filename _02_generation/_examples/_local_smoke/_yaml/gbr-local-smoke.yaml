@@ -1,0 +1,30 @@
+# Standalone hardware test; this is not a catalogue song.
+song_id: 900000001
+variant_id: 1
+title: gbr-local-smoke
+cluster: Cinematic Orchestral & Epic
+style: Choral
+model: MiniMaxAI/MiniMax-Music3
+dit: bf16
+text_encoder: bf16
+encoder_cfg: 1.5
+encoder_seed: '123456789'
+top_k: 50
+sampler: euler
+scheduler: flow_match_euler
+sampler_cfg: 1.7
+sampler_seed: '987654321'
+sampler_steps: 30
+duration: 30
+caption: |-
+  A short cinematic choral song with a warm mixed choir, gentle piano,
+  slow strings and a clear melodic refrain. Calm, hopeful and spacious.
+lyrics: |
+  [verse]
+  A little light across the room
+  A rising note beyond the blue
+
+  [chorus]
+  Carry the song into the morning
+  Let every voice come shining through
+# Keep this comment and the lyric line breaks in the completed sidecar.

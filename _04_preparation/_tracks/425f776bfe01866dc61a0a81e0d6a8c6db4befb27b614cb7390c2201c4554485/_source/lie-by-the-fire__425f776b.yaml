@@ -1,0 +1,97 @@
+title: lie-by-the-fire
+cluster: ''
+version: country
+model: minimax H3
+dit: fp16
+text_encoder: int8_convrot
+encoder_cfg: 1.9
+encoder_seed: 968259945361230
+top_k: 45
+sampler: dpmpp_sde_gpu
+scheduler: ddim_uniform
+sampler_cfg: 1.7
+sampler_seed: 974223744709184
+sampler_steps: 50
+inspiration:
+inspirationyt:
+story:
+caption_source: custom
+caption: |-
+  Global Metadata
+  Basic Attributes: Upbeat Americana / Modern Folk-Country / Acoustic Singer-Songwriter, roughly 104–114 BPM, warm, organic and road-driven with a steady acoustic pulse. Global Emotional Progression: Rebuild the supplied song completely inside this style while preserving its narrative identity: a warm fireside song about Doja and Bam Bam finally resting after their adventures, affectionate rather than sentimental. Let repeated sections evolve through arrangement, register and intensity. Application Scenarios & Imagery: two golden retrievers asleep beside a low fire while the house becomes quiet and tomorrow can wait. Sonics & Production Profile: Steel-string acoustic guitar, restrained live drums, electric or upright bass, pedal steel, mandolin and occasional organ/piano. Keep the production natural, warm and moderately wide with believable room sound. Avoid pop synths, disco kick patterns, metal guitars and arena-country bombast.
+  Vocal Details
+  Vocal Gender & Timbre: Singer A (Male), an intimate warm baritone-tenor with natural storytelling phrasing and gentle dynamic control. Vocal Style: Use clear storytelling phrasing with natural conversational timing. Verses stay close and grounded; choruses open into stronger sustained melody without excessive vocal theatrics. Harmony/Backing Vocals: Use simple close harmonies or low/high partner vocals in choruses; keep verses mostly solo. Role Continuity: Keep the lead close and human. Harmonies should appear only where the target style benefits from communal warmth. Vocal FX: Short plate or room reverb, light compression and subtle tape warmth; preserve breath and consonant detail.
+  Arrangement
+  Section Timeline: [verse] to [verse] to [chorus] to [instrumental] to [verse] to [chorus] to [bridge] to [instrumental] to [verse] to [outro]. Instrument Lifecycle: Acoustic guitar provides continuous rhythmic identity. Bass and light drums enter early; pedal steel or mandolin answers vocal phrases; later choruses add fuller strumming and harmony without losing the intimate roots character. Section Directives: [intro]: Begin with acoustic picking or strumming and one memorable pedal-steel, fiddle or mandolin response. [verse]: Keep the groove light and narrative, with acoustic guitar, bass and restrained drums. [instrumental]: Let roots instruments trade short phrases over the established groove. [bridge]: Reduce to acoustic guitar and one secondary instrument, then rebuild naturally. [outro]: Return to a simpler acoustic texture and end with a warm natural cadence. Groove & Foundation Progression: All transitions must remain native to the stated genre. Preserve recognisable motifs across repeated sections while changing density, register, voicing or articulation. Keep the target genre dominant throughout.
+lyrics: |
+  [verse]
+  Lay down beside me
+  The daylight is done
+  Rest now your paws
+  By the fire, everyone
+  No need for kingdoms
+  No battles tonight
+  Only two goldens
+  Asleep by the light
+  [verse]
+  Doja, my lady
+  So watchful and wise
+  Firelight dancing
+  Like stars in your eyes
+  Bam Bam, brave hunter
+  Your quest is complete
+  The ball has been captured
+  Now rest at my feet
+  [chorus]
+  Stay by the fire
+  Stay here awhile
+  Dream of the meadows
+  And morning's first mile
+  Wherever we wander
+  Whatever we see
+  Home is wherever
+  You both are with me
+  [instrumental]
+  [verse]
+  Tomorrow the pathway
+  Will call us once more
+  Bam will stand waiting
+  Beside the old door
+  Doja will linger
+  And judge us all first
+  Then follow behind us
+  When curiosity wins
+  [chorus]
+  Stay by the fire
+  Stay here awhile
+  Dream of the meadows
+  And morning's first mile
+  Wherever we wander
+  Whatever we see
+  Home is wherever
+  You both are with me
+  [bridge]
+  No gold from the mountain
+  No jewel from the sea
+  Could purchase the hours
+  You've given to me
+  So sleep without worry
+  The watch I shall keep
+  While two golden guardians
+  Lie dreaming in sleep
+  [instrumental]
+  [verse]
+  Stay by the fire
+  Stay here awhile
+  Tomorrow we'll wander
+  Another good mile
+  Through forest and meadows
+  Wherever we roam
+  Two golden companions
+  Will always come home
+  [outro]
+  Rest now, Doja
+  Rest, Bam Bam
+  The fire burns low
+  And morning will come
+  Woof

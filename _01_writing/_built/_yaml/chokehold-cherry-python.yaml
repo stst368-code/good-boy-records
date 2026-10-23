@@ -1,0 +1,88 @@
+song_id: 71
+variant_id: 1
+title: chokehold-cherry-python
+album: weedkiller
+pos: 9
+version: vocal-jazz
+language: en
+model: minimax H3
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt: 
+story:
+caption:  |
+  Global Metadata
+  Basic Attributes: Late-Romantic Symphony / Operatic Ballad, roughly 68–84 BPM, broad lyrical pacing, rich chromatic harmony and long dramatic arcs rather than beat-driven repetition. Global Emotional Progression: Rebuild the supplied song completely inside this style while preserving its narrative identity: a gentle surreal pastoral journey following Doja and Bam Bam through flowers, fields, river light and dreamlike afternoon wandering. Let repeated sections evolve through arrangement, register and intensity. Application Scenarios & Imagery: a hazy English summer landscape where two golden retrievers drift through fields that feel slightly more magical than they ought to. Sonics & Production Profile: Full acoustic symphony: strings, woodwinds, horns, trumpets, trombones, timpani, harp and piano where useful. Preserve wide natural dynamics and a deep concert-hall image. No drum kit, synths, trailer percussion, electric guitar or pop compression.
+  Vocal Details
+  Vocal Gender & Timbre: Singer A (Male), a soft clear tenor-baritone with dreamy phrasing, restrained vibrato and an unforced intimate tone. Vocal Style: Use lyrical classical phrasing with careful diction and flexible rubato. Verses remain intimate and speech-aware; climactic sections expand into sustained operatic projection without becoming a modern pop belt. Harmony/Backing Vocals: Use subtle classical ensemble or choir support only at major peaks; avoid constant block harmony that flattens the dramatic arc. Role Continuity: Keep the male lead gentle and consistent; layered harmonies may bloom around refrains without overwhelming the pastoral character. Vocal FX: Natural hall acoustics only, with the singer placed clearly in front of the orchestra.
+  Arrangement
+  Section Timeline: [verse] to [instrumental] to [verse] to [chorus] to [instrumental] to [verse] to [bridge] to [instrumental] to [chorus] to [outro]. Instrument Lifecycle: Strings carry long harmonic motion from the opening. Woodwinds provide intimate counter-lines; horns and low brass enter as emotion grows; timpani is reserved for true structural peaks. Section Directives: [intro]: Begin with a fragile orchestral motif, exposed strings or woodwind and generous space before the voice. [verse]: Support the vocal with restrained strings and solo wind responses, allowing rubato and lyric clarity. [instrumental]: Use symphonic development and orchestral counterpoint rather than a groove break. [chorus]: Open into broad full-orchestra harmony and sustained vocal projection, using brass and timpani selectively. [bridge]: Suspend time with thinner orchestration, exposed harmony and a darker chromatic turn. [outro]: Return to the opening intimacy and let the final harmonic resolution ring naturally in the hall. Groove & Foundation Progression: All transitions must remain native to the stated genre. Preserve recognisable motifs across repeated sections while changing density, register, voicing or articulation. Keep the target genre dominant throughout.
+lyrics: |
+  [Chorus]
+  I'm a tickin', tickin', tickin' timebomb
+  Live a villain, die a icon
+  You should sleep with a light on
+  Chokehold cherry python
+  Shut up, be quiet
+  Watch me go, go geyser
+  Demidevil, I'm a liar
+  I'm the team's best hitter
+  [Post-Chorus]
+  Hey, hey, death and decay
+  Hey, hey, go get 'em
+  Hey, hey, blood on my face
+  Hey, hey, go get 'em
+  [Chorus]
+  I'm a tickin', tickin', tickin' timebomb
+  Live a villain, die a icon
+  You should sleep with a light on
+  Chokehold cherry python
+  Shut up, be quiet
+  Watch me go, go geyser
+  Demidevil, I'm a liar
+  I'm the team's best hitter
+  [Verse]
+  Menacing figures fall from the sky
+  Symbols and sigils, I saw the signs
+  Rats in the sewers, death on the mind
+  I've set my sights on you, baby, you're mine
+  [Chorus]
+  I'm a tickin', tickin', tickin' timebomb
+  Live a villain, die a icon
+  You should sleep with a light on
+  Chokehold cherry python
+  Shut up, be quiet
+  Watch me go, go geyser
+  Demidevil, I'm a liar
+  I'm the team's best hitter
+  [Post-Chorus]
+  Hey, hey, death and decay
+  Hey, hey, go get 'em
+  Hey, hey, blood on my face
+  Hey, hey, go get 'em
+  [Chorus]
+  I'm a tickin', tickin', tickin' timebomb
+  Live a villain, die a icon
+  You should sleep with a light on
+  Chokehold cherry python
+  Shut up, be quiet
+  Watch me go, go geyser
+  Demidevil, I'm a liar
+  I'm the team's best hitter
+  I'm a tickin', tickin', tickin' timebomb
+  Live a villain, die a icon
+  You should sleep with a light on
+  Chokehold cherry python
+  Shut up, be quiet
+  Watch me go, go geyser
+  Demidevil, I'm a liar
+  I'm the team's best hitter

@@ -1,0 +1,104 @@
+title: messy
+cluster: Soul, Blues & Gospel
+version: Soul / Blues Rock Ballad
+model: minimax H3
+dit: int8_convrot
+text_encoder: prunted_int8_convrot
+encoder_cfg: 1.7
+encoder_seed: 811055353746603
+top_k: 45
+sampler: sa_solver
+scheduler: beta
+sampler_cfg: 1.7
+sampler_seed: 606087327230022
+sampler_steps: 30
+inspiration:
+inspirationyt:
+story:
+caption_source: sample
+caption: |-
+  Global Metadata
+  Basic Attributes: bpm is 176. key is G, and scale is minor. Soul / Blues Rock Ballad.
+  Global Emotional Progression: The piece opens with a somber, intimate atmosphere that gradually accumulates tension through the verses. As the song progresses, the emotional intensity swells into a desperate, cathartic release during the climactic sections, characterized by vocal strain and instrumental density, before receding into a resigned, atmospheric fade-out.
+  Application Scenarios & Imagery: A solitary figure standing on a pier during a stormy night, cinematic scenes of emotional confrontation in a dimly lit bar, or moments of deep introspection amidst turbulent weather.
+  Sonics & Production Profile: The mix features a warm, vintage-inspired tonal balance with a wide stereo image for the guitars and keyboards, while the vocals remain centered and forward. The production utilizes dynamic compression to enhance the impact of the crescendos, creating a "wall of sound" effect in the climax without sacrificing the clarity of the lead performance.
+  Vocal Details
+  Vocal Gender & Timbre: Singer A (Male). The vocalist possesses a rich, raspy baritone texture that transitions from a smooth, breathy delivery in the lower register to a gritty, powerful belt in the upper range.
+  Vocal Style: The performance begins with a restrained, storytelling approach, utilizing subtle vibrato and soft phrasing. As the arrangement builds, the style evolves into an impassioned, soulful delivery featuring aggressive belting, vocal cracks for emotional emphasis, and extended melismatic runs during the climax.
+  Harmony/Backing Vocals: Subtle, low-register backing harmonies enter during the second half of the track, doubling the lead melody at the third and fifth intervals to thicken the texture during the emotional peaks. These layers are mixed slightly behind the lead to maintain focus on the primary narrative.
+  Vocal FX: The vocal track is treated with a moderate amount of plate reverb to create spatial depth, particularly noticeable during sustained notes. A slight delay is applied to the ad-libs in the final section to enhance the sense of space and lingering emotion.
+  Arrangement
+  Instrument Lifecycle Description (Primary/Secondary Layering):
+  Primary: A clean electric guitar with a slight chorus effect establishes the harmonic foundation in the intro and verses, switching to a distorted, overdriven tone with heavy sustain during the choruses and climax to drive the emotional weight.
+  Secondary: A warm Hammond-style organ enters subtly in the first verse, providing sustained chordal pads that swell in volume during the pre-chorus. A melodic bass guitar line locks tightly with the drums, becoming more active and syncopated as the song intensifies.
+  Groove & Foundation Progression: The rhythm section starts with a sparse, laid-back drum pattern featuring a soft kick and brushed snare, establishing a slow, contemplative groove. As the song reaches the chorus, the percussion shifts to a full kit with a punchy kick, crisp snare hits on beats 2 and 4, and open hi-hats, significantly increasing the rhythmic drive and urgency.
+  Embellishments, Textures & Spatial FX: Occasional cymbal swells and reverse reverb effects mark the transitions between sections. In the climax, layered guitar textures and organ swells fill the high-frequency spectrum, creating a dense, immersive soundscape that supports the vocalist's peak performance.
+lyrics: |-
+  [verse]
+  You know I'm impatient
+  So why would you leave me waiting outside the station
+  When it was like minus four degrees?
+  And I, I get what you're sayin'
+  I just really don't wanna hear it right now
+  Can you shut up for like once in your life?
+  Listen to me
+  I took your nice words of advice about
+  How you think I'm gonna die lucky if I turned thirty-three
+  Okay, so yeah, I smoke like a chimney
+  I'm not skinny and I pull a Britney
+  Every other week
+  But cut me some slack, who do you want me to be?
+  [chorus]
+  'Cause I'm too messy, and then I'm too fucking clean
+  You told me, "Get a job", then you ask where the hell I've been
+  And I'm too perfect till I open my big mouth
+  I want to be me, is that not allowed?
+  And I'm too clever, and then I'm too fucking dumb
+  You hate it when I cry unless it's that time of the month
+  And I'm too perfect till I show you that I'm not
+  A thousand people I could be for you and you hate the fucking lot
+  [post-chorus]
+  You hate the fucking lot
+  You hate the fucking lot
+  You hate, you hate
+  [verse]
+  It's taking you ages
+  You still don't get the hint, I'm not asking for pages
+  But one text or two would be nice
+  And please don't pull those faces
+  When I've been out working my arse off all day
+  It's just one bottle of wine or two
+  But hey, you can't even talk
+  You smoke weed just to help you sleep
+  Then why you out gettin' stoned at 4 o'clock?
+  And then you come home to me
+  And don't say hello
+  'Cause I got high again
+  And forgot to fold my clothes
+  [chorus]
+  'Cause I'm too messy, and then I'm too fucking clean
+  You told me, "Get a job", then you ask where the hell I've been
+  And I'm too perfect till I open my big mouth
+  I want to be me, is that not allowed?
+  And I'm too clever, and then I'm too fucking dumb
+  You hate it when I cry unless it's that time of the month
+  And I'm too perfect till I show you that I'm not
+  A thousand people I could be for you and you hate the fucking lot
+  [post-chorus]
+  You hate the fucking lot
+  You hate the fucking lot
+  [instrumental]
+  [chorus]
+  Oh, and I'm too messy, and then I'm too fucking clean
+  You told me, "Get a job", then you ask where the hell I've been
+  And I'm too perfect till I open my big mouth
+  I want to be me, is that not allowed?
+  And I'm too clever, and then I'm too fucking dumb
+  You hate it when I cry unless it's that time of the month
+  And I'm too perfect till I show you that I'm not
+  A thousand people I could be for you and you hate the fucking lot
+  [outro]
+  You hate the fucking lot
+  You hate the fucking lot
+  You hate the fucking lot
+  You hate the fucking lot

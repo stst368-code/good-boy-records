@@ -1,0 +1,62 @@
+song_id: 40
+variant_id: 1
+title: el-mañana
+album: demon-days
+pos: 6
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [verse]
+  Summer don't know me no more
+  He got mad, tiresome
+  Summer don't know me
+  He'd just let me low in myself
+  [pre-chorus]
+  'Cause I do know love
+  From you then
+  Just dying
+  [chorus]
+  I saw that day
+  Lost my mind
+  Lord, I'm fine
+  Maybe in time, you'll want to be mine
+  [verse]
+  Don't stop the bud when it comes
+  It's the dawn, you'll see
+  Money won't get there
+  Ten years passed and now you'll flee
+  [pre-chorus]
+  If you do that
+  I'll be sworn
+  To find you
+  [chorus]
+  I saw that day
+  Lost my mind
+  Lord, I'm fine
+  Maybe in time, you'll want to be mine
+  [instrumental]
+  [chorus]
+  I saw that day
+  Lost my mind
+  Lord, I'm fine
+  Maybe in time, you'll want to be mine
+  [outro]
+  Maybe in time, you'll want to be mine
+  Maybe in time, you'll want to be mine
+  Maybe in time, you'll want to be mine
+  Maybe in time, you'll want to be mine

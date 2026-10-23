@@ -1,0 +1,179 @@
+song_id: 13
+variant_id: 2
+title: moses-supposes
+cluster:
+version: post-punk-indie-rock_0001
+language: en
+model: MiniMaxAI/MiniMax-Music3
+dit: bf16
+text_encoder: bf16
+encoder_cfg: 1.5
+encoder_seed:
+top_k: 50
+sampler: euler
+scheduler: flow_match_euler
+sampler_cfg: 1.6
+sampler_seed:
+sampler_steps: 35
+inspiration:
+inspirationyt:
+story:
+caption: |
+  Global Metadata
+  Basic Attributes: roughly 210–240 BPM. Raw Second-Wave Black Metal / Extreme Black Metal. Relentless, primitive, hostile and violently fast from the first second to the final cutoff. The defining feature is an almost uninterrupted barrage of rapid double-kick bass drums and blast beats, with no breakdowns, no half-time sections, no slow passages and no atmospheric respite. Tremolo-picked guitars should remain thin, abrasive and vicious rather than thick modern death-metal chugging. Harmony is cold, dissonant and minor-key, with repeating malignant riff shapes and rapid chord movement rather than technical showcase playing.
+  Global Emotional Progression: Begin at maximum hostility and remain there. Verses, choruses and bridge should change through riff shape, vocal phrasing and cymbal pattern rather than through reduced intensity. Every section should feel like another stage of the same uncontrolled attack. The final section becomes even more frantic through denser blasting, harsher tremolo movement and increasingly desperate vocals before ending abruptly.
+  Application Scenarios & Imagery: A tiny underground venue, concrete walls, deafening amplifiers, sweat, feedback and a band performing with almost reckless physical intensity.
+  Sonics & Production Profile: Raw, abrasive and close. Guitars are sharp and grainy, bass is dirty but audible, drums are fast and physical, and the kick remains clearly perceptible beneath the blast beats. Avoid polished modern metal production, cinematic layers, orchestration, electronic elements and spacious atmospheric passages.
+  Vocal Details
+  Vocal Gender & Timbre: Singer A (Female), an extremely harsh female black-metal vocalist with piercing upper-register screams, torn rasps and occasional deeper throat-driven shrieks.
+  Vocal Style: Continuous extreme screaming with no clean singing, whispering or melodic relief. Verses use frantic clipped phrases and savage sustained screams. Choruses become wider and more hysterical through doubled screams rather than melodic hooks. The bridge remains equally fast and violent, with prolonged desperate screams layered over uninterrupted blasting. The final passage should sound physically exhausted but increasingly ferocious.
+  Harmony/Backing Vocals: Sparse doubled screams and occasional distant shriek layers only. No sung harmony or choir.
+  Vocal FX: Minimal processing. Short dirty room reverb, light saturation and occasional raw doubling. Keep the voice painfully close and human.
+  Arrangement
+  Instrument Lifecycle: Tremolo-picked distorted guitars, distorted bass and full-speed acoustic drums enter almost immediately and remain active throughout. Do not remove the drums, guitars or bass for transitions.
+  Groove & Foundation Progression: Maintain continuous high-speed double-kick and blast-beat propulsion across intro, verses, choruses, bridge and outro. Never drop into half-time. Never introduce a breakdown. Never reduce the pulse for dramatic contrast. Section changes come from alternating blast-beat patterns, snare emphasis, ride or crash changes, tremolo riff substitutions and short fills while preserving maximum forward momentum.
+  Embellishments, Textures & Spatial FX: Brief amplifier feedback and cymbal wash may mark transitions, but never interrupt the attack. Avoid solos, clean guitar, acoustic passages, ambient interludes and extended instrumental pauses. Finish with either an instantaneous full-band cutoff or a final violent chord struck directly out of the ongoing blast.
+lyrics: |
+  [intro]
+  moses... supposes... 
+  his toeses... are roses... 
+  but moses... supposes...
+  foolishly... 
+  [verse]
+  moses supposes his toeses are roses
+  because moses is crazy as can be
+  moses don't knowses his toeses aren't roses
+  because moses, is fucked in the head as can be
+  [chorus]
+  a mose is a mose!
+  a rose is a rose! 
+  a toes is a toes!
+  hooptie doodie doodle
+  doodle doodie hooptie
+  (ha ha ha fuck you)
+  [verse]
+  peter piper tricked a pack of pickled preppers
+  a pack of pickled preppers peter piper tricked
+  if peter piper tricked a pack of pickled preppers
+  where's the pack of pickled preppers peter piper tricked?
+  (he probably buried them in the woods)
+  how much wood would a woodchuck chuck if a woodchuck could chuck wood?
+  if a woodchuck could chuck wood how much wood would a woodchuck chuck
+  (idon'tgiveafuck! go ask mary...)
+  well, she sells seashells by the seashore
+  the shells she sells are seashells, i'm sure
+  what she sells in her sea shell shop by the seashell shore
+  isn't a woodchuck chuck book for sure
+  mary sells something more by the shore because mary is a fucking whore
+  (ugh, who can give me a fucking clue??)
+  sharp sharks seek snacks and selfish shellfish sellers, no answers to be found there
+  seven small dwarves swing, sing and sling, short little picks, no pickled pepper tricks
+  (kitty cat?)
+  kitty cat!
+  how would a kit-kat eating kitty cat eat its kit-kat?
+  would it make any difference if that kitty cat was a city cat?
+  or would the city kitty cat be a sittin' pretty cat
+  not a fussy pussy but a busy little pussy cat?
+  busy kitty, pretty kitty, picky kitty, city kitty
+  itty bitty kit-kat eatin' city kitty, ate its kitty cat
+  which kitty gets the kitty's kit-kat?
+  the sittin' pretty city cat?
+  or the itty bitty kitty cat?
+  which kitty cat is the real fucking twat?
+  [chorus]
+  a mose is a mose!
+  a rose is a rose!
+  a toes is a toes!
+  mose rose toes (mose rose toes)
+  hooptie doodie doodle
+  doodle doodie hooptie
+  hooptie doodie fucking doodle
+  (hey hey hey, fuck you!)
+  [verse]
+  well...
+  one one was a racehorse
+  two two was one too
+  one one won one race
+  and two two won one too
+  [bridge]
+  i've shared my ideas
+  one or two or more than a few
+  i've thought a thought
+  but the thought i thought
+  wasn't the thought i thought i thought
+  i think about thinking about
+  the thought i thought i thought
+  that's three thinking thoughts that i think i thought
+  (ha-ha-ha-ha)
+  [bridge]
+  i wish to wish the wish you wish to wish
+  but if you wish the wish the witch wishes
+  i won't wish the wish you wish to wish
+  i wish you were the fish in my dish
+  fresh fried fish, fish fresh fried,
+  four fresh fish flashed fins at five fat frogs
+  five fat frogs flipped fast from five flat logs
+  six slick snakes slipped straight through six small slots
+  while seven shocked sheep shouted stop!
+  i ate eight, or i ate eighty eight, eight past eight, i ate late
+  but nine nine nine never navigated nine niggling numbered nar-ra-tives
+  (ha-ha-ha-ha)
+  [verse]
+  red lorry, yellow lorry
+  red lorry, yellow lorry
+  red lorry, yellow lorry
+  lorry yellow, lorry red
+  yellow leather, red leather
+  since when did hagrid wear a little-leather frock?
+  that old ragged rascal ran around the rugged rock
+  the old ragged rascal and his rugged flock
+  meanwhile two witches were watching two wrist watches
+  which witch would watch which wrist watch
+  which wrist would which witch watch their wrist watch on?
+  (ugh)
+  [chorus]
+  a mose is a mose!
+  a rose is a rose! 
+  a toes is a toes!
+  mose rose toes (mose rose toes)
+  hooptie doodie doodle doodle doodie hooptie
+  doodle doodle doodie hooptie hooptie hoo
+  doodle doodle fuck you
+  (mwwwwah!)
+  [bridge]
+  Very well, very well, very well... where were we?
+  the wrist watch witch casts a wicked spell
+  a hiccup in the pick up of the pickled prepper smell
+  but is a hiccup in a tea cup a hiccup you can pick up (cup)
+  if you pick up a hiccup in a tea cup
+  that tea cup is now a hiccup cup, a pickup hiccup cup
+  so a hiccup pickup tea cup cup will serve you well
+  (you've lost me)
+  well let me try and explain again
+  (you better listen this time...)
+  peter piper's preppers were buried in the woods
+  those wood chucking woodchucks could tell you more
+  but don't go asking questions of that sea shore whore
+  the sharks, skeletons and the sea-shell seller don't know more
+  so think of that itty bitty city kitty, always hungry for more
+  you can search under five fat frogs and five flat logs
+  while the six slick snakes leave seven sleepy sheep shocked
+  you can search the forest faster, riding one one who won one
+  or two two who won one too, pick and choose, its up to you
+  think about it, thought about it, i thought you thought about
+  i'm thinking you thought i thought you thought about it
+  but they dont know that i know that they know that i know that they know too
+  carrying on.... if you find peter pipers preppers
+  load a red leather yellow lorry or a yellow leather red lorry
+  failing finding pickled preppers the ragged rascal likely ate the lot
+  around the ragged rock, he drove his rugged flock, in a little leather frock
+  be careful two witches will be watching two wrist watches
+  they're there, but they won't help you with your hiccup
+  no pickup hiccup cup or pickle prepper pickup truck
+  but most importantly of all, there is
+  no moses, no roses, or no toses to be seen
+  hey! hey! hey!
+  [outro]
+  a mose a rose a tose
+  a rose a tose a mose
+  a tose a mose a rose

@@ -1,0 +1,70 @@
+song_id: 24
+variant_id: 1
+title: sixteen-treats
+cluster:
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  (Woof)
+  Mm-hm...
+  Careful of that golden now...
+  (mhm uhuh uhuh)
+  She's a Gremlin... yeah..
+  [verse]
+  Some folks say a dog'll come a-runnin' for a ball
+  Well that golden girl, she won't come at all
+  Copper in her coat and a cold, cold stare
+  She makes the world come to her, and she don't even care
+  You want to scratch her ears?
+  Well, you better never stop
+  And you want offer her a treat?
+  She'll take the whole durn hand
+  [chorus]
+  You load sixteen treats and what do you get?
+  Slightly shorter fingers, and many treats less
+  Saint Peter don't you call me 'cause I can't go
+  I got Gremlin-retriever runnin' the show
+  (Woof)
+  [verse]
+  Now her favourite game, is any one you can't win
+  Dastardly smart, she don't ever lose
+  Remember ol' Gaia? Aggressive with the teeth
+  That scheming golden-gremlin, left her six-feet beneath
+  When she want's your toy, her mind it builds a ploy
+  She'll fake you out, pretend and walk about
+  Your mind it relaxes and she's quick as a flash
+  That copper coated Gremlin, just stole your stash
+  [bridge]
+  The smartest
+  Quickest Golden
+  You ever did meet
+  She'll steal your heart
+  But only for a treat
+  [chorus]
+  You load sixteen treats and what do you get?
+  Slightly shorter fingers, and many treats less
+  Saint Peter don't you call me 'cause I can't go
+  I got Gremlin-retriever runnin' the show
+  [outro]
+  Doja, she's a princess, a trickster, a Gremlin
+  Keeps her mind steady, you'll never know when she'll strike
+  Make you look one way while she sneaks 'round the back
+  That, copper coated, Gremlin
+  Just, wants her, snack...
+  (Woof)

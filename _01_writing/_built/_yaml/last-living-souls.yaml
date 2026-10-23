@@ -1,0 +1,69 @@
+song_id: 45
+variant_id: 1
+title: last-living-souls
+album: demon-days
+pos: 1
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [chorus]
+  Are we the last livin' souls?
+  Are we the last livin' souls?
+  Are we the last livin' souls?
+  Are we the last livin' souls?
+  [verse]
+  Take a gun, or how you say
+  That's no way to behave
+  You're just alone when you begin
+  To sing a song that doesn't sing
+  It grows (Hey)
+  You know
+  [chorus]
+  Are we the last livin' souls?
+  Are we the last living souls?
+  [verse]
+  Are we the last to get away
+  To a sun, another day?
+  Or do we know what we know?
+  It doesn't seem to be conveyed that way
+  [chorus]
+  Are we the last livin' souls?
+  Are we the last livin' souls?
+  Are we the last livin' souls?
+  Could go the last livin' soul
+  [bridge]
+  Get up, get up, get up, get up, get up, get up, get up, get up
+  Lord, save me
+  [bridge]
+  'Cause all out of song
+  I got it down and wrong
+  I see myself to get
+  The long all-seein' road down
+  You come and take a sound
+  I bought the car made up
+  The coldest man, he doesn't say it's wrong
+  [verse]
+  We go to the car
+  I see you walk into the fog
+  And when you get there, what do you see?
+  You fit the last you need on me
+  [chorus]
+  'Cause we're the last livin' souls
+  We're the last livin' souls
+  Yeah, we're the last livin' souls
+  We're the last livin' souls

@@ -1,0 +1,127 @@
+title: microphone-fiend
+cluster: Jazz, Swing & Big Band
+version: Jazz Ballad / Vocal Jazz
+model: minimax H3
+dit: fp16
+text_encoder: int8_convrot
+encoder_cfg: 1.7
+encoder_seed: 994147369739871
+top_k: 45
+sampler: dpmpp_sde_gpu
+scheduler: ddim_uniform
+sampler_cfg: 1.6
+sampler_seed: 552721185936069
+sampler_steps: 35
+inspiration:
+inspirationyt:
+story:
+caption_source: sample
+caption: |-
+  Global Metadata
+  Basic Attributes: bpm is 60. key is Bb, and scale is minor. Jazz Ballad / Vocal Jazz.
+  Global Emotional Progression: The piece opens with a solitary, contemplative atmosphere established by the piano, setting a tone of intimate vulnerability. As the vocals enter, the mood deepens into a soulful plea, maintaining a restrained and tender dynamic throughout the verses. The emotional intensity swells subtly during the instrumental solo section, where the electric guitar introduces a moment of expressive yearning before the arrangement gently recedes back to the initial sparse texture for the closing vocal refrain, ending in a state of quiet resolution.
+  Application Scenarios & Imagery: A dimly lit jazz club late at night, a rainy window view in a city apartment, or a scene of introspection in a noir film.
+  Sonics & Production Profile: The soundstage is intimate and focused, with a warm, analog-style frequency response that emphasizes the mid-range richness of the piano and vocals. The production is clean and uncluttered, utilizing natural room reverb to create a sense of physical space without heavy processing, resulting in a highly breathable and organic dynamic aesthetic.
+  Vocal Details
+  Vocal Gender & Timbre: Singer A (Female). The vocalist possesses a smoky, breathy alto timbre with a soft, velvety texture that conveys deep emotion and intimacy.
+  Vocal Style: The performance is characterized by a laid-back, conversational delivery that leans heavily on jazz phrasing and subtle rubato. The singer employs a gentle vibrato and dynamic control, moving from a near-whisper in the lower register to a slightly more projected, yet still controlled, tone during the emotional peaks of the melody.
+  Harmony/Backing Vocals: No distinct backing vocals or harmonic layers are present; the vocal line remains a singular, unaccompanied lead throughout the track.
+  Vocal FX: The vocal is treated with a tasteful, medium-length plate reverb that adds warmth and spatial depth while preserving the clarity and closeness of the performance.
+  Arrangement
+  Instrument Lifecycle Description (Primary/Secondary Layering):
+  Primary: An acoustic piano serves as the harmonic and melodic anchor, playing lush, extended chords and delicate melodic fills from the Intro through to the Outro.
+  Secondary: An upright bass enters shortly after the intro, providing a warm, walking bassline that grounds the harmony. A clean-toned electric guitar joins later, taking the lead for an expressive, blues-inflected solo before returning to a supporting role with sparse chordal comping.
+  Groove & Foundation Progression: The rhythm section is driven by a brushed drum kit, which establishes a slow, swinging groove immediately upon entry. The drummer uses soft brush sweeps on the snare and light cymbal work to maintain a low-volume, textured pulse that supports the ballad tempo without overpowering the melodic instruments.
+  Embellishments, Textures & Spatial FX: Subtle piano fills and bass slides act as transitional elements between vocal phrases. The electric guitar solo introduces a slight overdrive texture and sustain, adding a layer of emotional grit that contrasts with the otherwise smooth and polished arrangement.
+lyrics: |-
+  [intro]
+  [instrumental]
+  [verse]
+  I was a fiend before I became a teen
+  I melted microphones instead of cones of ice cream
+  Music orientated so when hip-hop was originated
+  Fitted like pieces of puzzles, complicated
+  'Cause I grabbed the mic and try to say, "Yes, y'all"
+  They tried to take it and say that I'm too small
+  Cool 'cause I don't get upset
+  I kick a hole in the speaker, pull the plug then I jet (Then I jet)
+  Back to the lab without a mic to grab
+  So then I add all the rhymes I had
+  One after the other one, then I make another one
+  To this the opposite then ask if the brother's done
+  I get a cravin' like I fiend for nicotine
+  But I don't need a cigarette, know what I mean?
+  I'm ragin', rippin' up the stage and
+  Don't it sound amazin'?
+  'Cause every rhyme is made and thought of
+  'Cause it's sort of an addiction
+  Magnetized by the mixing
+  Vocals, vocabulary, your verses, you're stuck in
+  The mic is a Drano, volcanoes eruptin'
+  Rhymes overflowin', gradually growin'
+  Everything is written in the cold, so it can coincide ('Cide)
+  My thoughts to guide
+  Forty-eight tracks to slide
+  The invincible, microphone fiend, Rakim (Rakim)
+  Spread the word 'cause I'm in
+  E-F-F-E-C-T
+  A smooth operator operating correctly
+  But back to the problem, I got a habit
+  You can't solve it, silly rabbit
+  The prescription is a hyper tone that's thorough when
+  I fiend for a microphone like heroin (Heroin)
+  Soon as the bass kicks, I need a fix
+  Give me a stage and a mic and a mix
+  And I'll put you in a mood or is it a state of
+  Unawareness, beware, it's the re-animator (Re-animator)
+  A menace to a microphone, a lethal weapon
+  An assassinator, if the people ain't steppin'
+  You'll see a part of me that you never seen
+  When I'm fiendin' for a microphone, I'm the microphone fiend
+  After twelve, I'm worse than a gremlin
+  Feed me hip-hop and I start tremblin' (Tremblin')
+  The thrill of suspense is intense, you're horrified
+  But this ain't the cinemas of 'Tales From the Darkside'
+  By any means necessary, this is what has to be done
+  Make way 'cause here I come
+  My DJ cuts material (Material)
+  Grand imperial
+  It's a must that I bust any mic you hand to me
+  It's inherited, it runs in the family
+  I wrote the rhyme that broke the bull's back
+  If that don't slow 'em up, I carry a full pack
+  Now I don't wanna have to let off, you should've kept off
+  You didn't keep the stage warm, step off (Step off)
+  Ladies and gentleman, you're about to see
+  A pastime hobby about to be
+  Taken to the maximum, I can't relax, see
+  I'm hype as a hypochondriac 'cause the rap be one
+  Hell of a antidote, somethin' you can't smoke
+  More than dope, you're tryin' to move away but you can't, you're broke
+  More than cracked up, you should've backed up
+  For those that act up, need to be more than smacked up
+  Any entertainer, I got a torture chamber
+  One-on-one and I'm the remainder (Remainder)
+  So close your eyes and hold your breath (Breath)
+  And I'ma hit you with the blow of death (Death)
+  Before you go, you'll remember you seen
+  The fiend of a microphone, I'm the microphone fiend (I'm the microphone fiend)
+  [outro]
+  The microphone fiend (The microphone fiend)
+  The micro-the micro-the micro—, the microphone fiend (The microphone fiend)
+  The micro-the-the mic-the microphone fiend
+  The micro-the-the microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The micro-the microphone
+  The micro-the micro-the microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The micro-the micro-the microphone
+  The micro-the micro-the microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The-the-the-the-the microphone fiend (The microphone fiend)
+  The mic (The mic), the microphone fiend

@@ -1,0 +1,92 @@
+{
+  "caption": [
+    {
+      "node": "2",
+      "input": "caption"
+    }
+  ],
+  "lyrics": [
+    {
+      "node": "2",
+      "input": "lyrics"
+    }
+  ],
+  "encoder_seed": [
+    {
+      "node": "2",
+      "input": "seed"
+    }
+  ],
+  "duration": [
+    {
+      "node": "2",
+      "input": "max_duration"
+    }
+  ],
+  "encoder_cfg": [
+    {
+      "node": "2",
+      "input": "cfg_scale"
+    }
+  ],
+  "top_k": [
+    {
+      "node": "2",
+      "input": "top_k"
+    }
+  ],
+  "sampler_seed": [
+    {
+      "node": "6",
+      "input": "seed"
+    }
+  ],
+  "sampler_steps": [
+    {
+      "node": "6",
+      "input": "steps"
+    }
+  ],
+  "sampler_cfg": [
+    {
+      "node": "6",
+      "input": "cfg"
+    }
+  ],
+  "sampler": [
+    {
+      "node": "6",
+      "input": "sampler_name"
+    }
+  ],
+  "scheduler": [
+    {
+      "node": "6",
+      "input": "scheduler"
+    }
+  ],
+  "text_encoder": [
+    {
+      "node": "1",
+      "input": "clip_name"
+    }
+  ],
+  "dit": [
+    {
+      "node": "4",
+      "input": "unet_name"
+    }
+  ],
+  "vae": [
+    {
+      "node": "7",
+      "input": "vae_name"
+    }
+  ],
+  "output_prefix": [
+    {
+      "node": "9",
+      "input": "filename_prefix"
+    }
+  ]
+}

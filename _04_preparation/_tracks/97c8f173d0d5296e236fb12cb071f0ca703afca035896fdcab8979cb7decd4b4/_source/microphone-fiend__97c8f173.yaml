@@ -1,0 +1,127 @@
+title: microphone-fiend
+cluster: Soul, Blues & Gospel
+version: Soul / Gospel-Pop Ballad
+model: minimax H3
+dit: fp16
+text_encoder: int8_convrot
+encoder_cfg: 1.7
+encoder_seed: 222649894390804
+top_k: 45
+sampler: dpmpp_sde_gpu
+scheduler: ddim_uniform
+sampler_cfg: 1.6
+sampler_seed: 355563225803780
+sampler_steps: 35
+inspiration:
+inspirationyt:
+story:
+caption_source: sample
+caption: |-
+  Global Metadata
+  Basic Attributes: bpm is 62. key is Eb, and scale is major. Soul / Gospel-Pop Ballad.
+  Global Emotional Progression: The piece opens with a solitary, introspective mood, establishing a sense of quiet resilience. As the arrangement expands, the emotion swells into a powerful, anthemic declaration of strength and hope during the chorus sections, before receding into a serene, resolved conclusion that mirrors the opening tranquility but with a sense of earned peace.
+  Application Scenarios & Imagery: Cinematic moments of personal triumph, scenes depicting nature reclaiming space, or emotional turning points in a dramatic narrative where a character finds their inner voice.
+  Sonics & Production Profile: The production features a spacious and warm soundstage, utilizing natural room acoustics to create depth. The frequency response is rich in the mid-range to highlight the vocal presence, supported by a deep, rounded low end. Dynamics are carefully managed, moving from an intimate, uncompressed feel in the verses to a fuller, more saturated texture in the climactic sections without sacrificing clarity.
+  Vocal Details
+  Vocal Gender & Timbre: A single female vocalist leads the track. Her timbre is rich and soulful, possessing a smoky lower register that transitions into a clear, resonant belt in the upper range. She demonstrates excellent control over breathiness and power, shifting seamlessly between intimate whispers and full-throated projection.
+  Vocal Style: The performance begins with a restrained, storytelling delivery characterized by subtle melismatic runs and a gentle vibrato. As the song builds, the style evolves into a passionate, gospel-inflected belting technique, utilizing dynamic swells and sustained notes to convey intensity. The delivery remains emotive and grounded throughout, avoiding excessive ornamentation in favor of raw expression.
+  Harmony/Backing Vocals: Layered backing vocals enter during the chorus sections, providing lush, multi-part harmonies that create a choir-like effect. These harmonies are stacked in thirds and fifths, sung by the lead vocalist through multi-tracking, adding significant width and emotional weight to the refrain.
+  Vocal FX: The vocal track is treated with a tasteful plate reverb that enhances the sense of space without washing out articulation. Subtle delay is applied to specific phrases in the chorus to accentuate key melodic lines, while the verses remain relatively dry to maintain intimacy.
+  Arrangement
+  Instrument Lifecycle Description (Primary/Secondary Layering):
+  Primary: A grand piano serves as the harmonic backbone, present from the very first note to the end. It plays arpeggiated figures in the verses and shifts to broad, rhythmic block chords during the choruses to drive the momentum.
+  Secondary: An upright bass enters shortly after the intro, providing a warm, woody low-end foundation that locks in with the drums. A full drum kit joins at the first chorus, featuring a soft kick, crisp snare, and shimmering cymbals that lift the energy.
+  Groove & Foundation Progression: The track begins without percussion, relying on the piano's rhythmic pulse. Upon entering the chorus, a steady, mid-tempo groove is established by the drums and bass, creating a solid foundation that supports the vocal climax. The groove simplifies again in the bridge before returning with full force for the final refrain, then stripping back to just piano and bass for the outro.
+  Embellishments, Textures & Spatial FX: Subtle string pads swell in the background during the second chorus, adding cinematic depth and sustaining the harmonic tension. Occasional cymbal swells and reverse piano effects are used as transitional elements between sections, smoothing the dynamic shifts and enhancing the atmospheric quality of the arrangement.
+lyrics: |-
+  [intro]
+  [instrumental]
+  [verse]
+  I was a fiend before I became a teen
+  I melted microphones instead of cones of ice cream
+  Music orientated so when hip-hop was originated
+  Fitted like pieces of puzzles, complicated
+  'Cause I grabbed the mic and try to say, "Yes, y'all"
+  They tried to take it and say that I'm too small
+  Cool 'cause I don't get upset
+  I kick a hole in the speaker, pull the plug then I jet (Then I jet)
+  Back to the lab without a mic to grab
+  So then I add all the rhymes I had
+  One after the other one, then I make another one
+  To this the opposite then ask if the brother's done
+  I get a cravin' like I fiend for nicotine
+  But I don't need a cigarette, know what I mean?
+  I'm ragin', rippin' up the stage and
+  Don't it sound amazin'?
+  'Cause every rhyme is made and thought of
+  'Cause it's sort of an addiction
+  Magnetized by the mixing
+  Vocals, vocabulary, your verses, you're stuck in
+  The mic is a Drano, volcanoes eruptin'
+  Rhymes overflowin', gradually growin'
+  Everything is written in the cold, so it can coincide ('Cide)
+  My thoughts to guide
+  Forty-eight tracks to slide
+  The invincible, microphone fiend, Rakim (Rakim)
+  Spread the word 'cause I'm in
+  E-F-F-E-C-T
+  A smooth operator operating correctly
+  But back to the problem, I got a habit
+  You can't solve it, silly rabbit
+  The prescription is a hyper tone that's thorough when
+  I fiend for a microphone like heroin (Heroin)
+  Soon as the bass kicks, I need a fix
+  Give me a stage and a mic and a mix
+  And I'll put you in a mood or is it a state of
+  Unawareness, beware, it's the re-animator (Re-animator)
+  A menace to a microphone, a lethal weapon
+  An assassinator, if the people ain't steppin'
+  You'll see a part of me that you never seen
+  When I'm fiendin' for a microphone, I'm the microphone fiend
+  After twelve, I'm worse than a gremlin
+  Feed me hip-hop and I start tremblin' (Tremblin')
+  The thrill of suspense is intense, you're horrified
+  But this ain't the cinemas of 'Tales From the Darkside'
+  By any means necessary, this is what has to be done
+  Make way 'cause here I come
+  My DJ cuts material (Material)
+  Grand imperial
+  It's a must that I bust any mic you hand to me
+  It's inherited, it runs in the family
+  I wrote the rhyme that broke the bull's back
+  If that don't slow 'em up, I carry a full pack
+  Now I don't wanna have to let off, you should've kept off
+  You didn't keep the stage warm, step off (Step off)
+  Ladies and gentleman, you're about to see
+  A pastime hobby about to be
+  Taken to the maximum, I can't relax, see
+  I'm hype as a hypochondriac 'cause the rap be one
+  Hell of a antidote, somethin' you can't smoke
+  More than dope, you're tryin' to move away but you can't, you're broke
+  More than cracked up, you should've backed up
+  For those that act up, need to be more than smacked up
+  Any entertainer, I got a torture chamber
+  One-on-one and I'm the remainder (Remainder)
+  So close your eyes and hold your breath (Breath)
+  And I'ma hit you with the blow of death (Death)
+  Before you go, you'll remember you seen
+  The fiend of a microphone, I'm the microphone fiend (I'm the microphone fiend)
+  [outro]
+  The microphone fiend (The microphone fiend)
+  The micro-the micro-the micro—, the microphone fiend (The microphone fiend)
+  The micro-the-the mic-the microphone fiend
+  The micro-the-the microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The micro-the microphone
+  The micro-the micro-the microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The micro-the micro-the microphone
+  The micro-the micro-the microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The microphone fiend (The microphone fiend)
+  The-the-the-the-the microphone fiend (The microphone fiend)
+  The mic (The mic), the microphone fiend

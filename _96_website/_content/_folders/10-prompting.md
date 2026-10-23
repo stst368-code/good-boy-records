@@ -1,0 +1,1193 @@
+---
+tab: Prompting
+title: Prompting
+order: 10
+---
+# MiniMax Music 3 Prompting — the short lesson I wish I had first
+
+This is the version to keep beside the YAML folder.
+
+The whole thing is much simpler than it first looks:
+
+> **Lyrics = what gets sung, and the rough map of the song.**  
+> **Caption = what the music actually sounds like, who performs it, and how it changes over time.**
+
+That is basically the game.
+
+A filename called `blue-eyed-soul.yaml` does **not** make blue-eyed soul. A `version: blue-eyed-soul` field does **not** make blue-eyed soul either. If the caption says *minimal piano singer-songwriter*, you have asked for a piano singer-songwriter track.
+
+That exact mistake appeared repeatedly in the YAMLs we reviewed.
+
+So the first rule is:
+
+## THE MODEL DOES NOT CARE WHAT YOU MEANT
+
+It cares what you actually fed it.
+
+---
+
+# The 30-second version
+
+There are only **two important text inputs**.
+
+## 1. Lyrics
+
+Use lyrics for:
+
+- the actual words
+- `[verse]`, `[chorus]`, `[bridge]`, etc.
+- the broad song structure
+
+Do **not** use lyrics as a second caption full of production instructions.
+
+## 2. Caption
+
+Use the caption for:
+
+1. `Global Metadata`
+2. `Vocal Details`
+3. `Arrangement`
+
+Think of those as:
+
+> **WHAT IS IT?**  
+> **WHO IS PERFORMING IT?**  
+> **WHAT HAPPENS FROM START TO FINISH?**
+
+If those three answers are clear and agree with each other, you are most of the way there.
+
+---
+
+# What the bad / average / good YAMLs actually taught us
+
+The biggest lesson from the bad, average and good sets was **not** "long prompt good" or "short prompt bad".
+
+Caption length overlapped quite a lot.
+
+Lyrics length overlapped.
+
+Section count overlapped.
+
+There was no magic number of words that separated a good result from a shit one.
+
+The much stronger pattern was this:
+
+## Bad prompts
+
+They tended to be:
+
+- generic genre conversions
+- internally contradictory
+- over-templated
+- vague about the singer
+- written like an equipment list rather than a song
+- carrying arrangement details copied from another genre
+- leaving lyrics shaped for a completely different style
+- relying on the filename/version to communicate something the caption did not
+
+## Average prompts
+
+They often had:
+
+- the right genre name
+- some correct instruments
+- roughly sensible tempo
+- broadly suitable lyrics
+
+…but they stopped there.
+
+They described a **sound**, but not a **performance unfolding through time**.
+
+That tends to give you "sort of the genre".
+
+## Good prompts
+
+They were much more likely to be:
+
+- specific to the actual song
+- internally consistent
+- explicit about vocal identity
+- explicit about the target genre in musical terms, not just by name
+- arranged section-by-section
+- written as an energy arc
+- paired with lyrics whose structure actually suits the new style
+
+That last bit matters.
+
+If I take lyrics written like a slow piano ballad and tell the model "this is now black metal" without changing anything else, I have given it two competing ideas.
+
+The better question is:
+
+> **What would this song need to become if it genuinely belonged to this genre?**
+
+---
+
+# Lesson 1 — Caption = three headings. Do not get clever.
+
+Use exactly:
+
+```text
+Global Metadata
+
+Vocal Details
+
+Arrangement
+```
+
+That is the structure MiniMax's own guidance is built around.
+
+Aim for roughly **250–450 words total**.
+
+That range is useful because it forces enough detail without turning the caption into a novel. It is not a magic quality score.
+
+---
+
+# PART A — GLOBAL METADATA
+
+This answers:
+
+> **What song am I asking for?**
+
+It has four main jobs.
+
+---
+
+## A1. Genre / style identity
+
+The genre name is the starting point, not the whole prompt.
+
+### BAD
+
+```text
+Genre: ska-punk.
+```
+
+Technically correct. Barely useful.
+
+### GOOD
+
+```text
+Fast third-wave ska-punk: bright off-beat clean guitar upstrokes, aggressive live punk drums,
+melodic electric bass, short brass punches and a shout-along chorus. The verses should feel
+spring-loaded and syncopated; the choruses should open into full punk-rock impact without
+losing the ska pulse.
+```
+
+Now the model has actual musical evidence for "ska-punk".
+
+### The rule
+
+If I deleted the genre name, could I still tell roughly what genre you meant from the remaining description?
+
+If the answer is no, the prompt is too dependent on the label.
+
+---
+
+## A2. Tempo, key, scale and metre
+
+Precision is useful **when you actually care about it**.
+
+Do not invent numbers because numbers look clever.
+
+### BAD
+
+```text
+173 BPM, F# Phrygian, 7/8.
+```
+
+…when what you actually meant was simply "fast, dark punk".
+
+Now you have introduced three hard constraints for no reason.
+
+### GOOD — when precision matters
+
+```text
+Around 170–180 BPM in 4/4, fast enough for driving ska-punk but still leaving space for
+clearly audible off-beat guitar chops.
+```
+
+### GOOD — when precision does not matter
+
+```text
+Fast and driving, with a breathless punk tempo rather than a rigid exact BPM.
+```
+
+### The rule
+
+> **Specify what you care about. Leave the rest free.**
+
+---
+
+## A3. Emotional progression
+
+Do not give the model a bag of adjectives.
+
+Give it a journey.
+
+### BAD
+
+```text
+Dark, emotional, energetic, epic, sad, powerful.
+```
+
+That tells me nearly nothing. Half of those words fight each other.
+
+### GOOD
+
+```text
+The opening feels tense and contained, as though the singer is trying to laugh off something
+that genuinely bothers her. The verses stay sarcastic and wiry. Each chorus becomes louder,
+brighter and more defiant. The bridge briefly drops the bravado and exposes the hurt underneath,
+before the final chorus returns at maximum confidence.
+```
+
+That is an **arc**.
+
+The model now knows how the emotional state should change with the arrangement.
+
+### The rule
+
+Think:
+
+> **start → build → peak → interruption/change → final state**
+
+---
+
+## A4. Application scenario / imagery
+
+This sounds fluffy until you use it properly.
+
+A scene is often more useful than another six mood words.
+
+### BAD
+
+```text
+Fun, nostalgic, cool, energetic.
+```
+
+### GOOD
+
+```text
+It should feel like a tiny sweat-soaked club at midnight: bodies bouncing, brass blasting from
+the corner of the stage, cheap coloured lights, the singer grinning through an argument while
+the room shouts the hook back at her.
+```
+
+You have just communicated space, attitude, energy and performance style without writing
+"energetic" eight times.
+
+---
+
+## A5. Sonics / production profile
+
+This is where you tell it what kind of **recording** you want.
+
+Not just what instruments exist.
+
+### BAD
+
+```text
+Professional production. Good quality. Wide stereo.
+```
+
+### GOOD
+
+```text
+Punchy live-band production with a tight centre image for kick, snare, bass and lead vocal.
+Guitars and brass spread wider in the choruses. Keep the transients sharp, the low end controlled
+and physical, and avoid glossy EDM-style limiting; it should feel like an energetic band recording,
+not an electronic track wearing ska instruments.
+```
+
+### The rule
+
+Describe things like:
+
+- dry vs reverberant
+- intimate vs huge
+- raw vs polished
+- compressed vs dynamic
+- narrow vs wide
+- warm vs abrasive
+- clean vs saturated
+
+Only where they actually matter.
+
+---
+
+# PART B — VOCAL DETAILS
+
+This answers:
+
+> **Who is singing, and how do they behave?**
+
+This was one of the most important weak spots in the poorer prompts.
+
+Do not leave "the vocal" as some mystery person unless you genuinely do not care.
+
+---
+
+## B1. Vocal gender and timbre
+
+### BAD
+
+```text
+Strong vocals.
+```
+
+Whose vocals? Male? Female? Choir? Rapper? Soprano? Gravelly bloke in a pub?
+
+### GOOD
+
+```text
+Singer A (Female): a bright but slightly rough mezzo-soprano with a conversational lower register
+and enough edge to cut through loud guitars without becoming a polished pop belter.
+```
+
+That gives the model an identity to preserve.
+
+### Instrumental version?
+
+Say so directly.
+
+### BAD
+
+```text
+No singing probably.
+```
+
+### GOOD
+
+```text
+Entirely instrumental. No sung, spoken or choral vocals. The lead melodic role belongs to
+a heavily reverberant electric guitar.
+```
+
+---
+
+## B2. Vocal performance by section
+
+The singer should not perform every section identically.
+
+### BAD
+
+```text
+Energetic female singing throughout.
+```
+
+### GOOD
+
+```text
+Verses are clipped, sarcastic and rhythmically precise, almost spoken in places. The pre-chorus
+pushes into a more sustained melodic line. Choruses are full-voice and shoutable, with longer
+held notes and a rougher edge. The bridge pulls back to a close, almost dry delivery before the
+final chorus opens up again.
+```
+
+That is a performance.
+
+---
+
+## B3. Harmonies / backing vocals
+
+Say **where** they happen.
+
+### BAD
+
+```text
+Backing vocals and harmonies.
+```
+
+### GOOD
+
+```text
+Keep the verses almost entirely solo. Add short gang-vocal answers at the ends of selected
+pre-chorus lines. In the chorus, double the lead and add a small group shouting the final phrase
+of each hook. Remove the group vocals again for the bridge so the lead feels exposed.
+```
+
+Again: timeline.
+
+---
+
+## B4. Vocal effects
+
+Effects are seasoning.
+
+Do not turn the vocal paragraph into a plugin preset.
+
+### BAD
+
+```text
+Lots of reverb, delay, compression, saturation, chorus and stereo widening.
+```
+
+### GOOD
+
+```text
+Keep the lead vocal mostly dry and forward in the verses. Add a short plate reverb in the chorus
+for width, with occasional delay throws only on the final word of a phrase. Gang vocals can sit
+further back in a small-room ambience.
+```
+
+The second version tells the effects **when to exist and why**.
+
+---
+
+# PART C — ARRANGEMENT
+
+This is the bit I would pay the most attention to.
+
+The official guidance basically wants the arrangement written as a **timeline**.
+
+Not:
+
+> guitar, bass, drums, piano, strings
+
+but:
+
+> guitar starts here → bass joins here → drums become heavier here → everything drops here →
+> final chorus returns bigger → ending strips back
+
+That distinction is massive.
+
+---
+
+## C1. Primary and secondary instrument lifecycle
+
+### BAD
+
+```text
+Electric guitar, bass, drums, brass.
+```
+
+That is a shopping list.
+
+### GOOD
+
+```text
+A clean off-beat electric guitar is the rhythmic anchor from the opening onward. Bass and drums
+enter immediately but stay relatively lean through the first verse. Short trumpet and trombone
+stabs first appear in the pre-chorus, then become a major answering voice in the chorus. A second,
+more distorted guitar joins only in the choruses to turn the ska groove into punk impact.
+```
+
+Now I can hear the song developing.
+
+---
+
+## C2. Groove / rhythmic foundation
+
+Do not merely say "strong drums".
+
+### BAD
+
+```text
+Fast drums and good bass.
+```
+
+### GOOD
+
+```text
+Verses use a tight punk kick-snare pattern under clipped off-beat guitar, with the bass moving
+melodically between vocal phrases. The pre-chorus increases snare density and opens the hi-hats.
+The chorus shifts into a straighter, harder punk drive with crash cymbals while the guitar keeps
+enough off-beat emphasis to preserve the ska identity.
+```
+
+This matters because "genre" often lives as much in the groove as in the instrument names.
+
+---
+
+## C3. Section-by-section development
+
+This is where average prompts often become good prompts.
+
+### BAD
+
+```text
+The song has verses, choruses and a bridge with increasing energy.
+```
+
+### GOOD
+
+```text
+Intro: expose the guitar upstroke and bass for two bars before the drums snap in.
+
+Verse 1: keep the band lean and dry, leaving gaps around the vocal.
+
+Pre-chorus: introduce brass answers and increase cymbal movement.
+
+Chorus: full drum weight, doubled rhythm guitar, louder brass and gang responses.
+
+Verse 2: return to the lean verse texture but keep a little more bass movement than before.
+
+Bridge: remove the brass and cut the drums to rim clicks for the first half, then rebuild with
+a snare roll and rising guitar noise.
+
+Final chorus: everything returns at maximum density, with the brass now sustaining underneath
+the final hook.
+
+Outro: hard stop after the last shouted phrase.
+```
+
+That is what "arrangement as a timeline" means.
+
+---
+
+## C4. Embellishments, textures and spatial FX
+
+Only add these when they contribute something.
+
+### BAD
+
+```text
+Risers, impacts, reverse cymbals, ambience, ear candy, sweeps, delays.
+```
+
+Why? Where? What genre are we making now?
+
+### GOOD
+
+```text
+Use a brief reverse cymbal only to pull into the first chorus. Let brass notes leave short room
+tails between phrases. Add a scrape of guitar feedback before the final chorus, then keep the
+final stop completely dry.
+```
+
+Specific, sparse, useful.
+
+---
+
+# Lesson 2 — Lyrics are not another caption
+
+This is the easiest mistake to make.
+
+The lyric input is mainly:
+
+> **words + structural tags**
+
+The caption is where the detailed musical instructions live.
+
+---
+
+# The valid structural vocabulary
+
+Keep the tags simple:
+
+```text
+[intro]
+[verse]
+[pre-chorus]
+[chorus]
+[post-chorus]
+[bridge]
+[instrumental]
+[solo]
+[outro]
+```
+
+You do not need to use all of them.
+
+---
+
+## L1. Put every tag on its own line
+
+This one is boring but important.
+
+### BAD
+
+```text
+[verse] I saw you waiting by the gate
+```
+
+The model's input contract can drop text placed on the same line as the leading tag.
+
+### GOOD
+
+```text
+[verse]
+I saw you waiting by the gate
+```
+
+Do that every time.
+
+---
+
+## L2. Do not invent elaborate performer tags
+
+We found a lot of things like character names, singer descriptions and decorated verse tags in the old YAMLs.
+
+They may sometimes appear to work.
+
+They are not the clean documented control path.
+
+### BAD
+
+```text
+[Verse 1 - Angry Female Singer, whispered then screaming]
+You took the ball again
+```
+
+### GOOD
+
+Caption:
+
+```text
+Vocal Style: Singer A begins Verse 1 in a restrained, irritated tone and becomes increasingly
+forceful toward the final line.
+```
+
+Lyrics:
+
+```text
+[verse]
+You took the ball again
+```
+
+Put **performance information in Vocal Details**.
+
+Keep the lyric tags structural.
+
+---
+
+## L3. Lyrics should contain lyrics
+
+### BAD
+
+```text
+[chorus]
+BIG distorted guitars enter here with double-time drums
+You stole my ball
+Add gang vocals on this line
+Give it back
+```
+
+There is now a non-zero chance the singer attempts to sing your production notes.
+
+### GOOD
+
+Caption:
+
+```text
+Arrangement: The chorus introduces the distorted second guitar and moves the drums into a
+full double-time punk pattern. Gang vocals answer the lead on "Give it back."
+```
+
+Lyrics:
+
+```text
+[chorus]
+You stole my ball
+Give it back
+```
+
+Two inputs. Two jobs.
+
+---
+
+## L4. Give the song enough actual song
+
+The requested duration is an upper limit, not an instruction forcing the model to fill five minutes.
+
+If the lyrics finish, the model can finish.
+
+### BAD — asking for five minutes
+
+```text
+[verse]
+Where did you go?
+
+[chorus]
+Come back home.
+```
+
+You have written about twenty seconds of song.
+
+### GOOD
+
+```text
+[intro]
+
+[verse]
+...
+
+[pre-chorus]
+...
+
+[chorus]
+...
+
+[verse]
+...
+
+[pre-chorus]
+...
+
+[chorus]
+...
+
+[bridge]
+...
+
+[chorus]
+...
+
+[outro]
+...
+```
+
+You do not need filler for the sake of filler, but the lyric structure should be remotely compatible
+with the duration you want.
+
+---
+
+## L5. Adapt the lyric shape to the genre when necessary
+
+This is one of the strongest practical lessons from the good/bad comparison.
+
+"Keep the exact lyrics unchanged" is useful when you are testing the **same song in different production styles**.
+
+It becomes stupid when the phrasing is fundamentally hostile to the new genre.
+
+### BAD — rap conversion
+
+```text
+[verse]
+I have one enormous paragraph containing thirty-six syllables and no obvious rhythmic
+break because it originally belonged to a slow theatrical ballad and I am refusing to touch it
+```
+
+Caption:
+
+```text
+Genre: aggressive boom-bap.
+```
+
+The model now has to solve your structural problem for you.
+
+### GOOD
+
+```text
+[verse]
+I have one enormous paragraph
+Thirty-six syllables in a row
+Break the thought where rhythm lands
+Give the rapper somewhere to go
+```
+
+Same idea, but now there are bars.
+
+For another genre you may need the opposite:
+
+- longer held vowels for a ballad
+- repeated hook phrases for dance music
+- shorter brutal phrases for extreme metal
+- call-and-response space for gospel
+- sparse text for atmospheric music
+
+You are not just changing the wallpaper. You are arranging a song.
+
+---
+
+## L6. Use `[instrumental]` and `[solo]` deliberately
+
+### BAD
+
+```text
+[solo]
+```
+
+…in every song because the tag exists.
+
+### GOOD
+
+```text
+[bridge]
+The room goes quiet when you leave
+
+[solo]
+
+[chorus]
+I still hear your name
+```
+
+Then explain in the caption **what the solo actually is**:
+
+```text
+Arrangement: After the bridge vocal, an eight-bar tremolo-guitar solo carries the main melodic
+motif over a stripped bass-and-drums backing before the final chorus returns.
+```
+
+The tag says **there is a solo section**.
+
+The caption says **what happens in it**.
+
+---
+
+# Lesson 3 — Genre mismatch will wreck you faster than almost anything
+
+This happened a lot in the archive.
+
+You would have something labelled as one style while the caption very confidently described another.
+
+The caption wins because the caption is the actual music instruction.
+
+## BAD
+
+```yaml
+version: blue-eyed-soul
+```
+
+Caption:
+
+```text
+Global Metadata
+Minimal piano singer-songwriter. Female vocal and acoustic piano only. No bass, drums, guitar
+or horns.
+```
+
+That is not a blue-eyed soul prompt with a minor mistake.
+
+That is a piano-ballad prompt wearing a blue-eyed-soul filename.
+
+## GOOD
+
+```yaml
+version: blue-eyed-soul
+```
+
+Caption:
+
+```text
+Global Metadata
+Blue-eyed soul with warm 1970s pop-soul production, a relaxed live pocket, electric piano,
+melodic bass, restrained guitar, live drums and selective horn support. Verses stay intimate;
+choruses broaden into a richer soul arrangement without becoming disco.
+```
+
+Now the metadata and the actual instruction agree.
+
+---
+
+# Lesson 4 — Specific detail beats negative prompting
+
+A common instinct is:
+
+> "I don't want X, Y, Z, A, B, C, D..."
+
+That can become half the prompt.
+
+Usually it is stronger to tell the model what **should** occupy that space.
+
+### BAD
+
+```text
+Do not make this metalcore, deathcore, nu metal, pop punk, hard rock, arena rock, industrial,
+electronic, symphonic, gothic or cinematic.
+```
+
+That is a lot of attention spent describing things you do not want.
+
+### GOOD
+
+```text
+Raw second-wave black metal: thin abrasive tremolo guitars, continuous high-speed live drumming,
+harsh shrieked lead vocal, minimal bass prominence and a cold primitive rehearsal-room production.
+Keep the arrangement relentless and riff-led rather than breakdown-led.
+```
+
+One useful exclusion at the end is fine when a neighbouring style is a genuine risk.
+
+A blacklist is not a genre description.
+
+---
+
+# Lesson 5 — Do not copy a good prompt and forget to replace its musical DNA
+
+This is how you get hilariously wrong generations.
+
+Changing:
+
+```text
+version: folk-rock
+```
+
+does nothing useful if the caption still says:
+
+```text
+Late-1970s Scandinavian disco-pop...
+four-on-the-floor kick...
+glossy stacked chorus vocals...
+bright dance-floor lift...
+```
+
+The model is not confused.
+
+**We are.**
+
+It is doing what the caption says.
+
+When reusing a prompt, check all of these:
+
+```text
+Genre
+Tempo / rhythmic feel
+Singer
+Vocal delivery
+Backing vocals
+Core instruments
+Drum language
+Bass language
+Section progression
+Production character
+Special effects
+Outro behaviour
+```
+
+If half still belong to the old style, you have not made a new version yet.
+
+---
+
+# A useful way to build a prompt from scratch
+
+Do not stare at a blank YAML and try to write 400 words.
+
+Answer these in order.
+
+## Pass 1 — WHAT IS IT?
+
+```text
+Genre:
+Tempo / feel:
+Key, only if important:
+Opening emotion:
+Peak emotion:
+Ending emotion:
+Scene:
+Production character:
+```
+
+## Pass 2 — WHO IS PERFORMING IT?
+
+```text
+Lead singer:
+Timbre:
+Verse delivery:
+Chorus delivery:
+Backing vocals:
+Vocal effects:
+```
+
+Or:
+
+```text
+Instrumental:
+Lead melodic instrument:
+```
+
+## Pass 3 — WHAT HAPPENS?
+
+```text
+Intro:
+Verse:
+Pre-chorus:
+Chorus:
+Verse 2:
+Bridge / solo:
+Final chorus:
+Outro:
+```
+
+Then turn those answers into the three caption sections.
+
+That is much easier than trying to "write a MiniMax prompt".
+
+---
+
+# Full mini example
+
+Target: **dark surf rock instrumental**
+
+## BAD
+
+```text
+Global Metadata
+Dark surf rock, cinematic, epic, spooky, cool.
+
+Vocal Details
+Instrumental.
+
+Arrangement
+Electric guitar, bass and drums. Lots of reverb. Builds up.
+```
+
+It is not technically broken.
+
+It is just doing fuck-all to control the result.
+
+## GOOD
+
+```text
+Global Metadata
+Dark instrumental surf rock with a fast, driving 4/4 pulse, combining early-1960s reverb guitar
+language with a menacing minor-key chase-scene mood. The track should begin tense and stripped,
+become increasingly frantic through the middle, and reach its most aggressive point in the final
+return of the main riff. Imagine a night-time desert road chase: headlights, dust, empty highway,
+danger just behind the car. Production is raw and physical rather than modern-metal heavy, with
+spring reverb dominating the guitar sound, narrow live drums and a dry, clearly articulated bass.
+
+Vocal Details
+Entirely instrumental. No sung, spoken or choral vocals. The lead melodic role belongs to a
+bright, sharply picked electric guitar with heavy spring reverb, rapid alternate picking and
+occasional low-string slides. The lead should remain recognisably guitar-like rather than becoming
+a synth or orchestral melody.
+
+Arrangement
+The intro exposes the main tremolo-picked guitar figure alone for one bar before bass and drums
+enter with a fast straight pulse. The first section keeps the rhythm guitar sparse and lets the
+lead riff dominate. A second guitar begins answering the main phrase in the next section while
+the drummer adds tom fills between phrases. The middle section briefly drops the lead guitar,
+leaving bass, floor tom and muted rhythm guitar to create suspense. A short lead-guitar solo then
+climbs back toward the central riff. The final section returns to the opening motif with both
+guitars, harder snare accents and more frequent cymbal crashes. End with a sudden full-band stop
+followed only by the final spring-reverb tail.
+```
+
+That is one coherent idea from beginning to end.
+
+---
+
+# Full lyric example
+
+## BAD
+
+```text
+[Verse 1 - sad female voice]
+I waited all night by the door
+[CHORUS - BIG DRUMS AND GUITARS] I don't need you anymore
+[Female screaming]
+GET OUT
+[8 bar guitar solo with lots of delay]
+```
+
+Problems:
+
+- decorated non-standard tags
+- instructions mixed into lyrics
+- a tag and lyric share the same line
+- singer identity is being controlled in the wrong input
+- solo instrumentation is being controlled in the wrong input
+
+## GOOD
+
+```text
+[verse]
+I waited all night by the door
+Counting every footstep on the floor
+
+[chorus]
+I don't need you anymore
+I don't need you anymore
+
+[bridge]
+Get out
+Get out
+
+[solo]
+
+[chorus]
+I don't need you anymore
+
+[outro]
+Not anymore
+```
+
+Then put the singer, screaming, drums, guitars and solo behaviour in the caption.
+
+Clean division of labour.
+
+---
+
+# The "am I about to generate nonsense?" check
+
+Before sending the YAML, do this quickly.
+
+## Caption
+
+- [ ] Exactly `Global Metadata → Vocal Details → Arrangement`
+- [ ] Actual genre is written in the caption
+- [ ] Musical details support that genre
+- [ ] Tempo/key are only precise if I genuinely care
+- [ ] There is an emotional journey, not just adjectives
+- [ ] Singer identity is explicit, or `instrumental` is explicit
+- [ ] Vocal behaviour changes appropriately by section
+- [ ] Core instruments are named
+- [ ] Arrangement says what changes through the song
+- [ ] Groove is described, not merely "strong drums"
+- [ ] Production character is coherent with the genre
+- [ ] Nothing later contradicts something I made explicit earlier
+- [ ] Roughly 250–450 words
+- [ ] No lyric lines pasted into the caption
+
+## Lyrics
+
+- [ ] Tags are simple macro tags
+- [ ] Every tag is alone on its own line
+- [ ] No `[Female Angry Verse 2]` nonsense
+- [ ] No production instructions hiding between lyric lines
+- [ ] There are enough sections/words for the approximate duration I want
+- [ ] The phrasing makes sense for the target genre
+- [ ] `[solo]` / `[instrumental]` only appear when actually useful
+
+## Metadata
+
+- [ ] `version:` agrees with the caption
+- [ ] filename agrees with the intended version
+- [ ] I have not assumed either of those fields will override the caption
+
+---
+
+# The actual mental model
+
+Do not think:
+
+> "I am telling an AI what genre this song is."
+
+Think:
+
+> "I am briefing a band, a singer, an arranger and a recording engineer at the same time."
+
+The genre name gets everybody into roughly the correct room.
+
+The rest of the caption tells them what to do once they are in there.
+
+And the lyrics put the sheet of words and section markers on the stand.
+
+That is it.
+
+---
+
+# Final TL;DR
+
+If you remember nothing else:
+
+1. **Lyrics are words + structure.**
+2. **Caption is music.**
+3. **Use exactly three caption headings.**
+4. **Name the singer properly.**
+5. **Describe the arrangement as time passing.**
+6. **A genre label is not enough; describe the musical evidence of that genre.**
+7. **Do not let copied details from the old genre survive into the new one.**
+8. **Do not bury musical instructions inside lyric tags.**
+9. **Adapt lyric structure when the new genre genuinely needs it.**
+10. **The filename cannot save a bad caption.**
+
+The question I would ask before every generation is:
+
+> **If MiniMax ignored my filename and version field completely, would the caption and lyrics alone still describe exactly the song I want?**
+
+If yes, send it.
+
+If no, fix that first.
+

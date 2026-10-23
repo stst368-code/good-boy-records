@@ -1,0 +1,88 @@
+song_id: 32
+variant_id: 1
+title: how-deep-is-your-brass
+album: brasston
+pos: 2
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [verse]
+  I know your eyes in the mornin' sun
+  I feel you touch me in the pourin' rain
+  And the moment that you wander far from me
+  I wanna feel you in my arms again
+  [pre-chorus]
+  And you come to me on a submarine
+  Keep me warm in your love, then you softly leave
+  And it's me you need to show
+  How deep is your brass?
+  [chorus]
+  How deep is your brass? How deep is your brass?
+  I really mean to learn
+  'Cause we're livin' in a world of fools
+  Breakin' us down
+  When they all should let us be
+  We belong to you and me
+  [verse]
+  I believe in you
+  You know the door to my very soul
+  You're the light in my deepest, darkest hour
+  You're my saviour when I fall
+  [pre-chorus]
+  And you may not think I care for you
+  When you know down inside that I really do
+  And it's me you need to show
+  How deep is your brass?
+  [chorus]
+  How deep is your brass? How deep is your brass?
+  I really mean to learn
+  'Cause we're livin' in a world of fools
+  Breakin' us down
+  When they all should let us be
+  We belong to you and me
+  [bridge]
+  Na-na-na-na-na
+  Na-na-na-na, na-na-na-na-na
+  Na-na-na, na-na-na-na-na-na-na
+  Na-na-na, na-na-na-na
+  [pre-chorus]
+  And you come to me on a submarine
+  Keep me warm in your love, then you softly leave
+  And it's me you need to show
+  How deep is your brass?
+  [chorus]
+  How deep is your brass? How deep is your brass?
+  I really mean to learn (I really mean to learn)
+  'Cause we're livin' in a world of fools
+  Breakin' us down
+  When they all should let us be
+  We belong to you and me
+  (Na-na-na-na-na)
+  How deep is your brass? How deep is your brass?
+  I really mean to learn
+  'Cause we're livin' in a world of fools
+  Breakin' us down
+  When they all should let us be
+  We belong to you and me
+  (Na-na-na-na-na)
+  How deep is your brass? How deep is your brass?
+  I really mean to learn
+  'Cause we're livin' in a world of fools
+  Breakin' us down
+  When they all should let us be
+  We belong to you and me

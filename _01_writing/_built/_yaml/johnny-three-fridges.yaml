@@ -1,0 +1,92 @@
+song_id: 9
+variant_id: 1
+title: johnny-three-fridges
+cluster:
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  they call him Johnny
+  ...
+  Johnny, Three Fridges
+  a name enough to chill the bone
+  once you've heard my story
+  i'll let you judge if you're safe at home
+  [verse]
+  so, what's a man to do with three whole fridges
+  one for food, one for beer
+  third one you'll never get near
+  he'll have you over, n' cook you dinner
+  delicious to eat, calories for a sinner
+  hear it hum, hear it shiver
+  go near fridge three and you'll hear him snigger
+  [pre-chorus]
+  so what he heck is going down
+  in that sweet ol' minnesota town?
+  well keep on 'a listenin'
+  cuz I know the story, i wrote it down
+  [chorus]
+  ol' Johnny Three Fridges, sinister by name
+  livin' the dream, playin' his all American game
+  what's he got in 'em?
+  day to day, never the same
+  don't get nosey, don't go pryin'
+  else you'll be the one runnin' away cryin'
+  [post-chorus]
+  so, listen up and listen real close
+  won't be long before i'm gone ghost
+  i'm spillin' the beans
+  on ol Johnny Three Fridges dreams
+  [verse]
+  see, ain't nothin' sinister
+  ain't nothin' chillin'
+  except a white tailed deer
+  and some ruffed grouse dead from killin'
+  that's it that's all
+  least that's all he'll tell ya' he got chilling'
+  [pre-chorus]
+  so, listen again, listen well
+  my song my story should ring a bell
+  what's in fridge number three ain' nobody around to tell
+  [instrumental]
+  [chorus]
+  ol' Johnny Three Fridges, sinister by name
+  livin' the dream, playin' his all American game
+  what's he got in 'em?
+  day to day, never the same
+  don't get nosey, don't go pryin'
+  else you'll be the one runnin' away cryin'
+  [post-chorus]
+  family man, family man
+  ol' Johnny Three Fridges got a big family, man
+  mouths to feed from dawn till eve
+  maybe three fridges ain't so hard to believe
+  [verse]
+  bet with that revelation
+  you're startin' to relax now but hear my hesitation
+  one's in the kitchen, ordinary as can be
+  second in the garage, nothin' hauntin' there still
+  but when you find that third fridge
+  tucked behind the basement door
+  you'll see why Johnny told me
+  I ain't welcome anymore
+  [outro]
+  so dear friend
+  time's now for this here song to end
+  hear my message, understand my warnin'
+  maybe you'll wake to a delicious breakfast in the mornin'

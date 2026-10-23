@@ -1,0 +1,91 @@
+song_id: 42
+variant_id: 1
+title: feel-good-inc
+album: demon-days
+pos: 5
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  Hahahahahahaha-ha-ha-ha-ha-ha
+  Feel good
+  Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  (Change, change, change, change) Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  (Change, change, change, change) Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  [verse]
+  City's breakin' down on a camel's back
+  They just have to go, 'cause they don't know wack
+  So all ya fill the streets, it's appealing to see
+  You won't get undercounted 'cause you're damned and free
+  You got a new horizon, it's ephemeral style
+  A melancholy town where we never smile
+  And all I wanna hear is the message beep
+  My dreams, they gotta kiss because I don't get sleep, no​
+  [chorus]
+  Windmill, windmill for the land
+  Turn forever, hand in hand
+  Take it all in on your stride
+  It is ticking, falling down
+  Love forever, love is free
+  Let's turn forever, you and me
+  Windmill, windmill for the land
+  Is everybody in?
+  [verse]
+  Laughin' gas, these hazmats, fast cats
+  Linin' 'em up like ass cracks
+  Play these ponies at the track
+  It's my chocolate attack
+  Shit, I'm steppin' in the heart of this here (Yeah)
+  Care Bear repping in harder this year (Yeah)
+  Watch me as I gravitate, ha-ha-ha-ha-ha
+  Yo, we gon' ghost town this Motown
+  With yo' sound, you in the blink
+  Gon' bite the dust, can't fight with us
+  With yo' sound, you kill the Inc
+  So don't stop, get it, get it (Get it)
+  Until you're cheddar headed
+  And watch the way I navigate, ha-ha-ha-ha-ha (Ha, ha-ha, ha-ha, ha-ha, ha)
+  [bridge]
+  Sha-ba, sha-ba, sha-ba-da-ba, feel good (Hahaha)
+  (Ah-hahahahaha, ah) Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  (Hahahahahahahaha, ah) Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  (Hahahahahahahaha) Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  [instrumental]
+  [chorus]
+  Windmill, windmill for the land
+  Turn forever, hand in hand
+  Take it all in on your stride
+  It is ticking, falling down
+  Love forever, love is free
+  Let's turn forever, you and me
+  Windmill, windmill for the land
+  Is everybody in?
+  [outro]
+  Don't stop, get it, get it, peep how your captain's in it (Sha-ba, sha-ba, sha-ba-da-ba, feel good)
+  Steady, watch me navigate, ha-ha-ha-ha-ha (Sha-ba, sha-ba, sha-ba-da-ba, feel good)
+  Don't stop, get it, get it, peep how your captain's in it (Sha-ba, sha-ba, sha-ba-da-ba, feel good)
+  Steady, watch me navigate, ha-ha-ha-ha-ha (Sha-ba, sha-ba, sha-ba-da-ba, feel good; Hahahahahahahahahahahaha)
+  Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  (Ah-hahahahahahahahahahahahahahaha) Sha-ba, sha-ba, sha-ba-da-ba, feel good
+  Sha-ba, sha-ba, sha-ba-da-ba, feel good (Ah)
+  Sha-ba, sha-ba, sha-ba-da-ba, feel good (Hahahahahahahahahahahahahahahahahaha)

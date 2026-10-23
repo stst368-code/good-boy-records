@@ -1,0 +1,92 @@
+song_id: 82
+variant_id: 1
+title: you-make-me-sick
+album: weedkiller
+pos: 2
+version: orchestral
+language: en
+model: minimax H3
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt: 
+story:
+caption:  |
+  Global Metadata
+  Basic Attributes: broad lyrical tempo, roughly 68–84 BPM. Late-Romantic Symphony / Operatic Ballad. Build the song as a sweeping nineteenth-century-style dramatic scena with long melodic arcs, rich chromatic harmony and a full symphonic palette. Open in private, fragile introspection, expand through increasingly passionate verses, and allow choruses to surge into broad emotional release rather than rhythmic aggression. The bridge should suspend time with exposed harmony before the final chorus becomes the grandest statement. Imagine an opera house at dusk, deep velvet, warm wood and a full orchestra breathing with the singer. Preserve wide natural dynamics and detailed orchestral depth. Avoid modern pop drums, electronic textures, trailer percussion, metal guitars and Baroque motor rhythm.
+  Vocal Details
+  Vocal Gender & Timbre: Singer A (Male), a resonant romantic tenor with rounded vowels, expressive legato and a strong but elegant upper register. Vocal Style: Shape verses with legato storytelling and restrained vibrato, allowing rubato around emotionally important phrases. Choruses broaden into full supported tone with longer sustained notes. Backing voices, if used, should be a small operatic ensemble entering only at the largest returns. The bridge should feature the most intimate dynamic. Use only concert-hall ambience and natural vocal bloom. Keep the same lead identity across repeated sections so the performance feels continuous rather than recast between verses.
+  Arrangement
+  Section Timeline: [intro] to [verse] to [instrumental] to [verse] to [solo] to [verse] to [instrumental] to [bridge] to [instrumental] to [outro]. Instrument Lifecycle / Groove / Texture: Begin with divided strings and a single woodwind colour. Verses grow through clarinet, oboe, horn and warm lower strings, keeping percussion absent or extremely light. Pre-choruses increase harmonic tension with tremolo strings and rising inner voices. Choruses release into full strings, horns, restrained trumpets, timpani and sweeping woodwind counterlines. Instrumental passages should hand the melody between solo cello, violin and woodwinds. The bridge reduces to harp, low strings and one solo instrument, then the orchestra rebuilds in long crescendos. Reserve full brass and cymbal weight for the final chorus. The outro resolves with a slow orchestral cadence and lingering strings. Establish the signature texture immediately and leave clear room for the first vocal entrance. Keep the lead intelligible and let the core groove carry the narrative without unnecessary density. Develop an existing motif using the featured instruments of this style instead of inserting an unrelated Keep transitions connected so changes in density, register and instrumentation clearly serve the section change.
+lyrics: |
+  [Chorus]
+  You make me sick
+  You make me turn my insides out onto the bricks
+  I could never train a bitch like you
+  Click, c-c-click, c-c-click, click (Woof)
+  You like my boots?
+  I could squash you like a little rotten fruit
+  On your jugular and leave a pretty bruise
+  Attitude and the booze won't save you
+  [Verse 1]
+  You fucking loser
+  Red meat deadbeat, you fucking tumor
+  Can't believe I let your hands inside my bloomers
+  Better count your blessings, I got humor
+  Got a knife too, I call her Tilda
+  Bet your fucking ass that I'ma use her
+  Fucking user
+  Cokehеad cretin, your life is a blooper
+  Splintеr-looking ass born in a sewer
+  Suck a dick then I bite, I'm a chewer
+  Go find another bitch to hoover
+  Count the days until you lose her
+  [Pre-Chorus]
+  I'm mad
+  You fuck my life up then you say, "My bad"
+  You don't know your way around a pussy, call you "Chad"
+  Throwing temper tantrums every time I got a bag
+  Kinda sad, little nads, I'm mad
+  [Chorus]
+  You make me sick
+  You make me turn my insides out onto the bricks
+  I could never train a bitch like you
+  Click, c-c-click, c-c-click, click (Woof)
+  You like my boots?
+  I could squash you like a little rotten fruit
+  On your jugular and leave a pretty bruise
+  Attitude and the booze won't save you
+  (Mommy's okay!)
+  [Verse 2]
+  Hello, waitress
+  I want his head for dinner, silver plate it
+  Cut his tongue out first, let's hear him go and try and say shit
+  I'm abrasive?
+  I'm a dragon, animorph and shapeshift
+  Fire breathing, break shit
+  Brain-eating amoeba, coming for you, I'm contagious
+  Ruined what was sacred
+  I was living good before your locusts and your plague hit
+  I always fucking fake it
+  Now you're crying and you're shaking?
+  Take your tears and bottle 'em and use 'em as a face mist
+  I'm beautiful
+  [Pre-Chorus]
+  I'm mad
+  You fuck my life up then you say, "My bad"
+  You don't know your way around a pussy, call you "Chad"
+  Throwing temper tantrums every time I got a bag
+  Kinda sad, little nads, I'm mad
+  [Chorus]
+  You make me sick
+  You make me turn my insides out onto the bricks
+  I could never train a bitch like you
+  Click, c-c-click, c-c-click, click (Woof)

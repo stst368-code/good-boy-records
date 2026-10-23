@@ -1,0 +1,82 @@
+song_id: 25
+variant_id: 1
+title: smooth-pawterator
+cluster:
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  (Woof, soft)
+  Mmm... two goldens...
+  [verse]
+  She moves through the room like she's made out of
+  silk
+  Cool as the morning, calm as the milk
+  She won't chase a thing,
+  what she wants, It comes to her
+  A golden-eyed lady, with that regal glow
+  [chorus]
+  She's a smooth paw-ter-arator, running your home
+  Cool little princess on her velvet throne
+  And her chunk's all heart,
+  all sunshine and sway
+  Two goldens,
+  one home,
+  at the end of the day
+  (mmm)
+  [instrumental]
+  [verse]
+  He's a big gentle giant with a mouth soft and
+  wide
+  Loves every stranger,
+  takes them all in his stride
+  But Teddy, sweet Teddy, he just cannot abide
+  And nobody knows what he's feeling inside
+  [chorus]
+  She's a smooth paw-ter-arator, running your home
+  Cool little princess on her velvet throne
+  And her chunk's all heart,
+  all sunshine and sway
+  Two goldens,
+  one home,
+  at the end of the day
+  (mmm)
+  [bridge]
+  Two sides of a golden,
+  one cool and one warm
+  She's the calm in the quiet,
+  he's the joy in the storm
+  (soft) Doja... Bam Bam...
+  [chorus]
+  She's a smooth paw-ter-arator, running your home
+  Cool little princess on her velvet throne
+  And her chunk's all heart,
+  all sunshine and sway
+  Two goldens,
+  one home,
+  at the end of the day
+  (mmm)
+  [post-chorus]
+  She's a smooth paw-ter-arator, running your home
+  (mmm)
+  [outro]
+  Two goldens,
+  one home,
+  and they've got it all
+  (whispered) Go on... fetch the ball...
+  (Woof)

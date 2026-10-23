@@ -1,0 +1,90 @@
+song_id: 56
+variant_id: 1
+title: messy
+cluster:
+version:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+language: ru
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [verse]
+  You know I'm impatient
+  So why would you leave me waiting outside the station
+  When it was like minus four degrees?
+  And I, I get what you're sayin'
+  I just really don't wanna hear it right now
+  Can you shut up for like once in your life?
+  Listen to me
+  I took your nice words of advice about
+  How you think I'm gonna die lucky if I turned thirty-three
+  Okay, so yeah, I smoke like a chimney
+  I'm not skinny and I pull a Britney
+  Every other week
+  But cut me some slack, who do you want me to be?
+  [chorus]
+  'Cause I'm too messy, and then I'm too fucking clean
+  You told me, "Get a job", then you ask where the hell I've been
+  And I'm too perfect till I open my big mouth
+  I want to be me, is that not allowed?
+  And I'm too clever, and then I'm too fucking dumb
+  You hate it when I cry unless it's that time of the month
+  And I'm too perfect till I show you that I'm not
+  A thousand people I could be for you and you hate the fucking lot
+  [post-chorus]
+  You hate the fucking lot
+  You hate the fucking lot
+  You hate, you hate
+  [verse]
+  It's taking you ages
+  You still don't get the hint, I'm not asking for pages
+  But one text or two would be nice
+  And please don't pull those faces
+  When I've been out working my arse off all day
+  It's just one bottle of wine or two
+  But hey, you can't even talk
+  You smoke weed just to help you sleep
+  Then why you out gettin' stoned at 4 o'clock?
+  And then you come home to me
+  And don't say hello
+  'Cause I got high again
+  And forgot to fold my clothes
+  [chorus]
+  'Cause I'm too messy, and then I'm too fucking clean
+  You told me, "Get a job", then you ask where the hell I've been
+  And I'm too perfect till I open my big mouth
+  I want to be me, is that not allowed?
+  And I'm too clever, and then I'm too fucking dumb
+  You hate it when I cry unless it's that time of the month
+  And I'm too perfect till I show you that I'm not
+  A thousand people I could be for you and you hate the fucking lot
+  [post-chorus]
+  You hate the fucking lot
+  You hate the fucking lot
+  [instrumental]
+  [chorus]
+  Oh, and I'm too messy, and then I'm too fucking clean
+  You told me, "Get a job", then you ask where the hell I've been
+  And I'm too perfect till I open my big mouth
+  I want to be me, is that not allowed?
+  And I'm too clever, and then I'm too fucking dumb
+  You hate it when I cry unless it's that time of the month
+  And I'm too perfect till I show you that I'm not
+  A thousand people I could be for you and you hate the fucking lot
+  [outro]
+  You hate the fucking lot
+  You hate the fucking lot
+  You hate the fucking lot
+  You hate the fucking lot

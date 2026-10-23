@@ -1,0 +1,88 @@
+﻿song_id,song_name,filename,author,inspiration_author,inspiration_track,album_bool,album_name,album_position,styles_linked,original_cluster,original_style
+1,a golden life,a-golden-life.yaml,gbr,gbr original,gbr original,f,,,t,"Jazz, Swing & Big Band",
+2,california rear view,california-rear-view.yaml,gbr,gbr original,gbr original,f,,,t,General Pop & Ballad,
+3,cofetărie,cofetărie.yaml,gbr,50 cent,candy shop,f,,,t,Hip-Hop & Rap,hip-hop-boom-bap_0004
+4,dogtushya,dogtushya.yaml,gbr,gbr original,gbr original,f,,,t,Traditional Vocal & Stage,
+5,fluffies,fluffies.yaml,gbr,gbr original,gbr original,f,,,,,
+6,gangster of fluff,gangster-of-fluff.yaml,gbr,johnny watson,gangster of love,f,,,t,"Soul, Blues & Gospel",blues-electric-blues_0001
+7,gimmie gimmie ball,gimmie-gimmie-ball.yaml,gbr,abba,gimmie gimie,f,,,t,"Dance-Pop, Disco & Funk",disco-funk-pop_0001
+8,golden rhapsody,golden-rhapsody.yaml,gbr,queen,bohemian rhapsody,f,,,t,Traditional Vocal & Stage,musical-theatre-progressive-rock-opera_0001
+9,johnny three fridges,johnny-three-fridges.yaml,gbr,gbr original,gbr original,f,,,t,Country & Americana,
+10,know thy hedge,know-thy-hedge.yaml,gbr,rakim,know the ledge,f,,,t,Hip-Hop & Rap,hip-hop-boom-bap-with-jazz-influences_0001
+11,lie by the fire,lie-by-the-fire.yaml,gbr,gbr original,gbr original,f,,,t,"Soul, Blues & Gospel",
+12,many manele,many-manele.yaml,gbr,50 cent,many men,f,,,t,Hip-Hop & Rap,hip-hop-boom-bap-with-dark-ambient-influences_0001
+13,moses supposes,moses-supposes.yaml,gbr,gene kelly and donald oconnor,singin in the rain,f,,,t,Traditional Vocal & Stage,musical-theatre-big-band-jazz_0001
+14,nachttischlampe,nachttischlampe.yaml,gbr,gbr original,gbr original,f,,,t,"Jazz, Swing & Big Band",
+15,new mills new mills,new-mills-new-mills.yaml,gbr,frank sinatra,theme from new york new york,f,,,t,Traditional Vocal & Stage,traditional-pop-big-band-swing_0001
+16,paradox,paradox.yaml,gbr,gbr original,gbr original,f,,,t,Metal & Heavy Rock,
+17,paws off the velvet,paws-off-the-velvet.yaml,gbr,gbr original,gbr original,f,,,t,"Dance-Pop, Disco & Funk",
+18,paws off,paws-off.yaml,gbr,future,mask off,f,,,t,Hip-Hop & Rap,hip-hop-trap_0001
+19,paws on your nightstand,paws-on-your-nightstand.yaml,gbr,gbr original,gbr original,f,,,t,Hip-Hop & Rap,
+20,pity pawty,pity-pawty.yaml,gbr,melanie martinez,pity party,f,,,t,"Electronic, Synth & Ambient Pop",electropop-indie-pop_0001
+21,pupeii,pupeii.yaml,gbr,pink floyd,live at pompeii,f,,,t,Pop & Alternative Rock,
+22,self-righteous gremlin,self-rightous-gremelin.yaml,gbr,system of a down,chop suey,f,,,t,Metal & Heavy Rock,alternative-metal-nu-metal_0001
+23,sixteen balls,sixteen-balls.yaml,gbr,tennessee ernie ford,sixteen tons,f,,,t,Country & Americana,country-traditional-ballad_0001
+24,sixteen treats,sixteen-treats.yaml,gbr,tennessee ernie ford,sixteen tons,f,,,t,Country & Americana,country-traditional-ballad_0001
+25,smooth pawterator,smooth-pawterator.yaml,gbr,sade,smooth operator,f,,,t,"Jazz, Swing & Big Band",smooth-jazz-adult-contemporary-randb_0001
+26,the ball beyond the gate,the-ball-beyond-the-gate.yaml,gbr,gbr original,gbr original,f,,,t,Metal & Heavy Rock,
+27,the endless game,the-endless-game.yaml,gbr,gbr original,gbr original,f,,,t,Metal & Heavy Rock,
+28,where golden flowers grow,where-golden-flowers-grow.yaml,gbr,gbr original,gbr original,f,,,t,Country & Americana,
+29,you make me holy,you-make-me-holy.yaml,gbr,ashnikko,you make me sick,f,,,t,Hip-Hop & Rap,industrial-hip-hop-trap-metal_0001
+30,brasston,brasston.yaml,gbr,richard white,gaston,f,,,t,Traditional Vocal & Stage,musical-theatre-orchestral-pop_0002
+31,circle of life,circle-of-life.yaml,carmen twillie,carmen twillie,circle of life,f,,,t,Cinematic Pop Ballad,cinematic-orchestral-pop-epic-world-fusion_0001
+32,how deep is your brass,how-deep-is-your-brass.yaml,gbr,bee gees,how deep is your love,f,,,t,General Pop & Ballad,pop-ballad-adult-contemporary_0001
+33,if i were a brass man,if-i-were-a-brass-man.yaml,gbr,chaim topol,if I were a rich man,f,,,t,Traditional Vocal & Stage,musical-theatre-cinematic-folk_0001
+34,raspberry parade,raspberry-parade.yaml,prince,prince,raspberry beret,f,,,t,"Dance-Pop, Disco & Funk",funk-pop-neo-soul_0001
+35,all alone,all-alone.yaml,gorillaz,gorillaz,all alone,t,demon days,9,t,Hip-Hop & Rap,alternative-hip-hop-experimental-electronic_0001
+36,dare,dare.yaml,gorillaz,gorillaz,dare,t,demon days,11,t,"Dance-Pop, Disco & Funk",dance-pop-electronic-funk_0001
+37,demon days,demon-days.yaml,gorillaz,gorillaz,demon days,t,demon days,14,t,"Soul, Blues & Gospel",soul-gospel-infused-randb_0002
+38,dirty harry,dirty-harry.yaml,gorillaz,gorillaz,dirty harry,t,demon days,4,t,Hip-Hop & Rap,pop-rap-funk-pop_0001
+39,dont get lost in heaven,dont-get-lost-in-heaven.yaml,gorillaz,gorillaz,dont get lost in heaven,t,demon days,13,t,"Soul, Blues & Gospel",soul-gospel-pop-ballad_0002
+40,el mañana,el-mañana.yaml,gorillaz,gorillaz,el mañana,t,demon days,6,t,"Electronic, Synth & Ambient Pop",downtempo-ambient-pop_0001
+41,every planet we reach is dead,every-planet-we-reach-is-dead.yaml,gorillaz,gorillaz,every planet we reach is dead,t,demon days,7,t,"Soul, Blues & Gospel",soul-funk-rock-with-jazz-influences_0001
+42,feel good inc,feel-good-inc.yaml,gorillaz,gorillaz,feel good inc,t,demon days,5,t,Hip-Hop & Rap,alternative-hip-hop-indie-pop_0001
+43,fire coming out of the monkeys head,fire-coming-out-of-the-monkeys-head.yaml,gorillaz,gorillaz,fire coming out of the monkeys head,t,demon days,12,t,"Electronic, Synth & Ambient Pop",cinematic-ambient-spoken-word_0001
+44,kids with guns,kids-with-guns.yaml,gorillaz,gorillaz,kids with guns,t,demon days,2,t,Pop & Alternative Rock,post-punk-indie-rock_0001
+45,last living souls,last-living-souls.yaml,gorillaz,gorillaz,last living souls,t,demon days,1,t,Hip-Hop & Rap,alternative-hip-hop-indie-pop_0001
+46,november has come,november-has-come.yaml,gorillaz,gorillaz,november has come,t,demon days,8,t,Hip-Hop & Rap,conscious-hip-hop-abstract-hip-hop_0001
+47,o green world,o-green-world.yaml,gorillaz,gorillaz,o green world,t,demon days,3,t,Pop & Alternative Rock,alternative-rock-blues-rock_0001
+48,white light,white-light.yaml,gorillaz,gorillaz,white light,t,demon days,10,t,Pop & Alternative Rock,post-punk-indie-rock_0001
+49,amsterdam,amsterdam.yaml,nothing but thieves,nothing but thieves,amsterdam,f,,,t,Pop & Alternative Rock,alternative-rock-arena-rock_0003
+50,dealer,dealer.yaml,lola young,lola young,dealer,f,,,t,"Soul, Blues & Gospel",blues-rock-indie-soul_0002
+51,fuck her gently,fuck-her-gently.yaml,tenacious d,tenacious d,fuck her gently,f,,,t,Contemporary Folk & Acoustic,acoustic-pop-singer-songwriter_0001
+52,i hate you,i-hate-you.yaml,frank carter and the rattlesnakes,frank carter and the rattlesnakes,i hate you,f,,,t,"Soul, Blues & Gospel",blues-rock-alternative-rock_0001
+53,incredible,incredible.yaml,m-beat,m-beat,incredible,f,,,f,Jungle,
+54,jennys tale,jennys-tale.yaml,ren,ren,jennys tale,f,,,t,Hip-Hop & Rap,hip-hop-storytelling-rap-with-folk-pop-influences_0001
+55,lose yourself,lose-yourself.yaml,eminem,eminem,lose yourself,f,,,t,Hip-Hop & Rap,hip-hop-cinematic-rap_0002
+56,messy,messy.yaml,lola young,lola young,messy,f,,,t,"Soul, Blues & Gospel",blues-rock-indie-soul_0002
+57,microphone fiend,microphone-fiend.yaml,rakim,rakim,microphone fiend,f,,,t,Hip-Hop & Rap,hip-hop-boom-bap_0004
+58,my neck my back,my-neck-my-back.yaml,elle king,elle king,my neck my back,f,,,t,"Roots, Traditional & Global",acoustic-blues-folk_0001
+59,not like that anymore,not-like-that-anymore.yaml,lola young,lola young,not like that anymore,f,,,t,Pop & Alternative Rock,indie-rock-alternative-pop_0001
+60,particles,particles.yaml,nothing but thieves,nothing but thieves,particles,f,,,t,Pop & Alternative Rock,alternative-rock-arena-rock_0004
+61,popstar,popstar.yaml,instasamka,instasamka,popstar,f,,,t,Hip-Hop & Rap,pop-rap-electronic-pop_0001
+62,real shady,real-shady.yaml,eminem,eminem,real shady,f,,,t,Hip-Hop & Rap,pop-rap-funk-pop_0001
+63,sorry,sorry.yaml,nothing but thieves,nothing but thieves,sorry,f,,,t,Pop & Alternative Rock,alternative-rock-pop-rock_0001
+64,spiders,spiders.yaml,lola young,lola young,spiders,f,,,t,Pop & Alternative Rock,alternative-rock-post-grunge_0001
+65,without me,without-me.yaml,eminem,eminem,without me,f,,,t,Hip-Hop & Rap,pop-rap-electronic-pop_0001
+66,aerials,aerials.yaml,system of a down,system of a down,aerials,f,,,t,Metal & Heavy Rock,alternative-metal-hard-rock_0001
+67,sugar,sugar.yaml,system of a down,system of a down,sugar,f,,,t,Metal & Heavy Rock,alternative-metal-nu-metal_0001
+68,toxicity,toxicity.yaml,system of a down,system of a down,toxicity,f,,,t,Metal & Heavy Rock,alternative-metal-nu-metal_0001
+69,vicinity of obscenity,vicinity-of-obscenity.yaml,system of a down,system of a down,vicinity of obscenity,f,,,t,Metal & Heavy Rock,alternative-metal-hard-rock_0002
+70,violent songography,violent-songography.yaml,system of a down,system of a down,violent songography,f,,,t,Metal & Heavy Rock,alternative-metal-hard-rock_0002
+71,chokehold cherry python,chokehold-cherry-python.yaml,ashnikko,ashnikko,chokehold cherry python,t,weedkiller,9,t,Hip-Hop & Rap,industrial-hip-hop-electronic-rock_0001
+72,dont look,dont-look.yaml,ashnikko,ashnikko,dont look at it,t,weedkiller,5,t,"Electronic, Synth & Ambient Pop",electropop-dark-pop-with-trap-influences_0001
+73,dying star,dying-star.yaml,ashnikko,ashnikko,dying star,t,weedkiller,13,t,Contemporary Folk & Acoustic,indie-folk-ambient-acoustic_0001
+74,miss nectarine,miss-nectarine.yaml,ashnikko,ashnikko,miss nectarine,t,weedkiller,8,t,"Electronic, Synth & Ambient Pop",electronic-pop-synth-pop_0001
+75,moonlight magic,moonlight-magic.yaml,ashnikko,ashnikko,moonlight magic,t,weedkiller,7,t,"Dance-Pop, Disco & Funk",dance-pop-electro-pop_0001
+76,possession of a weapon,posession-of-a-weapon.yaml,ashnikko,ashnikko,possession of a weapon,t,weedkiller,12,t,"Electronic, Synth & Ambient Pop",dark-pop-cinematic-electronic_0001
+77,super soaker,super-soaker.yaml,ashnikko,ashnikko,super soaker,t,weedkiller,4,t,"Electronic, Synth & Ambient Pop",electropop-dark-pop-with-trap-influences_0001
+78,want it all,want-it-all.yaml,ashnikko,ashnikko,want it all,t,weedkiller,11,t,Hip-Hop & Rap,alternative-hip-hop-experimental-electronic_0001
+79,weedkiller,weedkiller.yaml,ashnikko,ashnikko,weedkiller,t,weedkiller,10,t,Hip-Hop & Rap,industrial-hip-hop-electronic-rock_0001
+80,world eater,world-eater.yaml,ashnikko,ashnikko,world eater,t,weedkiller,1,t,Hip-Hop & Rap,industrial-hip-hop-dark-trap_0001
+81,worms,worms.yaml,ashnikko,ashnikko,worms,t,weedkiller,3,t,General Pop & Ballad,indie-pop-retro-surf-rock_0001
+82,you make me sick,you-make-me-sick.yaml,ashnikko,ashnikko,you make me sick,t,weedkiller,2,t,Hip-Hop & Rap,industrial-hip-hop-trap-metal_0001
+83,cheerleader,cheerleader.yaml,ashnikko,ashnikko,cheerleader,t,weedkiller,6,t,Hip-Hop & Rap,hip-hop-trap-with-eastern-stylistic-influences_0001
+84,indigo puff,indigo-puff.yaml,sundara karma,sundara karma,indigo puff,f,,,t,Pop & Alternative Rock,indie-rock-alternative-rock_0001
+85,lilith,lilith.yaml,the montans,the montans,lilith,f,,,t,Pop & Alternative Rock,pop-rock-electronic-rock-with-hip-hop-influences_0001
+86,fuck me in shibuya,fuck-me-shibuya.yaml,ashnikko,ashnikko,fuck me in shibuya,f,,,t,Hip-Hop & Rap,alternative-hip-hop-experimental-electronic_0001
+87,don’t kill my vibe,dont-kill-my-vibe.yaml,kendrick lamar,kendrick lamar,bitch don’t kill my vibe,f,,,t,Hip-Hop & Rap,pop-rap-alternative-hip-hop_0001.txt

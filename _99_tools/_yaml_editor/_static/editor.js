@@ -1,0 +1,129 @@
+import {selectChoices,languageChoices} from "/static/choices.js";
+export function initYamlEditor({api,toast,browse}){
+  const host=document.getElementById('yamlView'),$=id=>document.getElementById('ye-'+id);
+  let loaded=false,rows=[],selected=new Set(),root='',preview=null,busy=false,rawFile=null,defaultOrderTemplate='',knownKeys=[],styleTemplates=[];
+  host.innerHTML=`
+  <div class="ye-heading"><div><h1>YAML editor</h1><p class="subtle">Choose files, build your changes, then inspect the preview before saving.</p></div><button id="ye-history" class="secondary">Undo / history</button></div>
+  <p id="ye-error" class="error" role="alert"></p>
+  <div class="ye-folder"><label>Directory<input id="ye-directory" placeholder="Defaults to _01_writing/_built"></label><button id="ye-browse" class="secondary">Browse…</button><label class="ye-check"><input id="ye-recursive" type="checkbox" checked> Subfolders</label><button id="ye-scan">Scan YAMLs</button></div>
+  <p id="ye-scan-status" class="subtle small" role="status"></p>
+  <div class="ye-layout"><section class="ye-panel" aria-label="Choose YAML files"><h2>1. Choose files <span id="ye-count" class="subtle"></span></h2>
+    <label>Search files or metadata<input id="ye-search" type="search" placeholder="Title, ID, cluster, style…"></label>
+    <div class="ye-filter"><label>Field<select id="ye-filter-key"><option value="">Choose field</option></select></label><label>Filter<select id="ye-filter-mode"><option value="all">Any</option><option value="present">Field present</option><option value="missing">Field missing</option><option value="errors">Files with issues</option></select></label></div>
+    <div class="generation-fields"><label>Track<select id="ye-track"><option value="">Any track</option></select></label><label>Cluster<select id="ye-cluster"><option value="">Any cluster</option></select></label><label>Style<select id="ye-style"><option value="">Any style</option></select></label></div><div class="ye-actions"><button id="ye-select" class="quiet-button">Select visible</button><button id="ye-clear" class="quiet-button">Clear selection</button></div>
+    <div id="ye-files" class="ye-files"></div><p class="subtle small">Click a filename for text repair. Untouched comments, lyrics, order and line endings are preserved.</p>
+  </section><section class="ye-panel" aria-label="Edit operations"><h2>2. Build changes</h2><div id="ye-operations"></div><div class="ye-actions"><button id="ye-add" class="secondary">+ Add operation</button><button id="ye-preview" class="primary">Preview changes</button></div><p class="subtle small">Operations run in order. Removal and reordering happen only when you explicitly request them here.</p></section></div>
+  <section id="ye-preview-panel" class="ye-panel" hidden><h2>3. Review changes</h2><p id="ye-preview-summary" role="status"></p><div id="ye-diffs"></div><label id="ye-skip-wrap" class="ye-check" hidden><input id="ye-skip" type="checkbox"> Skip errored files and save only valid changes</label><div class="ye-actions"><button id="ye-save" class="primary" disabled>Save previewed changes</button><button id="ye-cancel" class="secondary">Discard preview</button></div><p class="subtle small">Every save has an undo backup. The last 20 completed batches are retained; interrupted saves are kept for recovery.</p></section>
+  <dialog id="ye-raw"><div class="dialog-heading"><h2 id="ye-raw-title">Text repair</h2><button id="ye-raw-close" class="close" aria-label="Close">×</button></div><p class="subtle small">Edit only what you intend to change. Saving requires a preview and valid YAML.</p><label>YAML source<textarea id="ye-text" class="ye-code" spellcheck="false" rows="22"></textarea></label><p id="ye-raw-error" class="error" role="alert"></p><button id="ye-raw-preview">Preview text repair</button></dialog>
+  <dialog id="ye-template-picker"><div class="dialog-heading"><h2>Choose an order template</h2><button id="ye-template-close" class="close" aria-label="Close">×</button></div><p id="ye-template-folder" class="subtle small"></p><div id="ye-template-options"></div></dialog>
+  <dialog id="ye-history-dialog"><div class="dialog-heading"><h2>Undo / history</h2><button id="ye-history-close" class="close" aria-label="Close">×</button></div><p class="subtle small">Restoring also creates an undo backup. Files changed since the selected save are protected.</p><div id="ye-history-items"></div></dialog>`;
+  const safe=fn=>(...args)=>Promise.resolve(fn(...args)).catch(e=>{$('error').textContent=e.message;toast(e.message);});
+  function invalidate(){preview=null;$('preview-panel').hidden=true;$('save').disabled=true;}
+  async function task(fn){if(busy)return;busy=true;$('error').textContent='';for(const id of ['scan','preview','save','raw-preview','history'])$(id).disabled=true;try{return await fn();}finally{busy=false;for(const id of ['scan','preview','raw-preview','history'])$(id).disabled=false;updateSave();}}
+  function fileMatches(row,omit=''){
+    const search=$('search').value.toLowerCase(),key=$('filter-key').value.trim(),mode=$('filter-mode').value;
+    if(search&&!`${row.path} ${JSON.stringify(row.metadata)}`.toLowerCase().includes(search))return false;
+    if(mode==='present'&&!row.fields.includes(key)||mode==='missing'&&row.fields.includes(key)||mode==='errors'&&!row.issues.length)return false;
+    return [['track','title'],['cluster','cluster'],['style','style']].every(([id,field])=>id===omit||!$(id).value||String(row.metadata[field]??'')===$(id).value);
+  }
+  function visible(){return rows.filter(row=>fileMatches(row));}
+  function metadataChoices(){
+    for(const [id,key] of [['track','title'],['cluster','cluster'],['style','style']])selectChoices($(id),rows.filter(row=>fileMatches(row,id)).map(row=>row.metadata[key]).filter(v=>v!=null&&String(v).trim()).map(String),{empty:'Any '+id,disabledMissing:true});
+  }
+  function renderFiles(){const list=$('files');list.replaceChildren();const filtered=visible();$('count').textContent=`${selected.size} selected`;
+    for(const row of filtered){const item=document.createElement('div');item.className='ye-file';const check=document.createElement('input');check.type='checkbox';check.checked=selected.has(row.path);check.disabled=!row.sha256;check.setAttribute('aria-label',`Select ${row.path}`);check.onchange=()=>{check.checked?selected.add(row.path):selected.delete(row.path);invalidate();$('count').textContent=`${selected.size} selected`;};
+      const text=document.createElement('div'),button=document.createElement('button');button.type='button';button.className='quiet-button ye-filename';button.textContent=row.path;button.disabled=!row.sha256;button.onclick=safe(()=>openRaw(row));text.append(button);
+      const metadata=document.createElement('p');metadata.className='subtle small';metadata.textContent=['song_id','variant_id','cluster','style'].filter(k=>row.metadata[k]!=null).map(k=>`${k}: ${row.metadata[k]}`).join(' · ');text.append(metadata);
+      for(const issue of row.issues){const p=document.createElement('p');p.className='ye-issue small';p.textContent=issue;text.append(p);}item.append(check,text);list.append(item);
+    }if(!filtered.length){const p=document.createElement('p');p.className='subtle';p.textContent=rows.length?'No files match this filter.':'Scan a directory to choose YAML files.';list.append(p);}}
+  async function scan(){return task(async()=>{invalidate();const result=await api('/yaml-editor/scan',{directory:$('directory').value.trim()||null,recursive:$('recursive').checked});root=result.root;defaultOrderTemplate=result.default_order_template||'';for(const input of host.querySelectorAll('[data-role=template_path]'))if(!input.value)input.value=defaultOrderTemplate;$('directory').value=root;rows=result.files;selected.clear();loaded=true;knownKeys=[...new Set(rows.flatMap(r=>r.fields))].sort();try{const t=await api('/yaml-editor/order-template',{path:defaultOrderTemplate||null});knownKeys=[...new Set([...knownKeys,...t.keys])].sort();}catch{}try{styleTemplates=(await api('/generation/templates')).templates;}catch{}refreshFieldChoices();metadataChoices();$('scan-status').textContent=`${rows.length} YAML files · ${rows.filter(r=>r.issues.length).length} with issues`+(result.truncated?` · Limit reached (${result.max_files} files); choose a smaller directory.`:'')+(result.warning?' · '+result.warning:'');renderFiles();});}
+  function refreshFieldChoices(){
+    selectChoices($('filter-key'),knownKeys,{empty:'Choose field'});
+    for(const card of $('operations').children){
+      const get=role=>card.querySelector(`[data-role="${role}"]`);
+      selectChoices(get('key'),[...knownKeys,{value:'@new',label:'New field…'}],{empty:'Choose field'});
+      selectChoices(get('anchor'),knownKeys,{empty:'Choose anchor'});
+    }
+  }
+  function addOperation(){invalidate();const card=document.createElement('div');card.className='ye-operation';card.innerHTML=`<div class="ye-op-top"><label>Operation<select data-role="kind"><option value="set">Set / add field</option><option value="add_template">Add missing fields from template</option><option value="rename">Rename field</option><option value="remove">Remove field</option><option value="reorder">Reorder fields</option><option value="catalogue_ids">IDs from catalogue</option><option value="deduplicate">Remove duplicate field</option></select></label><div class="ye-op-buttons"><button type="button" data-action="up" class="quiet-button" title="Move up" aria-label="Move operation up">↑</button><button type="button" data-action="down" class="quiet-button" title="Move down" aria-label="Move operation down">↓</button><button type="button" data-action="remove" class="quiet-button" aria-label="Remove operation">×</button></div></div>
+      <label data-for="set rename remove deduplicate">Field<select data-role="key"></select></label><label data-role="custom_key_wrap" hidden>New field name<input data-role="custom_key" placeholder="New parameter name"></label>
+      <label data-for="rename">New field name<input data-role="new_key" placeholder="e.g. cluster"></label>
+      <div data-for="reorder add_template"><label data-only-reorder>Order source<select data-role="order_source"><option value="template">Template YAML (default)</option><option value="manual">Manual field list</option></select></label>
+      <div data-reorder-template><label>Template YAML<input data-role="template_path" placeholder="Default: _01_writing/_built/track-template.yaml"></label><div class="ye-actions"><button type="button" data-action="browse-template" class="secondary">Choose template…</button><button type="button" data-action="read-template" class="quiet-button">Read field order</button></div><p data-role="template_order" class="subtle small"></p></div>
+      <label data-reorder-manual>Fields in desired order<input data-role="keys" placeholder="song_id, variant_id, title, cluster, style"></label>
+      <p data-only-reorder class="subtle small">Uses field order only. Values stay unchanged; fields not listed keep their positions. Missing fields are not added.</p></div>
+      <div data-for="add_template"><label>Fields to add<select data-role="template_fields" multiple aria-label="Template fields to add"></select><span class="subtle small">No selection adds all missing template fields.</span></label><label class="ye-check"><input data-role="template_reorder" type="checkbox" checked> Also apply the template field order</label><label class="ye-check"><input data-role="use_default" type="checkbox"> Use a default for these newly added fields</label><label>Default text<input data-role="default_text" placeholder="e.g. no"></label><label>Per-field defaults (optional JSON)<textarea data-role="template_defaults" rows="2" placeholder='{"explicit":"no","duration":360}'></textarea></label><p class="subtle small">Existing fields and values are kept. Without a default, new fields use the template values. Text such as yes/no is quoted when needed.</p></div>
+      <label data-for="set">Value type<select data-role="type"><option value="text">Text / multiline</option><option value="integer">Whole number</option><option value="number">Number</option><option value="boolean">Boolean (true / false)</option><option value="null">Null</option></select></label>
+      <label data-for="set" data-role="known_value_wrap" hidden>Value<select data-role="known_value"></select></label><label data-for="set" data-role="value_wrap">Value<textarea data-role="value" rows="3" spellcheck="false"></textarea></label>
+      <label data-for="set" class="ye-check"><input data-role="missing_only" type="checkbox"> Only add when the field is missing</label>
+      <label data-for="set">Position if missing<select data-role="position"><option value="template">Standard generation field order</option><option value="before">Before named field</option><option value="after">After named field</option><option value="start">First field</option><option value="end">Last field</option></select></label>
+      <label data-for="set" data-anchor>Anchor field<select data-role="anchor"></select></label>
+      <label data-for="deduplicate">Keep occurrence<select data-role="keep"><option value="first">First</option><option value="last">Last</option></select></label>
+      <label data-for="catalogue_ids" class="ye-check"><input data-role="overwrite_ids" type="checkbox"> Replace existing IDs with catalogue values</label><p data-for="catalogue_ids" class="subtle small">Uses track_list.csv and variant_list.csv above the chosen directory. Ambiguous or invalid matches are refused.</p>`;
+    const get=role=>card.querySelector(`[data-role="${role}"]`);
+    function visibility(){const kind=get('kind').value;card.querySelectorAll('[data-for]').forEach(el=>{el.hidden=!el.dataset.for.split(' ').includes(kind);});card.querySelector('[data-anchor]').hidden=kind!=='set'||!['before','after'].includes(get('position').value);get('value').disabled=get('type').value==='null';get('key').querySelector('option[value="@new"]').disabled=kind!=='set';if(kind!=='set'&&get('key').value==='@new')get('key').value='';get('custom_key_wrap').hidden=kind!=='set'||get('key').value!=='@new';get('known_value_wrap').hidden=kind!=='set'||!['text','boolean'].includes(get('type').value)||!get('known_value').options.length;get('value_wrap').hidden=kind!=='set'||['text','boolean'].includes(get('type').value)&&get('known_value').options.length>0&&get('known_value').value!=='@custom';card.querySelector('[data-reorder-template]').hidden=kind!=='add_template'&&(kind!=='reorder'||get('order_source').value!=='template');card.querySelectorAll('[data-only-reorder]').forEach(el=>{el.hidden=kind!=='reorder';});card.querySelector('[data-reorder-manual]').hidden=kind!=='reorder'||get('order_source').value!=='manual';}
+    get('template_path').value=defaultOrderTemplate;
+    card.querySelector('[data-action=read-template]').onclick=safe(()=>task(async()=>{const template=await api('/yaml-editor/order-template',{path:get('template_path').value.trim()||null});get('template_path').value=template.path;get('template_order').textContent=template.keys.join(', ');get('template_fields').replaceChildren(...template.keys.map(k=>new Option(k,k)));invalidate();}));
+    card.querySelector('[data-action=browse-template]').onclick=safe(()=>browse(safe(path=>chooseTemplate(card,path))));
+    card.addEventListener('input',invalidate);card.addEventListener('change',()=>{invalidate();visibility();});
+    card.querySelector('[data-action="remove"]').onclick=()=>{card.remove();invalidate();};card.querySelector('[data-action="up"]').onclick=()=>{if(card.previousElementSibling)card.before(card.previousElementSibling);invalidate();};card.querySelector('[data-action="down"]').onclick=()=>{if(card.nextElementSibling)card.after(card.nextElementSibling);invalidate();};$('operations').append(card);refreshFieldChoices();
+    function valueChoices(){
+      const key=get('key').value,type=get('type').value;let choices=[];
+      if(type==='boolean')choices=['true','false'];
+      if(type==='text'&&key==='explicit')choices=['no','yes'];
+      if(type==='text'&&key==='language')choices=languageChoices();
+      if(type==='text'&&key==='cluster')choices=[...styleTemplates.map(t=>t.cluster),...rows.map(r=>r.metadata.cluster).filter(Boolean)];
+      if(type==='text'&&key==='style')choices=[...styleTemplates.map(t=>t.style),...rows.map(r=>r.metadata.style).filter(Boolean)];
+      get('value').value='';
+      if(choices.length)selectChoices(get('known_value'),[...choices,...(type==='boolean'?[]:[{value:'@custom',label:'New value…'}])],{empty:'Blank',value:''});else get('known_value').replaceChildren();
+      visibility();
+    }
+    get('key').addEventListener('change',()=>{if(['explicit','language','cluster','style'].includes(get('key').value))get('type').value='text';valueChoices();});
+    get('type').addEventListener('change',valueChoices);
+    get('known_value').addEventListener('change',()=>{if(get('known_value').value!=='@custom')get('value').value=get('known_value').value;visibility();});
+    get('kind').addEventListener('change',()=>{if(['add_template','reorder'].includes(get('kind').value))card.querySelector('[data-action=read-template]').click();});
+    visibility();
+  }
+  function operations(){return [...$('operations').children].map(card=>{const value=role=>card.querySelector(`[data-role="${role}"]`).value,checked=role=>card.querySelector(`[data-role="${role}"]`).checked,kind=value('kind'),op={kind};
+    if(kind==='catalogue_ids')return {...op,missing_only:!checked('overwrite_ids')};
+    if(kind==='add_template'){const fields=[...card.querySelector('[data-role=template_fields]').selectedOptions].map(o=>o.value),defaults=value('template_defaults').trim()?JSON.parse(value('template_defaults')):{};if(!defaults||Array.isArray(defaults)||typeof defaults!=='object')throw new Error('Defaults must be a JSON object.');if(checked('use_default')){if(!fields.length)throw new Error('Name the fields that should receive the default.');for(const field of fields)if(!(field in defaults))defaults[field]=value('default_text');}return {...op,template_path:value('template_path').trim()||null,...(fields.length?{fields}:{}),defaults,reorder:checked('template_reorder')};}
+    if(kind==='reorder')return value('order_source')==='template'?{...op,order_source:'template',template_path:value('template_path').trim()||null}:{...op,order_source:'manual',keys:value('keys').split(/[\s,]+/).filter(Boolean)};
+    op.key=value('key')==='@new'?value('custom_key').trim():value('key').trim();if(!op.key)throw new Error('Enter a field name for each operation.');
+    if(kind==='rename')op.new_key=value('new_key').trim();if(kind==='deduplicate')op.keep=value('keep');
+    if(kind==='set'){const type=value('type'),text=value('value');let v=text;
+      if(type==='integer'){if(!/^-?\d+$/.test(text.trim())||!Number.isSafeInteger(Number(text)))throw new Error('Enter a whole number within the browser’s safe integer range.');v=Number(text);}
+      if(type==='number'){if(!text.trim()||!Number.isFinite(Number(text)))throw new Error('Enter a finite number.');v=Number(text);}
+      if(type==='boolean'){if(!['true','false'].includes(text.trim().toLowerCase()))throw new Error('Enter true or false for a boolean.');v=text.trim().toLowerCase()==='true';}
+      if(type==='null')v=null;
+      Object.assign(op,{value:v,missing_only:checked('missing_only'),position:value('position'),anchor:value('anchor').trim()});
+    }return op;});}
+  async function chooseTemplate(card,directory){return task(async()=>{
+    const result=await api('/yaml-editor/scan',{directory,recursive:false}),list=$('template-options');list.replaceChildren();$('template-folder').textContent=result.root;
+    for(const file of result.files){const button=document.createElement('button');button.type='button';button.className='secondary ye-template-option';button.textContent=file.path;button.disabled=!file.sha256;button.onclick=safe(()=>task(async()=>{
+      const path=result.root.replace(/[\\/]$/,'')+'/'+file.path,template=await api('/yaml-editor/order-template',{path});
+      card.querySelector('[data-role=template_path]').value=template.path;card.querySelector('[data-role=template_order]').textContent=template.keys.join(', ');card.querySelector('[data-role=template_fields]').replaceChildren(...template.keys.map(k=>new Option(k,k)));$('template-picker').close();invalidate();
+    }));list.append(button);}
+    if(!result.files.length)list.textContent='No YAML templates here. Choose another folder or enter a file path.';
+    $('template-picker').showModal();
+  });}
+  function showPreview(result){preview=result;$('preview-panel').hidden=false;$('skip').checked=false;$('skip-wrap').hidden=!result.errors;$('preview-summary').textContent=`${result.ready} changed · ${result.unchanged} unchanged · ${result.errors} errors. `+(result.root||root);const list=$('diffs');list.replaceChildren();
+    for(const template of result.order_templates||[]){const p=document.createElement('p');p.className='subtle small';p.textContent=`Order template: ${template.path} · ${template.keys.join(', ')}`;list.append(p);}
+    for(const file of result.files){const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent=`${file.path} · ${file.state}`;details.append(summary);if(file.error){const p=document.createElement('p');p.className='error';p.textContent=file.error;details.append(p);}if(file.diff){const pre=document.createElement('pre');pre.className='ye-diff';pre.textContent=file.diff;details.append(pre);}if(file.diff_truncated){const p=document.createElement('p');p.className='error';p.textContent='Diff exceeds the preview limit. Split this edit before saving.';details.append(p);}details.open=result.files.length<=3||file.state==='error';list.append(details);}
+    updateSave();$('preview-panel').scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  function updateSave(){$('save').disabled=busy||!preview||!preview.ready||(preview.errors&&!$('skip').checked)||preview.files.some(f=>f.diff_truncated);}
+  async function openRaw(row){return task(async()=>{rawFile=await api('/yaml-editor/file',{directory:root,path:row.path});$('raw-title').textContent=row.path;$('text').value=rawFile.text;$('raw-error').textContent='';$('raw').showModal();});}
+  async function showHistory(){return task(async()=>{const result=await api('/yaml-editor/history'),list=$('history-items');list.replaceChildren();for(const batch of result.batches){const card=document.createElement('div');card.className='ye-history-item';const p=document.createElement('p');p.textContent=`${new Date(batch.created_at).toLocaleString()} · ${batch.files} files · ${batch.state}`;const path=document.createElement('p');path.className='subtle small';path.textContent=batch.root;const button=document.createElement('button');button.className='secondary';button.textContent=['applying','prepared','recovery_needed'].includes(batch.state)?'Preview recovery':'Preview restore';button.onclick=safe(()=>task(async()=>{const result=await api('/yaml-editor/restore-preview',{batch:batch.batch});$('history-dialog').close();showPreview(result);}));card.append(p,path,button);list.append(card);}if(!result.batches.length)list.textContent='No editor saves yet.';$('history-dialog').showModal();});}
+  $('scan').onclick=safe(scan);$('browse').onclick=safe(()=>browse(path=>{$('directory').value=path;rows=[];selected.clear();invalidate();renderFiles();}));
+  $('directory').oninput=()=>{rows=[];selected.clear();invalidate();renderFiles();};$('recursive').onchange=invalidate;
+  for(const id of ['search','filter-key','filter-mode','track','cluster','style'])$(id).addEventListener('input',()=>{metadataChoices();renderFiles();});
+  $('select').onclick=()=>{for(const row of visible())if(row.sha256)selected.add(row.path);invalidate();renderFiles();};$('clear').onclick=()=>{selected.clear();invalidate();renderFiles();};
+  $('add').onclick=addOperation;$('cancel').onclick=invalidate;$('skip').onchange=updateSave;
+  $('preview').onclick=safe(()=>task(async()=>{if(!selected.size)throw new Error('Select one or more files first.');const ops=operations();invalidate();showPreview(await api('/yaml-editor/preview',{directory:root,files:[...selected],operations:ops,expected:Object.fromEntries(rows.filter(r=>selected.has(r.path)).map(r=>[r.path,r.sha256]))}));}));
+  $('save').onclick=safe(()=>task(async()=>{if(!preview)throw new Error('Preview the changes first.');const result=await api('/yaml-editor/apply',{token:preview.token,skip_errors:$('skip').checked});invalidate();toast(`Saved ${result.saved} YAML files${result.skipped?`; skipped ${result.skipped} errors`:''}. Undo is available in history.`);loaded=false;rows=[];selected.clear();renderFiles();$('scan-status').textContent='Changes saved. Scan again to refresh the file list.';}));
+  $('template-close').onclick=()=>$('template-picker').close();
+  $('raw-close').onclick=()=>$('raw').close();$('history-close').onclick=()=>$('history-dialog').close();$('history').onclick=safe(showHistory);
+  $('text').oninput=invalidate;$('raw-preview').onclick=async()=>{try{await task(async()=>{const result=await api('/yaml-editor/preview',{directory:root,files:[rawFile.path],text:$('text').value,expected:{[rawFile.path]:rawFile.sha256}});$('raw').close();showPreview(result);});}catch(e){$('raw-error').textContent=e.message;}};
+  addOperation();renderFiles();
+  return {invalidateCatalogue:()=>{loaded=false;invalidate();},open:async()=>{if(!loaded)await scan();}};
+}

@@ -1,0 +1,106 @@
+{
+  "format_version": 1,
+  "run_id": "bbb4d33d3db4434ba1e7dbb29becccd1",
+  "attempt_id": "8670c3169e7643a89ba9d75ce4f767e5",
+  "source_sha256": "67ba67c6f5080238f09c3f0f372a581ed99f318d98b58e8a76b6213ed1beb7d7",
+  "completed_at": "2026-10-21T05:38:48.867656+00:00",
+  "files": {
+    "microphone-fiend-jazz-ballad-0005.flac": "6850ed027b26ecd0fbfd931197c2a7b84e62af6c25727e1f3f68e1cf358d867c",
+    "microphone-fiend-jazz-ballad-0005.yaml": "7c754135bc3be37f7b02d7413c8c5eeea7742b6d21f152b1210eb73337f7103a",
+    "source.yaml": "67ba67c6f5080238f09c3f0f372a581ed99f318d98b58e8a76b6213ed1beb7d7"
+  },
+  "worker_result": {
+    "actual_parameters": {
+      "caption": "Global Metadata\nBasic Attributes: bpm is 65. key is Bb, and scale is major. Jazz Ballad / Mandopop.\nGlobal Emotional Progression: The piece opens with a hushed, intimate atmosphere that feels solitary and reflective. As the arrangement gradually thickens, the emotional tone shifts from quiet introspection to a more profound, yearning melancholy during the climactic sections, before gently receding back to a fragile, unresolved stillness in the outro.\nApplication Scenarios & Imagery: A dimly lit jazz club late at night, a rainy window view in a city apartment, or a scene depicting quiet longing and unspoken affection in a film noir setting.\nSonics & Production Profile: The production favors a warm, organic soundstage with a moderate width, placing the piano slightly off-center and the vocals intimately in the foreground. The frequency response is characterized by a rich mid-range and rounded lows, avoiding harsh highs to maintain a \"smoky\" aesthetic. Dynamics are preserved with a natural, breathable feel, allowing the nuances of the performance to dictate the volume swells rather than heavy compression.\nVocal Details\nVocal Gender & Timbre: Singer A (Female). The vocalist possesses a soft, breathy, and velvety timbre with a distinct lower-mid register warmth that conveys intimacy and vulnerability.\nVocal Style: The performance is characterized by a gentle, storytelling delivery that relies heavily on breath control and subtle dynamic shading. The singer employs a restrained, almost whisper-like technique in the verses, which evolves into a slightly more resonant and emotionally charged projection during the chorus, though never breaking the overall delicate atmosphere.\nHarmony/Backing Vocals: No distinct backing vocals or harmonic layers are present; the vocal line remains a singular, unaccompanied melody throughout, emphasizing the solo nature of the narrative.\nVocal FX: The vocal is treated with a lush, medium-length hall reverb that creates a sense of space without obscuring clarity. A subtle delay is occasionally audible on sustained notes, adding depth, while light compression ensures the breathy nuances remain audible against the instrumental backdrop.\nArrangement\nInstrument Lifecycle Description (Primary/Secondary Layering):\nPrimary: A grand piano serves as the harmonic and melodic core, playing flowing arpeggios and chord voicings from the very beginning to the end. Its tone is warm and resonant, anchoring the song's jazz ballad identity.\nSecondary: An upright bass enters shortly after the intro, providing a deep, woody foundation with a walking line that subtly propels the rhythm. A brushed drum kit joins in the first verse, offering a soft, textural groove that supports the dynamics without overpowering the piano or vocals.\nGroove & Foundation Progression: The rhythmic foundation is established by the interplay between the upright bass and the brushed snare/kick pattern. In the verses, the groove is minimal and spacious, allowing the piano to breathe. As the song moves into the chorus, the bass line becomes slightly more active, and the brush work on the drums intensifies just enough to lift the energy, creating a gentle swell before settling back down for the bridge and outro.\nEmbellishments, Textures & Spatial FX: Subtle cymbal swells and occasional soft rim-clicks act as transitional textures between sections. The spatial arrangement places the piano slightly left, the bass centered but deep, and the drums spread wide in the background, creating an immersive, three-dimensional listening experience that mimics a live small-ensemble setting.",
+      "cluster": "Jazz, Swing & Big Band",
+      "dit": "minimax_music3_dit_int8_convrot.safetensors",
+      "duration": 360.0,
+      "encoder_cfg": 1.7,
+      "encoder_seed": "10080299916993504261",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "sampler": "dpmpp_sde_gpu",
+      "sampler_cfg": 1.6,
+      "sampler_seed": "9234643162313521059",
+      "sampler_steps": 35,
+      "scheduler": "ddim_uniform",
+      "style": "Jazz Ballad",
+      "text_encoder": "minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+      "top_k": 50
+    },
+    "attempt_id": "8670c3169e7643a89ba9d75ce4f767e5",
+    "completed_at": "2026-10-21T05:38:48.867656+00:00",
+    "encoding": {
+      "cache_hit": false,
+      "key": null,
+      "mode": "comfy_graph"
+    },
+    "hardware": {
+      "address": "http://127.0.0.1:8190",
+      "cuda_device": 0,
+      "free_vram_bytes_at_start": 11221053030,
+      "gpu_name": "cuda:0 NVIDIA GeForce RTX 4070 Ti : cudaMallocAsync",
+      "gpu_peak_vram_bytes": null,
+      "gpu_uuid": null,
+      "memory_profile": "server_managed",
+      "provider": "comfyui_url",
+      "usable_vram_bytes": 12878086144
+    },
+    "models": {
+      "checkpoint_sha256": null,
+      "dit": "minimax_music3_dit_int8_convrot.safetensors",
+      "identity_kind": "workflow-and-checkpoint-names",
+      "node_classes": [
+        "CLIPLoader",
+        "ConditioningZeroOut",
+        "EmptyMiniMaxMusic3LatentAudio",
+        "KSampler",
+        "MiniMaxMusic3TextEncode",
+        "SaveAudio",
+        "UNETLoader",
+        "VAEDecodeAudio",
+        "VAELoader"
+      ],
+      "revision": "82f71616a068dea8ffa60c50e2a8d1dd5925e94c",
+      "source_workflow_sha256": "b30ac791a329e7e4eae0c0d9a1f15e685fff56d2009ae4f4f679741af0a74cec",
+      "text_encoder": "minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+      "vae": "minimax_music3_dav.safetensors"
+    },
+    "protocol": 1,
+    "remote": {
+      "download_sha256": "329202a4b3ed063e2bee69c307baadaae37cbbb0e2433378f0d5839840cc14a8",
+      "file": {
+        "filename": "8670c3169e7643a89ba9d75ce4f767e5_00001.flac",
+        "subfolder": "gbr",
+        "type": "output"
+      },
+      "prompt_id": "e0c021da-bdae-486f-9397-1ece39bc9dd9"
+    },
+    "run_id": "bbb4d33d3db4434ba1e7dbb29becccd1",
+    "status": "succeeded",
+    "telemetry_limitations": [
+      "Per-prompt peak VRAM is unavailable from stock ComfyUI; checkpoint hashes require the GBR bridge."
+    ],
+    "workflow_sha256": "f28ff0529db089fe0691b5dfa0cbf0e9e4838c9c881c9bf522a680c1f8146eb9"
+  },
+  "yaml_timezone": "Europe/London",
+  "worker_audio_sha256": "329202a4b3ed063e2bee69c307baadaae37cbbb0e2433378f0d5839840cc14a8",
+  "audio_conversion": {
+    "original": {
+      "format": "FLAC",
+      "subtype": "PCM_16",
+      "channels": 2,
+      "sample_rate": 44100,
+      "frames": 12522496
+    },
+    "output": {
+      "format": "FLAC",
+      "subtype": "PCM_24",
+      "channels": 2,
+      "sample_rate": 44100,
+      "frames": 12522496
+    },
+    "converted": true,
+    "resampled": false,
+    "mono_duplicated": false
+  }
+}

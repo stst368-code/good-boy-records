@@ -1,0 +1,63 @@
+song_id: 61
+variant_id: 1
+title: popstar
+cluster:
+version:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+language: ru
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  [verse]
+  Королева этих клубов, а, а, а
+  На мне норковая шуба, а, а, а
+  Я влетаю с ноги тупо, а, а, а
+  Эти тусы меня любят, а, а, а
+  [chorus]
+  Ты слышишь мой голос и улетаешь в ра-ай
+  На мне сияет Prada и дьявол мой адвока-а-а-а-т
+  Не мечта-ай, когда видишь мой сладкий за-а-а-д
+  На губа-ах блестит lipstick от Jeffree Sta-a-a-r
+  [bridge]
+  А, а, а, beach never stops, do dance
+  А, а, а, мама пополняет баланс
+  А, а, а, real peach never has a stress
+  А, а, а... А, а, а
+  А, а, а, beach never stops, do dance
+  А, а, а, мама пополняет баланс, mommy
+  А, а, а, real peach never has a stress
+  А, а, а... А, а, а
+  [verse]
+  Очередь в клуб так ждёт мой лимузин, мой лимузин
+  Мешаю в гримерке со Sprite'ом мой тусин, мой тусин
+  Денег так много в кассе, я магазин, я магазин
+  Лью на себя весь этот джин, этот джин, э-этот джин
+  [chorus]
+  Ты слышишь мой голос и улетаешь в ра-ай
+  На мне сияет Prada и дьявол мой адвока-а-а-а-т
+  Не мечта-ай, когда видишь мой сладкий за-а-а-д
+  На губа-ах блестит lipstick от Jeffree Sta-a-a-r
+  [bridge]
+  А, а, а, beach never stops, do dance
+  А, а, а, мама пополняет баланс
+  А, а, а, real peach never has a stress
+  А, а, а... А, а, а
+  [chorus]
+  Ты слышишь мой голос и улетаешь в ра-ай
+  На мне сияет Prada и дьявол мой адвока-а-а-а-т
+  Не мечта-ай, когда видишь мой сладкий за-а-а-д
+  На губа-ах блестит lipstick от Jeffree Sta-a-a-r
+  [outro]

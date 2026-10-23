@@ -1,0 +1,108 @@
+song_id: 8
+variant_id: 1
+title: golden-rhapsody
+cluster:
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [intro]
+  Is this the real life?
+  Is this just fantasy?
+  Caught in a landslide
+  no escape from reality
+  Open your eyes
+  look up to ma-ma and seeeee
+  I'm just a poor boy
+  I need no sympathy (Ooh, poor boy)
+  Because I'm easy come,
+  easy go,
+  little high,
+  little low
+  Any way the wind blows (Ooh, the wind blows)
+  Doesn't really matter, to me
+  ...
+  to me
+  [verse]
+  Dojaa,
+  I just floored a man
+  Put my paws against his leg, pushed him over,
+  thankfully didn't hit his head
+  ...
+  Dojaa,
+  life had just begun
+  But now I've gone and thrown my ball away
+  Dojaa,
+  oooo oo oo ooo,
+  didn't mean to make you bark
+  If I'm not back again this time tomorrow
+  Carry on,
+  carry on,
+  as if nothing really matters
+  [instrumental]
+  [verse]
+  Too late, my time has come
+  Sends shivers down my spine, body's aching all the time
+  Goodbyee, everybody, I've got to go
+  Gotta leave you allll behind and face the truuuth
+  Doja,
+  ooo oo ooo (Any way the wind blows)
+  I don't wanna die (Ooh)
+  I sometimes wish I'd never seen that ball at all (Ooh, ooh, ooh, ooh, ooh)
+  [solo]
+  [verse]
+  I see a little silhouetto of a dog
+  little-pooch, little-pooch, will you do the Fandango?
+  Sudden noises... or high thing, very, very frightening me
+  (Teddylileo) Teddylileo, (Teddylileo) Teddylileo, Teddylileo Gussie
+  Terrifico (Oh-oh-oh-oh)
+  But I'm just a poor chunk, nobody loves me
+  He's just a poor chunk from a poor family
+  Spare him his life from this monstrosity
+  Easy come, easy go, will you let me go? (outside with you)
+  Miss-Miller, no!, we will not let you go (Let him go)
+  Miss-Miller, we will not let you go (Let him go)
+  Miss-Miller, we will not let you go (Let me go)
+  Will not let you go (Let me go)
+  (Never, never, never, never, never, never let me go) Will not let you go
+  Oh-oh-oh-oh
+  No, no, no, no, no, no, no
+  Oh, d-d-doja, d-d-doja (d-d-doja, let me go)
+  Teddy has a devil put aside for me,
+  for me,
+  for meeeeee
+  [instrumental]
+  [bridge]
+  So you think you can leave me at home?
+  So you think you can love me and leave me to diiieeee?
+  Ohhhhh, Doja,
+  can't do this to me, Doja
+  Just gotta get out,
+  just gotta get right outta here
+  [instrumental]
+  [outro]
+  (Ooh)
+  (Ooh, yeah)
+  (ooh, yeah)
+  Pawthing really matters, anyone can see
+  Pawthing really matters
+  Pawthing really matters to meeeeeeeeeee
+  Any
+  way
+  the
+  wind
+  blows

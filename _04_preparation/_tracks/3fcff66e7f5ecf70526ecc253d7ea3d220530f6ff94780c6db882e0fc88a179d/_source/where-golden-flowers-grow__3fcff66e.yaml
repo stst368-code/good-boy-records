@@ -1,0 +1,99 @@
+title: where-golden-flowers-grow
+cluster: ''
+version: choral
+model: minimax H3
+dit: fp16
+text_encoder: int8_convrot
+encoder_cfg: 1.7
+encoder_seed: 489447097437387
+top_k: 45
+sampler: sa_solver
+scheduler: beta
+sampler_cfg: 1.7
+sampler_seed: 323769880507881
+sampler_steps: 50
+inspiration:
+inspirationyt:
+story:
+caption_source: custom
+caption: |-
+  Global Metadata
+  Basic Attributes: Soviet-Era Massed Choral / Orchestral March. Broad, disciplined tempo with minor-to-major harmonic lift, massed voices and acoustic orchestra. Aim for the sound of a mid-20th-century state concert choir and marching orchestra rather than a modern trailer score, gospel choir or musical theatre ensemble.
+  Global Emotional Progression: The song reframes warm pastoral reflection, sunlight, growth and gentle dreamlike optimism, with room for tenderness rather than irony with ceremonial collective scale. Start with one voice or a restrained section, broaden each refrain into disciplined communal force, withdraw to lower voices in the bridge, and finish with the largest unified statement while keeping the underlying comic, reflective or dramatic character intelligible.
+  Application Scenarios & Imagery: A vast mid-century concert hall: ranks of singers, brass, strings and disciplined ceremonial movement.
+  Sonics & Production Profile: Large natural concert-hall acoustic. Lower voices, brass, strings and military percussion dominate. Dynamics expand from solo or sectional singing to full-choir refrains. No electronic sub-bass, synth pads or cinematic risers.
+  Vocal Details
+  Vocal Gender & Timbre: Lead: Singer A (Male), a soft clear tenor-baritone with dreamy phrasing, restrained vibrato and an unforced intimate tone.. Ensemble: a disciplined male choir led by basses and baritones, with tenors widening major cadences.
+  Vocal Style: Preserve the lead narrative identity where useful, but phrase with formal diction, sustained vowels and disciplined projection. Refrains should sound collective and monumental rather than individually ornamented.
+  Harmony/Backing Vocals: A large low male choir is central: basses and baritones in unison or octaves, with tenors widening cadences. Female source leads remain soloists against the male ensemble.
+  Vocal FX: Use the natural hall as the principal vocal effect. Minimal artificial delay; no pop doubling or pitch-effect sheen.
+  Arrangement
+  Instrument Lifecycle (Primary/Secondary): Primary: massed choir and acoustic orchestra. Low strings and brass establish weight; snare, bass drum and cymbals provide the march. Secondary: horns, trumpets, woodwinds and occasional accordion or plucked folk-string colour.
+  Groove & Foundation Progression: Verses begin with restrained orchestra and solo or sectional voice. A measured march develops underneath. Choruses expand into full choir, brass and strings. The bridge drops to low voices and strings before the final maximum-width return.
+  Embellishments, Textures & Spatial FX: Use brass fanfares, drum rolls and cymbal swells sparingly. Avoid trailer impacts, gospel melisma, rock grooves and contemporary pop harmony.
+  Section Continuity: Keep acoustic march/choral language continuous across the whole song; softer sections use fewer singers and instruments rather than changing into pop or soundtrack ambience.
+lyrics: |-
+  [intro]
+  [verse]
+  Come through the garden
+  The morning is blue
+  Sunlight is falling
+  In circles on you
+  Doja lies dreaming
+  Where yellow flowers grow
+  Bam hears a ball bounce
+  And suddenly goes
+  [verse]
+  Golden as daylight
+  Soft as the rain
+  One watches quietly
+  One runs again
+  Where are you going?
+  Nobody knows
+  Over the hillside
+  Where the warm river flows
+  [chorus]
+  Run through the colours
+  Run through the light
+  Follow the fields
+  Till they fall out of sight
+  I'll be beside you
+  Wherever you roam
+  Two golden shadows
+  Will always come home
+  [instrumental]
+  [verse]
+  Doja sees kingdoms
+  Inside every tree
+  Bam sees a tennis ball
+  Floating at sea
+  One asks the questions
+  One simply runs
+  Both disappear
+  In the afternoon sun
+  [bridge]
+  Maybe the garden
+  Goes on without end
+  Maybe the pathway
+  Comes round again
+  Maybe tomorrow
+  We'll wake up and find
+  Golden pawprints
+  All over the sky
+  [chorus]
+  Run through the colours
+  Run through the light
+  Follow the fields
+  Till they fall out of sight
+  I'll be beside you
+  Wherever you roam
+  Two golden shadows
+  Will always come home
+  [outro]
+  Doja in sunlight
+  Bam in the blue
+  Wherever this road goes
+  I'll follow you
+  Follow you...
+  Follow you...
+  Woof.

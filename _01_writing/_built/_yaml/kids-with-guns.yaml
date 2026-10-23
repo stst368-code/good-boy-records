@@ -1,0 +1,95 @@
+song_id: 44
+variant_id: 1
+title: kids-with-guns
+album: demon-days
+pos: 2
+version:
+language: en
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+inspiration:
+inspirationyt:
+story:
+caption: |
+lyrics: |
+  [verse]
+  Kids with guns
+  Kids with guns
+  Takin' over
+  But they won't be long
+  They're mesmerized
+  Skeletons
+  [bridge]
+  Kids with guns
+  Kids with guns
+  Easy does it, easy does it
+  They got something to say no to
+  [verse]
+  Drinking out (Push it real)
+  Pacifier (Push it real, push it)
+  Vitamin souls (Push it, push it real)
+  The street desire (Push it real, push it)
+  Doesn't make sense to (Push it, push it real)
+  But it won't be long (Push it real, push it)
+  [pre-chorus]
+  Kids with guns
+  Kids with guns
+  Easy does it, easy does it
+  They got something to say no to
+  [chorus]
+  Now they're turnin' us into monsters
+  Turnin' us into fire
+  Turnin' us into monsters
+  It's all desire, it's all desire, it's all desire
+  [verse]
+  Drinkin' out
+  Pacifier
+  Sinkin' soul
+  There you are
+  Doesn't make sense to
+  But it won't be long
+  [pre-chorus]
+  'Cause kids with guns
+  Kids with guns
+  Easy does it, easy does it
+  They got something to say no to
+  [chorus]
+  And they're turning us into monsters
+  Turnin' us into fire
+  Turnin' us into monsters
+  It's all desire, it's all desire, it's all desire
+  [bridge]
+  Push it, push it real (It's real)
+  Push it, real (Real)
+  Push it, push it, push it real (It's real, real)
+  Push it, real (Real)
+  Push it, push it, push it real (It's real)
+  Push it, real (Real)
+  Push it, push it, push it real (It's real, real)
+  Push it, real (It's real)
+  Push it, push it, push it real (It's real, real)
+  Push it, real (Real)
+  Push it, push it, push it real (It's real, real)
+  Push it, real (Real)
+  Push it, push it, push it real (It's real, real)
+  Push it, real
+  (Push it, push it, push it real)
+  [outro]
+  I don't know what I'm gonna do
+  Oh, oh, oh, oh
+  After day, after night come
+  Don't, don't kill me now
+  After night come day
+  Oh, oh, oh
+  After day, after night come
+  Don't, don't kill me now
+  Oh, oh, oh, oh
