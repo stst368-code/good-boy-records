@@ -42,6 +42,36 @@ working directory.
 
 ## Historical generation repair
 
+For automatic recovery followed by permanent removal of everything still
+unrecoverable, close GBR and generation controllers, pull the current repo, and run:
+
+```powershell
+py -3.12 _97_app/run_gbr.py cleanup-generations auto --prune-unrecoverable
+```
+
+This rescans configured completed inputs, reconciles archived files using the
+existing move journal, retries archive recovery, then builds and applies a fresh
+cleanup plan. Exact database YAML snapshots are recovered; metadata-only history
+does not block another usable YAML for the same PCM. Verified duplicate FLACs
+are consolidated while keeping the recording and its review/generation IDs.
+Remaining unrecoverable recordings, their reviews/metadata, and exclusively owned
+files are permanently removed. No CSV edits or song-ID decisions are required.
+
+Original Writing inputs, symlinks, staging files and files shared with surviving
+recordings are protected. Active jobs and live published releases are retained.
+Known terminal worker output copies can be removed by exact ledger identity;
+worker/cache directories are never swept by filename patterns.
+Every deletion is checksum/ownership checked, database relationships are checked
+transactionally, and no filename-pattern or recursive-directory deletion is used.
+A locked file leaves the printed journal resumable with `apply "PATH_TO_plan.json"`.
+Permanent removal cannot be undone. Successful automatic runs remove their
+one-time plan/CSV and retain an audit in the existing shared database, without
+another database, trash copy or setup script.
+
+For a read-only inspection instead, use `preview --prune-unrecoverable` and
+apply the printed plan separately. Plain `preview` retains the manual repair
+behaviour below and does not schedule permanent removal.
+
 After pulling an update, start GBR and let its archiving work finish, then close
 the app. Startup reconciles missing archive file-index records and verified
 reviewed duplicates through the existing archive journal. It preserves reviews

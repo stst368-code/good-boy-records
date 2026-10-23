@@ -192,9 +192,10 @@ class Indexer:
                           (uuid.uuid4().hex, audio_id, generation_id, review["id"], review["bucket"], timestamp, timestamp))
         return audio_id
 
-    def scan(self):
+    def scan(self, progress=None):
         seen, indexed, directory_cache = set(), 0, {}
         for root in self.config.inputs:
+            if progress:progress('Scanning completed input folder: ' + str(root))
             if not root.is_dir():
                 self.error(str(root), "Input directory unavailable")
                 continue
@@ -211,6 +212,7 @@ class Indexer:
                 try:
                     if resolved.parent not in directory_cache:
                         directory_cache[resolved.parent] = {p.name.lower(): p for p in resolved.parent.iterdir() if p.suffix.lower() in ('.yaml','.yml') and p.is_file()}
+                    if progress:progress('Indexing completed recording: ' + str(resolved))
                     self.index(resolved, directory_cache[resolved.parent])
                     indexed += 1
                 except Exception as exc:

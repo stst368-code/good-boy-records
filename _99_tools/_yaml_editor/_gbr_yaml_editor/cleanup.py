@@ -190,7 +190,7 @@ def recovered_file(destination, content, mtime_ns):
                                                fromfile='(recovered database snapshot)', tofile=str(destination)))}
 
 
-def make_plan(repo, database, roots, template_path=None, model_map=None, progress=None, identity_map=None):
+def make_plan(repo, database, roots, template_path=None, model_map=None, progress=None, identity_map=None, deduplicate=False):
     emit = progress or (lambda message: None)
     started = monotonic()
     emit('Loading shared database (read-only)')
@@ -293,8 +293,18 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
         emit(f'{index}/{len(tables["audio"])} indexed recordings; '
                f'{monotonic() - started:.0f}s elapsed; verifying FLAC: {media[0]["path"]}')
         try:
-            if len(media) != 1:
+            duplicate_media = []
+            if len(media) != 1 and not deduplicate:
                 raise ValueError('Multiple active copies of this PCM; archive/reconcile before cleanup')
+            if len(media) > 1:
+                media.sort(key=lambda row: (row['path'] != audio.get('archive_path'),
+                                           not Path(row['path']).resolve().is_relative_to(repo), row['path']))
+                duplicate_media = media[1:]
+                for copy in duplicate_media:
+                    emit('Verifying duplicate PCM before consolidation: ' + copy['path'])
+                    if checksum(copy['path']) != copy['sha256'] or audio_identity(copy['path'])[0] != audio['pcm_sha256']:
+                        raise ValueError('Duplicate differs from indexed checksum/PCM; retained it')
+                media = media[:1]
             source = Path(media[0]['path'])
             if checksum(source) != media[0]['sha256'] or audio_identity(source)[0] != audio['pcm_sha256']:
                 raise ValueError('Audio differs from indexed checksum/PCM; rescan before cleanup')
@@ -335,6 +345,10 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
                      'files': [], 'updates': [], 'notes': []}
             if mapped:
                 group['notes'].append('Song identity explicitly confirmed in the identity map')
+            if duplicate_media:
+                group['duplicate_files'] = [{'path': row['path'], 'sha256': row['sha256'], 'survivor_audio_id': audio['id']}
+                                            for row in duplicate_media if Path(row['path']) != source]
+                group['notes'].append('Consolidate verified duplicate FLACs; keep the recording and every generation/review identity')
             paths = {str(source): str(destination)}
             contents = {}
             yaml_for = {}
@@ -343,6 +357,10 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
             snapshots = {}
             for gen in generations:
                 metadata = all_metadata[gen['id']]
+                if (metadata['yaml_sha256'] is None and metadata['raw_yaml_bytes'] is None
+                        and metadata['raw_yaml'] is None):
+                    group['notes'].append(f'Historical metadata-only generation {gen["id"]} retained unchanged; no original YAML was indexed')
+                    continue
                 effective = json.loads(metadata['parsed_json'])
                 # Explicit conflicting numeric IDs must be fixed, not overwritten.
                 if not mapped and effective.get('song_id') and identifier(effective['song_id']) != sid:
@@ -421,6 +439,8 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
                 for update in (row_change('generation_metadata', metadata, values),
                                row_change('generations', gen, {'metadata_key': metadata_key})):
                     if update:group['updates'].append(update)
+            if not yaml_for:
+                raise ValueError('No recoverable completed YAML for this recording')
             updated_keys = {u['id']:u['after']['metadata_key'] for u in group['updates'] if u['table'] == 'generations'}
             keys_after = [updated_keys.get(g['id'], g['metadata_key']) for g in generations]
             if len(set(keys_after)) != len(keys_after):
@@ -496,10 +516,13 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
                     if Path(state['output_directory']) == source.parent:
                         update = row_change('generation_execution_state', state, {'output_stem': stem})
                         if update:group['updates'].append(update)
+            for duplicate in duplicate_media:
+                change = row_change('media_files', duplicate, {'storage_state': 'consolidated'})
+                if change:group['updates'].append(change)
             group['notes'] = list(dict.fromkeys(group['notes']))
             if group['files'] or group['updates']:
                 plan['groups'].append(group)
-        except (OSError, ValueError, KeyError, TypeError, sqlite3.Error) as exc:
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError, sqlite3.Error) as exc:
             plan['errors'].append({'audio_id': audio['id'], 'error': str(exc)})
     visited = set()
     for root in roots:
@@ -607,6 +630,14 @@ def issues_report(plan):
     return output.getvalue().encode('utf-8-sig')
 
 
+def forget_automatic_journal(repo, path):
+    try:
+        main(repo, ['forget', str(path)])
+    except (OSError, ValueError) as exc:
+        print(f'Cleanup complete; retained edited/busy journal at {path}: {exc}')
+    print('Removal audit retained in the shared database')
+
+
 def move_exclusive(source, destination):
     if source == destination:return
     # Same-folder links are exclusive on NTFS/ext4; never overwrite a conflict.
@@ -626,6 +657,18 @@ def check_idle(conn, plan):
 
 
 def apply_plan(plan_path, skip_errors=False):
+    plan_path = Path(plan_path).resolve(strict=True)
+    plan = json.loads(plan_path.read_text(encoding='utf-8'))
+    if not plan.get('pruning'):
+        return _apply_plan(plan_path, skip_errors)
+    from . import pruning
+    if plan['state'] == 'preview':
+        pruning.validate_plan(plan)
+    result = _apply_plan(plan_path, skip_errors=True)
+    return pruning.apply(plan_path, result)
+
+
+def _apply_plan(plan_path, skip_errors=False):
     plan_path = Path(plan_path).resolve(strict=True)
     plan = json.loads(plan_path.read_text(encoding='utf-8'))
     if plan['state'] == 'applied':return plan
@@ -693,6 +736,10 @@ def apply_plan(plan_path, skip_errors=False):
 
 def undo_plan(plan_path):
     plan_path = Path(plan_path).resolve(strict=True);plan = json.loads(plan_path.read_text(encoding='utf-8'))
+    if plan.get('pruning'):
+        from . import pruning
+        if pruning.committed(plan):
+            raise ValueError('This plan permanently pruned unrecoverable recordings and cannot be undone')
     if plan['state'] == 'undone':return plan
     if plan['state'] not in {'applied', 'applying', 'undoing'}:raise ValueError('Only applied/interrupted cleanup can be undone')
     from _review.__main__ import ProcessLock
@@ -747,7 +794,7 @@ def undo_plan(plan_path):
 
 def main(repo, arguments):
     parser = argparse.ArgumentParser(description='Preview/apply/undo historical generation cleanup. Stop GBR before apply/undo. Audio bytes and review IDs are preserved.')
-    parser.add_argument('action', choices=['preview', 'apply', 'undo', 'forget'])
+    parser.add_argument('action', choices=['preview', 'auto', 'apply', 'undo', 'forget'])
     parser.add_argument('plan', type=Path, nargs='?', help='Saved plan.json path for apply/undo/forget')
     parser.add_argument('--database', type=Path, default=repo / '_98_database/gbr.sqlite3')
     parser.add_argument('--config', type=Path, default=repo / '_03_review/_generation_review/config.json')
@@ -755,9 +802,20 @@ def main(repo, arguments):
     parser.add_argument('--template', type=Path, help='Order/default template; default: writing track-template.yaml')
     parser.add_argument('--model-map', type=Path, help='JSON {"dit":{"exact old":"exact new"},"text_encoder":{...}}; never infer quantization')
     parser.add_argument('--identity-map', type=Path, help='CSV with audio_id,song_id; blank song_id rows are ignored. Use preview issues.csv')
+    parser.add_argument('--prune-unrecoverable', action='store_true',
+                        help='Preview automatic recovery, then permanent removal of remaining unrecoverable recordings and owned files')
     parser.add_argument('--skip-errors', action='store_true', help='Apply only valid groups listed in this frozen preview')
     args = parser.parse_args(arguments)
-    if args.action == 'preview':
+    if args.action == 'auto' and not args.prune_unrecoverable:
+        parser.error('auto requires --prune-unrecoverable: recover what can be verified, then permanently prune the rest')
+    if args.action == 'auto' and args.root:
+        parser.error('auto uses the configured collection. For selected folders use preview --root ... --prune-unrecoverable, then apply')
+    if args.action in {'preview', 'auto'}:
+        def progress(message):
+            print(f'[{datetime.now().astimezone():%H:%M:%S}] {message}', flush=True)
+        if args.action == 'auto':
+            from . import pruning
+            pruning.recover_existing(repo, args.database, args.config, progress)
         roots = args.root
         automatic = roots is None
         if roots is None:
@@ -769,13 +827,16 @@ def main(repo, arguments):
         for warning in skipped:
             print('WARNING: ' + warning, flush=True)
         aliases = json.loads(args.model_map.read_text(encoding='utf-8-sig')) if args.model_map else {}
-        def progress(message):
-            print(f'[{datetime.now().astimezone():%H:%M:%S}] {message}', flush=True)
         plan = make_plan(repo, args.database, roots, args.template, aliases, progress=progress,
-                         identity_map=read_identity_map(args.identity_map))
+                         identity_map=read_identity_map(args.identity_map), deduplicate=args.prune_unrecoverable)
         plan['warnings'][:0] = skipped
+        if args.prune_unrecoverable:
+            from . import pruning
+            progress('Planning permanent removal of unrecoverable recordings')
+            plan['pruning'] = pruning.make_plan(plan, args.config, progress=progress)
+        if args.action == 'auto':plan['automatic'] = True
         path = repo / '_02_generation/_runtime/_cleanup' / plan['id'] / 'plan.json'
-        progress('Writing preview plan (no track files changed)')
+        progress('Writing cleanup plan' if args.action == 'auto' else 'Writing preview plan (no track files changed)')
         path.parent.mkdir(parents=True)
         if plan['errors']:
             raw_report = issues_report(plan)
@@ -784,27 +845,64 @@ def main(repo, arguments):
         persist(path, plan)
         print(f'Preview: {len(plan["groups"])} recordings; {len(plan["errors"])} errors; {len(plan["warnings"])} warnings\nPlan: {path}')
         print(f'Plan size: {path.stat().st_size / 1024**2:.1f} MiB')
+        if plan.get('pruning'):
+            removal = plan['pruning']
+            print(f'PERMANENT REMOVAL: {len(removal["audio_ids"])} recordings, '
+                  f'{len(removal["files"])} owned files. No manual identity mapping required. '
+                  'Pruned recordings cannot be undone.')
+            for entry in removal['recordings']:
+                print('  REMOVE: ' + entry['title'] + ' — ' + entry['reason'])
+            for entry in removal['retained']:
+                print('  RETAINED: ' + entry['path'] + ' — ' + entry['reason'])
         if plan['errors']:
-            print(f'Unresolved recordings: {path.parent / "issues.csv"}\n'
-                  'Confirm song_id only where needed, then preview again with --identity-map pointing to that CSV.')
+            if plan.get('pruning'):
+                if args.action == 'auto':
+                    print('Unrecoverable entries are scheduled for removal; no CSV editing required')
+                else:
+                    print(f'Removal audit: {path.parent / "issues.csv"} (no CSV editing required)')
+            else:
+                print(f'Unresolved recordings: {path.parent / "issues.csv"}\n'
+                      'Confirm song_id only where needed, then preview again with --identity-map pointing to that CSV.')
         for group in plan['groups']:
+            if args.action == 'auto':
+                print(f'KEEP: {group["title"]} — {len(group["files"])} file changes, '
+                      f'{len(group.get("duplicate_files", []))} verified duplicate FLACs to consolidate')
+                continue
             print('\n' + group['title'])
             for item in group['files']:
                 print(f'  {item["source"]} → {item["destination"]}')
                 if item.get('diff'):print(item['diff'])
             for note in group['notes']:print('  ' + note)
         for row in plan['errors']:
-            print('ERROR: ' + row['audio_id'] + ': ' + row['error'])
+            if args.action == 'auto':continue  # Already listed by title above; no repeated wall of paths.
+            label = ('REMOVE: ' if row['audio_id'] in set(plan.get('pruning', {}).get('audio_ids', [])) else 'ERROR: ')
+            print(label + row['audio_id'] + ': ' + row['error'])
             if row.get('title'):print('  Track: ' + row['title'])
             for source_path in row.get('paths', []):print('  Audio: ' + source_path)
             for source_path in row.get('yaml_paths', []):print('  YAML: ' + source_path)
         for warning in plan['warnings']:print('WARNING: ' + warning)
+        if args.action == 'auto':
+            progress('Applying verified recoveries and permanent removals')
+            try:
+                applied = apply_plan(path)
+            except (OSError, ValueError, RuntimeError, sqlite3.Error) as exc:
+                raise RuntimeError(f'{exc}\nCleanup journal: {path}\n'
+                                   f'Retry/details: py -3.12 _97_app/run_gbr.py cleanup-generations apply "{path}"') from exc
+            print(f'Cleanup {applied["id"]}: {applied["state"]}; permanent removal {applied["pruning"]["state"]}')
+            # Pruning is permanent. Once finished, its central audit is enough;
+            # do not leave large one-time plans and CSVs accumulating on disk.
+            forget_automatic_journal(repo, path)
+            return 2 if applied['pruning']['retained'] else 0
+        print(f'Plan: {path}')
         return 2 if plan['errors'] else 0
     if args.plan is None:parser.error('This action requires the saved plan.json path')
     if args.action == 'apply':plan = apply_plan(args.plan, args.skip_errors)
     elif args.action == 'undo':plan = undo_plan(args.plan)
     else:
         plan = json.loads(args.plan.read_text(encoding='utf-8'))
+        if (plan.get('pruning') and plan['state'] not in {'preview', 'undone'}
+                and plan['pruning']['state'] != 'done'):
+            raise ValueError('Permanent file removal is incomplete; apply this journal again before forgetting it')
         if plan['state'] not in {'applied', 'undone', 'preview'}:raise ValueError('Recover the interrupted operation before forgetting its journal')
         # Only our own plan file and empty journal directory; never recursive delete.
         if args.plan.name != 'plan.json' or args.plan.parent.name != plan['id']:raise ValueError('Not a cleanup journal directory')
@@ -820,4 +918,6 @@ def main(repo, arguments):
         print('Cleanup journal removed. Existing shared database audit remains. Undo is no longer available.')
         return 0
     print(f'Cleanup {plan["id"]}: {plan["state"]} ({len(plan["groups"])} recordings)')
+    if args.action == 'apply' and plan.get('automatic') and plan.get('pruning', {}).get('state') == 'done':
+        forget_automatic_journal(repo, args.plan)
     return 0
