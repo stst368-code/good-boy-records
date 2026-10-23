@@ -5,6 +5,7 @@ original paths, worker results, requests and writing/source snapshots stay intac
 """
 import argparse
 import base64
+from collections import defaultdict
 from contextlib import closing
 import csv
 from datetime import datetime
@@ -15,6 +16,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+from time import monotonic
 import uuid
 
 from _gbr_generation.yaml_document import YamlDocument
@@ -157,9 +159,9 @@ def repair_yaml(raw, template, effective, title, song_id, model_map):
     return raw, notes
 
 
-def file_change(source, destination, content=None):
+def file_change(source, destination, content=None, checksum=None):
     source, destination = Path(source), Path(destination)
-    before = digest(source)
+    before = (checksum or digest)(source)
     after = hashlib.sha256(content).hexdigest() if content is not None else before
     if source == destination and before == after:
         return None
@@ -175,7 +177,10 @@ def file_change(source, destination, content=None):
     return item
 
 
-def make_plan(repo, database, roots, template_path=None, model_map=None):
+def make_plan(repo, database, roots, template_path=None, model_map=None, progress=None):
+    emit = progress or (lambda message: None)
+    started = monotonic()
+    emit('Loading shared database (read-only)')
     repo, database = Path(repo).resolve(), Path(database).resolve(strict=True)
     roots, _ = select_roots(repo, roots)
     template = Editor(repo).order_template(template_path)
@@ -193,9 +198,44 @@ def make_plan(repo, database, roots, template_path=None, model_map=None):
     with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute('BEGIN')
-        tables = {name: read_rows(conn, name) for name in ('audio', 'media_files', 'generations',
+        tables = {}
+        for name in ('audio', 'media_files', 'generations',
                   'generation_metadata', 'generation_sources', 'generation_artifacts', 'generation_output_links',
-                  'generation_execution_state', 'archive_operations', 'processing_tasks', 'generation_runs')}
+                  'generation_execution_state', 'archive_operations', 'processing_tasks', 'generation_runs'):
+            tables[name] = read_rows(conn, name)
+            emit(f'Loaded {name}: {len(tables[name])} records')
+    # Build lookups once. Historical ledgers can contain many more rows than
+    # recordings; rescanning every ledger for each recording is quadratic.
+    def by(rows, key):
+        result = defaultdict(list)
+        for row in rows:
+            result[row[key]].append(row)
+        return result
+    media_by_audio = by(tables['media_files'], 'audio_id')
+    generations_by_audio = by(tables['generations'], 'audio_id')
+    sources_by_generation = by(tables['generation_sources'], 'generation_id')
+    links_by_generation = by(tables['generation_output_links'], 'review_generation_id')
+    artifacts_by_run = by(tables['generation_artifacts'], 'run_id')
+    state_by_run = by(tables['generation_execution_state'], 'run_id')
+    pending_archives = {row['audio_id'] for row in tables['archive_operations']
+                        if row['status'] in {'pending', 'running', 'failed'}}
+    pending_tasks = {row['generation_id'] for row in tables['processing_tasks']
+                     if row['status'] in {'queued', 'running'}}
+    active_runs = {row['id'] for row in tables['generation_runs']
+                   if row['status'] not in {'succeeded', 'failed', 'cancelled', 'interrupted'}}
+    path_columns = [('audio', 'archive_path'), ('media_files', 'path'),
+                    ('generation_sources', 'yaml_path'), ('generation_artifacts', 'uri')]
+    path_rows = {table: by(tables[table], column) for table, column in path_columns}
+    # Reuse file hashes within this preview only. Apply/undo always recheck.
+    hashes = {}
+    def checksum(path):
+        path = Path(path)
+        stat = path.stat()
+        key = (str(path), stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_ino)
+        if key not in hashes:
+            hashes[key] = digest(path)
+        return hashes[key]
+    emit('Matching catalogue songs and variants')
     all_metadata = {row['generation_id']: row for row in tables['generation_metadata']}
     identities = []
     for gen in tables['generations']:
@@ -220,9 +260,9 @@ def make_plan(repo, database, roots, template_path=None, model_map=None):
                     raise ValueError('Variant catalogue has missing/conflicting song/variant IDs')
                 variants.add(pair)
     recorded = set()
-    for audio in tables['audio']:
-        media = [row for row in tables['media_files'] if row['audio_id'] == audio['id']
-                 and row['storage_state'] in {'input', 'archived'} and Path(row['path']).is_file() and allowed(row['path'])]
+    for index, audio in enumerate(tables['audio'], 1):
+        media = [row for row in media_by_audio[audio['id']]
+                 if row['storage_state'] in {'input', 'archived'} and allowed(row['path']) and Path(row['path']).is_file()]
         archived = audio.get('archive_path')
         if archived and Path(archived).is_file() and allowed(archived) and archived not in {r['path'] for r in media}:
             plan['errors'].append({'audio_id': audio['id'], 'error': f'Archive is not indexed: {archived}; scan/reconcile first'})
@@ -230,20 +270,22 @@ def make_plan(repo, database, roots, template_path=None, model_map=None):
         if not media:
             continue
         recorded.update(row['path'] for row in media)
+        emit(f'{index}/{len(tables["audio"])} indexed recordings; '
+               f'{monotonic() - started:.0f}s elapsed; verifying FLAC: {media[0]["path"]}')
         try:
             if len(media) != 1:
                 raise ValueError('Multiple active copies of this PCM; archive/reconcile before cleanup')
             source = Path(media[0]['path'])
-            if digest(source) != media[0]['sha256'] or audio_identity(source)[0] != audio['pcm_sha256']:
+            if checksum(source) != media[0]['sha256'] or audio_identity(source)[0] != audio['pcm_sha256']:
                 raise ValueError('Audio differs from indexed checksum/PCM; rescan before cleanup')
-            generations = [g for g in tables['generations'] if g['audio_id'] == audio['id']]
-            if any(op['audio_id'] == audio['id'] and op['status'] in {'pending', 'running', 'failed'} for op in tables['archive_operations']):
+            generations = generations_by_audio[audio['id']]
+            if audio['id'] in pending_archives:
                 raise ValueError('Pending archive/recovery operation; finish it first')
             gids = {g['id'] for g in generations}
-            if any(t['generation_id'] in gids and t['status'] in {'queued', 'running'} for t in tables['processing_tasks']):
+            if gids & pending_tasks:
                 raise ValueError('Recording has an active preparation task')
-            run_ids = {l['run_id'] for l in tables['generation_output_links'] if l['review_generation_id'] in gids}
-            if any(r['id'] in run_ids and r['status'] not in {'succeeded', 'failed', 'cancelled', 'interrupted'} for r in tables['generation_runs']):
+            run_ids = {link['run_id'] for gid in gids for link in links_by_generation[gid]}
+            if run_ids & active_runs:
                 raise ValueError('Recording belongs to an active generation run')
             keys = {names.by_generation[g['id']] for g in generations}
             if len(keys) != 1 or not next(iter(keys)).startswith('song:'):
@@ -268,8 +310,7 @@ def make_plan(repo, database, roots, template_path=None, model_map=None):
                     raise ValueError('Variant ID is absent from the variant catalogue')
                 if effective.get('variant_id') is None:
                     group['notes'].append('variant_id unknown; not inferred from a generation number')
-                candidates = [metadata['yaml_archive_path']] + [r['yaml_path'] for r in tables['generation_sources']
-                    if r['generation_id'] == gen['id']]
+                candidates = [metadata['yaml_archive_path']] + [r['yaml_path'] for r in sources_by_generation[gen['id']]]
                 yp = next((Path(p) for p in candidates if p and Path(p).is_file() and allowed(p)
                            and not Path(p).name.endswith('.source.yaml') and Path(p).name != 'source.yaml'), None)
                 if yp is None:
@@ -318,9 +359,9 @@ def make_plan(repo, database, roots, template_path=None, model_map=None):
             if len(set(keys_after)) != len(keys_after):
                 raise ValueError('Normalization would merge distinct historical metadata identities; retain/repair them explicitly')
             # Native companions belong to the same recording through explicit links.
-            artifacts = [a for a in tables['generation_artifacts'] if a['run_id'] in run_ids
-                         and Path(a['uri']).is_file() and allowed(a['uri'])]
-            if any(not a['sha256'] or digest(a['uri']) != a['sha256'] for a in artifacts):
+            artifacts = [a for run_id in sorted(run_ids) for a in artifacts_by_run[run_id]
+                         if allowed(a['uri']) and Path(a['uri']).is_file()]
+            if any(not a['sha256'] or checksum(a['uri']) != a['sha256'] for a in artifacts):
                 raise ValueError('Native artifact checksum differs from the ledger; recover first')
             for artifact in artifacts:
                 path = Path(artifact['uri'])
@@ -339,48 +380,61 @@ def make_plan(repo, database, roots, template_path=None, model_map=None):
                 report_path = Path(artifact['uri']);report = json.loads(report_path.read_text(encoding='utf-8'))
                 siblings = {a['kind']: a for a in artifacts if a['run_id'] == artifact['run_id'] and a['uri'] in paths}
                 files = {}
-                for filename, checksum in report.get('files', {}).items():
+                for filename, checksum_value in report.get('files', {}).items():
                     kind = 'audio' if filename.endswith('.flac') else 'source_yaml' if filename == 'source.yaml' else 'completed_yaml'
                     member = siblings.get(kind)
                     if member:
                         content = contents.get(member['uri'])
                         filename = Path(paths[member['uri']]).name
-                        checksum = hashlib.sha256(content).hexdigest() if content is not None else digest(member['uri'])
-                    files[filename] = checksum
+                        file_hash = hashlib.sha256(content).hexdigest() if content is not None else checksum(member['uri'])
+                    else:
+                        file_hash = checksum_value
+                    files[filename] = file_hash
                 if report.get('files') != files:
                     report['files'] = files
                     contents[str(report_path)] = (json.dumps(report, ensure_ascii=False, indent=2) + '\n').encode()
             # Additional unregistered companions are never moved/deleted by guesswork.
             for old, new in paths.items():
-                item = file_change(old, new, contents.get(old))
+                item = file_change(old, new, contents.get(old), checksum=checksum)
                 if item:
                     item['stage'] = str(Path(new).with_name('.gbr-cleanup-' + plan['id'] + '-' + hashlib.sha256(old.encode()).hexdigest()[:12] + '.part'))
                     group['files'].append(item)
             if len({p.casefold() for p in paths.values()}) != len(paths):
                 raise ValueError('Companion destination collision')
-            for table, columns in [('audio', ('archive_path',)), ('media_files', ('path',)),
-                                   ('generation_sources', ('yaml_path',)), ('generation_artifacts', ('uri',))]:
-                for row in tables[table]:
-                    values = {column: paths[row[column]] for column in columns if row[column] in paths}
-                    if table == 'audio' and row['id'] == audio['id'] and values:
-                        values['archive_stem'] = stem
-                    if table == 'generation_artifacts' and row['uri'] in contents:
-                        values.update(sha256=hashlib.sha256(contents[row['uri']]).hexdigest(), size_bytes=len(contents[row['uri']]))
-                    update = row_change(table, row, values)
-                    if update:group['updates'].append(update)
-            for state in tables['generation_execution_state']:
-                if state['run_id'] in run_ids and Path(state['output_directory']) == source.parent:
-                    update = row_change('generation_execution_state', state, {'output_stem': stem})
-                    if update:group['updates'].append(update)
+            for table, column in path_columns:
+                for old in paths:
+                    for row in path_rows[table].get(old, ()):
+                        values = {column: paths[old]}
+                        if table == 'audio' and row['id'] == audio['id'] and values:
+                            values['archive_stem'] = stem
+                        if table == 'generation_artifacts' and row['uri'] in contents:
+                            values.update(sha256=hashlib.sha256(contents[row['uri']]).hexdigest(), size_bytes=len(contents[row['uri']]))
+                        update = row_change(table, row, values)
+                        if update:group['updates'].append(update)
+            for run_id in sorted(run_ids):
+                for state in state_by_run[run_id]:
+                    if Path(state['output_directory']) == source.parent:
+                        update = row_change('generation_execution_state', state, {'output_stem': stem})
+                        if update:group['updates'].append(update)
             group['notes'] = list(dict.fromkeys(group['notes']))
             if group['files'] or group['updates']:
                 plan['groups'].append(group)
         except (OSError, ValueError, KeyError, TypeError, sqlite3.Error) as exc:
             plan['errors'].append({'audio_id': audio['id'], 'error': str(exc)})
+    visited = set()
     for root in roots:
-        for path in root.rglob('*'):
-            if path.is_file() and path.suffix.casefold() == '.flac' and allowed(path) and str(path.resolve()) not in recorded:
-                plan['warnings'].append(f'Unindexed audio retained: {path}. Run the review scan to include it.')
+        emit(f'Checking for unindexed FLACs: {root}')
+        for directory, dirs, filenames in os.walk(root, followlinks=False):
+            dirs[:] = [name for name in dirs if not protected(Path(directory) / name, repo)]
+            for filename in filenames:
+                if Path(filename).suffix.casefold() != '.flac':
+                    continue
+                path = Path(directory) / filename
+                if str(path) in visited:
+                    continue
+                visited.add(str(path))
+                if allowed(path) and path.is_file() and str(path.resolve()) not in recorded:
+                    plan['warnings'].append(f'Unindexed audio retained: {path}. Run the review scan to include it.')
     # Refuse cross-recording shared paths/rows rather than create an unsafe plan.
     files, rows = set(), set()
     for group in plan['groups']:
@@ -391,6 +445,8 @@ def make_plan(repo, database, roots, template_path=None, model_map=None):
             identity = (update['table'], update['id'])
             if identity in rows:raise ValueError('A database row is shared by different recordings; reconcile first')
             rows.add(identity)
+    emit(f'Preview checked in {monotonic() - started:.0f}s: {len(plan["groups"])} recordings to update, '
+           f'{len(plan["errors"])} errors, {len(plan["warnings"])} warnings')
     return plan
 
 
@@ -568,12 +624,15 @@ def main(repo, arguments):
                 config = Config(args.config);roots += [*config.inputs, config.archive]
         roots, skipped = select_roots(repo, roots, automatic=automatic)
         for warning in skipped:
-            print('WARNING: ' + warning)
+            print('WARNING: ' + warning, flush=True)
         aliases = json.loads(args.model_map.read_text(encoding='utf-8-sig')) if args.model_map else {}
-        plan = make_plan(repo, args.database, roots, args.template, aliases)
+        def progress(message):
+            print(f'[{datetime.now().astimezone():%H:%M:%S}] {message}', flush=True)
+        plan = make_plan(repo, args.database, roots, args.template, aliases, progress=progress)
         plan['warnings'][:0] = skipped
         path = repo / '_02_generation/_runtime/_cleanup' / plan['id'] / 'plan.json'
         if len(json.dumps(plan).encode()) > 64 * 1024**2:raise ValueError('Preview exceeds 64 MiB; select smaller --root batches')
+        progress('Writing preview plan (no track files changed)')
         path.parent.mkdir(parents=True);persist(path, plan)
         print(f'Preview: {len(plan["groups"])} recordings; {len(plan["errors"])} errors; {len(plan["warnings"])} warnings\nPlan: {path}')
         for group in plan['groups']:

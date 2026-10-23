@@ -282,3 +282,46 @@ def test_partial_audio_move_and_partial_text_stage_are_recoverable(legacy, monke
     assert path.exists() and path.with_suffix('.yaml').read_bytes() == raw
     assert len(list(path.parent.glob('*.flac'))) == 1
     assert not list(path.parent.glob('.gbr-*'))
+
+
+def test_preview_reports_progress_and_hashes_audio_once(legacy, monkeypatch):
+    service, repo, path, _, _, raw = legacy
+    real_digest = cleanup.digest
+    reads = []
+    def tracked_digest(filename):
+        reads.append(Path(filename))
+        return real_digest(filename)
+    monkeypatch.setattr(cleanup, 'digest', tracked_digest)
+    messages = []
+    before_audio = path.read_bytes()
+    plan = cleanup.make_plan(repo, service.db.path, [path.parent], progress=messages.append)
+    assert not plan['errors']
+    assert reads.count(path) == 1
+    assert any('Loaded media_files:' in message for message in messages)
+    assert any('1/1 indexed recordings' in message and str(path) in message for message in messages)
+    assert any('Checking for unindexed FLACs:' in message for message in messages)
+    assert messages[-1].startswith('Preview checked in ')
+    assert path.read_bytes() == before_audio and path.with_suffix('.yaml').read_bytes() == raw
+
+
+def test_preview_prunes_worker_scratch_and_deduplicates_nested_roots(legacy, monkeypatch):
+    service, repo, path, _, _, _ = legacy
+    scratch = repo / '_02_generation/_runtime/attempts/private'
+    scratch.mkdir(parents=True)
+    (scratch / 'audio.flac').write_bytes(b'worker scratch; never inspect')
+    nested = path.parent / 'older'
+    nested.mkdir()
+    extra = nested / 'unindexed.flac'
+    extra.write_bytes(b'unindexed; report without decoding')
+    real_walk = cleanup.os.walk
+    visited = []
+    def tracked_walk(*args, **kwargs):
+        for entry in real_walk(*args, **kwargs):
+            visited.append(Path(entry[0]))
+            yield entry
+    monkeypatch.setattr(cleanup.os, 'walk', tracked_walk)
+    plan = cleanup.make_plan(repo, service.db.path, [repo / '_02_generation', nested])
+    assert not plan['errors']
+    assert len(plan['warnings']) == 1 and str(extra) in plan['warnings'][0]
+    assert not any(directory.is_relative_to(repo / '_02_generation/_runtime') for directory in visited)
+
