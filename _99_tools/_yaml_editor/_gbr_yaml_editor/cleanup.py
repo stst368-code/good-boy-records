@@ -68,6 +68,31 @@ def protected(path, repo):
             or any(p.is_symlink() for p in (path, *path.parents)))
 
 
+def select_roots(repo, candidates, automatic=False):
+    roots, skipped = [], []
+    for candidate in candidates:
+        path = Path(candidate).expanduser()
+        reason = ('protected writing, worker scratch, staging or symlink path' if protected(path, repo)
+                  else 'folder does not exist' if not path.exists()
+                  else 'not a directory' if not path.is_dir() else None)
+        if reason:
+            message = f'{path}: {reason}'
+            if not automatic:
+                raise ValueError('Choose completed generation/review folders, outside writing and worker scratch. '
+                                 'Rejected: ' + message)
+            skipped.append('Skipped default folder: ' + message)
+        else:
+            resolved = path.resolve(strict=True)
+            if resolved not in roots:
+                roots.append(resolved)
+    if not roots:
+        raise ValueError('No eligible completed generation/review folders found. '
+                         'Use preview --root "PATH_TO_COMPLETED_FLAC_AND_YAML_FOLDER" '
+                         '(repeat --root for multiple folders).'
+                         + ('\n' + '\n'.join(skipped) if skipped else ''))
+    return roots, skipped
+
+
 def newline_repair(value):
     # URL paths such as /news are text, never newline markers.
     parts = re.split(r'(https?://\S+)', value)
@@ -152,9 +177,7 @@ def file_change(source, destination, content=None):
 
 def make_plan(repo, database, roots, template_path=None, model_map=None):
     repo, database = Path(repo).resolve(), Path(database).resolve(strict=True)
-    roots = list(dict.fromkeys(Path(path).resolve(strict=True) for path in roots))
-    if not roots or any(protected(root, repo) for root in roots):
-        raise ValueError('Choose completed generation/review folders, outside writing and worker scratch')
+    roots, _ = select_roots(repo, roots)
     template = Editor(repo).order_template(template_path)
     model_map = model_map or {}
     if set(model_map) - {'model', 'dit', 'text_encoder'} or any(
@@ -537,14 +560,18 @@ def main(repo, arguments):
     args = parser.parse_args(arguments)
     if args.action == 'preview':
         roots = args.root
+        automatic = roots is None
         if roots is None:
             roots = [repo / '_02_generation/_generated']
             if args.config.is_file():
                 from _review.config import Config
                 config = Config(args.config);roots += [*config.inputs, config.archive]
-            roots = [p for p in roots if p.is_dir()]
+        roots, skipped = select_roots(repo, roots, automatic=automatic)
+        for warning in skipped:
+            print('WARNING: ' + warning)
         aliases = json.loads(args.model_map.read_text(encoding='utf-8-sig')) if args.model_map else {}
         plan = make_plan(repo, args.database, roots, args.template, aliases)
+        plan['warnings'][:0] = skipped
         path = repo / '_02_generation/_runtime/_cleanup' / plan['id'] / 'plan.json'
         if len(json.dumps(plan).encode()) > 64 * 1024**2:raise ValueError('Preview exceeds 64 MiB; select smaller --root batches')
         path.parent.mkdir(parents=True);persist(path, plan)
