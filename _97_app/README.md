@@ -1,7 +1,7 @@
 # GBR platform launcher
 
-The unified application provides Review, Selection, Generation, Preparation and YAML editor
-tabs, connected to `_98_database/gbr.sqlite3`. The shared platform belongs here;
+The unified application provides Writing, YAML editor, Generation, Review, Selection,
+Preparation and Publish tabs, connected to `_98_database/gbr.sqlite3`. The shared platform belongs here;
 reusable worker and editing tools belong in `_99_tools`.
 
 The native generation controller is available separately for the

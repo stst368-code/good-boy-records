@@ -66,6 +66,7 @@ def stage(root, target):
     # Explicit public allow-list; never copy the repository, database or media.
     shutil.copyfile(root / '_data/catalogue.json', target / 'catalogue.json')
     shutil.copyfile(root / 'showcase-host.js', target / 'showcase-host.js')
+    shutil.copyfile(root / 'releases.js', target / 'releases.js')
     for name in ('index.html', 'landscape.html'):
         shutil.copyfile(root / '_templates/landscape.html', target / name)
     (target / 'analytics').mkdir()

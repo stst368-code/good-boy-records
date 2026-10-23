@@ -151,6 +151,7 @@ def create_app(config_path, start_worker=True, database_path=None):
             service.start()
             app.state.generation.dispatcher.start()
         yield
+        app.state.publisher.close()
         app.state.generation.dispatcher.close()
         service.close()
 
@@ -477,7 +478,21 @@ def create_app(config_path, start_worker=True, database_path=None):
         return {"items": items, "offset": offset, "has_more": offset+limit < len(rows)}
 
     @app.post("/api/publishing/{gid}")
-    def publish_status(gid: str, body: PublishingBody):
+    def publish_status(gid: str, body: PublishingBody, request: Request):
+        # Existing Selection controls must not claim a web withdrawal while the
+        # recording is still present in the public R2 catalogue.
+        publisher=getattr(app.state,'publisher',None)
+        if publisher and publisher.prep.enabled and body.status!='published':
+            if service.db.one("SELECT 1 FROM processing_tasks WHERE generation_id=? AND kind='release_publish' AND status IN ('queued','running')",(gid,)):
+                raise ValueError('Publication is active; wait before changing its distribution state')
+            live=service.db.one("SELECT recipe_json FROM processing_tasks WHERE generation_id=? AND kind='release_publish' AND status IN ('done','failed','interrupted') ORDER BY rowid DESC LIMIT 1",(gid,))
+            current=service.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(gid,))
+            if live and current and (current['status']=='published' or body.status in {'withdrawn','not_selected','passed','rejected'}):
+                require_host(request)
+                try:publisher.start_withdraw(json.loads(live['recipe_json'])['prepared_id'])
+                except Exception as exc:
+                    from _gbr_preparation.publishing import error_text
+                    raise HTTPException(400,error_text(exc)) from exc
         service.publishing(gid, body.status, body.external_reference)
         return {"saved": True}
 
@@ -666,6 +681,10 @@ def create_app(config_path, start_worker=True, database_path=None):
     preparation_routes, preparation = preparation_router(repo_root, service, local)
     app.include_router(preparation_routes)
     app.state.preparation = preparation
+    from _gbr_preparation.publishing_api import router as publishing_router
+    release_routes,publisher=publishing_router(repo_root,service,preparation,local)
+    app.include_router(release_routes)
+    app.state.publisher=publisher
     app.mount('/tools/preparation', StaticFiles(directory=preparation_root / '_static'), name='preparation')
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app
