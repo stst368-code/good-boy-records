@@ -325,3 +325,50 @@ def test_preview_prunes_worker_scratch_and_deduplicates_nested_roots(legacy, mon
     assert len(plan['warnings']) == 1 and str(extra) in plan['warnings'][0]
     assert not any(directory.is_relative_to(repo / '_02_generation/_runtime') for directory in visited)
 
+
+def test_cli_plan_above_64_mib_can_preview_apply_and_undo(legacy, monkeypatch, capsys):
+    service, repo, path, aid, _, raw = legacy
+    plan = cleanup.make_plan(repo, service.db.path, [path.parent])
+    assert not plan['errors']
+    # Exercise the former size gate through the real CLI and journal lifecycle,
+    # without needing thousands of long audio files in the test fixture.
+    plan['large_collection_fixture'] = ['x' * 1024**2] * 65
+    monkeypatch.setattr(cleanup, 'make_plan', lambda *args, **kwargs: plan)
+    before = path.read_bytes()
+    assert cleanup.main(repo, ['preview', '--root', str(path.parent),
+                               '--database', str(service.db.path)]) == 0
+    journal = repo / '_02_generation/_runtime/_cleanup' / plan['id'] / 'plan.json'
+    assert journal.stat().st_size > 64 * 1024**2
+    assert 'Plan size: 65.' in capsys.readouterr().out
+    assert path.read_bytes() == before and path.with_suffix('.yaml').read_bytes() == raw
+    cleanup.apply_plan(journal)
+    target = path.with_name('moses-supposes__' + aid[:12] + '.flac')
+    assert target.read_bytes() == before
+    cleanup.undo_plan(journal)
+    assert path.read_bytes() == before and path.with_suffix('.yaml').read_bytes() == raw
+    with journal.open(encoding='utf-8') as handle:
+        restored = json.load(handle)
+    assert restored['state'] == 'undone'
+    assert restored['large_collection_fixture'] == plan['large_collection_fixture']
+    assert not list(journal.parent.glob('*.tmp'))
+
+
+@pytest.mark.parametrize('failure', ['write', 'fsync', 'replace'])
+def test_streamed_journal_failure_keeps_previous_recovery_data(tmp_path, monkeypatch, failure):
+    journal = tmp_path / 'plan.json'
+    original = {'state': 'preview', 'original': 'Recover this exact journal'}
+    cleanup.persist(journal, original)
+    before = journal.read_bytes()
+    def broken(*args, **kwargs):
+        if failure == 'write':
+            args[1].write('{"partial":')
+        raise OSError('simulated disk failure')
+    if failure == 'write':
+        monkeypatch.setattr(cleanup.json, 'dump', broken)
+    else:
+        monkeypatch.setattr(cleanup.os, failure, broken)
+    with pytest.raises(OSError, match='simulated disk failure'):
+        cleanup.persist(journal, {'state': 'applying', 'new': 'Uncommitted replacement'})
+    assert journal.read_bytes() == before
+    assert list(tmp_path.iterdir()) == [journal]
+

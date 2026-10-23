@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import tempfile
 from time import monotonic
 import uuid
 
@@ -473,7 +474,21 @@ def update_rows(conn, plan, side):
 
 
 def persist(plan_path, plan):
-    atomic(Path(plan_path), (json.dumps(plan, ensure_ascii=False, indent=2) + '\n').encode())
+    # A collection's recovery journal can legitimately exceed 64 MiB. Stream
+    # JSON instead of allocating additional complete string/byte copies, but
+    # keep the previous journal intact until the replacement is fully synced.
+    plan_path = Path(plan_path)
+    fd, temporary = tempfile.mkstemp(prefix='.gbr-cleanup-journal-', suffix='.tmp', dir=plan_path.parent)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8', newline='\n') as handle:
+            json.dump(plan, handle, ensure_ascii=False, indent=2)
+            handle.write('\n')
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, plan_path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
 
 
 def move_exclusive(source, destination):
@@ -631,10 +646,10 @@ def main(repo, arguments):
         plan = make_plan(repo, args.database, roots, args.template, aliases, progress=progress)
         plan['warnings'][:0] = skipped
         path = repo / '_02_generation/_runtime/_cleanup' / plan['id'] / 'plan.json'
-        if len(json.dumps(plan).encode()) > 64 * 1024**2:raise ValueError('Preview exceeds 64 MiB; select smaller --root batches')
         progress('Writing preview plan (no track files changed)')
         path.parent.mkdir(parents=True);persist(path, plan)
         print(f'Preview: {len(plan["groups"])} recordings; {len(plan["errors"])} errors; {len(plan["warnings"])} warnings\nPlan: {path}')
+        print(f'Plan size: {path.stat().st_size / 1024**2:.1f} MiB')
         for group in plan['groups']:
             print('\n' + group['title'])
             for item in group['files']:
