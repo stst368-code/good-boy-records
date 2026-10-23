@@ -205,7 +205,8 @@ def test_archived_reviews_tag_revisions_and_publishing_survive_cleanup(legacy):
     assert archived.exists()
 
 
-def test_native_bundle_receipts_artifacts_and_source_snapshot(legacy):
+@pytest.mark.parametrize('missing_yaml', [False, True])
+def test_native_bundle_receipts_artifacts_and_source_snapshot(legacy, missing_yaml):
     service, repo, path, aid, gid, raw = legacy
     source = path.parent/'source.yaml';source.write_bytes(b'# frozen source\nlyrics: original\n')
     report = path.parent/'generation.json'
@@ -223,6 +224,8 @@ def test_native_bundle_receipts_artifacts_and_source_snapshot(legacy):
         conn.execute('INSERT INTO generation_execution_state VALUES(?,?,?,?)', ('run-1','original-revision','audio',str(path.parent)))
     frozen = service.db.all('SELECT * FROM generation_runs')
     before_report = report.read_bytes();before_source = source.read_bytes()
+    if missing_yaml:
+        path.with_suffix('.yaml').unlink()
     plan,journal = preview(legacy);cleanup.apply_plan(journal)
     assert source.read_bytes() == before_source
     marker = json.loads(report.read_text())
@@ -236,6 +239,7 @@ def test_native_bundle_receipts_artifacts_and_source_snapshot(legacy):
     assert service.db.all('PRAGMA foreign_key_check') == []
     cleanup.undo_plan(journal)
     assert path.exists() and report.read_bytes() == before_report and source.read_bytes() == before_source
+    assert path.with_suffix('.yaml').exists() is (not missing_yaml)
 
 
 def test_application_lock_blocks_cleanup(legacy):
@@ -371,4 +375,228 @@ def test_streamed_journal_failure_keeps_previous_recovery_data(tmp_path, monkeyp
         cleanup.persist(journal, {'state': 'applying', 'new': 'Uncommitted replacement'})
     assert journal.read_bytes() == before
     assert list(tmp_path.iterdir()) == [journal]
+
+
+def test_missing_completed_yaml_is_recovered_and_undo_removes_only_created_file(legacy):
+    service, repo, path, aid, gid, raw = legacy
+    path.with_suffix('.yaml').unlink()
+    original_audio = path.read_bytes()
+    plan, journal = preview(legacy)
+    assert len([item for item in plan['groups'][0]['files'] if item.get('created')]) == 1
+    target = path.with_name('moses-supposes__' + aid[:12] + '.yaml')
+    cleanup.apply_plan(journal)
+    assert YamlDocument(target.read_bytes()).values['title'] == 'moses-supposes'
+    assert service.db.one('SELECT yaml_archive_path FROM generation_metadata')['yaml_archive_path'] == str(target)
+    assert service.db.one('SELECT yaml_path FROM generation_sources')['yaml_path'] == str(target)
+    assert service.db.one('SELECT id FROM generations')['id'] == gid
+    cleanup.undo_plan(journal)
+    assert path.read_bytes() == original_audio
+    assert not path.with_suffix('.yaml').exists() and not target.exists()
+    assert service.db.one('SELECT raw_yaml_bytes FROM generation_metadata')['raw_yaml_bytes'] == raw
+
+
+def test_missing_yaml_recovery_refuses_corrupted_database_snapshot(legacy):
+    service, repo, path, _, _, _ = legacy
+    path.with_suffix('.yaml').unlink()
+    service.db.execute('UPDATE generation_metadata SET raw_yaml_bytes=?', (b'corrupted snapshot',))
+    plan = cleanup.make_plan(repo, service.db.path, [path.parent])
+    assert not plan['groups']
+    assert 'no checksum-verified database snapshot' in plan['errors'][0]['error']
+    assert plan['errors'][0]['title']
+    assert str(path) in plan['errors'][0]['paths']
+
+
+def test_edited_recovered_yaml_is_preserved_on_undo(legacy):
+    _, _, path, aid, _, _ = legacy
+    path.with_suffix('.yaml').unlink()
+    plan, journal = preview(legacy)
+    cleanup.apply_plan(journal)
+    target = path.with_name('moses-supposes__' + aid[:12] + '.yaml')
+    target.write_bytes(target.read_bytes() + b'# later edit\n')
+    with pytest.raises(ValueError, match='Recovered YAML changed'):
+        cleanup.undo_plan(journal)
+    assert target.read_bytes().endswith(b'# later edit\n')
+
+
+def test_recovery_rolls_back_after_database_write_failure(legacy, monkeypatch):
+    _, _, path, _, _, _ = legacy
+    path.with_suffix('.yaml').unlink()
+    original_audio = path.read_bytes()
+    _, journal = preview(legacy)
+    def fail(*args):
+        raise OSError('database failure during recovery')
+    monkeypatch.setattr(cleanup, 'update_rows', fail)
+    with pytest.raises(OSError, match='database failure'):
+        cleanup.apply_plan(journal)
+    assert path.read_bytes() == original_audio
+    assert not list(path.parent.glob('*.yaml'))
+    assert json.loads(journal.read_text())['state'] == 'undone'
+
+
+def test_adjacent_yaml_relinks_stale_sources_without_creating_another_copy(legacy):
+    service, repo, path, aid, gid, _ = legacy
+    stale = str(path.parent / 'old-name.yaml')
+    service.db.execute('UPDATE generation_sources SET yaml_path=?', (stale,))
+    service.db.execute('UPDATE generation_metadata SET yaml_archive_path=?', (stale,))
+    plan, journal = preview(legacy)
+    assert not any(item.get('created') for item in plan['groups'][0]['files'])
+    cleanup.apply_plan(journal)
+    target = path.with_name('moses-supposes__' + aid[:12] + '.yaml')
+    assert service.db.one('SELECT yaml_path FROM generation_sources')['yaml_path'] == str(target)
+    service.indexer.index(target.with_suffix('.flac'))
+    assert service.db.one('SELECT COUNT(*) n FROM generations')['n'] == 1
+    assert service.db.one('SELECT id FROM generations')['id'] == gid
+
+
+def test_exact_catalogue_alias_resolves_legacy_song_title_and_map_is_explicit(legacy):
+    service, repo, path, aid, gid, raw = legacy
+    metadata = service.db.one('SELECT parsed_json FROM generation_metadata')['parsed_json']
+    values = json.loads(metadata)
+    values.pop('title', None);values.pop('song_id', None)
+    values['song_title'] = 'moses-supposes-v2_CFG-1.6'
+    service.db.execute('UPDATE generation_metadata SET parsed_json=?', (json.dumps(values),))
+    service.db.execute("UPDATE songs SET title='legacy unknown'")
+    service.db.execute("UPDATE generations SET original_filename='audio.flac',song_id=(SELECT id FROM songs LIMIT 1)")
+    plan = cleanup.make_plan(repo, service.db.path, [path.parent])
+    assert not plan['errors']
+    # An explicit mapping authorises the correction even if old metadata has
+    # a numeric ID absent from the current catalogue; no silent fuzzy matching.
+    values['song_id'] = 999
+    service.db.execute('UPDATE generation_metadata SET parsed_json=?', (json.dumps(values),))
+    blocked = cleanup.make_plan(repo, service.db.path, [path.parent])
+    assert blocked['errors']
+    mapped = cleanup.make_plan(repo, service.db.path, [path.parent], identity_map={aid: '13'})
+    assert not mapped['errors'] and mapped['identity_overrides'] == {aid: '13'}
+
+
+def test_issues_csv_roundtrip_and_invalid_confirmation_is_rejected(legacy):
+    service, repo, path, aid, _, _ = legacy
+    path.with_suffix('.yaml').unlink()
+    service.db.execute('UPDATE generation_metadata SET raw_yaml_bytes=NULL,raw_yaml=NULL')
+    plan = cleanup.make_plan(repo, service.db.path, [path.parent])
+    report = path.parent / 'issues.csv'
+    report.write_bytes(cleanup.issues_report(plan))
+    assert cleanup.read_identity_map(report) == {}
+    rows = list(cleanup.csv.DictReader(report.read_text(encoding='utf-8-sig').splitlines()))
+    rows[0]['song_id'] = '13'
+    with report.open('w', encoding='utf-8-sig', newline='') as handle:
+        writer = cleanup.csv.DictWriter(handle, fieldnames=rows[0].keys())
+        writer.writeheader();writer.writerows(rows)
+    assert cleanup.read_identity_map(report) == {aid: '13'}
+    with pytest.raises(ValueError, match='unknown audio ID'):
+        cleanup.make_plan(repo, service.db.path, [path.parent], identity_map={aid: '999'})
+
+
+def test_archiver_reconcile_repairs_missing_archive_index_and_preserves_reviews(legacy):
+    service, _, path, _, gid, _ = legacy
+    service.queues.open(service.default_reviewer_id, gid)
+    service.review(gid, dict(audio_quality=4, composition=4, consistency=4, realism=4), 'full')
+    for op in service.db.all("SELECT * FROM archive_operations WHERE status='pending'"):
+        service.archiver.process(op)
+    archive = Path(service.db.one('SELECT archive_path FROM audio')['archive_path'])
+    assert archive.exists()
+    before = service.db.all('SELECT * FROM reviews')
+    service.db.execute("UPDATE media_files SET storage_state='missing' WHERE path=?", (str(archive),))
+    service.archiver.reconcile()
+    pending = service.db.all("SELECT * FROM archive_operations WHERE status='pending'")
+    assert len(pending) == 1
+    service.archiver.process(pending[0])
+    assert service.db.one("SELECT 1 AS n FROM media_files WHERE path=? AND storage_state='archived'", (str(archive),))
+    assert service.db.all('SELECT * FROM reviews') == before
+    assert not service.db.all('PRAGMA foreign_key_check')
+
+
+def test_archiver_reconcile_consolidates_reviewed_duplicates(legacy):
+    service, _, path, _, gid, _ = legacy
+    service.queues.open(service.default_reviewer_id, gid)
+    service.review(gid, dict(audio_quality=4, composition=4, consistency=4, realism=4), 'full')
+    for op in service.db.all("SELECT * FROM archive_operations WHERE status='pending'"):
+        service.archiver.process(op)
+    archive = Path(service.db.one('SELECT archive_path FROM audio')['archive_path'])
+    original = archive.read_bytes()
+    duplicate = path.parent / 'duplicate.flac'
+    duplicate.write_bytes(original)
+    duplicate.with_suffix('.yaml').write_bytes(archive.with_suffix('.yaml').read_bytes())
+    service.indexer.index(duplicate)
+    service.db.execute("UPDATE archive_operations SET status='superseded' WHERE status='pending'")
+    service.archiver.reconcile()
+    pending = service.db.all("SELECT * FROM archive_operations WHERE status='pending'")
+    assert len(pending) == 1
+    service.archiver.process(pending[0])
+    assert not duplicate.exists() and archive.read_bytes() == original
+    assert service.db.one("SELECT COUNT(*) n FROM media_files WHERE storage_state IN ('input','archived')")['n'] == 1
+
+
+def test_three_metadata_revisions_can_share_the_second_yaml_target(legacy):
+    service, repo, path, aid, _, raw = legacy
+    second_yaml = path.parent / 'second.yaml'
+    second_yaml.write_bytes(raw.replace(b'custom: [a, b]', b'custom: [c, d]'))
+    for number in (2, 3):
+        other = path.parent / f'revision-{number}.flac'
+        other.write_bytes(path.read_bytes())
+        tags = FLAC(other);tags['custom_tag'] = f'revision-{number}';tags.save()
+        other.with_suffix('.yaml').write_bytes(second_yaml.read_bytes())
+        service.indexer.index(other)
+        gid = service.db.one('SELECT id FROM generations WHERE original_filename=?', (other.name,))['id']
+        service.db.execute('UPDATE generation_sources SET yaml_path=? WHERE generation_id=?', (str(second_yaml), gid))
+        service.db.execute('UPDATE generation_metadata SET yaml_archive_path=? WHERE generation_id=?', (str(second_yaml), gid))
+        service.db.execute("UPDATE media_files SET storage_state='superseded' WHERE path=?", (str(other),))
+    plan = cleanup.make_plan(repo, service.db.path, [path.parent])
+    assert not plan['errors']
+    assert len(plan['groups']) == 1
+    assert len([item for item in plan['groups'][0]['files'] if item['destination'].endswith('.yaml')]) == 2
+
+
+def test_recovery_refuses_destination_added_after_preview(legacy):
+    _, _, path, _, _, _ = legacy
+    path.with_suffix('.yaml').unlink()
+    plan, journal = preview(legacy)
+    item = next(item for item in plan['groups'][0]['files'] if item.get('created'))
+    target = Path(item['destination'])
+    target.write_bytes(b'User file; never overwrite')
+    with pytest.raises(ValueError, match='Recovery destination appeared'):
+        cleanup.apply_plan(journal)
+    assert target.read_bytes() == b'User file; never overwrite' and path.exists()
+
+
+def test_cli_issues_report_can_be_confirmed_and_edited_report_is_not_deleted(legacy, monkeypatch, capsys):
+    service, repo, path, aid, _, _ = legacy
+    values = json.loads(service.db.one('SELECT parsed_json FROM generation_metadata')['parsed_json'])
+    values['song_id'] = 999
+    service.db.execute('UPDATE generation_metadata SET parsed_json=?', (json.dumps(values),))
+    args = ['preview', '--root', str(path.parent), '--database', str(service.db.path)]
+    assert cleanup.main(repo, args) == 2
+    plans = list((repo / '_02_generation/_runtime/_cleanup').glob('*/plan.json'))
+    assert len(plans) == 1
+    report = plans[0].parent / 'issues.csv'
+    assert report.exists()
+    rows = list(cleanup.csv.DictReader(report.read_text(encoding='utf-8-sig').splitlines()))
+    assert rows[0]['audio_id'] == aid and rows[0]['title']
+    rows[0]['song_id'] = '13'
+    with report.open('w', encoding='utf-8-sig', newline='') as handle:
+        writer = cleanup.csv.DictWriter(handle, fieldnames=rows[0].keys())
+        writer.writeheader();writer.writerows(rows)
+    with pytest.raises(ValueError, match='Edited issues.csv retained'):
+        cleanup.main(repo, ['forget', str(plans[0])])
+    assert report.exists()
+    assert cleanup.main(repo, [*args, '--identity-map', str(report)]) == 0
+    confirmed = next(plan for plan in (repo / '_02_generation/_runtime/_cleanup').glob('*/plan.json') if plan != plans[0])
+    cleanup.apply_plan(confirmed)
+    assert json.loads(service.db.one('SELECT parsed_json FROM generation_metadata')['parsed_json'])['song_id'] == 13
+    cleanup.undo_plan(confirmed)
+    assert json.loads(service.db.one('SELECT parsed_json FROM generation_metadata')['parsed_json'])['song_id'] == 999
+
+
+def test_archiver_recovery_does_not_write_a_corrupt_snapshot(legacy):
+    service, _, path, _, gid, _ = legacy
+    service.queues.open(service.default_reviewer_id, gid)
+    service.review(gid, dict(audio_quality=4, composition=4, consistency=4, realism=4), 'full')
+    path.with_suffix('.yaml').unlink()
+    service.db.execute('UPDATE generation_metadata SET raw_yaml_bytes=?', (b'corrupt database copy',))
+    op = service.db.one("SELECT * FROM archive_operations WHERE status='pending'")
+    service.archiver.process(op)
+    result = service.db.one('SELECT * FROM archive_operations WHERE id=?', (op['id'],))
+    assert result['status'] == 'failed' and 'No checksum-verified YAML snapshot' in result['error']
+    assert path.exists()
+    assert not (service.config.data / 'recovery').exists()
 

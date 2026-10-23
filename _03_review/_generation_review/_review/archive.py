@@ -116,11 +116,14 @@ class Archiver:
                 yp = next((r["yaml_path"] for r in sources if r["yaml_path"] and Path(r["yaml_path"]).is_file() and digest(r["yaml_path"]) == yh), None)
             if not yp:
                 # Byte-identical YAML is retained in SQLite, including malformed YAML.
+                raw = g['raw_yaml_bytes']
+                if not isinstance(raw, bytes) or hashlib.sha256(raw).hexdigest() != yh:
+                    raise ValueError(f'No checksum-verified YAML snapshot for generation {g["id"]}; originals retained')
                 recovered = self.config.data / "recovery" / (g["id"] + ".yaml")
                 recovered.parent.mkdir(parents=True, exist_ok=True)
                 if not recovered.exists():
                     with recovered.open("xb") as f:
-                        f.write(g["raw_yaml_bytes"])
+                        f.write(raw)
                         f.flush()
                         os.fsync(f.fileno())
                 yp = str(recovered)
@@ -220,6 +223,12 @@ class Archiver:
             yamls = self.db.all("SELECT yaml_sha256,yaml_archive_path FROM generation_metadata m JOIN generations g ON g.id=m.generation_id WHERE g.audio_id=?", (a["id"],))
             healthy = a["archive_path"] and Path(a["archive_path"]).is_file() and a["archive_bucket"] == a["bucket"]
             healthy = healthy and all(not y["yaml_sha256"] or (y["yaml_archive_path"] and Path(y["yaml_archive_path"]).is_file()) for y in yamls)
+            media = self.db.all("SELECT path FROM media_files WHERE audio_id=? AND storage_state IN ('input','archived')", (a['id'],))
+            # A complete archive can still have stale file-index rows or live
+            # input duplicates. Reuse the verified, journaled archiver to repair
+            # those; a normal scan of inputs does not reconcile archive files.
+            healthy = healthy and any(Path(row['path']) == Path(a['archive_path']) for row in media)
+            healthy = healthy and not any(Path(row['path']) != Path(a['archive_path']) and Path(row['path']).is_file() for row in media)
             if not healthy:
                 self.db.execute("INSERT INTO archive_operations(id,audio_id,generation_id,review_id,bucket,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
                                 (uuid.uuid4().hex, a["id"], a["generation_id"], a["review_id"], a["bucket"], now(), now()))

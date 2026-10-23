@@ -11,6 +11,7 @@ import csv
 from datetime import datetime
 import difflib
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -24,7 +25,7 @@ from _gbr_generation.yaml_document import YamlDocument
 from .document import Source, edit
 from .service import Editor, atomic
 from _review.indexer import audio_identity, number, as_text, parse_embedded
-from _review.metadata_identity import worker_intermediate
+from _review.metadata_identity import worker_intermediate, title as metadata_title
 from _review.song_names import SongNames, identifier
 from _review.util import digest, dumps, now, slug
 
@@ -105,7 +106,7 @@ def newline_repair(value):
     return ''.join(parts)
 
 
-def repair_yaml(raw, template, effective, title, song_id, model_map):
+def repair_yaml(raw, template, effective, title, song_id, model_map, mapped=False):
     doc = YamlDocument(raw)
     operations, notes = [], []
     for old, new in RENAMES.items():
@@ -120,7 +121,7 @@ def repair_yaml(raw, template, effective, title, song_id, model_map):
     if title and doc.values.get('title') != title:
         operations.append({'kind': 'set', 'key': 'title', 'value': title, 'position': 'start'})
         notes.append('catalogue title')
-    if not doc.values.get('song_id') and song_id:
+    if song_id and (not doc.values.get('song_id') or (mapped and identifier(doc.values.get('song_id')) != song_id)):
         operations.append({'kind': 'set', 'key': 'song_id', 'value': int(song_id), 'position': 'start'})
         notes.append('catalogue song ID')
     for field in ('lyrics', 'caption'):
@@ -178,7 +179,18 @@ def file_change(source, destination, content=None, checksum=None):
     return item
 
 
-def make_plan(repo, database, roots, template_path=None, model_map=None, progress=None):
+def recovered_file(destination, content, mtime_ns):
+    destination = Path(destination)
+    if destination.exists():
+        raise ValueError(f'Recovery destination already exists: {destination}')
+    return {'source': str(destination), 'destination': str(destination), 'created': True,
+            'before': None, 'after': hashlib.sha256(content).hexdigest(), 'content': packed(content),
+            'mode': 0o600, 'mtime_ns': mtime_ns,
+            'diff': ''.join(difflib.unified_diff([], content.decode('utf-8-sig').splitlines(True),
+                                               fromfile='(recovered database snapshot)', tofile=str(destination)))}
+
+
+def make_plan(repo, database, roots, template_path=None, model_map=None, progress=None, identity_map=None):
     emit = progress or (lambda message: None)
     started = monotonic()
     emit('Loading shared database (read-only)')
@@ -200,7 +212,7 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
         conn.row_factory = sqlite3.Row
         conn.execute('BEGIN')
         tables = {}
-        for name in ('audio', 'media_files', 'generations',
+        for name in ('songs', 'audio', 'media_files', 'generations',
                   'generation_metadata', 'generation_sources', 'generation_artifacts', 'generation_output_links',
                   'generation_execution_state', 'archive_operations', 'processing_tasks', 'generation_runs'):
             tables[name] = read_rows(conn, name)
@@ -238,19 +250,26 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
         return hashes[key]
     emit('Matching catalogue songs and variants')
     all_metadata = {row['generation_id']: row for row in tables['generation_metadata']}
+    song_titles = {row['id']: row['title'] for row in tables['songs']}
     identities = []
     for gen in tables['generations']:
         meta = json.loads(all_metadata[gen['id']]['parsed_json'])
-        identities.append({'id': gen['id'], 'title': str(meta.get('title') or gen['original_filename']),
+        identities.append({'id': gen['id'], 'title': metadata_title(meta) or gen['original_filename'],
                            'original_filename': gen['original_filename'], 'db_song_id': gen['song_id'],
                            'catalogue_song_id': meta.get('song_id'), 'catalogue_song_type': None})
     names = SongNames(identities, repo / '_01_writing/_built')
+    catalogue_names = SongNames([], repo / '_01_writing/_built')
     masters = {}
     with (repo / '_01_writing/_built/track_list.csv').open(encoding='utf-8-sig', newline='') as handle:
         for row in csv.DictReader(handle):
             sid = identifier(row.get('song_id'));title = (row.get('song_name') or row.get('title') or '').strip()
             if not sid or not title or sid in masters:raise ValueError('Master catalogue contains missing/duplicate IDs or titles')
             masters[sid] = title
+    identity_map = identity_map or {}
+    audio_ids = {row['id'] for row in tables['audio']}
+    if any(aid not in audio_ids or identifier(sid) not in masters for aid, sid in identity_map.items()):
+        raise ValueError('Identity map contains an unknown audio ID or catalogue song ID')
+    plan['identity_overrides'] = dict(identity_map)
     variants = {(sid, '1') for sid in masters}
     variant_path = repo / '_01_writing/_built/variant_list.csv'
     if variant_path.is_file():
@@ -288,7 +307,23 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
             run_ids = {link['run_id'] for gid in gids for link in links_by_generation[gid]}
             if run_ids & active_runs:
                 raise ValueError('Recording belongs to an active generation run')
+            mapped = audio['id'] in identity_map
             keys = {names.by_generation[g['id']] for g in generations}
+            if mapped:
+                keys = {'song:' + identifier(identity_map[audio['id']])}
+            elif len(keys) != 1 or not next(iter(keys)).startswith('song:'):
+                # Match only explicit catalogue aliases, including old song/
+                # song_title metadata and database titles; no fuzzy guessing.
+                matches = {key for key in keys if key.startswith('song:')}
+                for gen in generations:
+                    meta = json.loads(all_metadata[gen['id']]['parsed_json'])
+                    texts = [metadata_title(meta), gen['original_filename'], song_titles.get(gen['song_id'])]
+                    texts += [Path(row['path']).name for row in media]
+                    for text in filter(None, texts):
+                        match = catalogue_names.lookup(text, prefix=True)
+                        if match:matches.add(match)
+                if len(matches) == 1:
+                    keys = matches
             if len(keys) != 1 or not next(iter(keys)).startswith('song:'):
                 raise ValueError('No unambiguous catalogue song ID; fix the catalogue/YAML first')
             key = next(iter(keys));sid = key[5:]
@@ -298,14 +333,19 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
             destination = source.with_name(stem + '.flac')
             group = {'audio_id': audio['id'], 'generation_ids': sorted(gids), 'title': title,
                      'files': [], 'updates': [], 'notes': []}
+            if mapped:
+                group['notes'].append('Song identity explicitly confirmed in the identity map')
             paths = {str(source): str(destination)}
             contents = {}
             yaml_for = {}
+            yaml_targets = {}
+            recovered = {}
+            snapshots = {}
             for gen in generations:
                 metadata = all_metadata[gen['id']]
                 effective = json.loads(metadata['parsed_json'])
                 # Explicit conflicting numeric IDs must be fixed, not overwritten.
-                if effective.get('song_id') and identifier(effective['song_id']) != sid:
+                if not mapped and effective.get('song_id') and identifier(effective['song_id']) != sid:
                     raise ValueError('Conflicting song IDs in existing generation metadata')
                 if effective.get('variant_id') is not None and (sid, identifier(effective['variant_id'])) not in variants:
                     raise ValueError('Variant ID is absent from the variant catalogue')
@@ -313,13 +353,28 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
                     group['notes'].append('variant_id unknown; not inferred from a generation number')
                 candidates = [metadata['yaml_archive_path']] + [r['yaml_path'] for r in sources_by_generation[gen['id']]]
                 yp = next((Path(p) for p in candidates if p and Path(p).is_file() and allowed(p)
-                           and not Path(p).name.endswith('.source.yaml') and Path(p).name != 'source.yaml'), None)
+                           and not Path(p).name.casefold().endswith('.source.yaml') and Path(p).name.casefold() != 'source.yaml'), None)
                 if yp is None:
-                    raise ValueError(f'Completed YAML missing for generation {gen["id"]}; recover/scan first')
-                raw = yp.read_bytes()
+                    # A stale pointer must not hide an exact adjacent sidecar.
+                    siblings = [source.with_suffix('.yaml'), source.with_suffix('.yml'), Path(str(source) + '.yaml')]
+                    yp = next((p for p in siblings if p.is_file() and allowed(p)
+                               and checksum(p) == metadata['yaml_sha256']), None)
+                if yp is None:
+                    raw = metadata['raw_yaml_bytes']
+                    if raw is None and isinstance(metadata['raw_yaml'], str):
+                        raw = metadata['raw_yaml'].encode('utf-8')
+                    if not isinstance(raw, bytes) or hashlib.sha256(raw).hexdigest() != metadata['yaml_sha256']:
+                        raise ValueError(f'Completed YAML missing for generation {gen["id"]}; no checksum-verified database snapshot')
+                    yp = source.with_name(stem + '__g' + gen['id'] + '.yaml')
+                    if yp.exists():
+                        raise ValueError(f'Recovery path already exists: {yp}; reconcile it first')
+                    recovered[str(yp)] = raw
+                    group['notes'].append('Recover completed YAML from checksum-verified database bytes')
+                else:
+                    raw = yp.read_bytes()
                 if len(raw) > 2 * 1024**2:raise ValueError('Completed YAML exceeds the 2 MiB editor limit')
                 raw_values = YamlDocument(raw).values
-                if raw_values.get('song_id') is not None and identifier(raw_values['song_id']) != sid:
+                if not mapped and raw_values.get('song_id') is not None and identifier(raw_values['song_id']) != sid:
                     raise ValueError('Completed YAML song ID conflicts with its indexed/catalogue identity')
                 if raw_values.get('variant_id') is not None and (sid, identifier(raw_values['variant_id'])) not in variants:
                     raise ValueError('Completed YAML variant ID is absent from the variant catalogue')
@@ -328,15 +383,26 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
                     raise ValueError('Completed YAML variant ID conflicts with its indexed identity')
                 if metadata['yaml_sha256'] != hashlib.sha256(raw).hexdigest():
                     raise ValueError(f'Completed YAML changed since indexing: {yp}')
-                updated, notes = repair_yaml(raw, template, effective, title, sid, model_map)
+                updated, notes = repair_yaml(raw, template, effective, title, sid, model_map, mapped=mapped)
                 if str(yp) in contents and contents[str(yp)] != updated:
                     raise ValueError('Shared YAML has conflicting generation metadata')
                 contents[str(yp)] = updated
-                target = source.with_name(stem + ('' if not yaml_for or str(yp) in yaml_for.values()
-                                                  else '__p' + hashlib.sha256(updated).hexdigest()[:12]) + '.yaml')
+                target = yaml_targets.get(str(yp))
+                if target is None:
+                    target = source.with_name(stem + ('' if not yaml_targets
+                                                      else '__p' + hashlib.sha256(updated).hexdigest()[:12]) + '.yaml')
+                    yaml_targets[str(yp)] = target
                 if str(yp) in paths and paths[str(yp)] != str(target):
                     raise ValueError('Shared YAML has conflicting destinations')
                 paths[str(yp)] = str(target);yaml_for[gen['id']] = str(yp)
+                for old in candidates:
+                    if (old and allowed(old) and not Path(old).exists()
+                            and Path(old).name.casefold() != 'source.yaml' and not Path(old).name.casefold().endswith('.source.yaml')):
+                        paths[old] = str(target)
+                        snapshots[old] = raw
+                        contents[old] = updated
+                        if str(yp) in recovered:
+                            recovered[old] = raw
                 group['notes'].extend(notes)
                 values = YamlDocument(updated).values
                 # This is the effective overlay; FLAC embedded metadata stays as
@@ -346,7 +412,7 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
                 values = {'yaml_sha256': hashlib.sha256(updated).hexdigest(), 'raw_yaml_bytes': updated,
                           'raw_yaml': updated.decode('utf-8-sig'), 'parsed_json': dumps(effective),
                           'metadata_status': 'valid', 'error': None,
-                          'yaml_archive_path': str(target) if metadata['yaml_archive_path'] else None}
+                          'yaml_archive_path': str(target)}
                 for field in PARAMETERS:
                     values[field] = (number(effective.get(field), field in {'top_k', 'sampler_steps'}) if field in NUMBERS
                                      else as_text(effective.get(field)))
@@ -361,8 +427,9 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
                 raise ValueError('Normalization would merge distinct historical metadata identities; retain/repair them explicitly')
             # Native companions belong to the same recording through explicit links.
             artifacts = [a for run_id in sorted(run_ids) for a in artifacts_by_run[run_id]
-                         if allowed(a['uri']) and Path(a['uri']).is_file()]
-            if any(not a['sha256'] or checksum(a['uri']) != a['sha256'] for a in artifacts):
+                         if allowed(a['uri']) and (Path(a['uri']).is_file() or a['uri'] in snapshots)]
+            if any(not a['sha256'] or (hashlib.sha256(snapshots[a['uri']]).hexdigest()
+                       if a['uri'] in snapshots else checksum(a['uri'])) != a['sha256'] for a in artifacts):
                 raise ValueError('Native artifact checksum differs from the ledger; recover first')
             for artifact in artifacts:
                 path = Path(artifact['uri'])
@@ -395,12 +462,24 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
                     report['files'] = files
                     contents[str(report_path)] = (json.dumps(report, ensure_ascii=False, indent=2) + '\n').encode()
             # Additional unregistered companions are never moved/deleted by guesswork.
+            created = set()
             for old, new in paths.items():
-                item = file_change(old, new, contents.get(old), checksum=checksum)
+                if old in recovered:
+                    if new in created:
+                        continue
+                    created.add(new)
+                    item = recovered_file(new, contents[old], source.stat().st_mtime_ns)
+                elif not Path(old).exists():
+                    continue  # Relink stale database references; no source file to move.
+                else:
+                    item = file_change(old, new, contents.get(old), checksum=checksum)
                 if item:
                     item['stage'] = str(Path(new).with_name('.gbr-cleanup-' + plan['id'] + '-' + hashlib.sha256(old.encode()).hexdigest()[:12] + '.part'))
                     group['files'].append(item)
-            if len({p.casefold() for p in paths.values()}) != len(paths):
+            live_paths = {old: new for old, new in paths.items() if old not in recovered and Path(old).exists()}
+            if len({p.casefold() for p in live_paths.values()}) != len(live_paths):
+                raise ValueError('Companion destination collision')
+            if len({item['destination'].casefold() for item in group['files']}) != len(group['files']):
                 raise ValueError('Companion destination collision')
             for table, column in path_columns:
                 for old in paths:
@@ -436,6 +515,14 @@ def make_plan(repo, database, roots, template_path=None, model_map=None, progres
                 visited.add(str(path))
                 if allowed(path) and path.is_file() and str(path.resolve()) not in recorded:
                     plan['warnings'].append(f'Unindexed audio retained: {path}. Run the review scan to include it.')
+    for error in plan['errors']:
+        gens = generations_by_audio[error['audio_id']]
+        error['generation_ids'] = [g['id'] for g in gens]
+        error['title'] = ' | '.join(dict.fromkeys(metadata_title(json.loads(all_metadata[g['id']]['parsed_json']))
+                              or song_titles.get(g['song_id']) or g['original_filename'] for g in gens))
+        error['paths'] = list(dict.fromkeys(row['path'] for row in media_by_audio[error['audio_id']]))
+        error['yaml_paths'] = list(dict.fromkeys(p for g in gens for p in
+            [all_metadata[g['id']]['yaml_archive_path'], *[r['yaml_path'] for r in sources_by_generation[g['id']]]] if p))
     # Refuse cross-recording shared paths/rows rather than create an unsafe plan.
     files, rows = set(), set()
     for group in plan['groups']:
@@ -491,6 +578,35 @@ def persist(plan_path, plan):
         Path(temporary).unlink(missing_ok=True)
 
 
+def read_identity_map(path):
+    result = {}
+    if path is None:
+        return result
+    with Path(path).open(encoding='utf-8-sig', newline='') as handle:
+        reader = csv.DictReader(handle)
+        if not {'audio_id', 'song_id'} <= set(reader.fieldnames or []):
+            raise ValueError('Identity CSV needs audio_id and song_id columns; use the preview issues.csv')
+        for row in reader:
+            value = (row.get('song_id') or '').strip()
+            if not value:
+                continue
+            aid, sid = (row.get('audio_id') or '').strip(), identifier(value)
+            if not aid or not sid or (aid in result and result[aid] != sid):
+                raise ValueError('Identity CSV contains missing, invalid or conflicting IDs')
+            result[aid] = sid
+    return result
+
+
+def issues_report(plan):
+    output = io.StringIO(newline='')
+    writer = csv.DictWriter(output, fieldnames=['audio_id', 'song_id', 'title', 'error', 'paths', 'yaml_paths'])
+    writer.writeheader()
+    for error in plan['errors']:
+        writer.writerow({key: (' | '.join(error.get(key, [])) if key in {'paths', 'yaml_paths'}
+                               else error.get(key, '')) for key in writer.fieldnames})
+    return output.getvalue().encode('utf-8-sig')
+
+
 def move_exclusive(source, destination):
     if source == destination:return
     # Same-folder links are exclusive on NTFS/ext4; never overwrite a conflict.
@@ -529,7 +645,9 @@ def apply_plan(plan_path, skip_errors=False):
                     source, target = Path(item['source']), Path(item['destination'])
                     if protected(source, Path(plan['repo'])) or protected(target, Path(plan['repo'])):
                         raise ValueError('Protected path in cleanup plan')
-                    if digest(source) != item['before']:raise ValueError(f'File changed since preview: {source}')
+                    if item.get('created'):
+                        if target.exists():raise ValueError(f'Recovery destination appeared since preview: {target}')
+                    elif digest(source) != item['before']:raise ValueError(f'File changed since preview: {source}')
                     if target != source and target.exists():raise ValueError(f'Destination exists: {target}')
                     if Path(item['stage']).exists():raise ValueError('Unexpected staging file; preview again')
             plan['state'] = 'applying';persist(plan_path, plan)
@@ -541,7 +659,8 @@ def apply_plan(plan_path, skip_errors=False):
                         with stage.open('xb') as handle:
                             handle.write(unpacked(item['content']));handle.flush();os.fsync(handle.fileno())
                         if digest(stage) != item['after']:raise ValueError('Written YAML/report did not verify')
-                        if target == source:os.replace(stage, target)
+                        if item.get('created'):move_exclusive(stage, target)
+                        elif target == source:os.replace(stage, target)
                         else:
                             move_exclusive(stage, target)
                             source.unlink()
@@ -591,6 +710,10 @@ def undo_plan(plan_path):
                     source, target = Path(item['source']), Path(item['destination'])
                     if protected(source, Path(plan['repo'])) or protected(target, Path(plan['repo'])):
                         raise ValueError('Protected path in cleanup plan')
+                    if item.get('created'):
+                        if target.exists() and digest(target) != item['after']:
+                            raise ValueError(f'Recovered YAML changed; retained it: {target}')
+                        continue
                     if source.exists() and digest(source) not in ({item['before'], item['after']} if source == target else {item['before']}):
                         raise ValueError(f'Source changed; retained it: {source}')
                     if target.exists() and target != source and digest(target) != item['after']:
@@ -601,6 +724,10 @@ def undo_plan(plan_path):
             for group in reversed(plan['groups']):
                 for item in reversed(group['files']):
                     source, target = Path(item['source']), Path(item['destination'])
+                    if item.get('created'):
+                        target.unlink(missing_ok=True)
+                        Path(item['stage']).unlink(missing_ok=True)
+                        continue
                     if 'original' in item:
                         if not source.exists() or digest(source) != item['before']:
                             atomic(source, unpacked(item['original']), item['mode'])
@@ -627,6 +754,7 @@ def main(repo, arguments):
     parser.add_argument('--root', type=Path, action='append', help='Completed files folder; repeat. Default: configured review inputs/archive plus generated inbox')
     parser.add_argument('--template', type=Path, help='Order/default template; default: writing track-template.yaml')
     parser.add_argument('--model-map', type=Path, help='JSON {"dit":{"exact old":"exact new"},"text_encoder":{...}}; never infer quantization')
+    parser.add_argument('--identity-map', type=Path, help='CSV with audio_id,song_id; blank song_id rows are ignored. Use preview issues.csv')
     parser.add_argument('--skip-errors', action='store_true', help='Apply only valid groups listed in this frozen preview')
     args = parser.parse_args(arguments)
     if args.action == 'preview':
@@ -643,20 +771,33 @@ def main(repo, arguments):
         aliases = json.loads(args.model_map.read_text(encoding='utf-8-sig')) if args.model_map else {}
         def progress(message):
             print(f'[{datetime.now().astimezone():%H:%M:%S}] {message}', flush=True)
-        plan = make_plan(repo, args.database, roots, args.template, aliases, progress=progress)
+        plan = make_plan(repo, args.database, roots, args.template, aliases, progress=progress,
+                         identity_map=read_identity_map(args.identity_map))
         plan['warnings'][:0] = skipped
         path = repo / '_02_generation/_runtime/_cleanup' / plan['id'] / 'plan.json'
         progress('Writing preview plan (no track files changed)')
-        path.parent.mkdir(parents=True);persist(path, plan)
+        path.parent.mkdir(parents=True)
+        if plan['errors']:
+            raw_report = issues_report(plan)
+            atomic(path.parent / 'issues.csv', raw_report)
+            plan['issues_report_sha256'] = hashlib.sha256(raw_report).hexdigest()
+        persist(path, plan)
         print(f'Preview: {len(plan["groups"])} recordings; {len(plan["errors"])} errors; {len(plan["warnings"])} warnings\nPlan: {path}')
         print(f'Plan size: {path.stat().st_size / 1024**2:.1f} MiB')
+        if plan['errors']:
+            print(f'Unresolved recordings: {path.parent / "issues.csv"}\n'
+                  'Confirm song_id only where needed, then preview again with --identity-map pointing to that CSV.')
         for group in plan['groups']:
             print('\n' + group['title'])
             for item in group['files']:
                 print(f'  {item["source"]} → {item["destination"]}')
                 if item.get('diff'):print(item['diff'])
             for note in group['notes']:print('  ' + note)
-        for row in plan['errors']:print('ERROR: ' + row['audio_id'] + ': ' + row['error'])
+        for row in plan['errors']:
+            print('ERROR: ' + row['audio_id'] + ': ' + row['error'])
+            if row.get('title'):print('  Track: ' + row['title'])
+            for source_path in row.get('paths', []):print('  Audio: ' + source_path)
+            for source_path in row.get('yaml_paths', []):print('  YAML: ' + source_path)
         for warning in plan['warnings']:print('WARNING: ' + warning)
         return 2 if plan['errors'] else 0
     if args.plan is None:parser.error('This action requires the saved plan.json path')
@@ -667,7 +808,14 @@ def main(repo, arguments):
         if plan['state'] not in {'applied', 'undone', 'preview'}:raise ValueError('Recover the interrupted operation before forgetting its journal')
         # Only our own plan file and empty journal directory; never recursive delete.
         if args.plan.name != 'plan.json' or args.plan.parent.name != plan['id']:raise ValueError('Not a cleanup journal directory')
-        if set(args.plan.parent.iterdir()) != {args.plan}:raise ValueError('Journal directory contains other files; retained it')
+        expected = {args.plan}
+        report = args.plan.parent / 'issues.csv'
+        if plan.get('issues_report_sha256') and report.is_file():
+            if digest(report) != plan['issues_report_sha256']:
+                raise ValueError('Edited issues.csv retained. Move your confirmed identity map elsewhere before forgetting this journal')
+            expected.add(report)
+        if set(args.plan.parent.iterdir()) != expected:raise ValueError('Journal directory contains other files; retained it')
+        if report in expected:report.unlink()
         args.plan.unlink();args.plan.parent.rmdir()
         print('Cleanup journal removed. Existing shared database audit remains. Undo is no longer available.')
         return 0

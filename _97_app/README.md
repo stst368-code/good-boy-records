@@ -40,6 +40,34 @@ selected database. A configuration's optional `database_path` resolves relative
 to that configuration file; command-line overrides resolve from the current
 working directory.
 
+## Historical generation repair
+
+After pulling an update, start GBR and let its archiving work finish, then close
+the app. Startup reconciles missing archive file-index records and verified
+reviewed duplicates through the existing archive journal. It preserves reviews
+and generation IDs; unrecoverable files remain flagged.
+
+From the repository root, run `py -3.12 _97_app/run_gbr.py cleanup-generations preview`.
+This reads the shared database and previews filename/schema changes. Missing
+completed YAMLs can be recovered from exact, checksum-verified database bytes;
+source Writing YAMLs and frozen source snapshots are never rewritten. Large
+plans stream to disk and retain complete undo data. No additional database is created.
+
+If recordings remain blocked, the printed plan directory contains `issues.csv`,
+with track titles, audio/YAML paths and errors. Confirm an uncertain catalogue
+identity by filling only its `song_id` cell, then run preview again with
+`--identity-map "PATH_TO_issues.csv"`. Blank cells are ignored. A mapping is an
+explicit correction, not a fuzzy match; malformed YAML and unavailable files
+still require repair. Keep old input folders configured while they contain
+recordings that have not been imported or archived.
+
+With GBR closed, apply the saved plan using
+`py -3.12 _97_app/run_gbr.py cleanup-generations apply "PATH_TO_plan.json"`.
+`--skip-errors` explicitly excludes blocked recordings. `undo` with the same
+plan restores files and database values, including removing only YAMLs created
+by recovery. After accepting the result, `forget` removes that journal and its
+unchanged issues report; an edited identity CSV is retained for reuse.
+
 ## Directory convention and existing devices
 
 Repository directories use lowercase names starting with `_`, including source
