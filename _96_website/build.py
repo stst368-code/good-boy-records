@@ -67,6 +67,8 @@ def stage(root, target):
     shutil.copyfile(root / '_data/catalogue.json', target / 'catalogue.json')
     shutil.copyfile(root / 'showcase-host.js', target / 'showcase-host.js')
     shutil.copyfile(root / 'releases.js', target / 'releases.js')
+    for name in ('display.css', 'display.js'):
+        shutil.copyfile(root / name, target / name)
     for name in ('index.html', 'landscape.html'):
         shutil.copyfile(root / '_templates/landscape.html', target / name)
     (target / 'analytics').mkdir()

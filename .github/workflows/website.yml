@@ -27,7 +27,7 @@ jobs:
       - run: python -m pip install -r _96_website/requirements.txt
       - run: python -m unittest discover -s _96_website/_tests -p 'test_*.py'
       - run: node --check _96_website/_analytics/analytics.js && node --check _96_website/_analytics/platform.js
-      - run: node --check _96_website/releases.js
+      - run: node --check _96_website/releases.js && node --check _96_website/display.js
       - run: python _96_website/build.py
       - uses: actions/upload-artifact@v4
         with:
