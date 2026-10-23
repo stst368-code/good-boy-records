@@ -4800,7 +4800,7 @@ body[data-view="knowledge"] #easterStoryOverlay{display:none!important}
       <div class="zoom-controls" aria-label="Map zoom controls"><button id="zoomOut" title="Zoom out">−</button><output id="zoomLevel">100%</output><button id="zoomIn" title="Zoom in">+</button><button id="zoomReset" title="Fit map">⌂</button></div>
     </div>
     <nav class="utility-nav" id="utilityNav" aria-label="Good Boy Records views">
-      <button class="utility-button" id="knowledgeButton" type="button">Knowledge</button>
+      <button class="utility-button" id="knowledgeButton" type="button">How it’s made</button>
       <button class="utility-button" id="tracksButton" type="button" aria-expanded="false">Tracks</button>
       <button class="utility-button" id="filterButton" type="button" aria-expanded="false">Filter</button>
       <button class="utility-button" id="storyButton" type="button" aria-expanded="false">Story</button>
@@ -6328,7 +6328,7 @@ function exitKnowledge(){
   if(viewMode!=='knowledge')return;
   knowledgeExpanded.clear();knowledgeExpansionOrder=[];knowledgeSelectedId=null;syncKnowledgeWorldCards();
   closeKnowledgeReader();viewMode='tracks';
-document.body.dataset.view='tracks';knowledgeHoverId=null;ui.knowledgeButton.classList.remove('active');ui.knowledgeButton.textContent='Knowledge';
+document.body.dataset.view='tracks';knowledgeHoverId=null;ui.knowledgeButton.classList.remove('active');ui.knowledgeButton.textContent='How it’s made';
   if(trackCameraSnapshot){Object.assign(camera,trackCameraSnapshot);trackCameraSnapshot=null}else setExplorationStart()
 }
 function openTracksPanel(){
@@ -6773,6 +6773,8 @@ function drawKnowledge(w,h,music){
   positionKnowledgeWorldCards(layout)
 }
 function draw(){
+  // Full-screen documents cover the map; keep its animation idle until return.
+  if(document.hidden||document.body.classList.contains('gbr-making-open')||document.body.classList.contains('gbr-observatory-open')){requestAnimationFrame(draw);return}
   const w=ui.stage.clientWidth,h=ui.stage.clientHeight,t=tracks[index],c=accent(t),gas={r:255,g:174,b:82},music=musicVisualState(t),level=music.level,visualLamp=testMode?1:(albumLightEnabled?lamp:0);camera.x+=(camera.targetX-camera.x)*.14;camera.y+=(camera.targetY-camera.y)*.14;camera.zoom+=(camera.targetZoom-camera.zoom)*.14;ctx.clearRect(0,0,w,h);const worldAnchorScreen=viewToScreen(playingAnchor.x,playingAnchor.y),coreScreen=worldAnchorScreen,anchorScreen=worldAnchorScreen;const mobileCore=matchMedia('(max-width:900px)').matches,coreSize=GBRDisplay.coverSize,lyricHeight=GBRDisplay.lyricHeight;if(ui.playingCoverViewport&&ui.playingCoverScreen){const sr=ui.stage.getBoundingClientRect();ui.playingCoverViewport.style.left=`${sr.left}px`;ui.playingCoverViewport.style.top=`${sr.top}px`;ui.playingCoverViewport.style.width=`${sr.width}px`;ui.playingCoverViewport.style.height=`${sr.height}px`;ui.playingCoverScreen.style.left=`${coreScreen.x}px`;ui.playingCoverScreen.style.top=`${coreScreen.y}px`;if(ui.easterStoryOverlay){ui.easterStoryOverlay.style.left=`${coreScreen.x}px`;ui.easterStoryOverlay.style.top=`${coreScreen.y}px`;ui.easterStoryOverlay.style.width=`${coreSize}px`;ui.easterStoryOverlay.style.height=`${coreSize}px`;}ui.playingCoverScreen.style.visibility=viewMode==='knowledge'?'hidden':'visible';if(ui.easterStoryOverlay)ui.easterStoryOverlay.style.visibility=viewMode==='knowledge'?'hidden':'visible';}ui.centerStack.style.setProperty('left',`${coreScreen.x}px`,'important');ui.centerStack.style.setProperty('top',`${coreScreen.y+coreSize/2+10*GBRDisplay.scale}px`,'important');ui.centerStack.style.setProperty('width',`${coreSize}px`,'important');ui.centerStack.style.setProperty('min-width',`${coreSize}px`,'important');ui.centerStack.style.setProperty('max-width',`${coreSize}px`,'important');ui.centerStack.style.transform='translate(-50%,0)';ui.centerStack.style.zoom='1';ui.centerCard.style.setProperty('display','none','important');if(ui.playingCoverScreen)ui.playingCoverScreen.dataset.renderSize=`${coreSize}x${coreSize}`;ui.lyric.style.setProperty('width',`${coreSize}px`,'important');ui.lyric.style.setProperty('height',`${lyricHeight}px`,'important');const grad=ctx.createRadialGradient(coreScreen.x,coreScreen.y,36,coreScreen.x,coreScreen.y,Math.max(w,h)*.62);grad.addColorStop(0,`rgba(${gas.r},${gas.g},${gas.b},${((easter?.08:.028)+.08*visualLamp)*visualLamp})`);grad.addColorStop(.35,`rgba(${gas.r},${gas.g},${gas.b},${(.018+.035*visualLamp)*visualLamp})`);grad.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);drawStars(w,h,music);
   if(viewMode==='knowledge'){
     drawKnowledge(w,h,music);

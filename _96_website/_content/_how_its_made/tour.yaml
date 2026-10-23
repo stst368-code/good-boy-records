@@ -1,0 +1,497 @@
+# This is the public guide. Edit prose and blocks here; order stages/nodes by
+# moving list items. IDs are permanent link targets. See AUTHORING.md for media,
+# branching diagrams and the listening-lab format. No HTML is executed.
+format: gbr-making-v1
+stages:
+  - id: writing
+    title: Writing
+    short: WRITE
+    colour: '#b5c788'
+    summary: >-
+      Start with a song worth telling. Keep its identity separate from the many ways it might be performed.
+    delivers: [Lyrics, 'Song + variant identity', 'A YAML recipe']
+    entry: idea
+    nodes:
+      - id: idea
+        title: Find the story
+        summary: >-
+          A character, a joke, an image, or something that needs saying.
+        body:
+          - type: paragraph
+            text: >-
+              Good Boy Records starts with writing. A song needs its own voice, a point of view and something that survives a change of arrangement. The same words can become orchestral, punk, folk or something much stranger.
+          - type: paragraph
+            text: >-
+              Draft the verses and chorus, read them aloud, and decide what should repeat. Section markers give the intended shape; they do not guarantee that a music model will follow every instruction literally.
+          - type: note
+            text: >-
+              The story comes first. A detailed caption cannot rescue a lyric that has nothing to say.
+        next: [{to: identity}]
+      - id: identity
+        title: Give the song an identity
+        summary: >-
+          One master song; explicit variants for deliberate changes.
+        body:
+          - type: paragraph
+            text: >-
+              The master track catalogue identifies the song. A variant identifies a deliberate change to that song, such as a translation or adjusted lyrics. A generated recording is a separate performance of that song and variant.
+          - type: paragraph
+            text: >-
+              These identities travel with the recording. A descriptive filename is useful to a person, but it is not the only thing connecting a song to its history.
+          - type: code
+            text: |
+              song_id: 13
+              variant_id: 2
+              title: moses-supposes
+              cluster: rock
+              style: punk
+              language: en
+              explicit: yes
+          - type: note
+            text: >-
+              This is a small illustrative excerpt, not a complete generation recipe. The cluster/style pair must match the actual style catalogue.
+        next: [{to: caption}]
+      - id: caption
+        title: Describe the performance
+        summary: >-
+          Caption, style and lyrics describe different things.
+        body:
+          - type: paragraph
+            text: >-
+              Lyrics supply the words. The caption describes the sound around them — instruments, vocal character, production, pace and emotional direction. The cluster and style provide a catalogue identity for that musical direction.
+          - type: paragraph
+            text: >-
+              Vendor templates and custom captions can provide alternate interpretations of the same song. A useful caption describes a coherent performance rather than an ever-growing wish list of incompatible sounds.
+          - type: links
+            items:
+              - label: Explore the caption references
+                url: https://github.com/stst368-code/good-boy-records/tree/main/_01_writing/_references
+                description: >-
+                  Vendor templates, custom templates and the shared style catalogue.
+        next: [{to: recipe}]
+      - id: recipe
+        title: Preserve the recipe
+        kind: output
+        summary: >-
+          Keep the writing original; send a copy through production.
+        body:
+          - type: paragraph
+            text: >-
+              Generation imports a copy of the writing YAML. It must not move, delete or rewrite the original. The completed recording keeps its recipe so the words, caption and effective controls remain traceable.
+          - type: paragraph
+            text: >-
+              Formatting matters too. A literal lyric block should stay a literal lyric block. Unrelated fields and their order are preserved; fields changed by generation can record their actual values.
+          - type: stage-link
+            stage: generation
+            label: Follow the recipe into generation →
+        next: []
+  - id: generation
+    title: Generation
+    short: GENERATE
+    colour: '#8fc4bf'
+    summary: >-
+      Turn lyrics and a sound description into conditioning, then sample a musical performance. Explore the controls without confusing more computation with better music.
+    delivers: ['FLAC recording', 'Effective recipe', 'Performance measurements']
+    entry: select
+    nodes:
+      - id: select
+        title: Select and validate
+        summary: >-
+          Choose songs, captions and an experiment; catch bad inputs early.
+        body:
+          - type: paragraph
+            text: >-
+              A batch can target one song, several songs, an album or a wider selection. Captions and parameter combinations create distinct attempts. Validation checks identity, required inputs and style references before expensive work starts.
+          - type: paragraph
+            text: >-
+              A frozen job records what was actually selected. Invalid inputs can be excluded or the batch can be cancelled while they are fixed. An experiment should be understandable before the first worker starts.
+        next: [{to: engine}]
+      - id: engine
+        title: Choose an execution path
+        kind: decision
+        summary: >-
+          The same production idea can run through two worker interfaces.
+        body:
+          - type: paragraph
+            text: >-
+              Native workers execute the Python model pipeline. ComfyUI workers execute a node workflow through the ComfyUI API. These are execution paths around the same broad conditioning and diffusion process; available controls and model files depend on the worker.
+          - type: paragraph
+            text: >-
+              Hosting is a separate choice. Workers may run locally, on a dedicated RunPod instance, or through a supported serverless adapter. Discovery queries what a worker actually has instead of assuming every machine is identical.
+          - type: note
+            text: >-
+              Changing precision or execution backend is itself an experimental change. Do not assume two engines produce identical results just because their visible parameter labels match.
+        next:
+          - {to: native, label: Native}
+          - {to: comfy, label: ComfyUI}
+      - id: native
+        title: Python pipeline
+        summary: >-
+          A worker loads the discovered model components and effective controls.
+        body:
+          - type: paragraph
+            text: >-
+              The native path runs generation in Python. Model loading, precision, conditioning reuse and hardware availability determine its resource needs. A local GPU can be the limiting factor even when a cloud worker runs the same job comfortably.
+          - type: topic-link
+            topic: platform
+            label: How workers and the database fit together ↗
+        next: [{to: conditioning}]
+      - id: comfy
+        title: ComfyUI workflow
+        summary: >-
+          An API workflow wires together model loading, encoding and sampling.
+        body:
+          - type: paragraph
+            text: >-
+              ComfyUI expresses the generation process as connected nodes. GBR supplies the job values to the workflow, submits it, follows progress and collects its audio output. A local URL or a pod proxy identifies the worker.
+          - type: paragraph
+            text: >-
+              The workflow and the files available on the worker decide which encoders, diffusion models, samplers and schedulers are available. An unavailable checkpoint should be discovered before dispatch, not guessed from a friendly display name.
+          - type: links
+            items:
+              - label: ComfyUI project
+                url: https://github.com/Comfy-Org/ComfyUI
+                description: >-
+                  The node workflow engine used by this execution path.
+        next: [{to: conditioning}]
+      - id: conditioning
+        title: Encode the text
+        summary: >-
+          Caption and lyrics become the model’s conditioning inputs.
+        body:
+          - type: paragraph
+            text: >-
+              The text encoder converts the supplied words into representations used by the music model. Those representations are conditioning: they guide the performance being generated rather than being a recording themselves.
+          - type: paragraph
+            text: >-
+              Cached conditioning can avoid repeating compatible encoding work. It is only reusable when its inputs, model and relevant settings match. Changing the words or an encoder setting may require a fresh encoding.
+          - type: note
+            text: >-
+              Encoder controls and diffusion controls operate at different parts of the process. A single label such as CFG does not make them interchangeable.
+        next: [{to: sampling}]
+      - id: sampling
+        title: Sample the performance
+        summary: >-
+          Steps, guidance and sampler/scheduler choices shape the sampling process.
+        body:
+          - type: paragraph
+            text: >-
+              The music model samples audio conditioned on the encoded text. Sampling steps control the number of scheduled sampling updates. The sampler and scheduler determine how those updates are taken. Guidance controls influence conditioning strength.
+          - type: paragraph
+            text: >-
+              More steps means more sampling work; it does not establish that the resulting song will sound better. Listen to matched outputs, record the controls, and compare the things that actually changed.
+          - type: experiment
+            id: sampling-steps
+            title: What do 1–50 steps sound like?
+            parameter: Sampling steps
+            min: 1
+            max: 50
+            step: 1
+            conditions: >-
+              Keep the caption, lyrics, duration, encoder, DiT precision, seed pair, CFG, top-k and sampler/scheduler fixed. Change only sampling steps. These listening samples still need to be generated and added.
+            samples: []
+          - type: note
+            text: >-
+              The control above is an audition interface, not an online generator. It will play published listening clips when they are supplied. No synthetic results or quality claims have been filled in for missing settings.
+        next: [{to: bundle}]
+      - id: bundle
+        title: Collect a complete result
+        kind: output
+        summary: >-
+          Audio, recipe, provenance and measurements belong together.
+        body:
+          - type: paragraph
+            text: >-
+              The completed bundle contains the recording, a YAML recipe and generation details. Effective controls, model names, hardware and timing information are recorded so an interesting sound can be investigated later.
+          - type: paragraph
+            text: >-
+              Hardware and memory measurements may be missing for older recordings. Unknown peak VRAM or historical cost is kept unknown; it is not silently treated as zero.
+          - type: stage-link
+            stage: review
+            label: Take the recording to review →
+        next: []
+  - id: review
+    title: Review
+    short: REVIEW
+    colour: '#d5a486'
+    summary: >-
+      Listen first. Scores describe the result; tags describe why. Technical measurements can flag a problem, but cannot decide whether a song is worth keeping.
+    delivers: ['Four listening scores', 'Observations + reasons', 'A production decision']
+    entry: listen
+    nodes:
+      - id: listen
+        title: Listen to the recording
+        summary: >-
+          Judge the performance, including the parts that are easy to miss.
+        body:
+          - type: paragraph
+            text: >-
+              A promising opening is not the same as a finished song. Listen for changes in the voice, sections that collapse into noise, unconvincing instruments and repetition that stops serving the song.
+          - type: paragraph
+            text: >-
+              Fast review helps cover a large batch, while navigation and revisiting make closer listening possible. A machine measurement is supporting evidence, not a substitute for an opinion about music.
+        next: [{to: score}]
+      - id: score
+        title: Score and explain
+        summary: >-
+          Four metrics, optional positive/negative tags and an optional Reason.
+        body:
+          - type: paragraph
+            text: >-
+              Audio Quality, Composition, Consistency and Realism each receive a 0–5 score. Composition considers whether the performance belongs to the intended cluster and style. An exceptional score is reserved for an exceptional result.
+          - type: paragraph
+            text: >-
+              One-click positive and negative tags capture reusable observations, such as vocal clarity or arrangement structure. An unselected tag means no observation was recorded; it does not mean approval or criticism.
+          - type: paragraph
+            text: >-
+              The fourth outstanding rating submits the review in the existing listening flow. Tags and the optional free-text Reason travel with that review and reviewer. Revising a review preserves its history.
+        next: [{to: decide}]
+      - id: decide
+        title: What happens next?
+        kind: decision
+        summary: >-
+          Keep a useful candidate, or send the learning back to generation.
+        body:
+          - type: paragraph
+            text: >-
+              Distribution candidates move forward for preparation. A bookmark keeps an interesting result in view. Rejected or weak recordings still provide evidence about the combination that produced them.
+          - type: paragraph
+            text: >-
+              A score of 3 or lower on any of the four metrics automatically marks rejection unless Publish or Bookmark is selected. The reviewer’s explicit flags remain part of the decision.
+        next:
+          - {to: keep, label: Prepare}
+          - {to: learn, label: Revisit}
+      - id: keep
+        title: Promote the candidate
+        kind: output
+        summary: >-
+          Carry the selected recording and its context into preparation.
+        body:
+          - type: paragraph
+            text: >-
+              Review and preparation share the same recording identity. Moving an approved bundle through the workflow is not a reason to create another unrelated database record or a permanent second copy of its audio.
+          - type: stage-link
+            stage: post-process
+            label: Open post process →
+        next: []
+      - id: learn
+        title: Keep the lesson
+        kind: output
+        summary: >-
+          Change a deliberate variable, rather than blindly repeating a batch.
+        body:
+          - type: paragraph
+            text: >-
+              Compare observations with generation settings. If an arrangement is promising but a voice is unstable, record that distinction. A rerun can then target a specific question rather than treating every low score as the same failure.
+          - type: stage-link
+            stage: generation
+            node: sampling
+            label: Return to the generation controls ↶
+          - type: topic-link
+            topic: analytics
+            label: How do we analyse the evidence? ↗
+        next: []
+  - id: post-process
+    title: Post process
+    short: PREPARE
+    colour: '#c6b27e'
+    summary: >-
+      Prepare the chosen recording for release. Audition changes, check alignment and shape the visual response without losing the source performance.
+    delivers: ['Chosen source or master', 'Checked word timings', 'Artwork + light cues']
+    entry: source
+    nodes:
+      - id: source
+        title: Choose the source
+        summary: >-
+          Start from the exact reviewed recording and preserve it.
+        body:
+          - type: paragraph
+            text: >-
+              Preparation works from a selected recording. The untouched source remains available so a processing idea can be compared with the actual performance that earned its review.
+          - type: paragraph
+            text: >-
+              A master is a deliberate derivative, not a replacement for the source. The release must identify which version was chosen, so later edits cannot quietly change what was approved.
+        next: [{to: mix}]
+      - id: mix
+        title: Audition the mix
+        summary: >-
+          Trial level, fades, EQ and effects, then compare source and master.
+        body:
+          - type: paragraph
+            text: >-
+              The mastering workspace renders previews and lets the reviewer compare them with the source. Fades, dynamics and effects are creative decisions; a louder output is not automatically a more convincing performance.
+          - type: paragraph
+            text: >-
+              Stem separation can help isolate elements for further work. It can also introduce artefacts, so separation is an optional route rather than a mandatory improvement.
+          - type: links
+            items:
+              - label: Demucs
+                url: https://github.com/facebookresearch/demucs
+                description: >-
+                  Source separation used for optional preparation work.
+        next: [{to: lyrics}]
+      - id: lyrics
+        title: Check lyric alignment
+        summary: >-
+          Align the words, then correct what the model heard incorrectly.
+        body:
+          - type: paragraph
+            text: >-
+              Alignment estimates when words occur in the actual audio. A transcript and an intended lyric sheet can disagree: generated singers may omit, repeat or alter words. Low-confidence timing is a reason to listen and correct, not a guarantee that a word is wrong.
+          - type: paragraph
+            text: >-
+              The preparation page supports lyric correction and timing adjustments. Published timings should belong to the chosen audio, and approval should be revisited when that audio or those timings change.
+          - type: links
+            items:
+              - label: WhisperX
+                url: https://github.com/m-bain/whisperX
+                description: >-
+                  Speech transcription and word alignment tooling; singing still needs human checking.
+        next: [{to: lights}]
+      - id: lights
+        title: Map the response
+        summary: >-
+          Turn audio events and deliberate boosts into visual cues.
+        body:
+          - type: paragraph
+            text: >-
+              The player can react to the song’s energy and mapped events. Per-song sensitivity changes how strongly the light responds. A manually marked passage can receive an extra boost where a purely automatic response misses the musical intent.
+          - type: paragraph
+            text: >-
+              Previewing that response beside playback makes the mapping something to audition. Numeric light cues belong to the exact audio being prepared, just as word timings do.
+        next: [{to: package}]
+      - id: package
+        title: Assemble the release
+        kind: output
+        summary: >-
+          Attach artwork and choose which checked assets should travel with the audio.
+        body:
+          - type: paragraph
+            text: >-
+              Attach prepared cover artwork or use the GBR sleeve fallback. Choose the source or a specific master, optional lossless audio, approved lyric timings and the intended light cues. Audition the release before publishing it.
+          - type: stage-link
+            stage: publishing
+            label: Follow the release into publishing →
+        next: []
+  - id: publishing
+    title: Publishing
+    short: PUBLISH
+    colour: '#b3a6d3'
+    summary: >-
+      Release a deliberate public package. The catalogue is the front door; the production database and working recipes are a different layer.
+    delivers: ['Verified public assets', 'Stable catalogue entry', 'A playable release']
+    entry: approve
+    nodes:
+      - id: approve
+        title: Approve the exact package
+        summary: >-
+          Confirm the audio and editorial choices that will become public.
+        body:
+          - type: paragraph
+            text: >-
+              A saved release preview records the chosen source or master and its public assets. Audio or editorial changes can invalidate that preview. Publication should represent an explicit current choice, not an old approval applied to different files.
+          - type: paragraph
+            text: >-
+              A public MP3 is prepared for listening, with optional sanitised lossless FLAC. Raw writing YAML, private review Reasons, worker paths and credentials are excluded from new public release packages.
+        next: [{to: upload}]
+      - id: upload
+        title: Upload and verify
+        summary: >-
+          Content-addressed media lives on R2; verify it before announcing it.
+        body:
+          - type: paragraph
+            text: >-
+              Each public asset is identified by a content hash. The publisher uploads and verifies the object before referencing it from the public catalogue. An interrupted request can be reconciled rather than blindly producing another copy.
+          - type: paragraph
+            text: >-
+              The public URL and browser access settings are part of verification. A successful private object upload is not proof that a listener’s browser can fetch and play the result.
+        next: [{to: catalogue}]
+      - id: catalogue
+        title: Update the catalogue
+        summary: >-
+          A small conditional update makes the verified release discoverable.
+        body:
+          - type: paragraph
+            text: >-
+              New releases use the v2 public catalogue and content-addressed object layout. The catalogue points to the completed assets; it is updated conditionally so concurrent publication cannot silently erase another release.
+          - type: paragraph
+            text: >-
+              Existing showcase recordings keep their established identities and share links. The public player combines that saved catalogue with newer approved releases. It can still show its saved material if the live release catalogue is unavailable.
+        next: [{to: hear}]
+      - id: hear
+        title: Hear it in the player
+        kind: output
+        summary: >-
+          The public website presents the release, its artwork and checked visual material.
+        body:
+          - type: paragraph
+            text: >-
+              GitHub Pages serves the player and this process guide. R2 serves the media. Opening the site does not give a visitor access to the local production app or its operational database.
+          - type: media
+            kind: image
+            src: showcase:pupeii/pupeii-space-rock/pupeii-space-rock.png
+            alt: Pupeii album artwork from the existing GBR showcase
+            caption: >-
+              A real published showcase recording — an example of the finished presentation, not one of the controlled step-count samples.
+          - type: media
+            kind: audio
+            src: showcase:pupeii/pupeii-space-rock/pupeii-space-rock.mp3
+            caption: >-
+              Pupeii · space rock. The full existing release; audio loads when you choose to listen.
+          - type: topic-link
+            topic: platform
+            label: Explore the website and shared platform ↗
+        next: []
+topics:
+  - id: platform
+    title: One platform, several views
+    short: Platform & database
+    body:
+      - type: paragraph
+        text: >-
+          Writing, generation, review, preparation and publishing belong to one workflow. The operational database links those activities by stable song, variant, generation, recording and review identities. These entities describe different things; copying the same fact into every screen is not a useful integration strategy.
+      - type: heading
+        text: >-
+          Capture the facts once
+      - type: paragraph
+        text: >-
+          Workers report discovered model and hardware details, effective generation settings and available timings or memory measurements. Review adds human judgements and their revisions. Preparation and publishing refer back to the same recording and its derivatives.
+      - type: paragraph
+        text: >-
+          Missing historical telemetry stays null. A GPU name is not a measured peak VRAM value, and an unknown price is not free compute. The shared records make those distinctions visible to analysis.
+      - type: heading
+        text: >-
+          What is public?
+      - type: paragraph
+        text: >-
+          The production app runs on the operator’s device. The website is a static public presentation. Media comes from R2, and the Observatory uses an explicit public research export. The website does not open the live operational database to visitors.
+      - type: note
+        text: >-
+          A public research snapshot is a projection of approved fields. It is not a second operational database and is not a live write endpoint for reviews.
+      - type: links
+        items:
+          - label: Explore the GBR source
+            url: https://github.com/stst368-code/good-boy-records
+            description: >-
+              Application, worker integrations, shared schema and the public site build.
+  - id: analytics
+    title: Ask a better question of the evidence
+    short: Evidence & analytics
+    body:
+      - type: paragraph
+        text: >-
+          A batch answers very little if every interesting variable changes at once. Start with a question — for example, whether more sampling steps improve a particular performance — then hold the other inputs fixed and listen to matched outputs.
+      - type: paragraph
+        text: >-
+          The Observatory connects recorded controls with human judgements and available compute measurements. Look at sample counts, missing data and differences in caption or song coverage before treating a group average as a recommendation.
+      - type: heading
+        text: >-
+          Observation is not cause
+      - type: paragraph
+        text: >-
+          A configuration can appear stronger because it was used on easier songs, with different captions, or on a different model. More reviewed recordings help, but do not erase those design problems. A controlled listening set is a useful complement to a large historical archive.
+      - type: paragraph
+        text: >-
+          Current four-metric reviews and revision-bound tags are kept distinct from the earlier single-grade Porto archive. Unselected tags are not negative observations. A count of recordings should not accidentally become a count of repeated review events.
+      - type: analytics-link
+        label: Open the Signal Observatory →

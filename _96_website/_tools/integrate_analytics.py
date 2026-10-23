@@ -29,7 +29,7 @@ for filename in sys.argv[1:]:
     if 'id="gbrObservatory"' in html:
         print('Analytics view already integrated:',path)
         continue
-    anchor='<button class="utility-button" id="knowledgeButton" type="button">Knowledge</button>'
+    anchor='<button class="utility-button" id="knowledgeButton" type="button">How it’s made</button>'
     if anchor not in html or '</head>' not in html or '</body>' not in html:
         raise SystemExit(f'GBR player structure not recognised in {path}')
     html=html.replace(anchor,anchor+'\n      <button class="utility-button" id="gbrAnalyticsButton" type="button">Analytics</button>',1)

@@ -64,9 +64,14 @@ def main():
                 args=['--no-sandbox', '--use-angle=swiftshader', '--autoplay-policy=no-user-gesture-required'])
             for prefix, width, height in [('/',1440,1000),('/good-boy-records/',1280,900),('/good-boy-records/',390,844),('/porto/good-boy-records/',320,740)]:
                 context = browser.new_context(viewport={'width': width, 'height': height}, is_mobile=width<700, has_touch=width<700)
+                # These transport/navigation smoke checks do not test map
+                # animation. Freeze its raster loop after initial layout so a
+                # software GPU cannot starve clicks; ui_display tests live
+                # canvas geometry and hit selection separately.
+                context.add_init_script('const raf=requestAnimationFrame.bind(window);let paints=0;window.requestAnimationFrame=cb=>document.querySelector(".app")&&cb.name==="draw"&&++paints>6?0:raf(cb)')
                 context.route('https://pub-*.r2.dev/**', media)
                 page = context.new_page()
-                page.set_default_timeout(15000)
+                page.set_default_timeout(30000)
                 page.on('pageerror', lambda error: errors.append({'message': error.message, 'stack': error.stack}))
                 page.on('response', lambda response: failures.append(response.url) if response.url.startswith(base) and response.status>=400 else None)
                 page.goto(base+prefix, wait_until='domcontentloaded')
@@ -77,10 +82,9 @@ def main():
                 first = page.evaluate('({id:mainTracks[0].id,variant:variantOf(mainTracks[0]),token:shareTokenFor(mainTracks[0],"m")})')
                 assert first['token'] == share_token(first['id'], first['variant'])
                 assert page.evaluate('(()=>{const t=mainTracks[0],k=shareTokenFor(t,"m");return shareTokenFor({...t,variant:"edited",shareToken:k},"m")===k})()')
-                page.wait_for_function('audio.readyState>=1')
                 page.evaluate('setPower(true)')
                 page.locator('#play').click()
-                page.wait_for_function('!audio.paused')
+                page.wait_for_function('audio.readyState>=1 && !audio.paused')
                 page.evaluate('audio.pause()')
                 page.locator('#tracksButton').click()
                 assert page.locator('.track-song-group').count()>0
@@ -101,9 +105,11 @@ def main():
                     assert label.casefold() in facts.casefold(),(label,facts)
                 page.locator('#panelClose').click()
                 page.locator('#knowledgeButton').click()
-                page.wait_for_function('knowledgeReady && knowledgeNodes.length>0')
-                assert page.evaluate('GBR_KNOWLEDGE_NODES.find(n=>n.id==="generation-engine").markdown.includes("native")')
-                page.locator('#knowledgeButton').click()
+                guide = page.frame_locator('#gbrMaking iframe')
+                guide.locator('[role=tab]').first.wait_for()
+                assert guide.locator('[role=tab]').count() == 5
+                guide.locator('.back-player').click()
+                page.wait_for_function('!document.body.classList.contains("gbr-making-open")')
                 for hidden in (False, True):
                     page.evaluate('setEasterState('+str(hidden).lower()+');select('+('0' if hidden else 'Math.min(4,tracks.length-1)')+',false)')
                     identifier = page.evaluate('tracks[index].id')

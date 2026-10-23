@@ -13,6 +13,7 @@ import uuid
 import webbrowser
 sys.path.insert(0, str(Path(__file__).resolve().parent / '_tools'))
 from export_platform import export as export_platform, validate as validate_platform
+from build_making import stage as stage_making
 
 ROOT = Path(__file__).resolve().parent
 FORMAT = 'gbr-website-build-v1'
@@ -47,7 +48,7 @@ def output_path(root, output):
     if root.is_relative_to(output):
         raise ValueError('Build output cannot replace website source or its parent')
     if output.is_relative_to(root) and output.relative_to(root).parts[0] in {
-        '_templates', '_analytics', '_data', '_tools', '_content', '_tests', '_showcase'}:
+        '_templates', '_analytics', '_how_its_made', '_data', '_tools', '_content', '_tests', '_showcase'}:
         raise ValueError('Build output cannot replace website content or media')
     if output.exists():
         marker = output / 'build-manifest.json'
@@ -97,6 +98,9 @@ def stage(root, target):
                     str(target / 'knowledge-manifest.json')], cwd=root, check=True)
     subprocess.run([sys.executable, str(root / '_tools/integrate_analytics.py'),
                     str(target / 'index.html'), str(target / 'landscape.html')], cwd=root, check=True)
+    making = stage_making(root, target)
+    subprocess.run([sys.executable, str(root / '_tools/integrate_making.py'),
+                    str(target / 'index.html'), str(target / 'landscape.html')], check=True)
     (target / '.nojekyll').write_text('', encoding='utf-8')
     player = (target / 'index.html').read_text(encoding='utf-8')
     for anchor in ('crossorigin="anonymous"', 'id="knowledgeButton"', 'FALLBACK_ART', 'id="gbrAnalyticsButton"', 'id="gbrObservatory"'):
@@ -109,7 +113,7 @@ def stage(root, target):
             raise ValueError('Invalid knowledge document path')
     manifest = {'format': FORMAT, 'tracks': main, 'hidden_tracks': hidden,
                 'historical_analytics_records': len(analysis['generations']),
-                'analytics_generated_at': analysis.get('generated_at'), 'knowledge_documents': len(knowledge['documents'])}
+                'analytics_generated_at': analysis.get('generated_at'), 'knowledge_documents': len(knowledge['documents']), 'process_guide': making}
     if platform_available == 'available':
         current = json.loads(read_json(destination / 'platform.json'))
         manifest['platform_recordings'] = current['count']
