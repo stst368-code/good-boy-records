@@ -4989,6 +4989,7 @@ body[data-view="knowledge"] #easterStoryOverlay{display:none!important}
 </button>
 <audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
 <script src="showcase-host.js"></script>
+<script src="releases.js"></script>
 <script>
 const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext('2d'),audio=$('audio');
 audio.crossOrigin='anonymous';
@@ -5115,8 +5116,8 @@ function swapAudioExt(url,ext){
 function audioPools(t){
   const s=t?.audio?.sources||{},raw=[s.flac,s.lossless,s.mp3,s.stream,t?.audio_url,t?.audio?.url,t?.audio?.src].filter(Boolean),seen=new Set(),pools={flac:[],mp3:[],other:[]};
   for(const value of raw){const url=showcaseUrl(value),key=String(url);if(!key||seen.has(key))continue;seen.add(key);const bucket=classifyAudioUrl(url);(pools[bucket]||pools.other).push(url)}
-  if(!pools.flac.length&&pools.mp3.length){for(const url of pools.mp3){const alt=swapAudioExt(url,'flac');if(alt&&!seen.has(alt)){seen.add(alt);pools.flac.push(alt)}}}
-  if(!pools.mp3.length&&pools.flac.length){for(const url of pools.flac){const alt=swapAudioExt(url,'mp3');if(alt&&!seen.has(alt)){seen.add(alt);pools.mp3.push(alt)}}}
+  if(!t?.release_id&&!pools.flac.length&&pools.mp3.length){for(const url of pools.mp3){const alt=swapAudioExt(url,'flac');if(alt&&!seen.has(alt)){seen.add(alt);pools.flac.push(alt)}}}
+  if(!t?.release_id&&!pools.mp3.length&&pools.flac.length){for(const url of pools.flac){const alt=swapAudioExt(url,'mp3');if(alt&&!seen.has(alt)){seen.add(alt);pools.mp3.push(alt)}}}
   return pools
 }
 function audioCandidates(t,preferred=preferredAudioFormat){
@@ -5152,7 +5153,7 @@ function startPlaybackNow(){
 }
 const FALLBACK_ART='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="#0a0b09"/><circle cx="512" cy="512" r="255" fill="none" stroke="#6f5b43" stroke-width="18"/><circle cx="512" cy="512" r="70" fill="#6f5b43"/><text x="512" y="830" text-anchor="middle" fill="#a78a65" font-family="monospace" font-size="48" letter-spacing="8">GOOD BOY RECORDS</text></svg>`);
 function artOf(t){if(t?.artwork_url)return showcaseUrl(t.artwork_url);const a=t?.artwork;if(typeof a==='string')return showcaseUrl(a);if(a?.url||a?.src)return showcaseUrl(a.url||a.src);return FALLBACK_ART}
-function fullArtOf(t){const direct=t?.artwork_url||t?.artwork?.url||t?.artwork?.src||'';if(direct)return showcaseUrl(direct);const id=t?.id||t?.slug||'';const comp=t?.composition||t?.song||'';if(id&&comp)return showcaseUrl(`showcase/${comp}/${id}/${id}.png`);return artOf(t)}
+function fullArtOf(t){const direct=t?.artwork_url||t?.artwork?.url||t?.artwork?.src||'';if(direct)return showcaseUrl(direct);if(t?.release_id)return artOf(t);const id=t?.id||t?.slug||'';const comp=t?.composition||t?.song||'';if(id&&comp)return showcaseUrl(`showcase/${comp}/${id}/${id}.png`);return artOf(t)}
 function imageFor(t){const src=artOf(t);let im=coverImages.get(src);if(!im){im=new Image();im.decoding='async';im.src=src;coverImages.set(src,im)}return im}
 function lyricOf(t){const l=t?.lyrics,raw=typeof l==='string'?l:l?.raw||t?.lyric||'';if(!raw)return' ';return raw.split(/\r?\n/).map(x=>x.trim()).find(x=>x&&!x.startsWith('['))||' '}
 async function loadLyrics(t){
@@ -5647,6 +5648,7 @@ function toggleEaster(){const entering=!easter;easter=entering;document.body.dat
 async function load(){
   const candidates=['catalogue.json','data/catalogue.json','../data/catalogue.json'];let data=null;
   for(const url of candidates){try{const r=await fetch(url,{cache:'no-store'});if(r.ok){data=await r.json();break}}catch{}}
+  if(window.GBRloadReleases)data=await window.GBRloadReleases(data);
   data=externaliseShowcasePaths(data);mainTracks=Array.isArray(data)?data:(data?.tracks||[]);easterTracks=Array.isArray(data?.easter_tracks)?data.easter_tracks:(Array.isArray(data?.easter?.tracks)?data.easter.tracks:[]);tracks=mainTracks;
   if(!tracks.length)throw new Error('No catalogue tracks found');
   sortGenreSequence(mainTracks);sortGenreSequence(easterTracks);tracks=mainTracks;

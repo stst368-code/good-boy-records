@@ -110,7 +110,10 @@ def main():
                     link = page.evaluate('currentShareUrl()')
                     assert urlsplit(link).path == prefix
                     page.goto(link, wait_until='domcontentloaded')
-                    page.wait_for_function('typeof tracks!=="undefined" && tracks[index]?.id==='+json.dumps(identifier))
+                    try:page.wait_for_function('typeof tracks!=="undefined" && tracks[index]?.id==='+json.dumps(identifier))
+                    except Exception:
+                        print(json.dumps({'expected':identifier,'link':link,'state':page.evaluate('({id:tracks[index]?.id,token:pendingShareToken,hasToken:shareIndex.has(pendingShareToken),main:mainTracks.length,hidden:easterTracks.length})'),'errors':errors}),flush=True)
+                        raise
                     assert urlsplit(page.url).query == ''
                     assert page.evaluate('easter') == hidden
                 page.locator('#gbrAnalyticsButton').click()
@@ -137,7 +140,8 @@ def main():
         server.shutdown()
     assert not errors, errors
     assert not failures, failures
-    assert media_paths and all('/showcase/' in path for path in media_paths)
+    assert media_paths and any('/showcase/' in path for path in media_paths)
+    assert all('/showcase/' in path or path in {'/gbr/v2/catalogue.json','/gbr/v2/research.json'} for path in media_paths)
     print(json.dumps({'workflows':completed,'tracks':len(catalogue['tracks']),'hidden_tracks':len(catalogue['easter']['tracks']),
                       'historical_analytics_records':len(recordings),'javascript_errors':errors,'asset_errors':failures,'media':'synthetic'}))
 

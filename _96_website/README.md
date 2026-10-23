@@ -42,6 +42,41 @@ separate ledger and are not assigned to new recordings.
 
 ## Curated player catalogue
 
+New recordings publish from **GBR → Publish**, after a reviewed distribution
+selection reaches Preparation. Choose the prepared source or an exact master,
+optional registered artwork (otherwise the GBR sleeve), lossless download and
+approved word timings. **Prepare preview** creates MP3 plus optional sanitised
+FLAC, artwork, lyrics and numeric light cues. Audition and inspect its public
+metadata before **Publish this preview**. Source audio/YAML and reviews stay intact.
+
+Configure **Settings → Publishing · R2 and website** once: the existing public
+bucket's S3 API endpoint, bucket name, public media URL and website URL. Enter
+the R2 access/secret keys locally; blank fields retain saved credentials. An AWS
+profile or `GBR_R2_ACCESS_KEY_ID` / `GBR_R2_SECRET_ACCESS_KEY` also works. Saved
+keys live only in the ignored device runtime and are never returned by the API,
+included in a release or committed. Use a token scoped to the public bucket.
+**Check public connection** verifies a small upload, exact readback, public URL
+and CORS. Allow the website origin (normally `https://stst368-code.github.io`)
+for GET/HEAD with Range in the bucket CORS settings. No bucket is created or synced.
+For a different public media domain, update `GBR_RELEASE_CATALOGUE` and
+`GBR_RELEASE_RESEARCH` in `showcase-host.js` and deploy the website with that change.
+
+Objects live at `gbr/v2/objects/<hash-prefix>/<sha256>.<extension>`; a verified,
+conditional update to `gbr/v2/catalogue.json` makes them visible. Immutable
+catalogue snapshots preserve release history. Upload/check failures retain the
+previous catalogue and local preview for explicit retry. An uncertain response
+is reconciled by release ID on retry. Successful publication removes verified
+local web derivatives; **Discard preview** removes unused previews. **Withdraw
+from website** removes the entry without deleting historical objects. Legacy
+`showcase/` objects and share identities remain unchanged.
+
+The public player merges these releases with its saved catalogue and falls back
+to that catalogue if R2 is unavailable. **Publish research snapshot** exports the
+shared database through the existing public allow-list, uploads immutable research
+JSON and updates `gbr/v2/research.json`. The Observatory loads this separately from
+Porto's older single-grade data. Private Reasons, reviewer names, credentials,
+workstation paths and raw YAML are excluded. This introduces no new DB or schema.
+
 `_data/catalogue.json` retains 168 main and nine hidden recordings. Public R2
 `showcase/` object keys, catalogue identities and share tokens stay stable.
 The local source folders use the repository's lowercase naming convention:
@@ -75,9 +110,11 @@ Public routes remain `analytics/`, `data/analytics/` and `content-source/folders
 
 ## Deployment and checks
 
-`.github/workflows/website.yml` tests and builds the public artifact. Pages
-publishes only when **GBR website** is explicitly dispatched on `main` with
-**Deploy to GitHub Pages** enabled. Serve only `_site`; database/configuration,
+`.github/workflows/website.yml` tests and builds the public artifact. A website
+push to the repository's current default branch publishes that tested artifact;
+manual **GBR website → Deploy to GitHub Pages** also works on that branch.
+PR checks never deploy. The duplicate repository-root uploader was removed.
+Serve only `_site`; database/configuration,
 original inputs, review archives, environments and local media are excluded.
 A failed build retains the last completed site and cleans temporary staging.
 

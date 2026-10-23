@@ -26,6 +26,7 @@ jobs:
       - run: python -m pytest _03_review/_generation_review/_tests -q
       - run: python -m pytest _99_tools/_yaml_editor/_tests -q
       - run: node --input-type=module --check < _04_preparation/_static/preparation.js
+      - run: node --input-type=module --check < _04_preparation/_static/publishing.js
       - run: node --input-type=module --check < _04_preparation/_static/timeline.js
       - run: node --input-type=module --check < _02_generation/_static/generation.js
       - run: node --input-type=module --check < _02_generation/_static/jobs.js

@@ -6,7 +6,7 @@ from .service import digest
 
 def plan(db):
     objects={};missing=[];conflicts=[]
-    rows=db.all('SELECT id,kind,sha256,uri,size_bytes FROM generation_artifacts ORDER BY id')
+    rows=db.all("SELECT id,kind,sha256,uri,size_bytes FROM generation_artifacts WHERE kind<>'release_asset' ORDER BY id")
     # Legacy reviewed media and YAMLs predate generation_artifacts. Project their
     # existing records into the inventory instead of copying them into a new DB.
     rows+=db.all("SELECT 'media:'||id AS id,'audio' AS kind,sha256,path AS uri,size AS size_bytes FROM media_files WHERE storage_state IN ('input','archived')")
