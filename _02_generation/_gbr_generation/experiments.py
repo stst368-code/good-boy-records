@@ -72,7 +72,7 @@ def expand(options, rng=None):
     if any(type(v) is not int or not 1 <= v <= MAX_RUNS for v in (repeats, samples)):
         raise ValueError('Experiment quantities must be integers from 1 to 10000')
     strategy = options.get('strategy', 'grid')
-    if strategy not in {'grid', 'sample'} or options.get('seed_policy', 'preserve') not in {'preserve', 'randomize'}:
+    if strategy not in {'grid', 'sample'} or options.get('seed_policy', 'preserve') not in {'preserve', 'randomize', 'shared'}:
         raise ValueError('Unknown experiment strategy or seed policy')
     sweeps = options.get('sweeps', {})
     if not isinstance(sweeps, dict):

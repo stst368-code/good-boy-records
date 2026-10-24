@@ -4,6 +4,13 @@ The unified application provides Writing, YAML editor, Generation, Review, Selec
 Preparation and Publish tabs, connected to `_98_database/gbr.sqlite3`. The shared platform belongs here;
 reusable worker and editing tools belong in `_99_tools`.
 
+Generation has separate **Production queue** and **Experiments** views. Choose
+Experiment under New batch for encoding trials and parameter sweeps: outputs go
+to `_02_generation/_experiments/<batch-id>` and stay outside review and quality
+stats. Listen/compare, export timings, move selected bundles into review, or delete
+their output files while retaining measurements and worker caches. See the
+[generation guide](../_02_generation/README.md#production-and-experiments).
+
 The native generation controller is available separately for the
 [first local PC test](../_02_generation/LOCAL_TEST.md). Successful FLACs carry
 native run provenance and link back to generation telemetry when the existing

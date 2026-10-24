@@ -158,6 +158,8 @@ def open_database(path):
 
 def prepare_batch(checked, specification, workspace, database, *, input_root, error_policy="cancel", selection=None,
                   output_root=None, output_layout='single'):
+    from .purpose import purpose, label
+    run_purpose, experiment_label = purpose(specification), label(specification)
     if error_policy not in {"cancel", "drop"}:
         raise ValueError("error_policy must be cancel or drop")
     invalid = [i for i in checked if not i.ready]
@@ -200,10 +202,12 @@ def prepare_batch(checked, specification, workspace, database, *, input_root, er
             (staging / "requests").mkdir()
             created = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
             manifest = {"format_version": 1, "batch_id": batch_id, "status": "prepared", "created_at": created,
+                        "purpose": run_purpose, "experiment_label": experiment_label,
                         "database": str(Path(database).resolve()), "error_policy": error_policy,
                         "selection": selection or {}, "specification": specification, "inputs": [], "runs": []}
             if output_root is not None:
-                manifest.update(output_root=str(output_root), output_layout=output_layout)
+                manifest.update(output_root=str(output_root / batch_id if run_purpose == 'experiment' else output_root), output_layout=output_layout)
+            shared_seeds = {}
             for index, record in enumerate(checked):
                 summary = record.summary()
                 summary.update({"input_id": str(index), "status": "ready" if record.ready else "excluded"})
@@ -218,7 +222,12 @@ def prepare_batch(checked, specification, workspace, database, *, input_root, er
                     # Freeze automatic seeds only after all preflight checks.
                     for seed in SEEDS:
                         if effective.get(seed, "auto") == "auto":
-                            effective[seed] = str(secrets.randbits(64))
+                            if specification.get('experiments', {}).get('seed_policy') == 'shared':
+                                if seed not in shared_seeds:
+                                    shared_seeds[seed] = str(secrets.randbits(64))
+                                effective[seed] = shared_seeds[seed]
+                            else:
+                                effective[seed] = str(secrets.randbits(64))
                             provenance[seed] = provenance.get(seed, "automatic") + ":frozen"
                     worker_options=[]
                     for option in case.get('worker_options') or []:
@@ -233,6 +242,7 @@ def prepare_batch(checked, specification, workspace, database, *, input_root, er
                     working = record.document.with_generation_values(output_changes(record.document, effective))
                     write_new(staging / request_name, working)
                     manifest["runs"].append({"id": run_id, "input_id": str(index), "snapshot": input_name,
+                        "purpose": run_purpose,
                         "source_sha256": record.document.sha256, "request_yaml": request_name, "request_yaml_sha256": sha(working),
                         "song_id": record.item.song_id, "variant_id": record.item.variant_id,
                         "title": record.document.values["title"], "effective": effective, "provenance": provenance,
@@ -247,7 +257,8 @@ def prepare_batch(checked, specification, workspace, database, *, input_root, er
             conn.execute("BEGIN IMMEDIATE")
             conn.execute("INSERT INTO generation_batches VALUES(?,?,?,?,?)", (
                 batch_id, created, "prepared", json_text(selection or {}),
-                json_text({"error_policy": error_policy, "manifest_sha256": sha(rendered)})))
+                json_text({"error_policy": error_policy, "manifest_sha256": sha(rendered),
+                           "purpose": run_purpose, "experiment_label": experiment_label})))
             for record, summary in zip(checked, manifest["inputs"]):
                 source_hash = None
                 if record.ready:

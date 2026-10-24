@@ -8,6 +8,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
   <div class="section-heading"><h1>Generation</h1><p class="subtle">Select songs, adjust the stages you want to test, then check the batch.</p></div>
   <div class="generation-grid">
   <section class="generation-panel">
+    <div class="gen-purpose"><label>Run purpose<select id="genPurpose"><option value="production">Production · send to review</option><option value="experiment">Experiment · keep out of review</option></select></label><label id="genExperimentLabelBox" hidden>Experiment name (optional)<input id="genExperimentLabel" maxlength="160" placeholder="Encoding shortlist / step sweep"></label><p id="genPurposeNote" class="subtle small"></p></div>
     <h2>Tracks</h2><label>Writing catalogue<div class="generation-inline"><input id="genRoot"><button id="genBrowse" type="button">Browse</button><button id="genScan" type="button">Load</button></div></label>
     <div class="generation-inline"><label class="flex">Find a song or file<input id="genSearch" type="search"></label><label>Album<select id="genAlbum"><option value="">All albums</option></select></label></div>
     <div class="generation-inline"><button id="genSelectVisible" type="button">Select shown</button><button id="genClear" type="button">Clear</button><span id="genSelected" class="subtle small"></span></div><div id="genFiles" class="generation-files" aria-label="Writing inputs"></div>
@@ -16,7 +17,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     <div class="generation-stage-column"><section class="generation-module"><h2>1 · Models</h2><label>Encoder / DiT selection<select id="genModelsMode"><option value="yaml">YAML, then worker defaults / available models</option><option value="worker" selected>Worker defaults / available models</option><option value="pairs">Test listed encoder + DiT pairs</option></select></label><div id="genModelPairs" class="gen-pairs"></div><button id="genAddModelPair" type="button">+ Encoder / DiT pair</button></section>
     <section class="generation-module"><h2>2 · Text conditioning</h2><div id="genEncodingControls" class="generation-fields"></div><div class="generation-fields"><label>Caption source<select id="genCaptionMode"><option value="random">Random templates</option><option value="yaml">YAML caption</option><option value="catalogue">Catalogue style</option></select></label><label>Captions per track<input id="genCaptionCount" type="number" min="1" max="1000" value="1"></label></div><div id="genCaptionPool"><h3 class="caption-pool-title">Template clusters</h3><div id="genCaptionClusters"></div></div></section>
     </div><div class="generation-stage-column"><section class="generation-module"><h2>3 · Diffusion</h2><label>Sampler / scheduler selection<select id="genSamplingMode"><option value="yaml">YAML, then worker defaults / available choices</option><option value="worker" selected>Worker defaults / available choices</option><option value="pairs">Test listed sampler + scheduler pairs</option></select></label><div id="genSamplerPairs" class="gen-pairs"></div><button id="genAddSamplerPair" type="button">+ Sampler / scheduler pair</button><div id="genDiffusionControls" class="generation-fields"></div></section>
-    <section class="generation-module"><h2>4 · Queue & output</h2><div class="generation-fields"><label>Generations per combination<input id="genRepetitions" type="number" min="1" max="10000" value="1"></label><label>Combinations across stages<select id="genStrategy"><option value="grid">Test every combination</option><option value="sample">Sample random combinations</option></select></label><label id="genSamplesLabel" hidden>Random combinations<input id="genSamples" type="number" min="1" max="10000" value="1"></label><label>Repeated-run seeds<select id="genSeedPolicy"><option value="preserve">Use seed controls (automatic if blank)</option><option value="randomize">Force new seeds per generation</option></select></label><label>Conditioning cache<select id="genCache"><option value="prefer">Reuse when supported</option><option value="require">Require cached encodings (native)</option><option value="disabled">Encode every time (native)</option></select></label><label>Output grouping<select id="genLayout"><option value="single">Single inbox</option><option value="track">By track</option><option value="album">By album</option></select></label></div><p id="genEstimate" class="subtle small" role="status"></p><p class="subtle small">Each row keeps its encoder/DiT or sampler/scheduler paired. Ranges combine across stages. Blank selections inherit YAML, then each worker's defaults and available models.</p><p id="genOutput" class="subtle small"></p></section>
+    <section class="generation-module"><h2>4 · Queue & output</h2><div class="generation-fields"><label>Generations per combination<input id="genRepetitions" type="number" min="1" max="10000" value="1"></label><label>Combinations across stages<select id="genStrategy"><option value="grid">Test every combination</option><option value="sample">Sample random combinations</option></select></label><label id="genSamplesLabel" hidden>Random combinations<input id="genSamples" type="number" min="1" max="10000" value="1"></label><label>Repeated-run seeds<select id="genSeedPolicy"><option value="preserve">Use seed controls (automatic if blank)</option><option value="shared">Same automatic seeds across batch</option><option value="randomize">Force new seeds per generation</option></select></label><label>Conditioning cache<select id="genCache"><option value="prefer">Reuse when supported</option><option value="require">Require cached encodings (native)</option><option value="disabled">Encode every time (native)</option></select></label><label>Output grouping<select id="genLayout"><option value="single">Single inbox</option><option value="track">By track</option><option value="album">By album</option></select></label></div><p id="genEstimate" class="subtle small" role="status"></p><p class="subtle small">Each row keeps its encoder/DiT or sampler/scheduler paired. Ranges combine across stages. Blank selections inherit YAML, then each worker's defaults and available models.</p><p id="genOutput" class="subtle small"></p></section>
     </div></div><button id="genPreview" class="primary" type="button">Check selected tracks</button>
   </section>
   <section class="generation-panel generation-monitor"><h2>Workers</h2><label>Run on<select id="genWorker"><option value="auto">All available workers · shared queue</option></select></label><div class="generation-inline"><button id="genWorkerSettings" type="button">Worker settings</button><button id="genRefreshWorkers" type="button">Refresh availability</button></div><p id="genConnectionStatus" class="subtle small" role="status"></p><section id="genPlan" class="generation-plan" hidden><h2>Batch check</h2><p id="genPlanSummary"></p><div id="genPlanRows"></div><label class="generation-check"><input id="genDropErrors" type="checkbox">Drop errored inputs and run valid tracks</label><button id="genStart" class="primary" type="button">Generate checked tracks</button><button id="genCancelPreview" type="button">Cancel batch</button></section><h2>Jobs</h2><div class="generation-inline"><button id="genRefreshJobs" type="button">Refresh</button><button id="genClearLogs" type="button">Clear log view</button><button id="genRestoreLogs" type="button">Show full logs</button></div><div id="genJobs" class="generation-jobs"></div></section></div>`;
@@ -29,12 +30,12 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
   setup.append($('genPlan'));
   const queue=document.createElement('section');queue.id='genQueuePanel';queue.hidden=true;
   while(monitor.firstChild)queue.append(monitor.firstChild);
-  const tabs=document.createElement('div');tabs.className='gen-workspace-tabs';tabs.innerHTML='<button id="genSetupTab" type="button" class="active">New batch</button><button id="genQueueTab" type="button">Queue</button>';
+  const tabs=document.createElement('div');tabs.className='gen-workspace-tabs';tabs.innerHTML='<button id="genSetupTab" type="button" class="active">New batch</button><button id="genQueueTab" type="button">Production queue</button><button id="genExperimentsTab" type="button">Experiments</button>';
   grid.replaceWith(workerbar,tabs,setup,queue);
-  function showPanel(name){setup.hidden=name!=='setup';queue.hidden=name!=='queue';$('genSetupTab').classList.toggle('active',name==='setup');$('genQueueTab').classList.toggle('active',name==='queue');}
-  $('genSetupTab').onclick=()=>showPanel('setup');$('genQueueTab').onclick=()=>{showPanel('queue');jobs().catch(e=>toast(e.message));};
+  function showPanel(name){setup.hidden=name!=='setup';queue.hidden=name==='setup';$('genSetupTab').classList.toggle('active',name==='setup');$('genQueueTab').classList.toggle('active',name==='queue');$('genExperimentsTab').classList.toggle('active',name==='experiments');dashboard.setPurpose(name==='experiments'?'experiment':'production');}
+  $('genSetupTab').onclick=()=>showPanel('setup');for(const [id,name] of [['genQueueTab','queue'],['genExperimentsTab','experiments']])$(id).onclick=()=>{showPanel(name);jobs().catch(e=>toast(e.message));};
   $('genClearLogs').remove();$('genRestoreLogs').remove();
-  const state={rows:[],selected:new Set(),catalogueRoot:null,scanSequence:0,workers:[],resolved:null,token:null,preview:null,loaded:false,poll:null,busy:false,revision:0,logCursors:JSON.parse(sessionStorage.getItem('gbr-generation-log-cursors')||'{}'),tasks:[]};
+  const state={paths:null,rows:[],selected:new Set(),catalogueRoot:null,scanSequence:0,workers:[],resolved:null,token:null,preview:null,loaded:false,poll:null,busy:false,revision:0,logCursors:JSON.parse(sessionStorage.getItem('gbr-generation-log-cursors')||'{}'),tasks:[]};
   const guarded=fn=>(...args)=>Promise.resolve(fn(...args)).catch(error=>toast(error.message));
   const numericFields=[['encoder_cfg','genEncoderCfg','Encoder CFG',1.5,'genEncodingControls'],['top_k','genTopK','Top-k',50,'genEncodingControls'],['duration','genDuration','Maximum seconds',360,'genEncodingControls'],['encoder_seed','genEncoderSeed','Encoder seed','auto','genEncodingControls'],['sampler_steps','genSteps','Steps',30,'genDiffusionControls'],['sampler_cfg','genCfg','Diffusion CFG',1.7,'genDiffusionControls'],['sampler_seed','genSamplerSeed','Diffusion seed','auto','genDiffusionControls']];
   for(const [key,id,label,value,container] of numericFields){
@@ -88,7 +89,9 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
   }
   function preferences(){return {worker_id:$('genWorker').value,input_root:$('genRoot').value,parameters:parameters(),controls:controlSettings(),layout:$('genLayout').value};}
   function invalidate(){state.revision++;state.token=null;state.preview=null;$('genPlan').hidden=true;estimate();}
-  function estimate(){$('genCaptionPool').hidden=$('genCaptionMode').value!=='random';$('genCaptionCount').disabled=$('genCaptionMode').value!=='random';for(const group of pairs)$(group.container).hidden=$(group.mode).value!=='pairs';try{const e=experiments();let n=e.groups.reduce((n,g)=>n*g.length,1);for(const value of Object.values(e.sweeps))n*=typeof value==='object'?Math.max(0,Math.floor((Number(value.stop)-Number(value.start))/Number(value.step)+1+1e-8)):value.split(',').length;if(e.strategy==='sample')n=e.samples;const captions=$('genCaptionMode').value!=='random'?1:Number($('genCaptionCount').value);$('genEstimate').textContent=`Estimated ${state.selected.size*captions*n*e.repetitions} generations · ${state.selected.size} tracks × ${captions} captions × ${n} combinations × ${e.repetitions} repeats. Each job runs once on a compatible worker.`;}catch{$('genEstimate').textContent='Complete the selected ranges and combinations to estimate the batch.';}$('genSamplesLabel').hidden=$('genStrategy').value!=='sample';}
+  function estimate(){purposeNotice();$('genCaptionPool').hidden=$('genCaptionMode').value!=='random';$('genCaptionCount').disabled=$('genCaptionMode').value!=='random';for(const group of pairs)$(group.container).hidden=$(group.mode).value!=='pairs';try{const e=experiments();let n=e.groups.reduce((n,g)=>n*g.length,1);for(const value of Object.values(e.sweeps))n*=typeof value==='object'?Math.max(0,Math.floor((Number(value.stop)-Number(value.start))/Number(value.step)+1+1e-8)):value.split(',').length;if(e.strategy==='sample')n=e.samples;const captions=$('genCaptionMode').value!=='random'?1:Number($('genCaptionCount').value);$('genEstimate').textContent=`Estimated ${state.selected.size*captions*n*e.repetitions} generations · ${state.selected.size} tracks × ${captions} captions × ${n} combinations × ${e.repetitions} repeats. Each job runs once on a compatible worker.`;}catch{$('genEstimate').textContent='Complete the selected ranges and combinations to estimate the batch.';}$('genSamplesLabel').hidden=$('genStrategy').value!=='sample';}
+  function purposeNotice(){const experimental=$('genPurpose').value==='experiment';$('genExperimentLabelBox').hidden=!experimental;$('genPurposeNote').textContent=experimental?'Saved separately with timings, hardware and cache data. Listen here, then send only the results you want to review.':'Completed songs enter the review inbox.';if(state.paths)$('genOutput').textContent=experimental?`Experiments: ${state.paths.experiment_root} · one folder per batch. Encoding caches stay with their worker.`:`Inbox: ${state.paths.output_root}. Each generation keeps its FLAC, completed YAML, source and report together until review.`;}
+  $('genPurpose').onchange=()=>{if($('genPurpose').value==='experiment'&&$('genSeedPolicy').value==='preserve')$('genSeedPolicy').value='shared';invalidate();};
   async function save(){return api('/generation/preferences',preferences());}
   async function reloadWorkers(refresh=false){const current=$('genWorker').value;state.workers=(await api('/generation/workers'+(refresh?'?refresh=true':''))).workers;$('genWorker').replaceChildren(new Option('All available workers · shared queue','auto'),...state.workers.map(w=>new Option(workerLabel(w),w.id)));$('genWorker').value=state.workers.some(w=>w.id===current)?current:'auto';state.resolved=null;refreshChoices();invalidate();}
   async function chooseWorker(){state.resolved=null;invalidate();if($('genWorker').value==='auto'){$('genConnectionStatus').textContent='Enabled online workers share this queue. Each worker uses its own compatible models; busy workers join after their current job.';refreshChoices();return;}const id=$('genWorker').value,entry=await api('/generation/workers/query',{worker_id:id});if($('genWorker').value!==id)return;state.workers=state.workers.map(w=>w.id===id?entry:w);state.resolved=entry;refreshChoices();$('genConnectionStatus').textContent=entry.status?.error||workerLabel(entry);}
@@ -167,7 +170,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     $("genPlan").hidden = !plan;
     if (!plan) return;
     $("genPlanSummary").textContent =
-      `${plan.ready} ready · ${plan.generation_count ?? plan.ready} generations · ${plan.invalid} errored · ${plan.workers?.length || 1} worker(s). Seeds and source copies will be frozen before dispatch.`;
+      `${plan.purpose==='experiment'?'Experiment · ':'Production · '}${plan.ready} ready · ${plan.generation_count ?? plan.ready} generations · ${plan.invalid} errored · ${plan.workers?.length || 1} worker(s). Seeds and source copies will be frozen before dispatch.`;
     $("genPlanRows").replaceChildren();
     for (const row of plan.inputs) {
       const details = document.createElement("details");
@@ -201,6 +204,8 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     if (loadedRoot !== state.catalogueRoot || $("genRoot").value.trim() !== loadedRoot)
       throw new Error("Writing folder changed. Load it again before checking tracks.");
     const body = {
+      purpose: $('genPurpose').value,
+      experiment_label: $('genExperimentLabel').value.trim(),
       input_root: loadedRoot,
       worker_id: requestedWorker,
       files,
@@ -269,14 +274,15 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     state.busy = true;
     $("genStart").disabled = true;
     try {
+      const experimental = state.preview?.purpose === "experiment";
       await api("/generation/start", {
         token: state.token,
         skip_errors: $("genDropErrors").checked,
       });
       invalidate();
-      showPanel('queue');
+      showPanel(experimental?'experiments':'queue');
       await jobs();
-      toast("Batch queued. You can continue reviewing.");
+      toast(experimental?"Experiment queued. Results and timings appear under Experiments.":"Batch queued. You can continue reviewing.");
     } finally {
       state.busy = false;
     }
@@ -300,8 +306,8 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
       if (!state.loaded) {
         const prefs = await api("/generation/preferences");
         $("genRoot").value = prefs.input_root;
-        $("genOutput").textContent =
-          `Inbox: ${prefs.output_root}. Each generation keeps its FLAC, completed YAML, source and report together until review.`;
+        state.paths = prefs;
+        purposeNotice();
         await reloadWorkers(true);
         if (state.workers.some(w => w.id === prefs.worker_id)) $('genWorker').value = prefs.worker_id;
         restoreControls(prefs.controls);

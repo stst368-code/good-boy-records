@@ -1,9 +1,12 @@
 """Generation routes mounted in the review app with the same host and request protection."""
+import csv
+import io
 import json
 from typing import Literal
 from urllib.error import HTTPError, URLError
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 from .web_service import GenerationService
@@ -74,6 +77,8 @@ class RatingFilter(Body):
 
 class Preview(Body):
     input_root: str
+    purpose: Literal['production','experiment'] = 'production'
+    experiment_label: str = Field(default='',max_length=160)
     connection: Connection | None = None
     worker_id: str | None = Field(default=None, max_length=2100)
     all_inputs: StrictBool = False
@@ -228,10 +233,39 @@ def router(root, review_service, local):
         return {'tasks': service.tasks()}
 
     @routes.get('/jobs')
-    def jobs():return jobs_service.listing()
+    def jobs(purpose:Literal['production','experiment','all']='production'):return jobs_service.listing(purpose)
 
     @routes.get('/jobs/{batch_id}')
-    def job_details(batch_id:str,offset:int=0,limit:int=100):return jobs_service.details(batch_id,offset,limit)
+    def job_details(batch_id:str,offset:int=0,limit:int=100,sort:Literal['created','steps','time']='created'):return jobs_service.details(batch_id,offset,limit,sort)
+
+    @routes.get('/jobs/{batch_id}/performance.csv')
+    def performance(batch_id:str):
+        rows=jobs_service.performance(batch_id)
+        stream=io.StringIO(newline='')
+        columns=list(dict.fromkeys(key for row in rows for key in row)) or ['batch_id','run_id','attempt_id','purpose']
+        writer=csv.DictWriter(stream,fieldnames=columns);writer.writeheader()
+        for row in rows:
+            writer.writerow({key:json.dumps(value,ensure_ascii=False) if isinstance(value,(list,dict)) else
+                "'"+value if isinstance(value,str) and value.startswith(('=','+','-','@')) else value for key,value in row.items()})
+        return StreamingResponse(iter(['\ufeff'+stream.getvalue()]),media_type='text/csv',
+            headers={'Content-Disposition':f'attachment; filename="gbr-{batch_id}-performance.csv"','Cache-Control':'no-store'})
+
+    @routes.get('/experiments/{run_id}/audio')
+    def experiment_audio(run_id:str):
+        from .experiment_outputs import ExperimentOutputs
+        return FileResponse(ExperimentOutputs(service).audio(run_id),media_type='audio/flac',headers={'Cache-Control':'no-store'})
+
+    @routes.post('/experiments/{run_id}/promote')
+    def promote_experiment(run_id:str):
+        from .experiment_outputs import ExperimentOutputs
+        try:return ExperimentOutputs(service).action(run_id,'promote')
+        except OSError as error:raise ValueError('Experiment move is pending. Close file handles and retry Send to review: '+str(error)) from None
+
+    @routes.post('/experiments/{run_id}/delete-output')
+    def delete_experiment_output(run_id:str):
+        from .experiment_outputs import ExperimentOutputs
+        try:return ExperimentOutputs(service).action(run_id,'delete')
+        except OSError as error:raise ValueError('Experiment file deletion is pending. Close file handles and retry Delete output files: '+str(error)) from None
 
     @routes.get('/jobs/{batch_id}/runs/{run_id}/text')
     def job_text(batch_id:str,run_id:str):return jobs_service.text(batch_id,run_id)
