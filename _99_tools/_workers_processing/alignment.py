@@ -10,6 +10,28 @@ import subprocess
 import sys
 
 
+ASR_MODEL='Systran/faster-whisper-large-v3'
+
+
+def prepare_model_cache(language):
+    """Finish Windows symlink probes before Hub download threads can race them."""
+    if sys.platform!='win32':return
+    from huggingface_hub import constants
+    from huggingface_hub.file_download import are_symlinks_supported,repo_folder_name
+    from whisperx.alignment import DEFAULT_ALIGN_MODELS_HF,DEFAULT_ALIGN_MODELS_TORCH
+
+    # WhisperX 3.8.6 requires Hub <1.0. Its first probe publishes a provisional
+    # True, letting another download attempt an unprivileged Windows symlink.
+    # Probe each actual repository directory serially so Hub's own move/copy
+    # fallback is selected before snapshot_download starts its thread pool.
+    repositories=[ASR_MODEL]
+    if language not in DEFAULT_ALIGN_MODELS_TORCH and language in DEFAULT_ALIGN_MODELS_HF:
+        repositories.append(DEFAULT_ALIGN_MODELS_HF[language])
+    for repository in dict.fromkeys(repositories):
+        folder=Path(constants.HF_HUB_CACHE)/repo_folder_name(repo_id=repository,repo_type='model')
+        are_symlinks_supported(folder)
+
+
 def match_words(expected, recognised):
     def normal(text):return ''.join(c for c in text.casefold() if c.isalnum())
     a=[normal(w['text']) for w in expected];b=[normal(w.get('word','')) for w in recognised]
@@ -33,6 +55,8 @@ def run(request):
     from demucs.audio import AudioFile
     from demucs.pretrained import get_model
     import soundfile as sf
+    language=request['recipe']['language']
+    prepare_model_cache(language)
     device='cuda' if torch.cuda.is_available() else 'cpu';out=Path(request['output']).parent
     model=get_model('htdemucs');model.to(device);model.eval()
     audio=AudioFile(request['source']).read(streams=0,samplerate=model.samplerate,channels=model.audio_channels)
@@ -44,8 +68,8 @@ def run(request):
         path=out/(name+'.wav');sf.write(path,wave.T.numpy(),model.samplerate,subtype='FLOAT');artifacts.append({'output':str(path),'artifact_kind':'stem_'+name})
     del model,stems,audio;gc.collect()
     if device=='cuda':torch.cuda.empty_cache()
-    speech=whisperx.load_audio(str(out/'vocals.wav'));language=request['recipe']['language']
-    asr=whisperx.load_model('large-v3',device,compute_type='float16' if device=='cuda' else 'int8',language=language,vad_method='silero')
+    speech=whisperx.load_audio(str(out/'vocals.wav'))
+    asr=whisperx.load_model(ASR_MODEL,device,compute_type='float16' if device=='cuda' else 'int8',language=language,vad_method='silero')
     transcript=asr.transcribe(speech,batch_size=4,language=language)
     del asr;gc.collect()
     if device=='cuda':torch.cuda.empty_cache()
