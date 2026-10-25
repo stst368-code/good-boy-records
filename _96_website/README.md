@@ -72,9 +72,15 @@ metadata before **Publish this preview**. Source audio/YAML and reviews stay int
 Configure **Settings → Publishing · R2 and website** once: the existing public
 bucket's S3 API endpoint, bucket name, public media URL and website URL. Enter
 the R2 access/secret keys locally; blank fields retain saved credentials. An AWS
-profile or `GBR_R2_ACCESS_KEY_ID` / `GBR_R2_SECRET_ACCESS_KEY` also works. Saved
+profile or `GBR_R2_ACCESS_KEY_ID` / `GBR_R2_SECRET_ACCESS_KEY` also works. Manually saved
 keys live only in the ignored device runtime and are never returned by the API,
 included in a release or committed. Use a token scoped to the public bucket.
+If the old uploader already works on this PC, choose **Use saved rclone r2
+connection** instead. GBR reads that existing R2 connection locally at publication
+time; no second key copy is created and rotating the keys in rclone takes effect
+on the next job. You can also enter `r2` in the endpoint field and save. The
+original rclone configuration is never changed. Manual keys and AWS profiles
+remain available for devices that do not use rclone.
 **Check public connection** verifies a small upload, exact readback, public URL
 and CORS. Allow the website origin (normally `https://stst368-code.github.io`)
 for GET/HEAD with Range in the bucket CORS settings. No bucket is created or synced.

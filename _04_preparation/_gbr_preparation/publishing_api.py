@@ -35,6 +35,14 @@ class Settings(BaseModel):
     profile:str=Field(default='',max_length=100)
 
 
+class RcloneSettings(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    remote:str=Field(default='r2',min_length=1,max_length=64)
+    bucket:str|None=Field(default=None,max_length=63)
+    public_base:str|None=Field(default=None,max_length=2000)
+    website_url:str|None=Field(default=None,max_length=2000)
+
+
 class LegacyPreview(BaseModel):
     model_config=ConfigDict(extra='forbid')
     directory:str=Field(max_length=2000)
@@ -56,6 +64,8 @@ def router(root,review,preparation,local):
     def settings():return service.configuration()
     @routes.post('/settings')
     def save(body:Settings):return service.save_settings(body.model_dump())
+    @routes.post('/settings/rclone')
+    def use_rclone(body:RcloneSettings):return service.use_rclone(**body.model_dump())
     @routes.post('/check')
     def check():
         try:return service.check()

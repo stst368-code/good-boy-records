@@ -54,7 +54,17 @@ def main():
                         page.locator('#settingsButton').click();page.locator('#pubConfig summary').click()
                         page.wait_for_function("()=>document.getElementById('pubConfig_public_base').value.startsWith('https://')")
                         for field,value in [('endpoint','https://test.r2.cloudflarestorage.com'),('bucket','gbr-public'),('public_base','https://media.test'),('website_url','https://test.github.io/good-boy-records/'),('access_key','saved-key'),('secret_key','saved-secret')]:page.locator('#pubConfig_'+field).fill(value)
-                        page.locator('#pubSaveConfig').click();page.wait_for_function("()=>document.getElementById('pubConfigMessage').textContent.includes('Saved')")
+                        from unittest.mock import patch
+                        with patch('_gbr_preparation.rclone.connection',return_value={'endpoint':'https://test.r2.cloudflarestorage.com','_access_key':'existing-rclone-key','_secret_key':'existing-rclone-secret','_session_token':''}):
+                            page.locator('#pubUseRclone').click()
+                            page.wait_for_function("()=>document.getElementById('pubConfigMessage').textContent.includes('using rclone r2')")
+                            assert publisher.settings()['rclone_remote']=='r2' and not publisher.secrets_path.exists()
+                            assert page.locator('#pubConfig_access_key').input_value()=='' and page.locator('#pubConfig_secret_key').input_value()==''
+                            assert 'existing-rclone-secret' not in page.locator('body').inner_text()
+                            page.screenshot(path='/tmp/gbr-rclone-settings.png',full_page=True)
+                        # Explicitly entering manual keys can still replace the source.
+                        page.locator('#pubConfig_access_key').fill('saved-key');page.locator('#pubConfig_secret_key').fill('saved-secret')
+                        page.locator('#pubSaveConfig').click();page.wait_for_function("()=>document.getElementById('pubConfigMessage').textContent==='Saved. Run the public connection check.'")
                         assert page.locator('#pubConfig_secret_key').input_value()==''
                         page.locator('#pubCheckConfig').click();page.wait_for_function("()=>document.getElementById('pubConfigMessage').textContent.includes('Ready')")
                         page.locator('#settingsDialog [data-close=settingsDialog]').click()

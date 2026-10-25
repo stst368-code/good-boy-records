@@ -22,7 +22,7 @@ from .release_catalogue import (POINTER, destination, read_catalogue, remove_oth
 PUBLIC_BASE = 'https://pub-a5c11159f6144ae885f7795a5bf7086a.r2.dev'
 DEFAULTS = {'endpoint': '', 'bucket': '', 'public_base': PUBLIC_BASE,
             'website_url': 'https://stst368-code.github.io/good-boy-records/',
-            'profile': '', 'access_key_env': 'GBR_R2_ACCESS_KEY_ID', 'secret_key_env': 'GBR_R2_SECRET_ACCESS_KEY'}
+            'profile': '', 'rclone_remote':'', 'access_key_env': 'GBR_R2_ACCESS_KEY_ID', 'secret_key_env': 'GBR_R2_SECRET_ACCESS_KEY'}
 
 
 def encoded(value):return (canonical(value)+'\n').encode('utf-8')
@@ -63,8 +63,12 @@ class R2:
         kwargs = {'endpoint_url': settings['endpoint'], 'region_name': 'auto',
                   'config': Config(signature_version='s3v4', retries={'max_attempts':2}, connect_timeout=10, read_timeout=60,
                                    request_checksum_calculation='when_required', response_checksum_validation='when_required')}
-        key, secret = (os.environ.get(settings[name]) or settings.get(local) for name,local in
-                       (('access_key_env','_access_key'),('secret_key_env','_secret_key')))
+        if settings.get('rclone_remote'):
+            key,secret=settings.get('_access_key'),settings.get('_secret_key')
+            if settings.get('_session_token'):kwargs['aws_session_token']=settings['_session_token']
+        else:
+            key, secret = (os.environ.get(settings[name]) or settings.get(local) for name,local in
+                           (('access_key_env','_access_key'),('secret_key_env','_secret_key')))
         if bool(key) != bool(secret):raise ValueError('Set both R2 credential environment variables')
         if key:kwargs.update(aws_access_key_id=key, aws_secret_access_key=secret)
         self.client = session.client('s3', **kwargs)
@@ -142,7 +146,18 @@ class Publisher:
 
     def save_settings(self, values):
         if set(values)-set(DEFAULTS)-{'access_key','secret_key'}:raise ValueError('Unknown publishing setting')
-        settings={**self.settings(), **{k:v for k,v in values.items() if k in DEFAULTS}}
+        from .rclone import connection,REMOTE
+        values=dict(values);previous=self.settings()
+        endpoint=values.get('endpoint','').strip()
+        if endpoint and REMOTE.fullmatch(endpoint.removesuffix(':')):
+            if values.get('access_key') or values.get('secret_key'):raise ValueError('Leave key fields blank to reuse rclone, or enter a full endpoint for manual keys')
+            remote=endpoint.removesuffix(':');saved=connection(remote)
+            values.update(endpoint=saved['endpoint'],rclone_remote=remote,profile='')
+        elif 'rclone_remote' not in values and (values.get('access_key') or values.get('secret_key') or values.get('profile') or 'endpoint' in values and endpoint!=previous['endpoint']):
+            values['rclone_remote']=''
+        settings={**previous, **{k:v for k,v in values.items() if k in DEFAULTS}}
+        if settings['rclone_remote'] and (not REMOTE.fullmatch(settings['rclone_remote']) or settings['profile'] or values.get('access_key') or values.get('secret_key')):
+            raise ValueError('Use either a saved rclone connection or manual credentials')
         for name in ('public_base','website_url'):
             url=urlparse(settings[name])
             if url.scheme!='https' or not url.netloc or url.username or url.password or url.query or url.fragment:
@@ -160,16 +175,28 @@ class Publisher:
             except OSError:pass
         write(self.config_path,encoded(settings));return self.configuration()
 
+    def use_rclone(self,remote='r2',**values):
+        from .rclone import REMOTE
+        if not REMOTE.fullmatch(remote.removesuffix(':')):raise ValueError('Choose a valid saved rclone connection name')
+        return self.save_settings({**{k:v for k,v in values.items() if v is not None},
+            'endpoint':remote,'bucket':values.get('bucket') or self.settings()['bucket'] or 'good-boy-records'})
+
     def configuration(self):
         settings=self.settings()
         return {'settings':settings,'configured':bool(settings['endpoint'] and settings['bucket']),
-                'credentials_available':bool(self.secrets_path.is_file() or settings['profile'] or os.environ.get(settings['access_key_env']) and os.environ.get(settings['secret_key_env'])),
+                'credentials_available':bool(settings['rclone_remote'] or self.secrets_path.is_file() or settings['profile'] or os.environ.get(settings['access_key_env']) and os.environ.get(settings['secret_key_env'])),
+                'rclone_available':bool(shutil.which('rclone')),
                 'catalogue_url':settings['public_base']+'/'+POINTER}
 
     def store(self):
         settings=self.settings()
         if not settings['endpoint'] or not settings['bucket']:raise ValueError('Configure Publishing in Settings and run the connection check first')
-        if self.secrets_path.is_file():
+        if settings.get('rclone_remote'):
+            from .rclone import connection
+            saved=connection(settings['rclone_remote'])
+            if saved['endpoint'].rstrip('/')!=settings['endpoint'].rstrip('/'):raise ValueError('The saved rclone endpoint changed. Use the rclone connection again in Publishing settings before uploading.')
+            settings={**settings,**saved}
+        elif self.secrets_path.is_file():
             credentials=json.loads(self.secrets_path.read_text(encoding="utf-8"))
             settings={**settings,'_access_key':credentials['access_key'],'_secret_key':credentials['secret_key']}
         return self.store_factory(settings)
