@@ -62,7 +62,20 @@ URLs may be HTTPS, `showcase:relative/path.mp3` (uses the existing public showca
 
 ## Controlled listening playgrounds
 
-The public 1–50 step experiment intentionally has **no invented audio**. Add real matched clips to its `samples` list; slider positions without a clip remain unavailable. A and B switch a single audio player at the same timestamp; switching a paused player keeps it paused. The UI exposes how many settings have actual audio.
+The sampling playground loads published experiment sets from R2. In the GBR app, open **Generation → Experiments**, expand **Publish comparison to website**, choose a matched set and publish it to the sampling-steps position. The page then offers the published sets, their actual ranges (including 1–100 steps), A/B playback and available generation measurements. It continues working when the studio app is closed and local experiment files are removed. No example audio is invented.
+
+`GBR_EXPERIMENT_CATALOGUE` in `showcase-host.js` points to `gbr/v2/experiments/catalogue.json` in the configured public bucket. Audio and immutable manifests have separate experiment prefixes, outside the normal music catalogue. The browser verifies manifest checksums and rejects unsupported media URLs or malformed parameter grids. Failed loads show a reload control; absent samples remain unavailable.
+
+Add these two properties to an experiment block to bind it to an app publishing position. Each `published_slot` must be unique. Supported `parameter_field` values are `sampler_steps`, `sampler_cfg`, `encoder_cfg`, `top_k` and `duration`:
+
+```yaml
+published_slot: sampling-steps
+parameter_field: sampler_steps
+```
+
+The app discovers these positions from this document’s `tour.yaml`, so authors can add bindings without changing the review interface. A comparison can also be published with a direct link only. The published range, fixed controls and clip URLs replace the block’s fallback when a matching set is loaded. App-published sets are matched against the shared generation ledger; timing and memory data are reported per clip, without filling unknown values with zero.
+
+Hand-authored sets remain supported through the `samples` list. A and B switch one audio player at the same timestamp; switching a paused player keeps it paused. The UI exposes how many settings have actual audio:
 
 ```yaml
 - type: experiment
@@ -83,6 +96,6 @@ The public 1–50 step experiment intentionally has **no invented audio**. Add r
       label: Two steps
 ```
 
-Numeric experiments can use fractional increments, for example CFG 1.0–2.0 in steps of 0.1. IDs must be unique across experiments. Sample values must lie on that range, without duplicates. Use R2 HTTPS URLs for larger audio banks so media need not live in Git. The fixed conditions are editorial information: the guide cannot prove that an audio file was generated under those controls, so verify each recipe before adding it.
+Numeric experiments can use fractional increments, for example CFG 1.0–2.0 in steps of 0.1. IDs must be unique across experiments. Sample values must lie on that range, without duplicates. Use R2 HTTPS URLs for larger audio banks so media need not live in Git. For manually authored clips, fixed conditions are editorial information: verify their recipes before adding them.
 
 Link directly to a stage or node with `how-its-made/#generation/sampling`. Keyboard arrows move around the wheel; Enter/Space selects. The back button works standalone and when the guide is embedded in the player. Browser tests cover branches, deep links, media, A/B position preservation, missing samples and mobile/4K layouts.

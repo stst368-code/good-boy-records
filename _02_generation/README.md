@@ -5,8 +5,78 @@ resolves parameter provenance, and freezes requests in the shared database.
 It includes exact source snapshots, narrow output patches and successful-output
 timestamps. Local native MiniMax execution, compatible conditioning caches,
 automatic hardware discovery and stage/memory telemetry are implemented.
-Start with [the first local test](LOCAL_TEST.md). RunPod transports and the
-generation web interface remain subsequent work.
+Use the Generation tab in the unified app for local, ComfyUI, dedicated RunPod
+and serverless workers. [The first local test](LOCAL_TEST.md) remains available.
+
+## Production and experiments
+
+**New batch → Run purpose** defaults to **Production**, which sends completed
+recordings to the review inbox. Choose **Experiment** for encoding shortlists,
+sampler/step sweeps and other trials. Give the batch an optional name, then use
+the same worker selection, caption and parameter controls. The **Experiments**
+tab has its own active/completed/failed sections; the production queue is separate.
+
+Experiment bundles live at `_02_generation/_experiments/<batch-id>/`, with the
+same FLAC, completed YAML, exact source YAML and generation report as production.
+They do not enter review, quality analytics or production output counters. Broad
+review scans and copied FLACs also respect their embedded experiment purpose.
+Measurements stay in the existing shared database: all attempts, failures,
+stage timings, hardware, reported peak VRAM and cache observations. Missing
+measurements and unpriced cost remain null, never zero estimates. Stock ComfyUI
+reports execution timing and available cache events; it cannot report per-song
+peak VRAM without worker instrumentation.
+
+Expand a batch's configurations to listen, inspect measurements, order by steps
+or total time, and export **Performance CSV** (one row per attempt, including
+stage/resource details). **Send to review** moves one existing bundle to the
+production inbox and updates its ledger paths. Its original experiment purpose,
+run/attempt IDs, timings and source bytes are retained; it then participates in
+normal review/quality analytics. **Delete output files** permanently removes only
+an unpromoted experiment's verified bundle, keeping measurements, source snapshots
+and worker encoding caches. Interrupted moves/deletions resume with the same
+button. Unexpected/changed files and shared ownership block removal. Clean any
+pending temporary worker output first using the existing batch cleanup control.
+
+**Publish comparison to website**, inside an experiment batch, publishes a selected
+matched set using the existing **Settings → Publishing** R2 configuration. Choose
+the varied parameter, one of the available matched sets, a public title and the
+website position. Lossless FLAC is the default: its public copy has private tags,
+embedded YAML and workflow blocks removed while preserving decoded PCM exactly.
+MP3 is available for smaller downloads. Neither option alters the original bundle
+or creates review/distribution entries. Other controls, source and model revision
+must match; repetitions remain separate and missing/failed settings are excluded.
+
+Public comparisons have their own R2 namespace:
+`gbr/v2/experiments/catalogue.json`, immutable manifests under
+`gbr/v2/experiments/sets/`, and content-addressed audio under
+`gbr/v2/experiments/objects/`. They never enter `gbr/v2/catalogue.json`. How it’s
+made reads its published sets directly from R2, including each clip’s available
+timing/hardware/cache measurements. Publishing a 1–100 step set updates the player’s
+range automatically, without editing guide YAML or rebuilding the website.
+
+The app records publication progress/retries in `generation_artifacts`, using the
+existing shared database. Verified public renders are removed from local scratch
+after upload. Interrupted uploads retain their receipts and resume explicitly.
+Uploaded sets keep playing when the studio is closed or local experiment output
+files are deleted. **Remove from website index** removes the listing; immutable
+objects remain available to existing direct links. Set `GBR_EXPERIMENT_CATALOGUE`
+in `_96_website/showcase-host.js` to the matching public bucket if changing hosts.
+
+For a controlled step sweep, keep the caption, lyrics, encoder settings and
+duration fixed; set **Steps → Range**, start `1`, stop `100`, step `1`. Selecting
+Experiment initially chooses **Same automatic seeds across batch**. Explicit
+seed values/ranges still take precedence; use fixed seeds to reuse a known
+encoding from an earlier batch. Native **Reuse when supported** creates/reuses
+the matching cache on each worker; **Require cached encodings** refuses a missing
+native cache. ComfyUI uses its graph cache. Cache availability is worker specific;
+matching seeds alone do not copy caches between devices or guarantee a cache hit.
+
+The CLI accepts `plan --purpose experiment --experiment-label "Step sweep"`;
+the default output root then becomes `_02_generation/_experiments`. Purpose and
+label are recorded in the existing frozen request and batch policy JSON. Output
+actions use the existing audio artifact metadata as a durable journal. No extra
+database or table migration is needed; historical requests without purpose remain
+production. Original Writing YAMLs and their formatting are unchanged.
 
 ## Run the implemented planner
 

@@ -108,11 +108,13 @@
     for(const sample of block.samples){const option=el('option','',`${sample.value} ${block.parameter}`);option.value=sample.value;select.append(option);}
     const a=el('button','','A'),b=el('button','','B');a.type=b.type='button';compare.append(el('span','','Compare with'),select,a,b);compare.hidden=block.samples.length<2;box.append(compare);
     const base=el('p','fixed-conditions',block.conditions);box.append(base);
+    const measurements=el('dl','experiment-measurements');measurements.hidden=true;box.append(measurements);
     let primary=block.samples[0]?.value??block.min,current=primary,load=0;
     slider.value=primary;
     function audition(value,preserve=false){
       const sample=block.samples.find(s=>s.value===Number(value)),wasPlaying=!audio.paused,time=preserve?audio.currentTime:0,token=++load;
       current=Number(value);audio.pause();audio.onloadedmetadata=null;reading.value=current;reading.textContent=current;
+      measurements.replaceChildren();measurements.hidden=!sample?.measurements;if(sample?.measurements){const m=sample.measurements,seconds=v=>typeof v==='number'&&Number.isFinite(v)?v.toFixed(2)+' s':'Not reported',memory=v=>typeof v==='number'&&Number.isFinite(v)?(v/1024**3).toFixed(2)+' GiB':'Not reported';for(const [name,value] of [['Generation time',seconds(m.wall_seconds)],['Conditioning',seconds(m.conditioning_seconds)],[m.diffusion_seconds==null&&m.comfy_execution_seconds!=null?'Comfy execution':'Diffusion',seconds(m.diffusion_seconds??m.comfy_execution_seconds)],['Encoding cache',m.cache_status||'Not reported'],['GPU',m.gpu_name||'Not reported'],['Peak allocated',memory(m.peak_allocated_bytes)],['Peak device use',memory(m.peak_observed_device_bytes)]])measurements.append(el('dt','',name),el('dd','',value));}
       a.textContent='A · '+primary;b.textContent='B · '+(select.value||'—');
       a.setAttribute('aria-pressed',String(!!sample&&current===primary));b.setAttribute('aria-pressed',String(!!sample&&current===Number(select.value)));
       a.disabled=b.disabled=block.samples.length<2||!block.samples.some(s=>s.value===primary);select.disabled=block.samples.length<2;
@@ -127,6 +129,69 @@
     if(block.samples.length>1)select.value=String(block.samples[1].value);audition(primary);
     return box;
   }
+  let experimentCatalogue;
+  async function publicJSON(address,expected,missing=false){
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+    try{
+      const response=await fetch(address,{credentials:'omit',cache:'no-cache',signal:controller.signal});
+      if(response.status===404&&missing)return {format:'gbr-public-experiments-v1',sets:[]};
+      if(!response.ok)throw Error('Public comparison unavailable');
+      const bytes=await response.arrayBuffer();if(bytes.byteLength>8*1024**2)throw Error('Comparison manifest too large');
+      if(expected){if(!/^[0-9a-f]{64}$/.test(expected)||!globalThis.crypto?.subtle)throw Error('Invalid comparison checksum');const digest=await crypto.subtle.digest('SHA-256',bytes),actual=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');if(actual!==expected)throw Error('Comparison checksum mismatch');}
+      return JSON.parse(new TextDecoder().decode(bytes));
+    }finally{clearTimeout(timer);}
+  }
+  function publicAddress(value,base){
+    if(typeof value!=='string'||value.length>4000)throw Error('Invalid public comparison address');
+    const url=new URL(value,base);
+    if((url.protocol!=='https:'&&url.origin!==location.origin)||url.username||url.password||url.hash)throw Error('Unsupported comparison address');
+    if(base&&url.origin!==new URL(base).origin)throw Error('Comparison media belongs to another origin');
+    return url.href;
+  }
+  function validateComparison(payload,entry,base){
+    const number=v=>typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=Number.MAX_SAFE_INTEGER;
+    if(payload?.format!=='gbr-public-experiment-v1'||payload.id!==entry.id||payload.parameter_field!==entry.parameter_field||typeof payload.title!=='string'||!payload.title.trim()||payload.title.length>160||typeof payload.parameter!=='string'||typeof payload.conditions!=='string')throw Error('Invalid published comparison');
+    const {min,max,step}=payload;
+    if(![min,max,step].every(number)||step<=0||max<=min||(max-min)/step>5000||Math.abs((max-min)/step-Math.round((max-min)/step))>1e-6||!Array.isArray(payload.samples)||payload.samples.length<2||payload.samples.length>5001)throw Error('Invalid comparison grid');
+    const values=new Set();
+    for(const sample of payload.samples){const value=sample?.value;if(!number(value)||value<min||value>max||Math.abs((value-min)/step-Math.round((value-min)/step))>1e-6||values.has(value))throw Error('Invalid comparison sample');values.add(value);sample.audio=publicAddress(sample.audio,base);if(!/\.(flac|mp3)(\?|$)/i.test(sample.audio))throw Error('Unsupported comparison audio');}
+    return payload;
+  }
+  function publishedExperiment(block){
+    const host=el('section','published-experiment'),controls=el('div','published-set-controls'),label=el('label','','Published comparison'),select=el('select'),notice=el('p','published-set-state'),panel=el('div');
+    select.setAttribute('aria-label','Published comparison');label.append(select);controls.append(label);notice.setAttribute('role','status');
+    const retry=el('button','quiet-button','Reload comparisons');retry.type='button';controls.append(retry);host.append(controls,notice,panel);
+    controls.hidden=true;panel.append(experiment(block));
+    const requested=new URLSearchParams(location.search).get('experiment');let catalogueURL,entries=[],sequence=0;
+    function clearAudio(){panel.querySelectorAll('audio').forEach(a=>{a.pause();a.removeAttribute('src');a.load();});}
+    async function choose(){
+      const token=++sequence,entry=entries.find(s=>s.id===select.value);if(!entry)return;
+      clearAudio();notice.textContent='Loading published comparison…';
+      try{const payload=validateComparison(await publicJSON(publicAddress(entry.url,catalogueURL),entry.sha256),entry,catalogueURL);if(token!==sequence||!host.isConnected)return;panel.replaceChildren(experiment({...payload,id:block.id}));notice.textContent='Published audio · '+(payload.audio_format==='flac'?'lossless FLAC':'MP3');}
+      catch(_){if(token===sequence&&host.isConnected){panel.replaceChildren();notice.textContent='This comparison could not be loaded. Retry or select another set.';}}
+    }
+    async function load(){
+      retry.disabled=true;notice.textContent='Loading public comparisons…';
+      try{
+        if(!window.GBR_EXPERIMENT_CATALOGUE){notice.textContent='No public comparison catalogue is configured.';return;}
+        if(requested&&!/^[a-z0-9-]{1,180}$/.test(requested))throw Error('Invalid comparison ID');
+        catalogueURL=publicAddress(window.GBR_EXPERIMENT_CATALOGUE);
+        experimentCatalogue??=publicJSON(catalogueURL,null,true).catch(error=>{experimentCatalogue=null;throw error;});
+        const catalogue=await experimentCatalogue;
+        if(catalogue?.format!=='gbr-public-experiments-v1'||!Array.isArray(catalogue.sets)||catalogue.sets.length>10000)throw Error('Invalid comparison catalogue');
+        const ids=new Set();for(const entry of catalogue.sets){if(!entry||typeof entry.id!=='string'||!/^[a-z0-9-]{1,180}$/.test(entry.id)||ids.has(entry.id)||typeof entry.title!=='string'||entry.title.length>160||!['sampler_steps','sampler_cfg','encoder_cfg','top_k','duration'].includes(entry.parameter_field))throw Error('Invalid comparison listing');ids.add(entry.id);}
+        entries=catalogue.sets.filter(s=>(s.slot===block.published_slot&&s.parameter_field===block.parameter_field)||s.id===requested).reverse();
+        if(!host.isConnected)return;
+        controls.hidden=false;select.replaceChildren(...entries.map(s=>new Option(s.title,s.id)));select.disabled=!entries.length;
+        if(requested){if(!entries.some(s=>s.id===requested)){clearAudio();panel.replaceChildren();notice.textContent='This comparison is no longer listed on the website.';return;}select.value=requested;}
+        if(!entries.length){notice.textContent='No experiment set has been published here yet.';return;}
+        await choose();
+      }catch(_){if(host.isConnected){controls.hidden=false;notice.textContent='Published comparisons could not be loaded. Use Reload comparisons to retry.';}}
+      finally{retry.disabled=false;}
+    }
+    select.addEventListener('change',choose);retry.onclick=()=>{experimentCatalogue=null;load();};
+    queueMicrotask(load);return host;
+  }
   function blocks(items,target) {
     for(const block of items||[]){
       if(block.type==='paragraph')target.append(el('p','',block.text));
@@ -134,7 +199,7 @@
       else if(block.type==='note')target.append(el('div','block-note',block.text));
       else if(block.type==='code'){const pre=el('pre'),code=el('code','',block.text);pre.append(code);target.append(pre);}
       else if(block.type==='media')target.append(media(block));
-      else if(block.type==='experiment')target.append(experiment(block));
+      else if(block.type==='experiment')target.append(block.published_slot?publishedExperiment(block):experiment(block));
       else if(block.type==='links'){const list=el('ul','resource-links');for(const item of block.items){const row=el('li'),link=el('a','',item.label);link.href=source(item.url);link.target='_blank';link.rel='noopener noreferrer';row.append(link);if(item.description)row.append(el('small','',item.description));list.append(row);}target.append(list);}
       else if(block.type==='stage-link'){const button=el('button','quiet-button',block.label);button.type='button';button.onclick=()=>{if($('topicDialog').open)$('topicDialog').close();navigate(block.stage,block.node);};target.append(button);}
       else if(block.type==='topic-link'){const button=el('button','quiet-button',block.label);button.type='button';button.onclick=()=>openTopic(block.topic);target.append(button);}

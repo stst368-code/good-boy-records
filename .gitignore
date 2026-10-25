@@ -223,6 +223,7 @@ _Reviewed/
 !/_98_database/_tests/test_*.py
 /_02_generation/_runtime/
 /_02_generation/_generated/
+/_02_generation/_experiments/
 !/_02_generation/_tests/
 !/_02_generation/_tests/test_*.py
 /_99_tools/_workers_infdit/runtime/

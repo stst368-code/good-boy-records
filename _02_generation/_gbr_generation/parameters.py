@@ -51,11 +51,14 @@ def execution_options(specification):
 
 
 def resolve(document, specification, template=None, freeze=False):
-    allowed = set(SOURCES) | {"precedence", "field_precedence", "template_id", "parent_review_generation_id", "request_id", "execution", "model_revision", "experiments"}
+    allowed = set(SOURCES) | {"precedence", "field_precedence", "template_id", "parent_review_generation_id", "request_id", "execution", "model_revision", "experiments", "purpose", "experiment_label"}
     unknown = set(specification) - allowed
     if unknown or "yaml" in specification or "template" in specification:
         raise ValueError(f"Unsupported parameter specification keys: {sorted(unknown | (set(specification) & {'yaml','template'}))}")
     execution_options(specification)
+    from .purpose import purpose, label
+    purpose(specification)
+    label(specification)
     revision = specification.get("model_revision")
     if revision is not None and (not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision)):
         raise ValueError("model_revision must be a full 40-character commit SHA")

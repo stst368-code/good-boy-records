@@ -45,6 +45,18 @@ class GenerationService:
     def generated(self):
         return self.root / '_02_generation' / '_generated'
 
+    @property
+    def experimental(self):
+        return self.root / '_02_generation' / '_experiments'
+
+    def register_inbox(self):
+        with self.review.config_lock:
+            if self.generated.resolve() not in self.review.config.inputs:
+                directories = self.review.config.values['input_directories']
+                self.review.config.values['input_directories'] = [*directories, str(self.generated.resolve())]
+                self.review.config.validate()
+                self.review.config.save()
+
     def shared_ready(self):
         return bool(self.review.db.one("SELECT 1 FROM sqlite_master WHERE name='platform_migration_report'")
                     and self.review.db.one('SELECT 1 FROM platform_migration_report WHERE id=1'))
@@ -86,7 +98,7 @@ class GenerationService:
                 pass
         return {'connections': connections, 'worker_id': saved.get('worker_id', 'auto'), 'key_candidates': keys, 'parameters': saved.get('parameters', DEFAULT_PARAMETERS),
                 'controls':saved.get('controls',{}), 'input_root': str(self.catalogue_root(saved.get('input_root'))),
-                'output_root': str(self.generated), 'layout': saved.get('layout', 'single'),
+                'output_root': str(self.generated), 'experiment_root': str(self.experimental), 'layout': saved.get('layout', 'single'),
                 'storage_endpoint': saved.get('storage_endpoint', os.environ.get('GBR_S3_ENDPOINT', '')),
                 'storage_bucket': saved.get('storage_bucket', os.environ.get('GBR_S3_BUCKET', '')),
                 'storage_region': saved.get('storage_region', os.environ.get('AWS_DEFAULT_REGION', 'auto')),
@@ -144,6 +156,8 @@ class GenerationService:
         if not self.shared_ready():
             raise ValueError('Open GBR through _97_app with the migrated shared database before generating')
         data=deepcopy(data)
+        from .purpose import purpose, label
+        run_purpose, experiment_label = purpose(data), label(data)
         pool=self.workers.pool() if data.get('worker_id') in {'auto','all'} else None
         worker = None
         if data.get('worker_id'):
@@ -174,6 +188,7 @@ class GenerationService:
             data['_comfy_inventory']=Client(connection['address']).inventory()
         parameters = self.worker_parameters(data,worker,data.get('_comfy_inventory'))
         spec = {'defaults': parameters, 'execution': execution(connection, data.get('encoding_cache', 'prefer')),
+                'purpose': run_purpose, 'experiment_label': experiment_label,
                 'model_revision': None if connection['backend']=='comfyui' else data.get('model_revision') or SMOKE_MODEL_REVISION}
         for key in ('rerun', 'parent_review_generation_id', 'request_id'):
             if data.get(key):
@@ -353,11 +368,13 @@ class GenerationService:
                 'launcher': (data.get('_worker') or {}).get('launcher'),
                 'workers':data.get('_pool'),
                 'root': catalogue.root, 'layout': data.get('layout', 'single'),
-                'selection': {key: data.get(key) for key in ('worker_id','files', 'all_inputs', 'songs', 'albums', 'order', 'rating_filter', 'parameter_priority', 'template_id', 'catalogue_captions', 'caption_mode', 'caption_count', 'caption_cluster', 'caption_style','caption_templates', 'experiments')}}
+                'selection': {key: data.get(key) for key in ('purpose','experiment_label','worker_id','files', 'all_inputs', 'songs', 'albums', 'order', 'rating_filter', 'parameter_priority', 'template_id', 'catalogue_captions', 'caption_mode', 'caption_count', 'caption_cluster', 'caption_style','caption_templates', 'experiments')}}
             if rating_evidence is not None:
                 self.previews[token]['selection']['review_filter'] = rating_evidence
         return {'token': token, 'inputs': [record.summary() for record in checked], 'ready': sum(record.ready for record in checked),
-                'invalid': sum(not record.ready for record in checked), 'output_root': str(self.generated),
+                'invalid': sum(not record.ready for record in checked),
+                'purpose': spec['purpose'], 'experiment_label': spec['experiment_label'],
+                'output_root': str(self.experimental if spec['purpose'] == 'experiment' else self.generated),
                 'generation_count': sum(len(r.planned_runs or [{}]) for r in checked if r.ready),
                 'execution': spec['execution'], 'parameters': spec['defaults'], 'worker_id': connection_key(connection)}
 
@@ -415,7 +432,8 @@ class GenerationService:
                 raise ValueError('A selected recipe is being published in Writing; finish that publication and check the batch again')
             manifest = prepare_batch(preview['checked'], preview['spec'], self.runtime / 'batches', self.review.config.database,
                 input_root=preview['root'], error_policy='drop' if skip_errors else 'cancel', selection=preview['selection'],
-                output_root=self.generated, output_layout=preview['layout'])
+                output_root=self.experimental if preview['spec'].get('purpose') == 'experiment' else self.generated,
+                output_layout=preview['layout'])
             del self.previews[token]
             batch_id = manifest.parent.name
             from .planner import open_database
@@ -425,12 +443,8 @@ class GenerationService:
                 policy=json.loads(db.execute('SELECT policy_json FROM generation_batches WHERE id=?',(batch_id,)).fetchone()[0])
                 policy['automatic_workers']=bool(preview.get('workers'))
                 db.execute('UPDATE generation_batches SET policy_json=? WHERE id=?',(json_text(policy),batch_id))
-            with self.review.config_lock:
-                directories = self.review.config.values['input_directories']
-                if str(self.generated.resolve()) not in {str(p) for p in self.review.config.inputs}:
-                    self.review.config.values['input_directories'] = [*directories, str(self.generated.resolve())]
-                    self.review.config.validate()
-                    self.review.config.save()
+            if preview['spec'].get('purpose') != 'experiment':
+                self.register_inbox()
             if preview.get('workers'):
                 eligible={o['worker_id'] for r in preview['checked'] if r.ready for c in r.planned_runs or [] for o in c.get('worker_options') or []}
                 results=[self.launch({'manifest':str(manifest),'batch_id':batch_id,'connection':w['connection'],

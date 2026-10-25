@@ -37,6 +37,8 @@ def main(argv=None):
             p.add_argument("--on-error", choices=("cancel", "drop", "prompt"), default="prompt")
             p.add_argument('--outputs', type=Path, default=ROOT / '_02_generation' / '_generated')
             p.add_argument('--layout', choices=('single', 'track', 'album'), default='single')
+            p.add_argument('--purpose', choices=('production','experiment'))
+            p.add_argument('--experiment-label')
     p = sub.add_parser("verify")
     p.add_argument("manifest", type=Path)
     p = sub.add_parser("execute", help="Run frozen jobs locally or on a dedicated RunPod")
@@ -97,6 +99,11 @@ def main(argv=None):
         specification = json.loads(args.parameters.read_text(encoding="utf-8-sig")) if args.parameters else {}
         if not isinstance(specification, dict):
             raise ValueError("Parameter specification must be a JSON object")
+        if args.command == 'plan':
+            if args.purpose is not None:specification['purpose']=args.purpose
+            if args.experiment_label is not None:specification['experiment_label']=args.experiment_label
+            if specification.get('purpose','production')=='experiment' and args.outputs == ROOT / '_02_generation' / '_generated':
+                args.outputs = ROOT / '_02_generation' / '_experiments'
         styles = Styles(args.styles, args.styles_encoding)
         checked = preflight(selected, specification, styles, args.template_root)
         for record in checked:

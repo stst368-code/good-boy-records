@@ -117,8 +117,22 @@ class Indexer:
     def index(self, path, directory_entries=None):
         path = Path(path).resolve()
         if worker_intermediate(path):raise ValueError('Worker scratch audio is not a completed recording; choose _02_generation/_generated as the review input')
+        if any(a.name == '_experiments' and a.parent.name == '_02_generation' for a in path.parents):
+            return None
         before = path.stat()
         sidecar, raw_bytes, raw, meta, embedded, status, error = metadata_for(path, directory_entries)
+        # A broad input root, or manually moved experiment FLAC, must not enqueue
+        # experiments. Only the explicit promotion journal admits them to review.
+        if self.db.one("SELECT 1 FROM sqlite_master WHERE name='generation_artifacts'"):
+            artifact = self.db.one('''SELECT a.metadata_json,r.requested_json FROM generation_artifacts a
+                JOIN generation_runs r ON r.id=a.run_id WHERE a.kind='audio' AND a.uri=?''', (str(path),))
+            if artifact and json.loads(artifact['requested_json']).get('purpose') == 'experiment':
+                if json.loads(artifact['metadata_json']).get('experiment_output', {}).get('state') != 'promoted':
+                    return None
+            elif meta.get('gbr_run_purpose') == 'experiment':
+                return None
+        elif meta.get('gbr_run_purpose') == 'experiment':
+            return None
         yaml_hash = hashlib.sha256(raw_bytes).hexdigest() if raw_bytes is not None else None
         # Embedded values can distinguish provenance even if an external YAML is identical.
         key = hashlib.sha256(dumps({"yaml": yaml_hash, "metadata": meta}).encode()).hexdigest()
@@ -213,8 +227,8 @@ class Indexer:
                     if resolved.parent not in directory_cache:
                         directory_cache[resolved.parent] = {p.name.lower(): p for p in resolved.parent.iterdir() if p.suffix.lower() in ('.yaml','.yml') and p.is_file()}
                     if progress:progress('Indexing completed recording: ' + str(resolved))
-                    self.index(resolved, directory_cache[resolved.parent])
-                    indexed += 1
+                    if self.index(resolved, directory_cache[resolved.parent]) is not None:
+                        indexed += 1
                 except Exception as exc:
                     self.error(str(resolved), str(exc))
         self.repair_archive_names()

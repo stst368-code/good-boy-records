@@ -64,18 +64,21 @@ def reserve_output(conn, run, output_root, layout='legacy'):
             raise ValueError("This run already reserved a different output directory")
         return dict(row)
     prefix = re.sub(r"[^a-z0-9]+", "-", (run["title"] + "-" + run["effective"].get("style", "music")).casefold()).strip("-") or "track"
-    prior = 0
-    # Continue known historic output numbers when a matching filename prefix exists.
-    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='legacy_generation_jobs'").fetchone():
-        pattern = re.compile(re.escape(prefix) + r"-(\d+)$", re.IGNORECASE)
-        for old in conn.execute("SELECT output_stem FROM legacy_generation_jobs WHERE output_stem IS NOT NULL"):
-            match = pattern.fullmatch(old[0])
-            if match:
-                prior = max(prior, int(match[1]))
-    conn.execute("INSERT OR IGNORE INTO generation_output_counters VALUES(?,?)", (prefix, prior))
-    conn.execute("UPDATE generation_output_counters SET last_value=MAX(last_value,?)+1 WHERE title_key=?", (prior, prefix))
-    number = conn.execute("SELECT last_value FROM generation_output_counters WHERE title_key=?", (prefix,)).fetchone()[0]
-    stem = f"{prefix}-{number:04d}"
+    if run.get('purpose') == 'experiment':
+        stem = prefix + '-experiment-' + run['id'][:12]
+    else:
+        prior = 0
+        # Continue known historic output numbers when a matching filename prefix exists.
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='legacy_generation_jobs'").fetchone():
+            pattern = re.compile(re.escape(prefix) + r"-(\d+)$", re.IGNORECASE)
+            for old in conn.execute("SELECT output_stem FROM legacy_generation_jobs WHERE output_stem IS NOT NULL"):
+                match = pattern.fullmatch(old[0])
+                if match:
+                    prior = max(prior, int(match[1]))
+        conn.execute("INSERT OR IGNORE INTO generation_output_counters VALUES(?,?)", (prefix, prior))
+        conn.execute("UPDATE generation_output_counters SET last_value=MAX(last_value,?)+1 WHERE title_key=?", (prior, prefix))
+        number = conn.execute("SELECT last_value FROM generation_output_counters WHERE title_key=?", (prefix,)).fetchone()[0]
+        stem = f"{prefix}-{number:04d}"
     directory = output_root / run['id']
     if layout != 'legacy':
         group = run['title'] if layout == 'track' else run.get('album') or 'no-album' if layout == 'album' else None
@@ -215,6 +218,7 @@ def publish_bundle(directory, run, state, result, source, attempt_id, timezone_n
         if (exported.format,exported.subtype,exported.channels,exported.samplerate)!=('FLAC','PCM_24',2,44100) or exported.frames<=0:
             raise ValueError('Canonical FLAC conversion failed verification; saved worker audio retained')
         metadata = {**run["effective"], "song_id": run["song_id"], "variant_id": run["variant_id"], "title": run["title"],
+                    "gbr_run_purpose": run.get('purpose', 'production'),
                     "gbr_run_id": run["id"], "gbr_attempt_id": attempt_id, "gbr_source_sha256": run["source_sha256"],
                     "generation_timestamp": result["completed_at"],
                     "generation_source": ("gbr_" if execution_target(run["execution"])[0]=="comfyui" else "gbr_native_") + execution_target(run["execution"])[0],
@@ -232,6 +236,7 @@ def publish_bundle(directory, run, state, result, source, attempt_id, timezone_n
         tags.save()
         files = {p.name: file_sha(p) for p in bundle.iterdir()}
         marker = {"format_version": 1, "run_id": run["id"], "attempt_id": attempt_id,
+                  "purpose": run.get('purpose', 'production'),
                   "source_sha256": run["source_sha256"], "completed_at": result["completed_at"],
                   "files": files, "worker_result": result, "yaml_timezone": timezone_name}
         marker['worker_audio_sha256'] = file_sha(audio)
@@ -313,6 +318,9 @@ def cleanup_outputs(manifest_path, *, runpod_identity=None, worker_id=None):
                 raise ValueError('Cleanup reference differs from the frozen attempt')
             state = conn.execute('SELECT status FROM generation_runs WHERE id=?', (run['id'],)).fetchone()
             artifacts = conn.execute('SELECT uri,sha256 FROM generation_artifacts WHERE run_id=?', (run['id'],)).fetchall()
+            experiment = conn.execute("SELECT metadata_json FROM generation_artifacts WHERE run_id=? AND kind='audio'", (run['id'],)).fetchone()
+            if experiment and json.loads(experiment[0]).get('experiment_output', {}).get('state') == 'deleted':
+                continue
             if state and state['status']=='cancelled' and (directory/'cancelled-output.json').is_file():
                 verify_cancelled(directory)
                 if pending.is_file():

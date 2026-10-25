@@ -182,17 +182,19 @@ stages:
               More steps means more sampling work; it does not establish that the resulting song will sound better. Listen to matched outputs, record the controls, and compare the things that actually changed.
           - type: experiment
             id: sampling-steps
-            title: What do 1–50 steps sound like?
+            title: Hear how sampling steps change the result
+            published_slot: sampling-steps
+            parameter_field: sampler_steps
             parameter: Sampling steps
             min: 1
             max: 50
             step: 1
             conditions: >-
-              Keep the caption, lyrics, duration, encoder, DiT precision, seed pair, CFG, top-k and sampler/scheduler fixed. Change only sampling steps. These listening samples still need to be generated and added.
+              Keep the caption, lyrics, duration, encoder, DiT precision, seed pair, CFG, top-k and sampler/scheduler fixed. Change only sampling steps. Published experiment sets load here from the public audio store.
             samples: []
           - type: note
             text: >-
-              The control above is an audition interface, not an online generator. It will play published listening clips when they are supplied. No synthetic results or quality claims have been filled in for missing settings.
+              These are recorded comparisons. The generation app publishes selected experiments and their measured timings to the public audio store; this page plays them without connecting to the studio computer. Missing clips and unknown measurements remain unavailable.
         next: [{to: bundle}]
       - id: bundle
         title: Collect a complete result
