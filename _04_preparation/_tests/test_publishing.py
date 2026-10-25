@@ -426,3 +426,29 @@ def create_test_app(review,prep):
     app=create_app(review.config.path,start_worker=False)
     app.state.preparation.tracks=prep.tracks;app.state.preparation.showcase=prep.showcase
     return app
+
+
+def test_public_verifier_uses_browser_compatible_headers_and_keeps_validation(monkeypatch):
+    from _gbr_preparation import publishing
+    class Response:
+        headers={'Access-Control-Allow-Origin':'https://site.test'}
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def read(self,size):return b'probe'
+    requests=[]
+    def open_request(request,timeout):
+        requests.append(request)
+        return Response()
+    monkeypatch.setattr(publishing,'urlopen',open_request)
+    store=object.__new__(R2)
+    store.public_check('https://media.test/file','https://site.test',hashlib.sha256(b'probe').hexdigest())
+    assert requests[0].get_header('User-agent').startswith('Mozilla/5.0')
+    assert requests[0].get_header('Origin')=='https://site.test'
+    assert requests[0].get_header('Range')=='bytes=0-1023'
+    with pytest.raises(ValueError,match='CORS'):store.public_check('https://media.test/file','https://wrong.test')
+    with pytest.raises(ValueError,match='does not match'):store.public_check('https://media.test/file','https://site.test','wrong')
+    def forbidden(request,timeout):raise publishing.HTTPError(request.full_url,403,'Forbidden',{},io.BytesIO(b'private response'))
+    monkeypatch.setattr(publishing,'urlopen',forbidden)
+    with pytest.raises(ValueError,match='Public verification returned HTTP 403 for https://media.test/file') as error:
+        store.public_check('https://media.test/file','https://site.test')
+    assert 'private response' not in str(error.value)

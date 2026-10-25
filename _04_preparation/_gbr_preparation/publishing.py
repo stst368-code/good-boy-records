@@ -13,6 +13,7 @@ import threading
 import uuid
 from urllib.parse import urlparse, quote
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 
 from .service import canonical, digest, now
 from .editorial import lighting
@@ -111,8 +112,15 @@ class R2:
         if h.hexdigest()!=item['sha256'] or size!=item['size']:raise ValueError('Uploaded object failed checksum verification')
 
     def public_check(self, url, origin, expected=None):
-        request=Request(url,headers={'Origin':origin, 'Range':'bytes=0-1023'})
-        with urlopen(request,timeout=20) as result:
+        request=Request(url,headers={'Origin':origin, 'Range':'bytes=0-1023',
+                                     'User-Agent':'Mozilla/5.0 (compatible; GBR-Publisher/1.0)',
+                                     'Accept':'*/*'})
+        try:
+            response=urlopen(request,timeout=20)
+        except HTTPError as exc:
+            exc.close()
+            raise ValueError(f'Public verification returned HTTP {exc.code} for {url}. The asset upload may already have succeeded; retry after resolving public access.') from None
+        with response as result:
             data=result.read(1024)
             if result.headers.get('Access-Control-Allow-Origin') not in {'*', origin}:
                 raise ValueError('R2 CORS must allow '+origin+' for GET/HEAD requests with the Range header')
