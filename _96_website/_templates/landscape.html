@@ -5031,7 +5031,9 @@ function variantOf(t){return t?.variant||t?.version||(typeof t?.style==='string'
 /* Share links are deliberately opaque and short. The track id itself never appears
    in the shared URL, and the ?s= token is removed from the address bar immediately
    on arrival before the catalogue is fetched. */
-const hiddenPage=document.body.dataset.library==='hidden';
+const secretPage=document.body.dataset.library==='hidden';
+const easterPage=document.body.dataset.library==='easter';
+const hiddenPage=secretPage||easterPage;
 const SHARE_PARAM='s';
 const SHARE_ALPHABET='0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 let shareIndex=new Map(),shareTokensByKey=new Map();
@@ -5085,7 +5087,7 @@ function setEasterState(enabled){
 function openSharedTrack(token){
   const target=shareIndex.get(String(token||''));
   if(!target)return false;
-  if(target.scope==='e'&&!hiddenPage){location.replace(new URL('hidden.html?s='+encodeURIComponent(token),document.baseURI));return true;}
+  if(target.scope==='e'&&!hiddenPage){location.replace(new URL('easter.html?s='+encodeURIComponent(token),document.baseURI));return true;}
   setEasterState(target.scope==='e');
   const i=tracks.findIndex(t=>t.id===target.id);
   if(i<0)return false;
@@ -5095,7 +5097,7 @@ function currentShareUrl(){
   const t=tracks[index];if(!t)return'';
   const scope=easter?'e':'m',url=new URL(location.href);url.search='';url.hash='';
   url.pathname=url.pathname.replace(/\/index\.html$/i,'/')||'/';
-  if(easter)url.pathname=url.pathname.replace(/[^/]*$/,'hidden.html');
+  if(easter)url.pathname=url.pathname.replace(/[^/]*$/,easterPage?'easter.html':'hidden.html');
   url.searchParams.set(SHARE_PARAM,shareTokensByKey.get(`${scope}:${t.id}`)||shareTokenFor(t,scope));
   return url.href
 }
@@ -5649,16 +5651,16 @@ function genreSequenceCompare(a,b){
   return ap.h-bp.h || ap.l-bp.l || ac.h-bc.h || ac.l-bc.l || (a?.genre?.taxonomy_order??1e9)-(b?.genre?.taxonomy_order??1e9) || titleOf(a).localeCompare(titleOf(b));
 }
 function sortGenreSequence(list){return list.sort(genreSequenceCompare)}
-function toggleEaster(){location.assign(new URL(hiddenPage?'./':'hidden.html',document.baseURI))}
+function toggleEaster(){location.assign(new URL(easterPage?'./':'easter.html',document.baseURI))}
 async function load(){
   const candidates=['catalogue.json','data/catalogue.json','../data/catalogue.json'];let data=null;
   for(const url of candidates){try{const r=await fetch(url,{cache:'no-store'});if(r.ok){data=await r.json();break}}catch{}}
   if(hiddenPage){
-    const saved=Array.isArray(data?.easter_tracks)?data.easter_tracks:(data?.easter?.tracks||[]);
-    let hidden={tracks:saved};if(window.GBRloadReleases)hidden=await window.GBRloadReleases(hidden,{hidden:true});
+    const saved=easterPage?(Array.isArray(data?.easter_tracks)?data.easter_tracks:(data?.easter?.tracks||[])):[];
+    let hidden={tracks:saved};if(secretPage&&window.GBRloadReleases)hidden=await window.GBRloadReleases(hidden,{hidden:true});
     hidden=externaliseShowcasePaths(hidden);mainTracks=[];easterTracks=hidden.tracks||[];tracks=easterTracks;easter=true;
     const back=document.createElement('button');back.className='utility-button';back.textContent='Main player';back.onclick=()=>location.assign(new URL('./',document.baseURI));ui.utilityNav.prepend(back);
-    document.body.dataset.easter='true';if(ui.brandText)ui.brandText.textContent='Good Boy Records / Hidden Room';
+    document.body.dataset.easter='true';if(ui.brandText)ui.brandText.textContent=easterPage?'Good Boy Records / Easter Eggs':'Good Boy Records / Secret Room';
   }else{
     const egg=window.GBRcoverEgg?.load();
     if(window.GBRloadReleases)data=await window.GBRloadReleases(data);

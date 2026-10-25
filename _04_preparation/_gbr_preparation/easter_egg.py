@@ -19,7 +19,6 @@ class EasterEgg:
         if legacy.is_file():
             saved=json.loads(legacy.read_text(encoding='utf-8-sig'))
             tracks={t['id']:t for t in saved.get('tracks',[])}
-            hidden={t['id']:t for t in saved.get('easter',{}).get('tracks',[])}
         configured=bool(settings['endpoint'] and settings['bucket'])
         if configured:
             store=p.store();main,_=read_catalogue(store);secret,_=read_catalogue(store,'hidden')

@@ -106,8 +106,10 @@ def stage(root, target):
     hidden_page=(target/'index.html').read_text(encoding='utf-8')
     hidden_page=hidden_page.replace('<body data-power="on">','<body data-power="on" data-library="hidden">',1)
     hidden_page=hidden_page.replace('<title>Good Boy Records — Sonic Landscape</title>',
-                                    '<title>Good Boy Records — Hidden Room</title><meta name="robots" content="noindex,nofollow">',1)
+                                    '<title>Good Boy Records — Secret Room</title><meta name="robots" content="noindex,nofollow">',1)
     (target/'hidden.html').write_text(hidden_page,encoding='utf-8')
+    easter_page=hidden_page.replace('data-library="hidden"','data-library="easter"',1).replace('Good Boy Records — Secret Room','Good Boy Records — Easter Eggs',1)
+    (target/'easter.html').write_text(easter_page,encoding='utf-8')
     (target / '.nojekyll').write_text('', encoding='utf-8')
     player = (target / 'index.html').read_text(encoding='utf-8')
     for anchor in ('crossorigin="anonymous"', 'id="knowledgeButton"', 'FALLBACK_ART', 'id="gbrAnalyticsButton"', 'id="gbrObservatory"'):

@@ -56,3 +56,8 @@ vm.runInNewContext(fs.readFileSync(process.argv[1],'utf8'),context);
             self.assertIn('<script src="easter-egg.js"></script>',hidden)
             self.assertNotIn('data-library="hidden"',(target/'index.html').read_text())
             self.assertTrue((target/'easter-egg.js').is_file())
+            legacy=(target/'easter.html').read_text()
+            self.assertIn('data-library="easter"',legacy)
+            self.assertIn('secretPage&&window.GBRloadReleases',legacy)
+            self.assertIn("new URL(easterPage?'./':'easter.html'",legacy)
+            self.assertIn('const saved=easterPage?',hidden)
