@@ -18,7 +18,7 @@ from .review_selection import select_by_rating
 from .yaml_document import YamlDocument
 from .experiments import expand, MAX_RUNS
 from _gbr_layout import task_paths, relocated_path
-from _gbr_worker.contract import MODEL, SMOKE_MODEL_REVISION
+from _gbr_worker.contract import MODEL, SMOKE_MODEL_REVISION, python_environment
 
 DEFAULT_PARAMETERS = {'model': MODEL, 'dit': 'bf16', 'text_encoder': 'bf16', 'encoder_cfg': 1.5, 'top_k': 50,
     'sampler': 'euler', 'scheduler': 'flow_match_euler', 'sampler_cfg': 1.7, 'sampler_steps': 30,
@@ -89,7 +89,7 @@ class GenerationService:
             connections = [normalize({'backend': 'local'})]
             latest = self.runtime / 'local_test/latest.json'
             try:
-                manifest = verify_plan(relocated_path(json.loads(latest.read_text())['manifest']))
+                manifest = verify_plan(relocated_path(json.loads(latest.read_text(encoding="utf-8"))['manifest']))
                 target = manifest['runs'][0]['execution']['diffusion']
                 if target['backend'] != 'local':
                     connections.append(normalize({'backend': target['backend'], 'address': target['address'],
@@ -273,7 +273,7 @@ class GenerationService:
         parameters=dict(DEFAULT_PARAMETERS)
         if data['connection']['backend']=='comfyui' and inventory:
             from client import resolve
-            nodes=inventory['nodes'];graph=json.loads((Path(__file__).resolve().parents[2]/'_99_tools/_workers_comfyui/_workflows/music-full.json').read_text())
+            nodes=inventory['nodes'];graph=json.loads((Path(__file__).resolve().parents[2]/'_99_tools/_workers_comfyui/_workflows/music-full.json').read_text(encoding="utf-8"))
             for field,node,key,graph_id in [('text_encoder','CLIPLoader','clip_name','1'),('dit','UNETLoader','unet_name','4'),('sampler','KSampler','sampler_name','6'),('scheduler','KSampler','scheduler','6')]:
                 declaration=nodes.get(node,{}).get('input',{}).get('required',{}).get(key,[[]]);values=declaration[0]
                 if not isinstance(values,list) or not values:continue
@@ -383,7 +383,7 @@ class GenerationService:
         folder.mkdir(parents=True)
         path = folder / 'task.json'
         path.write_text(json_text(task), encoding='utf-8')
-        env = os.environ.copy()
+        env = python_environment()
         for name, variable in SECRET_ENV.items():
             value = (credentials or {}).get(name) or self.secrets.get(name)
             if value:
@@ -398,12 +398,12 @@ class GenerationService:
                 process = subprocess.Popen([sys.executable, '-u', str(Path(__file__).with_name('app_jobs.py')), str(path)],
                     stdin=subprocess.DEVNULL, stdout=log, stderr=log, env=env, **kwargs)
         except OSError as exc:
-            (folder / 'state.json').write_text(json_text({'status': 'failed', 'error': str(exc)}))
+            (folder / 'state.json').write_text(json_text({'status': 'failed', 'error': str(exc)}), encoding="utf-8")
             raise ValueError('The controller could not start. The frozen batch is retained in Jobs for retry: ' + str(exc)) from None
         self.processes[folder.name] = process
         import psutil
         try:
-            (folder / 'process.json').write_text(json_text({'pid': process.pid, 'created': psutil.Process(process.pid).create_time()}))
+            (folder / 'process.json').write_text(json_text({'pid': process.pid, 'created': psutil.Process(process.pid).create_time()}), encoding="utf-8")
         except psutil.Error:
             pass
         return {'task_id': folder.name, 'batch_id': task.get('batch_id')}
@@ -417,7 +417,7 @@ class GenerationService:
             return False
         import psutil
         try:
-            saved = json.loads(path.read_text())
+            saved = json.loads(path.read_text(encoding="utf-8"))
             process = psutil.Process(saved['pid'])
             return process.is_running() and abs(process.create_time() - saved['created']) < .01
         except (psutil.Error, OSError, ValueError):
@@ -467,7 +467,7 @@ class GenerationService:
             if index>=50 and not self.active(folder.name):continue
             if not folder.is_dir() or not (folder / 'task.json').is_file():
                 continue
-            task = task_paths(json.loads((folder / 'task.json').read_text()))
+            task = task_paths(json.loads((folder / 'task.json').read_text(encoding="utf-8")))
             state = read_state(folder/'state.json',{'status':'starting'})
             active = self.active(folder.name)
             item = {'id': folder.name, 'connection': task['connection'], 'batch_id': task.get('batch_id'), **state,
@@ -489,13 +489,13 @@ class GenerationService:
                 if task.get('worker_id'):
                     def owns(attempt_id):
                         try:
-                            target=json.loads((attempts_root/attempt_id/'request.json').read_text())['execution']['diffusion']
+                            target=json.loads((attempts_root/attempt_id/'request.json').read_text(encoding="utf-8"))['execution']['diffusion']
                             return target['backend']+'|'+(target.get('address') or '')==task['worker_id']
                         except (OSError,ValueError,KeyError):return False
                     attempts=self.review.db.all('SELECT a.id,a.run_id FROM generation_attempts a JOIN generation_runs r ON r.id=a.run_id WHERE r.batch_id=? ORDER BY a.started_at DESC,a.rowid DESC',(task['batch_id'],))
                     latest={}
                     for attempt in attempts:latest.setdefault(attempt['run_id'],attempt['id'])
-                    frozen=json.loads(Path(task['manifest']).read_text())
+                    frozen=json.loads(Path(task['manifest']).read_text(encoding="utf-8"))
                     from .assignments import runs_for
                     eligible={r['id'] for r in runs_for(task['manifest'],frozen,task['worker_id'])[0]}
                     item['runs']=[r for r in item['runs'] if (owns(latest[r['id']]) if r['id'] in latest else r['id'] in eligible)]
@@ -506,7 +506,7 @@ class GenerationService:
                     item['reconnect'] = bool(statuses & {'running','cancel_requested'}) and task['connection']['backend'] != 'local'
             report = folder / 'hardware.json'
             if report.is_file():
-                item['report'] = json.loads(report.read_text())
+                item['report'] = json.loads(report.read_text(encoding="utf-8"))
             items.append(item)
         return items
 
@@ -514,7 +514,7 @@ class GenerationService:
         if not re.fullmatch(r'[0-9a-f]{32}', task_id):
             raise ValueError('Invalid generation task')
         folder = self.runtime / 'app_jobs' / task_id
-        return folder, task_paths(json.loads((folder / 'task.json').read_text()))
+        return folder, task_paths(json.loads((folder / 'task.json').read_text(encoding="utf-8")))
 
     def action(self, task_id, action):
         if action not in {'pause', 'continue', 'resume', 'retry', 'cleanup'}:
@@ -559,7 +559,7 @@ class GenerationService:
             return [v for v in values if isinstance(v, str) and 'minimax' in re.sub(r'[^a-z0-9]', '', v.casefold())] if isinstance(values, list) else []
         models = {'text_encoders': relevant('CLIPLoader','clip_name'), 'diffusion_models': relevant('UNETLoader','unet_name'),
                   'vaes': relevant('VAELoader','vae_name'), 'samplers': options('KSampler','sampler_name'), 'schedulers': options('KSampler','scheduler')}
-        graph = json.loads((Path(__file__).resolve().parents[2]/'_99_tools/_workers_comfyui/_workflows/music-full.json').read_text())
+        graph = json.loads((Path(__file__).resolve().parents[2]/'_99_tools/_workers_comfyui/_workflows/music-full.json').read_text(encoding="utf-8"))
         missing = sorted({n['class_type'] for n in graph.values()} - set(nodes))
         devices = inventory['system'].get('devices', [])
         device = devices[0] if devices else {}

@@ -12,7 +12,7 @@ import sys
 def limiter_filters(ffmpeg, limit_db, sample_rate):
     """Query the installed build; older alimiter needs explicit lookahead compensation."""
     help_result = subprocess.run([ffmpeg, '-hide_banner', '-h', 'filter=alimiter'],
-                                 capture_output=True, text=True, check=True)
+                                 capture_output=True, text=True, check=True, encoding="utf-8", errors="replace")
     options = help_result.stdout + help_result.stderr
     limiter = f'alimiter=limit={10**(limit_db/20)}:level=0:attack=5'
     if re.search(r'^\s+latency\s', options, re.M):
@@ -30,7 +30,7 @@ def render(request):
     import soundfile as sf
     ffmpeg=shutil.which('ffmpeg')
     if not ffmpeg:raise RuntimeError('FFmpeg is required for previews and master candidates')
-    version=subprocess.run([ffmpeg,'-version'],capture_output=True,text=True,check=True).stdout.splitlines()[0]
+    version=subprocess.run([ffmpeg,'-version'],capture_output=True,text=True,check=True, encoding="utf-8", errors="replace").stdout.splitlines()[0]
     recipe=request['recipe'];mix=recipe['mix'];duration=float(request['duration'])
     output=Path(request['output']).with_suffix('.wav' if request['kind']=='mix_preview' else '.flac')
     filters=[]
@@ -52,7 +52,7 @@ def render(request):
         impulse[0]=1
         ir=output.parent/'room-ir.wav';sf.write(ir,impulse,rate,subtype='FLOAT')
         command+=['-i',str(ir)]
-        help_text=subprocess.run([ffmpeg,'-hide_banner','-h','filter=afir'],capture_output=True,text=True,check=True).stdout
+        help_text=subprocess.run([ffmpeg,'-hide_banner','-h','filter=afir'],capture_output=True,text=True,check=True, encoding="utf-8", errors="replace").stdout
         normalise='irnorm=-1' if 'irnorm' in help_text else 'gtype=none'
         graph+=f'[tone][{3 if request.get("stems") else 1}:a]afir=dry=1:wet=1:irgain=1:irfmt=mono:{normalise}[room];'
         source='room'
@@ -79,7 +79,7 @@ def render(request):
         try:os.link(request['source'],output)
         except OSError:shutil.copyfile(request['source'],output)
     else:
-        process=subprocess.run(command,capture_output=True,text=True,timeout=550)
+        process=subprocess.run(command,capture_output=True,text=True,timeout=550, encoding="utf-8", errors="replace")
         if process.returncode:raise RuntimeError(process.stderr[-5000:])
     info=sf.info(output)
     peak=0.;squares=0.;samples=0
@@ -128,7 +128,7 @@ def main():
             'ready_adapters':(['mix_preview','mix_master','visuals'] if all(modules[n] for n in ['numpy','soundfile']) and shutil.which('ffmpeg') else [])+(['lyric_alignment'] if modules['demucs'] and modules['whisperx'] and shutil.which('ffmpeg') else []),
             'pending_adapters':(['lyric_alignment'] if not (modules['demucs'] and modules['whisperx']) else [])+['image_diffusion']}))
         return
-    request=json.load(sys.stdin)
+    request=json.loads(sys.stdin.buffer.read().decode('utf-8'))
     if request['kind'] in {'mix_preview','mix_master'}:result=render(request)
     elif request['kind']=='visuals':result=visuals(request)
     else:raise ValueError('Unsupported preparation worker operation')

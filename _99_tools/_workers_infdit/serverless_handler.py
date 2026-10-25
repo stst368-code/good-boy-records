@@ -9,7 +9,7 @@ import sys
 from urllib.request import Request, urlopen
 
 from _gbr_worker.artifacts import pack
-from _gbr_worker.contract import PROTOCOL, canonical, execution_target, validate_job
+from _gbr_worker.contract import PROTOCOL, canonical, execution_target, validate_job, python_environment
 from _gbr_worker.hardware import gpu_lock
 
 
@@ -47,39 +47,39 @@ def handler(event):
         target.mkdir(parents=True, exist_ok=True)
         frozen = target / 'frozen-job.json'
         if frozen.is_file():
-            if frozen.read_text() != canonical(job):
+            if frozen.read_text(encoding="utf-8") != canonical(job):
                 raise ValueError('This attempt already has different frozen inputs')
         else:
-            with frozen.open('x') as stream:
+            with frozen.open('x', encoding='utf-8') as stream:
                 stream.write(canonical(job))
         if (target / 'uploaded.json').is_file():
-            return json.loads((target / 'uploaded.json').read_text())
+            return json.loads((target / 'uploaded.json').read_text(encoding="utf-8"))
         # An interrupted native attempt on a persistent volume is not silently regenerated.
         if (target / 'started').exists() and not (target / 'result.json').exists():
             raise RuntimeError('An unfinished attempt exists; inspect it before generating again')
         if not (target / 'result.json').exists():
             (target / 'started').touch(exist_ok=False)
             local = dict(job, result_directory=str(target), cache_root=str(root / 'encodings'))
-            (target / 'request.json').write_text(canonical(local))
+            (target / 'request.json').write_text(canonical(local), encoding="utf-8")
             with (target / 'stderr.log').open('wb') as log:
                 code = subprocess.call([sys.executable, '-u', str(Path(__file__).with_name('worker.py')), 'run', str(target / 'request.json')],
-                                       stdout=log, stderr=log, env=os.environ.copy())
-            (target / 'exit.json').write_text(canonical({'returncode': code}))
+                                       stdout=log, stderr=log, env=python_environment())
+            (target / 'exit.json').write_text(canonical({'returncode': code}), encoding="utf-8")
             if not (target / 'result.json').exists():
                 (target / 'result.json').write_text(canonical({'protocol': PROTOCOL, 'run_id': job['run_id'],
                     'attempt_id': job['attempt_id'], 'status': 'failed',
                     'completed_at': datetime.now(timezone.utc).isoformat(),
-                    'error': f'Native worker exited {code} without a result. Its logs and available measurements were retained.'}))
+                    'error': f'Native worker exited {code} without a result. Its logs and available measurements were retained.'}), encoding="utf-8")
         if not (target / 'exit.json').exists():
             # A handler restart can occur after the worker commits its result but before exit.json.
-            (target / 'exit.json').write_text(canonical({'returncode': None, 'recovered_from_result': True}))
+            (target / 'exit.json').write_text(canonical({'returncode': None, 'recovered_from_result': True}), encoding="utf-8")
         archive = target / 'outputs.tar'
         receipt = pack(target, archive, job)
         receipt_file = target / 'receipt.json'
-        receipt_file.write_text(canonical(receipt))
+        receipt_file.write_text(canonical(receipt), encoding="utf-8")
         upload(body['uploads']['archive'], archive)
         upload(body['uploads']['receipt'], receipt_file)
-        (target / 'uploaded.json').write_text(canonical(receipt))
+        (target / 'uploaded.json').write_text(canonical(receipt), encoding="utf-8")
         archive.unlink()
         (target / 'audio.flac').unlink(missing_ok=True)
         return receipt

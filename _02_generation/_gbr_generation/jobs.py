@@ -80,7 +80,7 @@ class Jobs:
             attempt=attempts[0] if attempts else None;worker=None;stage=row['status'];extra={}
             if attempt:
                 request=path.parent/'attempts'/attempt['id']/'request.json'
-                try:worker=identity(json.loads(request.read_text())['execution']['diffusion'])
+                try:worker=identity(json.loads(request.read_text(encoding="utf-8"))['execution']['diffusion'])
                 except (OSError,ValueError,KeyError):pass
                 current=next((t for t in controllers if (t.get('worker_id') or identity(t['connection']))==worker),None)
                 if current and row['status'] in LIVE:
@@ -139,6 +139,6 @@ class Jobs:
             attempt=self.g.review.db.one('SELECT id FROM generation_attempts WHERE run_id=? ORDER BY rowid DESC LIMIT 1',(run_id,))
             if attempt:
                 directory=path.parent/'attempts'/attempt['id']
-                if (directory/'request.json').is_file() and discard(directory,json.loads((directory/'request.json').read_text())):
-                    (directory/'cleanup-pending.json').write_text(json.dumps({'cancelled':True,'error':'Remote cancellation output cleanup may be retried'}))
+                if (directory/'request.json').is_file() and discard(directory,json.loads((directory/'request.json').read_text(encoding="utf-8"))):
+                    (directory/'cleanup-pending.json').write_text(json.dumps({'cancelled':True,'error':'Remote cancellation output cleanup may be retried'}), encoding="utf-8")
         return {'run_id':run_id,'status':status}

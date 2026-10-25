@@ -94,7 +94,7 @@ class ServerlessClient:
         reference_path = directory / 'remote.json'
         object_key = f"gbr-generations/{job['run_id']}/{job['attempt_id']}"
         if resume:
-            reference = json.loads(reference_path.read_text())
+            reference = json.loads(reference_path.read_text(encoding="utf-8"))
             if reference.get('endpoint') != self.endpoint or reference.get('object_key') != object_key:
                 raise ValueError('Serverless attempt reference changed')
         else:
@@ -109,7 +109,7 @@ class ServerlessClient:
                 raise RemotePending('No valid remote job ID returned; resume to look for its result')
             reference.update(job_id=response['id'], submission='accepted')
             temporary = reference_path.with_suffix('.tmp')
-            temporary.write_text(canonical(reference))
+            temporary.write_text(canonical(reference), encoding="utf-8")
             temporary.replace(reference_path)
         while True:
             if getattr(self,'cancelled',None) and self.cancelled() and reference.get('job_id'):
@@ -127,7 +127,7 @@ class ServerlessClient:
                 try:
                     store.download(object_key, archive)
                     unpack(archive, directory, receipt, job)
-                    (directory / 'remote-output.json').write_text(canonical(receipt))
+                    (directory / 'remote-output.json').write_text(canonical(receipt), encoding="utf-8")
                 except Exception:
                     raise RemotePending('Result download/verification failed; resume to collect the existing result') from None
                 finally:
@@ -145,8 +145,8 @@ class ServerlessClient:
             time.sleep(poll_seconds)
 
     def acknowledge(self, job, directory):
-        reference = json.loads((directory / 'remote.json').read_text())
-        receipt = json.loads((directory / 'remote-output.json').read_text())
+        reference = json.loads((directory / 'remote.json').read_text(encoding="utf-8"))
+        receipt = json.loads((directory / 'remote-output.json').read_text(encoding="utf-8"))
         if (receipt['attempt_id'] != job['attempt_id'] or receipt['run_id'] != job['run_id']
                 or reference.get('endpoint') != self.endpoint
                 or reference.get('object_key') != f"gbr-generations/{job['run_id']}/{job['attempt_id']}"):

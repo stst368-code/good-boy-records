@@ -138,7 +138,7 @@ class Publisher:
     def close(self):self.pool.shutdown(wait=True,cancel_futures=False)
 
     def settings(self):
-        return {**DEFAULTS, **(json.loads(self.config_path.read_text()) if self.config_path.is_file() else {})}
+        return {**DEFAULTS, **(json.loads(self.config_path.read_text(encoding="utf-8")) if self.config_path.is_file() else {})}
 
     def save_settings(self, values):
         if set(values)-set(DEFAULTS)-{'access_key','secret_key'}:raise ValueError('Unknown publishing setting')
@@ -170,7 +170,7 @@ class Publisher:
         settings=self.settings()
         if not settings['endpoint'] or not settings['bucket']:raise ValueError('Configure Publishing in Settings and run the connection check first')
         if self.secrets_path.is_file():
-            credentials=json.loads(self.secrets_path.read_text())
+            credentials=json.loads(self.secrets_path.read_text(encoding="utf-8"))
             settings={**settings,'_access_key':credentials['access_key'],'_secret_key':credentials['secret_key']}
         return self.store_factory(settings)
 
@@ -291,7 +291,7 @@ class Publisher:
             if not ffmpeg:raise ValueError('FFmpeg is required to prepare web audio')
             mp3=directory/'audio.mp3'
             result=subprocess.run([ffmpeg,'-nostdin','-v','error','-n','-i',str(source),'-map','0:a:0','-map_metadata','-1',
-                                   '-c:a','libmp3lame','-q:a','2','-ar','44100','-ac','2',str(mp3)],capture_output=True,text=True,timeout=900)
+                                   '-c:a','libmp3lame','-q:a','2','-ar','44100','-ac','2',str(mp3)],capture_output=True,text=True,timeout=900, encoding="utf-8", errors="replace")
             if result.returncode:raise ValueError('Web audio encoding failed: '+result.stderr[-1200:])
             paths=[(mp3,'audio/mpeg')]
             if options.get('include_flac',True):

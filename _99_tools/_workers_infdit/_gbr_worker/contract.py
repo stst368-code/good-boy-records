@@ -2,6 +2,7 @@
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import re
 from urllib.parse import urlsplit
@@ -55,6 +56,11 @@ def execution_target(execution):
 
 def canonical(value):
     return json.dumps(value, sort_keys=True, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+
+
+def python_environment(**values):
+    """Own Python subprocesses exchange UTF-8, independent of the host code page."""
+    return {**os.environ, **values, 'PYTHONUTF8':'1', 'PYTHONIOENCODING':'utf-8'}
 
 
 def file_sha(path):

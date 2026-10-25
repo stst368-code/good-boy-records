@@ -25,7 +25,7 @@ def addresses():
 def access_code(config):
     path = config.data / "mobile-code.txt"
     if path.is_file():
-        value = path.read_text().strip()
+        value = path.read_text(encoding="utf-8").strip()
         if password_ok(value, config.values["password_hash"]):
             return value
     return None
@@ -35,7 +35,7 @@ def enable_http(config):
     # Invoked explicitly by Start-Mobile-Windows.bat / the mobile command.
     # Retain any existing user password. Generate an access code only when
     # no password exists; show it on the host, never to remote visitors.
-    original = config.path.read_text() if config.path.exists() else None
+    original = config.path.read_text(encoding="utf-8") if config.path.exists() else None
     if original:
         backup = config.data / "backups" / "config-before-mobile.json"
         if not backup.exists():

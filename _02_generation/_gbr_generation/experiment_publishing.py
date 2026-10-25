@@ -237,7 +237,7 @@ class ExperimentPublisher:
                 raise ValueError('FFmpeg is required for MP3 comparisons; lossless FLAC publication needs no conversion')
             result = subprocess.run([ffmpeg, '-nostdin', '-v', 'error', '-y', '-i', str(source), '-map', '0:a:0',
                 '-map_metadata', '-1', '-map_chapters', '-1', '-c:a', 'libmp3lame', '-q:a', '2', '-ar', '44100', '-ac', '2',
-                '-f', 'mp3', str(destination)], capture_output=True, text=True, timeout=900)
+                '-f', 'mp3', str(destination)], capture_output=True, text=True, timeout=900, encoding="utf-8", errors="replace")
             if result.returncode:
                 raise ValueError('Comparison audio encoding failed: ' + result.stderr[-1200:])
 

@@ -5,14 +5,14 @@ from pathlib import Path
 
 
 def process_record(pid, proc=Path('/proc')):
-    text = (proc / str(pid) / 'stat').read_text()
+    text = (proc / str(pid) / 'stat').read_text(encoding="utf-8")
     fields = text.rsplit(')', 1)[1].split()
     return {'pid': int(pid), 'group': int(fields[2]), 'start_ticks': fields[19], 'state': fields[0]}
 
 
 def identity(pid):
     try:
-        return {**process_record(pid), 'boot_id': Path('/proc/sys/kernel/random/boot_id').read_text().strip()}
+        return {**process_record(pid), 'boot_id': Path('/proc/sys/kernel/random/boot_id').read_text(encoding="utf-8").strip()}
     except (OSError, ValueError, IndexError):
         # Restricted /proc views must not turn a successfully spawned worker into a submission error.
         return {'pid': pid}
@@ -30,8 +30,8 @@ def inspect_attempt(directory, root, proc=Path('/proc')):
     if not proc.is_dir():
         return {'state': 'unknown', 'reason': 'Process inventory is unavailable'}
     try:
-        saved = json.loads((directory / 'pid.json').read_text()) if (directory / 'pid.json').exists() else {}
-        boot = (proc / 'sys/kernel/random/boot_id').read_text().strip()
+        saved = json.loads((directory / 'pid.json').read_text(encoding="utf-8")) if (directory / 'pid.json').exists() else {}
+        boot = (proc / 'sys/kernel/random/boot_id').read_text(encoding="utf-8").strip()
         old_boot = saved.get('boot_id') and saved['boot_id'] != boot
         if saved.get('pid') and not old_boot:
             try:

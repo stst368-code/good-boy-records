@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 from .connections import connection_key, normalize
 from _gbr_worker.hardware import gpu_lock
+from _gbr_worker.contract import python_environment
 
 DEFAULT_FIELDS = {'text_encoder', 'dit', 'sampler', 'scheduler', 'encoder_cfg', 'top_k',
                   'sampler_cfg', 'sampler_steps', 'duration'}
@@ -112,7 +113,7 @@ def ensure_comfy(connection, launcher, runtime, timeout=60):
                 child = None
                 record = folder / 'process.json'
                 try:
-                    old = json.loads(record.read_text())
+                    old = json.loads(record.read_text(encoding="utf-8"))
                     process = psutil.Process(old['pid'])
                     running = process.is_running() and process.status() != psutil.STATUS_ZOMBIE and abs(process.create_time() - old['created']) < .01
                 except (OSError, ValueError, TypeError, KeyError, psutil.Error):
@@ -120,7 +121,7 @@ def ensure_comfy(connection, launcher, runtime, timeout=60):
                 # Some .bat launchers exit after handing off to Python. Keep a
                 # short start window as well as PID identity to avoid double starts.
                 if not running:
-                    try:running = time.time() - json.loads(record.read_text()).get('started_at', 0) < 120
+                    try:running = time.time() - json.loads(record.read_text(encoding="utf-8")).get('started_at', 0) < 120
                     except (OSError, ValueError, TypeError):pass
                 if not running:
                     command = launch_command(settings)
@@ -129,14 +130,14 @@ def ensure_comfy(connection, launcher, runtime, timeout=60):
                         raise ValueError('ComfyUI working folder does not exist')
                     flags = {'creationflags': subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
                     with (folder / 'launcher.log').open('ab') as log:
-                        child = subprocess.Popen(command, cwd=cwd, stdin=subprocess.DEVNULL, stdout=log, stderr=log, **flags)
+                        child = subprocess.Popen(command, cwd=cwd, stdin=subprocess.DEVNULL, stdout=log, stderr=log, env=python_environment(), **flags)
                     try:
                         created = psutil.Process(child.pid).create_time()
                     except psutil.Error:
                         if child.poll() is not None:
                             raise ValueError('ComfyUI launcher exited immediately; check ' + str(folder / 'launcher.log')) from None
                         created = None  # PID inspection can be restricted; readiness still works.
-                    record.write_text(json.dumps({'pid': child.pid, 'created': created, 'started_at': time.time()}))
+                    record.write_text(json.dumps({'pid': child.pid, 'created': created, 'started_at': time.time()}), encoding="utf-8")
                 # Keep the endpoint lock until ready: concurrent requests cannot
                 # spawn another launcher while a batch file hands off to Python.
                 while time.monotonic() < deadline:
@@ -258,7 +259,7 @@ class Workers:
             python = Path(connection.get('worker_python') or default_python())
             if not python.is_file():
                 raise ValueError('Native worker is not installed; use Prepare worker')
-            report = json.loads(subprocess.check_output([str(python), str(WORKER / 'worker.py'), 'doctor'], timeout=15, stderr=subprocess.PIPE))
+            report = json.loads(subprocess.check_output([str(python), str(WORKER / 'worker.py'), 'doctor'], timeout=15, stderr=subprocess.PIPE, env=python_environment()))
         return {'busy': False, 'hardware': report.get('hardware'), 'report': report, 'models': g.native_choices()}
 
     def query(self, entry, activate=False):

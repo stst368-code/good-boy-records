@@ -295,7 +295,7 @@ class Analyzer:
         previous = self.db.one("SELECT * FROM analyses WHERE audio_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (audio_id,))
         if not previous or not Path(previous["preview_path"]).is_file() or not Path(previous["spectrogram_path"]).is_file():
             return self.run(audio_id)
-        preview = json.loads(Path(previous["preview_path"]).read_text())
+        preview = json.loads(Path(previous["preview_path"]).read_text(encoding="utf-8"))
         metrics = json.loads(previous["metrics_json"])
         events = detect(preview["features"], preview["duration"], 10 ** (metrics["sample_peak_dbfs"] / 20), self.config.values["transition_sensitivity"])
         metrics.update(event_count=len(events), transition_method="multi_window_novelty_v1", transition_sensitivity=self.config.values["transition_sensitivity"], retuned_from_analysis_id=previous["id"], feature_source_version=metrics.get("feature_source_version", previous["version"]))

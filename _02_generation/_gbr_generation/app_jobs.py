@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / '_02_generation'))
 sys.path.insert(0, str(ROOT / '_99_tools/_workers_infdit'))
 sys.path.insert(0, str(ROOT / '_98_database'))
-from _gbr_worker.contract import canonical
+from _gbr_worker.contract import canonical, python_environment
 from _gbr_worker.hardware import gpu_lock
 from _gbr_worker.runpod import RunpodClient
 from _gbr_worker.serverless import ServerlessClient
@@ -51,15 +51,15 @@ def prepare_worker(connection, *, install=False):
     if install:
         # A healthy environment is reused; a new device installs in the existing worker directory.
         if python.is_file():
-            checked = subprocess.run([str(python), str(WORKER / 'worker.py'), 'doctor'], capture_output=True)
+            checked = subprocess.run([str(python), str(WORKER / 'worker.py'), 'doctor'], capture_output=True, env=python_environment())
             if checked.returncode == 0:
                 return json.loads(checked.stdout)
         if connection.get('worker_python'):
             raise ValueError('Repair a custom worker environment explicitly, or use the standard local environment')
-        subprocess.run([sys.executable, str(WORKER / 'install_worker.py')], check=True)
+        subprocess.run([sys.executable, str(WORKER / 'install_worker.py')], check=True, env=python_environment())
     if not python.is_file():
         raise ValueError('Local worker is not installed. Enable automatic setup or use Prepare worker')
-    return json.loads(subprocess.check_output([str(python), str(WORKER / 'worker.py'), 'doctor']))
+    return json.loads(subprocess.check_output([str(python), str(WORKER / 'worker.py'), 'doctor'], env=python_environment()))
 
 
 @contextmanager

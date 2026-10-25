@@ -67,7 +67,7 @@ class Preparation:
         if self.enabled:
             # Additive and idempotent: no copied metadata, history reset or second DB.
             with self.db.transaction() as c:
-                sql=(self.root/'_98_database/_gbr_database/processing.sql').read_text()
+                sql=(self.root/'_98_database/_gbr_database/processing.sql').read_text(encoding="utf-8")
                 for statement in sql.split(';'):
                     if statement.strip():c.execute(statement)
             self.review.archiver.preparation_root=self.tracks
@@ -289,17 +289,18 @@ class Preparation:
                     request['recipe']['words']=lyric_words(json.loads(row['parsed_json']).get('lyrics',''))
                     command=[str(self.alignment_python()),str(self.worker.with_name('alignment.py'))];timeout=7200
                 environment=os.environ.copy()
+                environment.update(PYTHONUTF8='1',PYTHONIOENCODING='utf-8')
                 environment.setdefault('HF_HOME',str(self.worker.parent/'_runtime/huggingface'))
                 environment.setdefault('TORCH_HOME',str(self.worker.parent/'_runtime/torch'))
-                process=subprocess.run(command,input=canonical(request),capture_output=True,text=True,timeout=timeout,env=environment)
+                process=subprocess.run(command,input=canonical(request).encode('utf-8'),capture_output=True,timeout=timeout,env=environment)
                 if process.returncode:
                     resource_file=Path(temporary)/'resources.ndjson'
                     if resource_file.is_file():
-                        observations=[json.loads(line) for line in resource_file.read_text().splitlines()]
+                        observations=[json.loads(line) for line in resource_file.read_text(encoding="utf-8").splitlines()]
                         ended=[row for row in observations if row.get('event')=='stage_end']
                         if ended:failure_telemetry={'resources':ended[-1]['resource']}
-                    raise RuntimeError(process.stderr[-5000:] or 'Processing worker failed')
-                result=json.loads(process.stdout);output=Path(result['output'])
+                    raise RuntimeError(process.stderr.decode('utf-8',errors='replace')[-5000:] or 'Processing worker failed')
+                result=json.loads(process.stdout.decode('utf-8'));output=Path(result['output'])
                 if not output.resolve().is_relative_to(Path(temporary).resolve()) or not output.is_file():raise ValueError('Invalid worker output')
                 if digest(source)!=task['input_sha256']:raise ValueError('Source changed while processing; result was not published')
                 if any(digest(value['path'])!=value['sha256'] for value in stems.values()):raise ValueError('Stem bytes changed while processing')
@@ -395,7 +396,7 @@ class Preparation:
             if not artifact:continue
             path=self.artifact(artifact['id'])
             if digest(path)!=artifact['sha256']:raise ValueError('Editorial sidecar bytes changed; restore the registered version')
-            data=json.loads(path.read_text())
+            data=json.loads(path.read_text(encoding="utf-8"))
             if data.get('source_sha256')!=sha:raise ValueError('Sidecar refers to different audio')
             if key=='lyric':result.update(language=data.get('language',result['language']),words=data['words'],approved=data.get('approved',False),lyric_task_id=task['id'],unmatched_recognition=data.get('unmatched_recognition',[]))
             elif key=='visual':result.update(features=data,feature_artifact_id=artifact['id'])

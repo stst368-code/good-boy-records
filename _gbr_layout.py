@@ -148,10 +148,10 @@ def _native_created(pid):
         finally:
             kernel.CloseHandle(handle)
     try:
-        stat = Path('/proc', str(pid), 'stat').read_text().rpartition(')')[2].split()
+        stat = Path('/proc', str(pid), 'stat').read_text(encoding="utf-8").rpartition(')')[2].split()
         if stat[0] == 'Z':
             return None
-        boot = int(next(line.split()[1] for line in Path('/proc/stat').read_text().splitlines() if line.startswith('btime ')))
+        boot = int(next(line.split()[1] for line in Path('/proc/stat').read_text(encoding="utf-8").splitlines() if line.startswith('btime ')))
         return boot + int(stat[19]) / os.sysconf('SC_CLK_TCK')
     except (FileNotFoundError, ProcessLookupError):
         return None
@@ -182,14 +182,14 @@ def _running(root):
         for process in Path('/proc').iterdir():
             if process.name.isdigit():
                 try:
-                    commands.append((int(process.name), (process / 'cmdline').read_text().split('\0'), str((process / 'cwd').resolve())))
+                    commands.append((int(process.name), (process / 'cmdline').read_text(encoding="utf-8").split('\0'), str((process / 'cwd').resolve())))
                 except OSError:
                     pass
         parent = os.getppid()
         while parent > 1 and parent not in ancestors:
             ancestors.add(parent)
             try:
-                parent = int(next(line.split()[1] for line in Path('/proc', str(parent), 'status').read_text().splitlines() if line.startswith('PPid:')))
+                parent = int(next(line.split()[1] for line in Path('/proc', str(parent), 'status').read_text(encoding="utf-8").splitlines() if line.startswith('PPid:')))
             except (OSError, StopIteration, ValueError):
                 break
     for pid, args, cwd in commands:
@@ -221,7 +221,7 @@ def _running(root):
     for runtime in locations:
         for path in runtime.glob('app_jobs/*/process.json'):
             try:
-                saved = json.loads(path.read_text())
+                saved = json.loads(path.read_text(encoding="utf-8"))
                 if psutil is None:
                     created = _native_created(saved['pid'])
                     active = created is not None and abs(created - saved['created']) < .02

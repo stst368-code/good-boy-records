@@ -142,7 +142,7 @@ def create_app(config_path, start_worker=True, database_path=None):
             secret_path.chmod(0o600)
         except OSError:
             pass
-    secret = secret_path.read_text().encode()
+    secret = secret_path.read_text(encoding="utf-8").encode()
     attempts = {}
 
     @asynccontextmanager
@@ -428,7 +428,7 @@ def create_app(config_path, start_worker=True, database_path=None):
         if not Path(analysis["preview_path"]).is_file() or not Path(analysis["spectrogram_path"]).is_file():
             service.db.execute("UPDATE audio SET analysis_state='pending' WHERE id=?", (g["audio_id"],))
             return {"ready": False, "technical_checks": checks}
-        data = json.loads(Path(analysis["preview_path"]).read_text())
+        data = json.loads(Path(analysis["preview_path"]).read_text(encoding="utf-8"))
         markers = service.db.all("SELECT id,start,end FROM audio_events WHERE analysis_id=? ORDER BY start", (analysis["id"],))
         segments = service.db.all("SELECT id,mode,ordinal,start,end FROM segments WHERE analysis_id=? ORDER BY mode,ordinal", (analysis["id"],))
         points = service.db.all("SELECT id,start,end FROM audio_events WHERE analysis_id=? AND type='structural_transition' ORDER BY start", (analysis["id"],))

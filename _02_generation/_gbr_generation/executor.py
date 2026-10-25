@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKER = ROOT / "_99_tools" / "_workers_infdit"
 sys.path.insert(0, str(WORKER))
 sys.path.insert(0, str(ROOT / "_98_database"))
-from _gbr_worker.contract import PROTOCOL, execution_target, file_sha, validate_job
+from _gbr_worker.contract import PROTOCOL, execution_target, file_sha, validate_job, python_environment
 from _gbr_worker.control import Cancelled,check_cancel
 from _gbr_worker.runpod import RemotePending, RunpodClient
 from _gbr_worker.serverless import ServerlessClient
@@ -212,7 +212,7 @@ def publish_bundle(directory, run, state, result, source, attempt_id, timezone_n
             ffmpeg=shutil.which('ffmpeg')
             if not ffmpeg:raise ValueError('Comfy FLAC needs sample-rate conversion from '+str(info.samplerate)+' Hz. Install FFmpeg, then Retry failed; the saved audio is retained and inference will not repeat.')
             filters=(['pan=stereo|c0=c0|c1=c0'] if info.channels==1 else [])+['aresample=44100']
-            converted=subprocess.run([ffmpeg,'-nostdin','-v','error','-i',str(audio),'-map','0:a:0','-af',','.join(filters),'-c:a','flac','-sample_fmt','s32','-bits_per_raw_sample','24','-n',str(destination)],capture_output=True,text=True)
+            converted=subprocess.run([ffmpeg,'-nostdin','-v','error','-i',str(audio),'-map','0:a:0','-af',','.join(filters),'-c:a','flac','-sample_fmt','s32','-bits_per_raw_sample','24','-n',str(destination)],capture_output=True,text=True, encoding="utf-8", errors="replace")
             if converted.returncode:raise ValueError('Comfy audio conversion failed; saved worker audio retained: '+converted.stderr[-2000:])
         exported=sf.info(destination)
         if (exported.format,exported.subtype,exported.channels,exported.samplerate)!=('FLAC','PCM_24',2,44100) or exported.frames<=0:
@@ -311,7 +311,7 @@ def cleanup_outputs(manifest_path, *, runpod_identity=None, worker_id=None):
             if not directory.is_dir() or not (directory / 'request.json').is_file():
                 continue
             pending = directory / 'cleanup-pending.json'
-            job = json.loads((directory / 'request.json').read_text())
+            job = json.loads((directory / 'request.json').read_text(encoding="utf-8"))
             if worker_id and '|'.join(str(v or '') for v in execution_target(job['execution']))!=worker_id:continue
             run = runs.get(job['run_id'])
             if not run or job['attempt_id'] != directory.name:
@@ -327,7 +327,7 @@ def cleanup_outputs(manifest_path, *, runpod_identity=None, worker_id=None):
                     backend,address=execution_target(job['execution'])
                     if backend=='comfyui':client=ComfyClient(address)
                     elif backend=='runpod_serverless':client=ServerlessClient(address)
-                    elif backend=='runpod_dedicated':client=RunpodClient(address,runpod_identity,release=json.loads((directory/'remote.json').read_text()).get('release'))
+                    elif backend=='runpod_dedicated':client=RunpodClient(address,runpod_identity,release=json.loads((directory/'remote.json').read_text(encoding="utf-8")).get('release'))
                     else:client=None
                     if client:client.acknowledge(job,directory)
                     pending.unlink()
@@ -338,7 +338,7 @@ def cleanup_outputs(manifest_path, *, runpod_identity=None, worker_id=None):
                     Path(a['uri']).is_file() and file_sha(a['uri']) == a['sha256'] for a in artifacts):
                 raise ValueError('Published files do not verify; remote output retained')
             report = conn.execute("SELECT uri FROM generation_artifacts WHERE run_id=? AND kind='generation_report'", (run['id'],)).fetchone()
-            marker = json.loads(Path(report['uri']).read_text())
+            marker = json.loads(Path(report['uri']).read_text(encoding="utf-8"))
             audio = directory / 'audio.flac'
             if audio.is_file():
                 if marker.get('attempt_id') != job['attempt_id'] or file_sha(audio) != marker.get('worker_audio_sha256'):
@@ -349,7 +349,7 @@ def cleanup_outputs(manifest_path, *, runpod_identity=None, worker_id=None):
                 continue
             backend, address = execution_target(job['execution'])
             if backend == 'runpod_dedicated':
-                reference = json.loads((directory / 'remote.json').read_text())
+                reference = json.loads((directory / 'remote.json').read_text(encoding="utf-8"))
                 client = RunpodClient(address, runpod_identity, release=reference.get('release'))
             elif backend == 'runpod_serverless':
                 client = ServerlessClient(address)
@@ -407,7 +407,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             if worker_id:
                 previous=conn.execute('SELECT id FROM generation_attempts WHERE run_id=? ORDER BY started_at DESC,rowid DESC LIMIT 1',(run['id'],)).fetchone()
                 if previous:
-                    saved=json.loads((attempts_root/previous['id']/'request.json').read_text())
+                    saved=json.loads((attempts_root/previous['id']/'request.json').read_text(encoding="utf-8"))
                     if saved['execution']!=run['execution'] or saved['parameters']!=run['effective']:
                         conn.rollback();continue
                 if status in {'running','publishing','cancel_requested'} and not resume_remote:
@@ -430,7 +430,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                     candidate = attempts_root / previous['id']
                     receipt = candidate / 'publication-input.json'
                     if receipt.is_file() and (candidate / 'audio.flac').is_file():
-                        saved = json.loads(receipt.read_text())
+                        saved = json.loads(receipt.read_text(encoding="utf-8"))
                         if saved.get('run_id') != run['id'] or saved.get('attempt_id') != previous['id'] or any(
                                 file_sha(candidate / name) != saved.get(name) for name in ('audio.flac', 'result.json', 'request.json')):
                             raise ValueError('Saved publication inputs changed; retained for inspection without another generation')
@@ -438,7 +438,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             if publication is not None:
                 attempt_id, started = publication['id'], publication['started_at']
                 directory = attempts_root / attempt_id
-                job = json.loads((directory / 'request.json').read_text())
+                job = json.loads((directory / 'request.json').read_text(encoding="utf-8"))
                 expected = make_job(run, manifest_path.parent, attempt_id, directory, job.get('model_revision'))
                 if request_paths(job) != request_paths(expected):
                     raise ValueError('Saved publication request changed')
@@ -489,7 +489,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                 if publication is not None:
                     print('Reusing verified worker audio; retrying metadata/publication without inference.', file=sys.stderr)
                     if not launcher and backend == 'runpod_dedicated':
-                        reference = json.loads((directory / 'remote.json').read_text())
+                        reference = json.loads((directory / 'remote.json').read_text(encoding="utf-8"))
                         client = RunpodClient(address, runpod_identity, release=reference.get('release'))
                     elif not launcher and backend == 'runpod_serverless':
                         client = ServerlessClient(address)
@@ -498,7 +498,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                 elif launcher:
                     launcher(python, directory / "request.json", directory)
                 elif backend == "runpod_dedicated":
-                    reference = json.loads((directory / "remote.json").read_text()) if resuming else {}
+                    reference = json.loads((directory / "remote.json").read_text(encoding="utf-8")) if resuming else {}
                     client = remote_client(RunpodClient(address, runpod_identity, release=reference.get("release")))
                     client.run(job, directory, resume=resuming)
                 elif backend == 'runpod_serverless':
@@ -510,7 +510,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                 else:
                     with (directory / "stderr.log").open("x", encoding="utf-8") as log:
                         process = subprocess.Popen([str(python), "-u", str(WORKER / "worker.py"), "run", str(directory / "request.json")],
-                                                   stdout=log, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+                                                   stdout=log, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", env=python_environment())
                         stopped=threading.Event()
                         def watch_cancel():
                             while not stopped.wait(.25) and process.poll() is None:
@@ -560,7 +560,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                 evidence = {'run_id': run['id'], 'attempt_id': attempt_id,
                             **{name: file_sha(directory / name) for name in ('audio.flac', 'result.json', 'request.json')}}
                 if receipt.is_file():
-                    if json.loads(receipt.read_text()) != evidence:
+                    if json.loads(receipt.read_text(encoding="utf-8")) != evidence:
                         raise ValueError('Publication input checksums changed')
                 else:
                     write_new(receipt, json_text(evidence).encode('utf-8'))
@@ -585,7 +585,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                         client.acknowledge(job, directory)
                     (directory / 'cleanup-pending.json').unlink(missing_ok=True)
                 except Exception as exc:
-                    (directory / 'cleanup-pending.json').write_text(json_text({'run_id': run['id'], 'attempt_id': attempt_id, 'error': str(exc)}))
+                    (directory / 'cleanup-pending.json').write_text(json_text({'run_id': run['id'], 'attempt_id': attempt_id, 'error': str(exc)}), encoding="utf-8")
                     print('Output saved. Temporary artifact cleanup needs a retry from Generation.', file=sys.stderr)
             except BaseException as exc:
                 error = f"{type(exc).__name__}: {exc}"
@@ -598,7 +598,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                     try:
                         if discard_cancelled(directory,job) and client:client.acknowledge(job,directory)
                     except Exception as cleanup_error:
-                        (directory/'cleanup-pending.json').write_text(json_text({'error':str(cleanup_error),'cancelled':True}))
+                        (directory/'cleanup-pending.json').write_text(json_text({'error':str(cleanup_error),'cancelled':True}), encoding="utf-8")
                     (directory/'download.part').unlink(missing_ok=True)
                 if isinstance(exc, KeyboardInterrupt):
                     print("Controller interrupted; reconnect with --resume-remote. The pod continues working." if pending

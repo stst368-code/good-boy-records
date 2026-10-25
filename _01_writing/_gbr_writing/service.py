@@ -72,7 +72,7 @@ class WritingService:
         self.ready = bool(review.db.one("SELECT 1 FROM sqlite_master WHERE name='worker_sessions'"))
         if self.ready:
             with review.db.transaction() as connection:
-                connection.executescript((Path(__file__).resolve().parents[2]/'_98_database/_gbr_database/writing.sql').read_text())
+                connection.executescript((Path(__file__).resolve().parents[2]/'_98_database/_gbr_database/writing.sql').read_text(encoding="utf-8"))
 
     def close(self):self.pool.shutdown(wait=False,cancel_futures=True)
     @property

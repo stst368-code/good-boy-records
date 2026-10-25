@@ -49,7 +49,7 @@ for attempt in (runtime/"attempts").glob("*"):
         raise RuntimeError("Worker attempt "+attempt.name+" is "+state['state']+"; environment kept unchanged. "+state.get('reason','')+". Resume its queue to collect it; do not submit a replacement.")
     recovered={'returncode':None,'recovered':True,'process_evidence':state}
     temporary=attempt/"exit.recovered.tmp"
-    with temporary.open('w') as stream:
+    with temporary.open('w',encoding='utf-8') as stream:
         json.dump(recovered,stream);stream.flush();os.fsync(stream.fileno())
     temporary.replace(attempt/"exit.json")
     print("Recovered stopped attempt "+attempt.name+"; diagnostics and results retained.",file=sys.stderr)
@@ -63,17 +63,17 @@ for name in ("python3.12","python3.11","python3"):
         python=candidate
         break
 if python is None: raise RuntimeError("Choose a pod template with Python 3.11 or 3.12 installed")
-env=dict(os.environ,HF_HOME=str(root/"runtime"/"huggingface"))
+env=dict(os.environ,HF_HOME=str(root/"runtime"/"huggingface"),PYTHONUTF8='1',PYTHONIOENCODING='utf-8')
 profile=hashlib.sha256((files["requirements.txt"]+"torch==2.10.0+cu128").encode()).hexdigest()
 marker=root/"runtime"/"dependency-profile.sha256"
 installed=root/".venv"/"bin"/"python"
-reuse=installed.is_file() and marker.is_file() and marker.read_text().strip()==profile
+reuse=installed.is_file() and marker.is_file() and marker.read_text(encoding='utf-8').strip()==profile
 if reuse:
     reuse=subprocess.call([str(installed),str(release/"worker.py"),"doctor"],env=env,stdout=sys.stderr,stderr=sys.stderr)==0
 if not reuse:
     subprocess.run([python,str(release/"install_worker.py"),"--environment",str(root/".venv"),"--runtime",str(root/"runtime")],env=env,stdout=sys.stderr,check=True)
     marker.parent.mkdir(parents=True,exist_ok=True)
-    marker.write_text(profile)
+    marker.write_text(profile,encoding='utf-8')
 else: print("Existing worker dependencies and GPU check passed; reusing environment.",file=sys.stderr)
 print(json.dumps({"release":digest,"remote_root":str(root)}))
 '''
@@ -141,7 +141,7 @@ class RunpodClient:
             + f'root=pathlib.Path({REMOTE_ROOT!r})\n'
             + f'release=root/"releases"/{self.release!r}\n'
             + 'ready=(root/".venv/bin/python").is_file() and any((root/"releases").glob("*/worker.py"))\n'
-            + 'scope={}\nexec(' + repr((WORKER / '_gbr_worker/process_state.py').read_text()) + ',scope)\n'
+            + 'scope={}\nexec(' + repr((WORKER / '_gbr_worker/process_state.py').read_text(encoding="utf-8")) + ',scope)\n'
             + 'attempts=[dict(attempt_id=p.name,**scope["inspect_attempt"](p,root)) for p in (root/"runtime/attempts").glob("*") if p.is_dir() and not (p/"exit.json").exists()]\n'
             + 'print(json.dumps({"connected":True,"python":platform.python_version(),"worker_installed":ready,"attempts":attempts,'
               '"message":"SSH connected. Worker is installed." if ready else '
@@ -175,13 +175,13 @@ class RunpodClient:
                 path.replace(directory / name)
             finally:
                 path.unlink(missing_ok=True)
-        code = json.loads((directory / "exit.json").read_text())["returncode"]
+        code = json.loads((directory / "exit.json").read_text(encoding="utf-8"))["returncode"]
         if not (directory / "result.json").is_file():
             raise RuntimeError(f"Remote worker exited {code} without a result; see {directory / 'stderr.log'}")
         (directory / 'remote-output.json').write_text(canonical(outputs), encoding='utf-8')
 
     def acknowledge(self, job, directory):
-        outputs = json.loads((directory / 'remote-output.json').read_text())
+        outputs = json.loads((directory / 'remote-output.json').read_text(encoding="utf-8"))
         # Works for attempts made by older immutable releases without installing code or packages.
         script = r'''
 import hashlib,json,os,pathlib,re,sys
@@ -201,7 +201,7 @@ if audio.exists():
     if audio.is_symlink() or digest(audio)!=body['audio_sha256']: raise ValueError('Remote audio changed; retained on the pod')
     audio.unlink()
 temporary=directory/'collected.tmp'
-with temporary.open('w') as stream:
+with temporary.open('w',encoding='utf-8') as stream:
     json.dump(body,stream);stream.flush();os.fsync(stream.fileno())
 temporary.replace(directory/'collected.json')
 print(json.dumps({'collected':True}))
@@ -216,7 +216,7 @@ print(json.dumps({'collected':True}))
         reference = {"address": self.address, "release": self.release, "attempt_id": job["attempt_id"]}
         reference_path = directory / "remote.json"
         if resume:
-            if json.loads(reference_path.read_text()) != reference:
+            if json.loads(reference_path.read_text(encoding="utf-8")) != reference:
                 raise ValueError("Remote attempt reference changed")
             operation, body = "status", {"attempt_id": job["attempt_id"]}
         else:

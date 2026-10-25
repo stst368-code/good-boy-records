@@ -73,7 +73,7 @@ class Client:
         return {'system':self.request('/system_stats',timeout=timeout),'nodes':self.request('/object_info',timeout=timeout),
                 'capabilities':self.capabilities(timeout=min(timeout,5))}
     def prepare(self,job,inventory=None):
-        inventory=inventory or self.inventory();nodes=inventory['nodes'];graph=json.loads((ROOT/'_workflows/music-full.json').read_text());bindings=json.loads((ROOT/'_workflows/music-bindings.json').read_text())
+        inventory=inventory or self.inventory();nodes=inventory['nodes'];graph=json.loads((ROOT/'_workflows/music-full.json').read_text(encoding="utf-8"));bindings=json.loads((ROOT/'_workflows/music-bindings.json').read_text(encoding="utf-8"))
         def choices(node,key):
             try:return nodes[node]['input']['required'][key][0]
             except KeyError:raise ValueError('Missing Comfy node/input: '+node+'/'+key) from None
@@ -100,7 +100,7 @@ class Client:
         hardware={'address':self.address,'provider':'comfyui_url','gpu_name':device.get('name'),'usable_vram_bytes':device.get('vram_total'),'free_vram_bytes_at_start':device.get('vram_free'),'gpu_uuid':None,'gpu_peak_vram_bytes':None,'cuda_device':device.get('index'),'memory_profile':'server_managed'}
         return {'compiled':compiled,'identity':identity,'hardware':hardware,'system':system}
     def acknowledge(self,job,directory):
-        ref=json.loads((Path(directory)/'comfy.json').read_text())
+        ref=json.loads((Path(directory)/'comfy.json').read_text(encoding="utf-8"))
         if not self.capabilities().get('verified_output_cleanup'):
             raise RuntimeError('ComfyUI output cleanup is pending: install _99_tools/_workers_comfyui/gbr_bridge.py in ComfyUI/custom_nodes, restart ComfyUI, then retry Clean temporary files. The verified local result is already saved.')
         self.request('/gbr/ack',{'attempt_id':job['attempt_id'],'file':ref['file'],'sha256':ref['download_sha256']})
@@ -115,7 +115,7 @@ class Client:
             from datetime import datetime,timezone
             with (directory/'events.ndjson').open('a',encoding='utf-8') as f:f.write(canonical({'at':datetime.now(timezone.utc).isoformat(),**data})+'\n')
         try:
-            if journal.is_file():ref=json.loads(journal.read_text())
+            if journal.is_file():ref=json.loads(journal.read_text(encoding="utf-8"))
             else:
                 check_cancel(cancelled)
                 prepared=self.prepare(job);compiled=prepared['compiled'];identity=prepared['identity'];hardware=prepared['hardware'];system=prepared['system']

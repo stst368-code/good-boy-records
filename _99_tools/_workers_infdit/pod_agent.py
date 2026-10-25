@@ -9,7 +9,7 @@ import re
 import subprocess
 import sys
 
-from _gbr_worker.contract import canonical, execution_target, file_sha, validate_job
+from _gbr_worker.contract import canonical, execution_target, file_sha, validate_job, python_environment
 from _gbr_worker.hardware import restore_pod_environment
 from _gbr_worker.process_state import identity, inspect_attempt
 
@@ -21,7 +21,7 @@ OUTPUTS = {"audio.flac", "result.json", "events.ndjson", "startup.ndjson", "stde
 
 
 def environment():
-    return dict(os.environ, HF_HOME=str(RUNTIME / "huggingface"), PYTHONUNBUFFERED="1")
+    return python_environment(HF_HOME=str(RUNTIME / "huggingface"), PYTHONUNBUFFERED="1")
 
 
 def attempt_directory(attempt_id):
@@ -71,7 +71,7 @@ def start(original):
     digest = hashlib.sha256(canonical(original).encode()).hexdigest()
     with launch_lock():
         if directory.exists():
-            saved = json.loads((directory / "identity.json").read_text())
+            saved = json.loads((directory / "identity.json").read_text(encoding="utf-8"))
             if saved["sha256"] != digest or saved["release"] != str(RELEASE):
                 raise ValueError("Attempt already exists with different input or worker code")
             return status(directory)

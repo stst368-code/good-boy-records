@@ -63,7 +63,7 @@ def run(request):
 
 
 if __name__=='__main__':
-    request=json.load(sys.stdin)
+    request=json.loads(sys.stdin.buffer.read().decode('utf-8'))
     import torch
     from contextlib import nullcontext
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'_workers_infdit'))
@@ -77,7 +77,7 @@ if __name__=='__main__':
         try:
             with journal.span('separate_and_align',gpu=bool(hardware)):result=run(request)
         finally:journal.close()
-        records=[json.loads(line) for line in (Path(request['output']).parent/'resources.ndjson').read_text().splitlines()]
+        records=[json.loads(line) for line in (Path(request['output']).parent/'resources.ndjson').read_text(encoding="utf-8").splitlines()]
         measured=next(row for row in reversed(records) if row['event']=='stage_end')
         result['measurements']['resources']=measured['resource']
         if hardware:result['hardware']=hardware
