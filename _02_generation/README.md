@@ -37,6 +37,31 @@ and worker encoding caches. Interrupted moves/deletions resume with the same
 button. Unexpected/changed files and shared ownership block removal. Clean any
 pending temporary worker output first using the existing batch cleanup control.
 
+**Publish comparison to website**, inside an experiment batch, publishes a selected
+matched set using the existing **Settings → Publishing** R2 configuration. Choose
+the varied parameter, one of the available matched sets, a public title and the
+website position. Lossless FLAC is the default: its public copy has private tags,
+embedded YAML and workflow blocks removed while preserving decoded PCM exactly.
+MP3 is available for smaller downloads. Neither option alters the original bundle
+or creates review/distribution entries. Other controls, source and model revision
+must match; repetitions remain separate and missing/failed settings are excluded.
+
+Public comparisons have their own R2 namespace:
+`gbr/v2/experiments/catalogue.json`, immutable manifests under
+`gbr/v2/experiments/sets/`, and content-addressed audio under
+`gbr/v2/experiments/objects/`. They never enter `gbr/v2/catalogue.json`. How it’s
+made reads its published sets directly from R2, including each clip’s available
+timing/hardware/cache measurements. Publishing a 1–100 step set updates the player’s
+range automatically, without editing guide YAML or rebuilding the website.
+
+The app records publication progress/retries in `generation_artifacts`, using the
+existing shared database. Verified public renders are removed from local scratch
+after upload. Interrupted uploads retain their receipts and resume explicitly.
+Uploaded sets keep playing when the studio is closed or local experiment output
+files are deleted. **Remove from website index** removes the listing; immutable
+objects remain available to existing direct links. Set `GBR_EXPERIMENT_CATALOGUE`
+in `_96_website/showcase-host.js` to the matching public bucket if changing hosts.
+
 For a controlled step sweep, keep the caption, lyrics, encoder settings and
 duration fixed; set **Steps → Range**, start `1`, stop `100`, step `1`. Selecting
 Experiment initially chooses **Same automatic seeds across batch**. Explicit

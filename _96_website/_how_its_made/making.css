@@ -879,3 +879,5 @@ dialog h2 {
 .experiment-compare[hidden] {
   display:none
 }
+
+.published-set-controls{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:12px 0}.published-set-controls[hidden]{display:none}.published-set-controls label{display:grid;gap:6px;min-width:0;flex:1;color:var(--muted);font-size:12px}.published-set-controls select{width:100%;max-width:100%;min-width:0;background:var(--bg);color:var(--paper);border:1px solid var(--line);border-radius:6px;padding:10px;font:inherit}.published-set-state{font-size:12px;color:var(--muted);line-height:1.6}.experiment-measurements{display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 12px;margin-top:16px;font-size:12px}.experiment-measurements[hidden]{display:none}.experiment-measurements dt{color:var(--muted)}.experiment-measurements dd{margin:0;overflow-wrap:anywhere}.published-experiment{min-width:0}

@@ -32,6 +32,20 @@ def write(path, raw):
     atomic_text(path, raw.decode('utf-8'))
 
 
+def public_flac(source, destination):
+    """Strip private metadata from a public copy, preserving every PCM sample."""
+    from mutagen.flac import FLAC
+    from _review.indexer import audio_identity
+    shutil.copyfile(source, destination)
+    tags = FLAC(destination)
+    tags.metadata_blocks = [block for block in tags.metadata_blocks if block.code in {0, 3}]
+    tags.tags = None
+    tags.cuesheet = None
+    tags.save(deleteid3=True, padding=lambda _: 0)
+    if audio_identity(destination)[0] != audio_identity(source)[0]:
+        raise ValueError('Public FLAC did not preserve decoded audio')
+
+
 def error_text(exc):
     # SDK exceptions can include endpoint/request details; never return credentials.
     if hasattr(exc, 'response'):
@@ -82,6 +96,10 @@ class R2:
         except self.client.exceptions.ClientError as exc:
             if exc.response['Error']['Code'] not in {'PreconditionFailed', '412'}:raise
         # Verify exact remote bytes, including on retry of an existing object.
+        self.verify(item)
+
+    def verify(self, item):
+        # Verification also works after a disposable local render has been removed.
         result=self.client.get_object(Bucket=self.bucket,Key=item['key']);h=hashlib.sha256();size=0
         with closing(result['Body']) as stream:
             for block in iter(lambda:stream.read(1024**2),b''):h.update(block);size+=len(block)
@@ -272,16 +290,7 @@ class Publisher:
             if result.returncode:raise ValueError('Web audio encoding failed: '+result.stderr[-1200:])
             paths=[(mp3,'audio/mpeg')]
             if options.get('include_flac',True):
-                from mutagen.flac import FLAC
-                from _review.indexer import audio_identity
-                flac=directory/'audio.flac';shutil.copyfile(source,flac)
-                tags=FLAC(flac)
-                # Strip comments, pictures, application/workflow blocks, cue
-                # sheets and ID3 too; retain only decoding/seek information.
-                tags.metadata_blocks=[block for block in tags.metadata_blocks if block.code in {0,3}]
-                tags.tags=None;tags.cuesheet=None
-                tags.save(deleteid3=True,padding=lambda _:0)
-                if audio_identity(flac)[0]!=audio_identity(source)[0]:raise ValueError('Public FLAC did not preserve decoded audio')
+                flac=directory/'audio.flac';public_flac(source,flac)
                 paths.append((flac,'audio/flac'))
             art=None
             if options.get('artwork_id'):

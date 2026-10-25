@@ -78,5 +78,16 @@ class ProcessGuideTests(unittest.TestCase):
             data['stages'][0]['nodes'][0]['body'].append({'type':'media','kind':kind,'src':'https://example.com/a.'+ext,'alt':'A description'})
         making.validate(data,self.source)
 
+    def test_public_comparison_bindings_are_explicit_valid_and_unique(self):
+        for edit in ['slot','parameter','duplicate']:
+            data=deepcopy(self.payload)
+            block=next(b for s in data['stages'] for n in s['nodes'] for b in n['body'] if b['type']=='experiment')
+            if edit=='slot':block['published_slot']='../private'
+            elif edit=='parameter':block['parameter_field']='arbitrary_path'
+            else:
+                duplicate=deepcopy(block);duplicate['id']='duplicate-example'
+                data['stages'][0]['nodes'][0]['body'].append(duplicate)
+            with self.subTest(edit=edit),self.assertRaises(ValueError):making.validate(data,self.source)
+
 
 if __name__=='__main__':unittest.main()

@@ -97,7 +97,7 @@ def validate(payload, source):
     for topic in topics:
         require(isinstance(topic, dict) and identifier(topic.get('id')) and topic['id'] not in topic_ids and text(topic.get('title')), 'invalid or duplicate topic')
         topic_ids.add(topic['id'])
-    experiments = set()
+    experiments, bindings = set(), set()
     for owner in [n for s in stages for n in s['nodes']] + topics:
         blocks = owner.get('body', [])
         require(isinstance(blocks, list), 'body must be a list of blocks')
@@ -128,6 +128,11 @@ def validate(payload, source):
                 require(identifier(block.get('id')) and block['id'] not in experiments, 'invalid or duplicate experiment ID')
                 experiments.add(block['id'])
                 require(all(text(block.get(k)) for k in ['title','parameter','conditions']), 'experiment needs a title, parameter and fixed conditions')
+                if block.get('published_slot') is not None or block.get('parameter_field') is not None:
+                    require(identifier(block.get('published_slot')) and block.get('parameter_field') in
+                        {'sampler_steps','sampler_cfg','encoder_cfg','top_k','duration'}, 'invalid public experiment binding')
+                    require(block['published_slot'] not in bindings, 'duplicate public experiment binding')
+                    bindings.add(block['published_slot'])
                 lo, hi, step = [block.get(k) for k in ['min','max','step']]
                 require(all(number(x) for x in [lo,hi,step]) and step > 0 and hi > lo and (hi-lo)/step <= 5000, 'invalid experiment range')
                 require(math.isclose((hi-lo)/step, round((hi-lo)/step), abs_tol=1e-7), 'range endpoint is not on the step grid')

@@ -109,6 +109,12 @@ class ExperimentOutputs:
                 conn.execute('BEGIN IMMEDIATE')
                 if conn.execute("SELECT 1 FROM generation_attempts WHERE run_id=? AND status='running'", (run_id,)).fetchone():
                     raise ValueError('This generation is finishing worker cleanup; wait for its attempt to finish and retry')
+                publication = conn.execute('''SELECT 1 FROM generation_artifacts p,
+                    json_each(p.metadata_json,'$.recipe.inputs') i WHERE p.kind='experiment_publication'
+                    AND json_extract(p.metadata_json,'$.status') IN ('queued','running')
+                    AND json_extract(i.value,'$.run_id')=? LIMIT 1''', (run_id,)).fetchone()
+                if publication:
+                    raise ValueError('This output is being published as a website comparison; wait for the upload to finish')
                 artifacts = [dict(r) for r in conn.execute('''SELECT * FROM generation_artifacts
                     WHERE run_id=? AND kind IN ('audio','completed_yaml','source_yaml','generation_report')''', (run_id,))]
                 audio = next((a for a in artifacts if a['kind'] == 'audio'), None)

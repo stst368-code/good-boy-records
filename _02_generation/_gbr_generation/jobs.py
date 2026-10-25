@@ -52,6 +52,8 @@ class Jobs:
                 'status':status,'section':section,'counts':dict(counts),'total':sum(counts.values()),'available_workers':available,'automatic_workers':automatic,
                 'worker_notices':[{'worker_id':wid,'message':message} for (bid,wid),message in list(self.g.dispatcher.notices.items()) if bid==batch['id']],
                 'workers':[{**{k:t.get(k) for k in ('id','worker_id','connection','status','active','run_id','stage','step','steps','message','updated_at','error','report','cleanup_pending')},'current_title':next((r['title'] for r in t.get('runs',[]) if r['id']==t.get('run_id')),None)} for t in workers]})
+            if policy.get('purpose')=='experiment' and getattr(self.g,'experiment_publisher',None):
+                result[-1]['publications']=self.g.experiment_publisher.listing(batch['id'])
         return {'jobs':result,'history_limit':100}
 
     def batch(self,batch_id):

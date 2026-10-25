@@ -687,6 +687,8 @@ def create_app(config_path, start_worker=True, database_path=None):
     release_routes,publisher=publishing_router(repo_root,service,preparation,local)
     app.include_router(release_routes)
     app.state.publisher=publisher
+    from _gbr_generation.experiment_publishing import ExperimentPublisher
+    generation.experiment_publisher=ExperimentPublisher(generation,publisher)
     app.mount('/tools/preparation', StaticFiles(directory=preparation_root / '_static'), name='preparation')
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app

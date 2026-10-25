@@ -112,6 +112,14 @@ class Start(Body):
     skip_errors: StrictBool = False
 
 
+class PublishComparison(Body):
+    parameter: Literal['sampler_steps','sampler_cfg','encoder_cfg','top_k','duration']
+    group: str = Field(pattern='^[0-9a-f]{64}$')
+    title: str = Field(min_length=1,max_length=160)
+    slot: str = Field(default='',max_length=64)
+    format: Literal['flac','mp3'] = 'flac'
+
+
 class Action(Body):
     action: Literal['pause', 'resume', 'continue', 'retry', 'cleanup']
 
@@ -249,6 +257,31 @@ def router(root, review_service, local):
                 "'"+value if isinstance(value,str) and value.startswith(('=','+','-','@')) else value for key,value in row.items()})
         return StreamingResponse(iter(['\ufeff'+stream.getvalue()]),media_type='text/csv',
             headers={'Content-Disposition':f'attachment; filename="gbr-{batch_id}-performance.csv"','Cache-Control':'no-store'})
+
+    @routes.get('/jobs/{batch_id}/comparison-options')
+    def comparison_options(batch_id:str):
+        return service.experiment_publisher.options(batch_id)
+
+    @routes.post('/jobs/{batch_id}/publish-comparison')
+    def publish_comparison(batch_id:str,body:PublishComparison):
+        try:return service.experiment_publisher.start(batch_id,body.model_dump())
+        except Exception as error:
+            from _gbr_preparation.publishing import error_text
+            raise HTTPException(400,error_text(error)) from None
+
+    @routes.post('/experiment-publications/{identifier}/retry')
+    def retry_comparison(identifier:str):
+        try:return service.experiment_publisher.retry(identifier)
+        except Exception as error:
+            from _gbr_preparation.publishing import error_text
+            raise HTTPException(400,error_text(error)) from None
+
+    @routes.post('/experiment-publications/{identifier}/withdraw')
+    def withdraw_comparison(identifier:str):
+        try:return service.experiment_publisher.withdraw(identifier)
+        except Exception as error:
+            from _gbr_preparation.publishing import error_text
+            raise HTTPException(400,error_text(error)) from None
 
     @routes.get('/experiments/{run_id}/audio')
     def experiment_audio(run_id:str):

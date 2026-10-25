@@ -1,3 +1,4 @@
+import {experimentPublishing} from "/tools/generation/experiment-publishing.js";
 const LABELS={completed:'Complete',prepared:'Queued',running:'Generating',publishing:'Finalising',cancel_requested:'Cancelling',cancelled:'Cancelled',succeeded:'Complete',failed:'Failed',waiting_worker:'Worker busy · waiting',paused:'Paused',queue_complete:'Queue finished',starting_worker:'Starting worker',comfy_queued:'Queued in ComfyUI',comfy_generating:'Generating in ComfyUI',conditioning:'Text conditioning',diffusion:'Diffusion',decode:'Decoding audio',write_flac:'Writing FLAC',downloading:'Downloading audio',cancel_after_generation:'Finishes current generation, then discards output',dedicated_generating:'Generating on pod',serverless_generating:'Generating serverless',reconnect:'Reconnect needed'};
 const label=value=>LABELS[value]||String(value||'Waiting').replaceAll('_',' ');
 const workerName=value=>value?.startsWith('local|')?'This PC':value?.replace(/^comfyui\|/,'ComfyUI · ').replace(/^runpod_dedicated\|/,'Pod · ').replace(/^runpod_serverless\|/,'Serverless · ')||'Next available worker';
@@ -8,6 +9,7 @@ const model=value=>String(value||'Default').split(/[\\/]/).pop().replace(/\.(saf
 export function initJobs({root,api,toast,onQueued}){
   const state={purpose:'production',sorts:new Map(),open:new Set(),pages:new Map(),texts:new Map(),logs:new Map(),busy:new Set(),jobs:[],sequence:0,cursors:JSON.parse(sessionStorage.getItem('gbr-generation-log-cursors')||'{}')};
   const guard=fn=>async(...args)=>{try{await fn(...args);}catch(e){toast(e.message);}};
+  const publication=experimentPublishing({api,toast,refresh});
   const button=(text,fn,cls='')=>{const b=node('button',cls,text);b.type='button';b.onclick=guard(fn);return b;};
   function drawer(key,title){const e=node('details','job-drawer');e.dataset.key=key;e.open=state.open.has(key);e.append(node('summary','',title));e.addEventListener('toggle',()=>{if(!e.isConnected)return;if(e.open)state.open.add(key);else state.open.delete(key);});return e;}
   function metadata(run){const p=run.parameters;return [['Encoder',model(p.text_encoder)],['DiT',model(p.dit)],['Sampling',p.sampler+' / '+p.scheduler],['Encoder CFG',p.encoder_cfg],['Diffusion CFG',p.sampler_cfg],['Top-k',p.top_k],['Steps',p.sampler_steps],['Seconds',p.duration]].map(([k,v])=>k+': '+v).join(' · ');}
@@ -101,13 +103,14 @@ export function initJobs({root,api,toast,onQueued}){
     const counts=node('div','job-counts');counts.append(node('span','complete',`${completed} / ${batch.total} complete`));for(const [name,n]of [['generating',(c.running||0)+(c.publishing||0)],['queued',c.prepared||0],['cancelled',(c.cancelled||0)+(c.cancel_requested||0)],['failed',c.failed||0]])if(n)counts.append(node('span',name,`${n} ${name}`));e.append(counts,workerControls(batch),assignmentControls(batch));
     const tools=node('div','experiment-batch-tools');
     if(batch.purpose==='experiment'){const caption=node('label','','Order results'),sort=node('select');sort.setAttribute('aria-label','Order experiment results');for(const [name,value] of [['Generation order','created'],['Steps · low to high','steps'],['Total time · fastest first','time']])sort.append(new Option(name,value));sort.value=state.sorts.get(batch.id)||'created';sort.onchange=guard(async()=>{state.sorts.set(batch.id,sort.value);state.pages.delete(batch.id);await loadRuns(batch.id);render();});caption.append(sort);tools.append(caption);}
-    const download=node('a','experiment-export','Export performance CSV');download.href=`/api/generation/jobs/${batch.id}/performance.csv`;tools.append(download);e.append(tools);
+    const download=node('a','experiment-export','Export performance CSV');download.href=`/api/generation/jobs/${batch.id}/performance.csv`;tools.append(download);e.append(tools);if(batch.purpose==='experiment')e.append(publication.controls(batch));
     const runs=drawer(batch.id+'/runs',`Tracks & configurations · ${batch.total}`);runs.classList.add('job-track-list');
     const page=state.pages.get(batch.id);if(page){for(const run of page.runs)runs.append(runRow(batch,run));if(page.has_more)runs.append(button('Load more configurations',async()=>{await loadRuns(batch.id,true);render();},'job-more'));}else runs.append(node('p','subtle small','Expand to load this batch.'));
     runs.addEventListener('toggle',guard(async()=>{if(runs.open&&!state.pages.has(batch.id)){await loadRuns(batch.id);render();}}));e.append(runs,diagnosticDrawer(batch));return e;
   }
   function updateCard(existing,batch){
     existing.className='job-batch '+batch.section;
+    if(batch.purpose==='experiment')publication.update(existing.querySelector('.comparison-publishing'),batch);
     const badge=existing.querySelector('.job-batch-heading .job-status');badge.className='job-status '+batch.status;badge.textContent=label(batch.status);
     const bar=existing.querySelector('.job-batch-progress'),c=batch.counts;bar.max=batch.total||1;bar.value=(c.succeeded||0)+(c.cancelled||0)+(c.failed||0);
     const counts=existing.querySelector('.job-counts');counts.replaceChildren(node('span','complete',`${c.succeeded||0} / ${batch.total} complete`));for(const [name,n]of [['generating',(c.running||0)+(c.publishing||0)],['queued',c.prepared||0],['cancelled',(c.cancelled||0)+(c.cancel_requested||0)],['failed',c.failed||0]])if(n)counts.append(node('span',name,`${n} ${name}`));
