@@ -1,3 +1,4 @@
+import {initLibrary} from '/tools/preparation/library.js';
 import {initPreparation} from "/tools/preparation/preparation.js";
 import {initPublishing} from "/tools/preparation/publishing.js";
 import {initYamlEditor} from "/tools/yaml-editor/editor.js";
@@ -38,7 +39,7 @@ function ratingButtons(){
 }
 function paintRatings(){
   $('changeUser').disabled=state.submitting||state.advancePending||state.flagSaving;
-  $('back').disabled=!state.canBack||state.submitting||state.advancePending;$('skip').disabled=!state.track||state.submitting||state.advancePending||state.reservationLost;$('queueButton').disabled=state.submitting||state.advancePending;$('selectionTab').disabled=state.submitting||state.advancePending;$('yamlTab').disabled=state.submitting||state.advancePending;$('generationTab').disabled=state.submitting||state.advancePending;$('preparationTab').disabled=state.submitting||state.advancePending;$('publishingTab').disabled=state.submitting||state.advancePending;$('writingTab').disabled=state.submitting||state.advancePending;
+  $('back').disabled=!state.canBack||state.submitting||state.advancePending;$('skip').disabled=!state.track||state.submitting||state.advancePending||state.reservationLost;$('queueButton').disabled=state.submitting||state.advancePending;$('selectionTab').disabled=state.submitting||state.advancePending;$('yamlTab').disabled=state.submitting||state.advancePending;$('generationTab').disabled=state.submitting||state.advancePending;$('preparationTab').disabled=state.submitting||state.advancePending;$('publishingTab').disabled=state.submitting||state.advancePending;$('libraryTab').disabled=state.submitting||state.advancePending;$('writingTab').disabled=state.submitting||state.advancePending;
   const complete=DIMENSIONS.every(d=>state.scores[d]!==undefined);$('submitReview').hidden=state.autoSubmit||state.selectionListen||!state.track;$('submitReview').disabled=!complete||state.submitting||state.advancePending||state.reservationLost||state.flagSaving;$('retryReview').hidden=!state.autoSubmit||!state.saveError||state.reservationLost||state.advancePending;$('retryReview').disabled=state.submitting;$('reason').disabled=state.submitting||state.advancePending;$('autoSubmit').disabled=state.submitting||state.advancePending;paintFlags();reviewTags.setDisabled(!state.track||state.selectionListen||state.submitting||state.advancePending||state.reservationLost);
   const missing=DIMENSIONS.findIndex(d=>state.scores[d]===undefined);if(missing>=0&&state.scores[DIMENSIONS[state.ratingIndex]]!==undefined)state.ratingIndex=missing;
   document.querySelectorAll('.rating').forEach((row,i)=>row.classList.toggle('keyboard-active',i===state.ratingIndex));
@@ -198,12 +199,16 @@ function mediaSession(){
   const actions={play:()=>audio.play(),pause:()=>audio.pause(),stop:()=>{audio.pause();audio.currentTime=0;},seekbackward:details=>audio.currentTime=Math.max(0,audio.currentTime-(details.seekOffset||10)),seekforward:details=>audio.currentTime=Math.min(audio.duration||0,audio.currentTime+(details.seekOffset||10)),seekto:details=>audio.currentTime=details.seekTime,nexttrack:()=>audio.currentTime=Math.min(audio.duration||0,audio.currentTime+10),previoustrack:()=>audio.currentTime=Math.max(0,audio.currentTime-10)};
   for(const [name,handler] of Object.entries(actions))try{navigator.mediaSession.setActionHandler(name,handler);}catch{}
 }
-function showView(view){if(view!=='preparation')preparation.close();if(view!=='publishing')publishing.close();if(view!=='writing')writing.close();state.view=view;for(const name of ['writing','yaml','generation','review','selection','preparation','publishing']){$(name+'View').hidden=view!==name;$(name+'Tab').classList.toggle('active',view===name);}if(view==='review')drawWave();}
+function showView(view){if(view!==state.view&&$('preparationView').offsetParent!==null&&!preparation.canLeave())throw Error('Save or reload the lyric and lighting draft before leaving');if(view!=='library'){library.close();restorePreparation();}if(view!=='preparation')preparation.close();if(view!=='publishing')publishing.close();if(view!=='writing')writing.close();state.view=view;for(const name of ['writing','yaml','generation','review','selection','preparation','publishing','library']){$(name+'View').hidden=view!==name;$(name+'Tab').classList.toggle('active',view===name);}if(view==='review')drawWave();}
 $('reviewTab').onclick=guarded(async()=>{showView('review');if(state.selectionListen||!state.track)await nextTrack();else await refreshFlags();});
 $('selectionTab').onclick=guarded(async()=>{showView('selection');await loadCandidates();});
 const yamlEditor=initYamlEditor({api,toast,browse:async callback=>{await openDirectory(callback);}});
 const preparation=initPreparation({api,toast});
 const publishing=initPublishing({api,toast});
+const preparationAnchor=document.createComment('Preparation home');$('preparationView').before(preparationAnchor);
+function restorePreparation(){if($('preparationView').parentElement?.id==='libraryEditorContainer')preparationAnchor.after($('preparationView'));}
+const library=initLibrary({api,toast,onEdit:async item=>{$('libraryEditorContainer').append($('preparationView'));$('preparationView').hidden=false;await preparation.open({published:item.generation_id,master_id:item.master_id,room:item.room,onBack:async()=>{preparation.close();restorePreparation();$('preparationView').hidden=true;await library.open();}});}});
+$('libraryTab').onclick=guarded(async()=>{audio.pause();showView('library');await library.open();});
 $('publishingTab').onclick=guarded(async()=>{audio.pause();showView('publishing');await publishing.open();});
 $('preparationTab').onclick=guarded(async()=>{audio.pause();showView('preparation');await preparation.open();});
 const writing=initWriting({api,toast,onPublished:kind=>{generation.writingChanged(kind);if(kind==='track')yamlEditor.invalidateCatalogue();}});

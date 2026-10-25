@@ -11,12 +11,12 @@ class Prepare(BaseModel):
     artwork_id:str|None=None
     include_flac:StrictBool=True
     timed_lyrics:StrictBool=False
-    visibility:Literal['public','hidden']='public'
+    visibility:str=Field(default='public',pattern=r'^[a-z][a-z0-9-]{0,63}$')
 
 
 class Publish(BaseModel):
     model_config=ConfigDict(extra='forbid')
-    visibility:Literal['public','hidden']|None=None
+    visibility:str|None=Field(default=None,pattern=r'^[a-z][a-z0-9-]{0,63}$')
 
 
 class CoverTrigger(BaseModel):
@@ -48,6 +48,10 @@ class LegacyPreview(BaseModel):
     directory:str=Field(max_length=2000)
 
 
+class LibraryImportRequest(LegacyPreview):
+    synchronise:StrictBool=True
+
+
 class LegacyApply(BaseModel):
     model_config=ConfigDict(extra='forbid')
     token:str=Field(max_length=64)
@@ -74,6 +78,24 @@ def router(root,review,preparation,local):
             raise HTTPException(400,error_text(exc)) from exc
     @routes.get('/projects')
     def projects():return service.projects()
+    @routes.get('/library')
+    def library():return service.library.projects()
+    @routes.get('/library/settings')
+    def library_settings():return service.library.configuration()
+    @routes.post('/library/settings')
+    def save_library_settings(body:dict):return service.library.save_settings(body)
+    @routes.post('/library/settings/sync')
+    def sync_library_settings():return service.library.sync_settings()
+    @routes.get('/library/import')
+    def import_state():return service.library_import.state()
+    @routes.post('/library/import')
+    def import_showcase(body:LibraryImportRequest):return service.library_import.start(body.directory,body.synchronise)
+    @routes.get('/library/recordings/{gid}')
+    def library_recording(gid:str):return service.library.detail(gid)
+    @routes.post('/library/recordings/{gid}')
+    def save_library_recording(gid:str,body:dict):return service.library.save(gid,body)
+    @routes.post('/library/recordings/{gid}/prepare')
+    def prepare_revision(gid:str,body:dict):return service.library.prepare_revision(gid,body)
     @routes.get('/easter-egg')
     def easter_egg():return service.easter.configuration()
     @routes.post('/easter-egg')
@@ -98,6 +120,8 @@ def router(root,review,preparation,local):
     def prepare(gid:str,body:Prepare):return service.start_prepare(gid,body.model_dump())
     @routes.post('/projects/{gid}/complete')
     def complete(gid:str,body:Prepare):return service.start_complete(gid,body.model_dump())
+    @routes.post('/projects/{gid}/finish')
+    def finish(gid:str,body:Prepare):return service.finish_preparation(gid,body.model_dump())
     @routes.post('/projects/{gid}/reset-completion')
     def reset(gid:str):return service.showcase.reset(gid)
     @routes.post('/{identifier}/publish')

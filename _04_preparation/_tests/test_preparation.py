@@ -191,7 +191,8 @@ def test_recovery_keeps_history_and_blocks_live_or_unknown_controller(prepared):
     retried=prep.retry(identifier);wait(prep,retried['id'])
     assert retried['id']!=identifier
     assert service.db.one('SELECT status FROM processing_tasks WHERE id=?',(identifier,))['status']=='interrupted'
-    assert len(prep.tasks(gid))==2
+    assert len([task for task in prep.tasks(gid) if task['kind']=='mix_preview'])==2
+    assert any(task['kind']=='lyric_alignment' and task['status']=='waiting' for task in prep.tasks(gid))
 
 
 def test_original_writing_yaml_is_copied_but_never_removed(prepared,monkeypatch):
@@ -227,8 +228,8 @@ def test_processing_history_download_is_complete_and_temporary_export_is_removed
         assert response.status_code==200
         exported=response.json()['processing_tasks']
         assert exported==before
-        assert exported[0]['id']==brief['id']
-        assert 'Copper engraving' in json.loads(exported[0]['recipe_json'])['prompt']
+        saved=next(item for item in exported if item['id']==brief['id'])
+        assert 'Copper engraving' in json.loads(saved['recipe_json'])['prompt']
         assert not list((app.state.service.config.data/'exports').glob('*'))
     assert service.db.all('SELECT * FROM processing_tasks')==before
 

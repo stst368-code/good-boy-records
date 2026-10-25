@@ -42,32 +42,34 @@ separate ledger and are not assigned to new recordings.
 
 ## Curated player catalogue
 
-Choose **Hidden room · Easter egg only** as the website destination in
-Preparation or Release preview to publish a secret track through the same
-MP3/FLAC, artwork and lyric pipeline. Its entry lives in
-`gbr/v2/hidden/catalogue.json`; the main catalogue suppresses older copies.
-Release history can move an existing publication between the two destinations,
-reusing its stable ID and audio assets. Withdrawal works in either destination.
-There is one local showcase bundle and one shared publishing ledger, with no
-database migration. Hidden recordings are omitted from future public research
-exports; local reviews and performance data remain intact.
+**GBR → Library → Rooms** manages multiple named rooms and their entrances. Choose
+a different main-player cover for each room. Three clicks/taps on that recording's
+playing cover, with no more than 1.4 seconds between taps, open the matching room.
+Changing tracks, panning or pinching resets the gesture. The original Easter room
+at `easter.html` stays separate from the secret room at `hidden.html`; additional
+rooms use `hidden.html?room=<stable-room-id>`. Each loads only its own recordings,
+supports playback and room-aware share links, and has a Main player return button.
+These are unlisted, no-index pages; the gesture is discovery, not access control.
 
-In **Settings → Website · Easter egg**, select an available main-player cover,
-preview it and save. Three clicks/taps on that recording's playing cover, with
-no more than 1.4 seconds between taps, open `hidden.html`. Changing tracks,
-panning or pinching resets the gesture. Disabled is the default. The public
-configuration is `gbr/v2/easter-egg.json`, so changing it needs no site rebuild.
-The unlisted, no-index page loads hidden releases directly from R2, supports
-playback and share links, and has a Main player return button. Existing hidden
-tracks remain supported. This is discovery by a secret gesture, not access
-control: someone with the URL can visit or share it.
+Library configuration, cover entrances, lighting sensitivity and display defaults
+are published as `gbr/v2/library.json`, without a site rebuild. The previous
+`gbr/v2/easter-egg.json` configuration remains a fallback until the new settings are
+published. Disabled rooms are unavailable. Their data and historical IDs remain.
+Catalogues are `gbr/v2/catalogue.json` (main), `gbr/v2/hidden/catalogue.json` (original
+secret room), and `gbr/v2/rooms/<room-id>/catalogue.json` (Easter and added rooms).
+Moving a release updates these pointers and suppresses its old placement, reusing
+the same public ID and audio objects. Nonpublic rooms are excluded from public
+research snapshots; local review and performance records are retained.
 
-New recordings publish from **GBR → Publish**, after a reviewed distribution
-selection reaches Preparation. Choose the prepared source or an exact master,
-optional registered artwork (otherwise the GBR sleeve), lossless download and
-approved word timings. **Prepare preview** creates MP3 plus optional sanitised
-FLAC, artwork, lyrics and numeric light cues. Audition and inspect its public
-metadata before **Publish this preview**. Source audio/YAML and reviews stay intact.
+New recordings move through **Preparation → Publish → Library**. Approval queues
+lyric alignment in the background. Preparation provides the read-only original
+YAML, lyric/light editor, mastering trials and artwork. **Finish preparation →
+Publish queue** creates the MP3, optional sanitised FLAC, cover and public sidecars
+locally. **Publish recording** then moves the bundle into Showcase and aligns R2.
+Library manages subsequent titles, genre, covers, lyrics, room placement and
+withdrawal; revisions reuse unchanged assets. Source YAML and review history stay
+intact. **Library → Import old showcase** imports the old porto tree on the host,
+including MP3-only and flat Easter folders, retaining IDs and share tokens.
 
 Configure **Settings → Publishing · R2 and website** once: the existing public
 bucket's S3 API endpoint, bucket name, public media URL and website URL. Enter

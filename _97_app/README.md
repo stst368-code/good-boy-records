@@ -148,9 +148,19 @@ history in the same database. FFmpeg is needed for audio renders;
 The [preparation, engine and storage plan](_plans/preparation-and-storage.md)
 identifies the built features and pending GPU/release integrations.
 
-Complete a recording from **Preparation → Complete & publish** after saving its
-lyric/lighting edits and choosing the working source or master and artwork. The
-app always encodes an MP3 of that exact audio. The local bundle moves to
+**Preparation** contains reviewed publication approvals that have not yet been
+completed or published. Lyric alignment queues automatically after the verified
+promotion into Preparation, without opening its page. It waits for the processing
+environment and a free local GPU; failures stay visible with a manual retry.
+`setup-processing` installs that environment on a new device. The page also shows
+the recording's original YAML, with its metadata, caption and lyrics available
+without editing the source.
+
+Choose **Finish preparation → Publish queue** after saving lyric/lighting edits
+and choosing the source or master and artwork. This local step always makes an
+MP3 of that exact audio and does not require R2. **Publish** lists only completed
+preparations waiting to go live. Choose a room and **Publish recording** to move
+the local bundle to
 `_05_showcase/_song-<song_id>/_variant-<variant_id>/_recording-<full-audio-id>/`.
 `_source` holds unchanged original audio/YAML and worker companions; `_derived`
 holds processing outputs; `_release/<preview-id>` holds MP3, sanitised public
@@ -158,30 +168,44 @@ FLAC, cover and approved playback sidecars. Genre is metadata, not a directory
 identity. Different recordings in the same genre cannot overwrite one another.
 The existing shared `processing_tasks` ledger records and resumes verified moves;
 no new database or migration script is required. Closed recordings leave the
-Preparation queue, and revised reviews keep them in Showcase.
+Preparation queue. A successful publication enters **Library**.
 
-Completion synchronises the approved public assets and conditionally updates the
+Publication synchronises the approved public assets and conditionally updates the
 R2 catalogue. Private source YAML, stems and operational data stay local. An R2
-failure retains the completed bundle; **Publishing → Retry R2 synchronisation**
+failure retains the completed bundle; **Publish → Retry publication**
 resumes without re-encoding or another move. A locked source is reported as
 cleanup pending; release the file and retry cleanup. Uncommitted failed moves can
 be reset if both copies still verify. Existing legacy public URLs and share IDs
 remain supported; re-releasing an indexed legacy recording through Preparation
 uses the new layout. Existing Windows/R2 data is not renamed by pulling code.
-To migrate existing genre-named folders, open **Publishing → Migrate existing
-showcase folders**. Preview the detected local directory, select ready recordings
-and choose whether to align R2. Unmatched audio/YAML, missing IDs, ambiguous or
-shared folders and recordings without current review/publish approval are flagged
-individually. Fix or exclude them; the preview changes no files. Apply verifies
-all bytes, moves the entire selected bundle into the recording's `_source`,
-updates shared database paths and removes verified old copies. Public IDs/share
-tokens, existing covers and public lyric/lighting sidecars are retained. Migrating
-a local directory alone does not change R2. Alignment creates a fresh MP3 and
-sanitised FLAC, then uses the same verified publication path. Raw YAML and private
-companions remain local. Old bucket objects are retained for link compatibility.
-Withdrawals also hide the saved legacy entry; republishing clears that withdrawal.
-Interrupted moves and publication can be retried in release history. No one-time
-script, additional database or manual editing of SQL is required.
+**Library → Recordings** manages published titles, genre, language, explicit flags,
+albums, covers, lyrics and room placement. Save a local draft or **Update website**;
+the timing/light/audio editor reuses the Preparation tools. Revisions preserve
+public IDs and share tokens, original YAML, reviews and history. Unchanged audio
+assets are reused rather than copied or encoded again.
+
+**Library → Rooms** creates multiple rooms, each with an optional unique main-player
+cover entrance. Three clicks on that playing cover open its room. The original
+Easter page remains separate. Room names/order and website lighting/defaults are
+stored once in the shared database and published as `gbr/v2/library.json`.
+
+For the old porto tree, use **Library → Import old showcase**. The Windows path
+`C:\Users\Simon\OneDrive\porto\good-boy-records\showcase` is prefilled. The resumable
+import recognises FLAC/MP3 pairs, MP3-only recordings and flat Easter folders with
+shared sidecars. It keeps public IDs, tokens, covers and existing lyric/light data,
+matches known tracks automatically and retains unmatched identities as legacy
+Library records. Normalised YAML copies acquire the current explicit fields and
+repair escaped newline markers; original YAML bytes are archived locally. The
+import links existing reviews by audio identity without inventing new reviews.
+Public audio strips private embedded tags without changing decoded audio; the
+original container remains in the local bundle.
+Verified files move into the canonical recording bundle, database paths update,
+and only then are old copies removed. Uncertain or changed files stay in place
+with a per-recording issue. MP3-only sources are labelled; no fake lossless version
+is made. The optional R2 alignment reuses existing audio, creates missing MP3s and
+updates room catalogues. Old bucket objects remain for link compatibility.
+Resume the import after interruptions or locked-file cleanup; no one-time script,
+additional database or manual SQL is required.
 
 The public website consumes the R2 release catalogue directly; do not point the
 legacy YAML catalogue builder at the private completed bundle.
@@ -223,13 +247,14 @@ cleanup remains pending until the bridge is installed and **Clean temporary file
 is retried. Required API failures identify the worker rather than the writing YAMLs.
 
 `python _97_app/run_gbr.py setup-processing` installs the isolated Demucs/WhisperX
-environment; `--cpu` selects CPU packages. Models download on an explicit job.
+environment; `--cpu` selects CPU packages. Models download on the first alignment
+or separation job, including automatically queued publication approvals.
 Lighting/lyric annotations use the current working audio hash and never rewrite
 source YAMLs. Artwork stays at brief preparation until the API workflow is supplied.
 
 ## Writing and workflow
 
-The workflow tabs are Writing → YAML editor → Generation → Review → Selection → Preparation.
+The workflow tabs are Writing → YAML editor → Generation → Review → Selection → Preparation → Publish → Library.
 The desktop workspace is fluid up to 1920 px; the preparation page uses that width too.
 The public GBR site now lives in `_96_website`; startup migrates local website files from
 `_04_website` and `_05_website`, including untracked media, without rewriting their bytes.

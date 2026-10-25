@@ -100,14 +100,18 @@ def test_unknown_destination_and_unsafe_cover_are_rejected(publication):
     with pytest.raises(ValueError):publisher.easter.save('bad')
 
 
-def test_hidden_tracks_are_excluded_from_public_research_but_keep_local_reviews(publication,tmp_path):
+@pytest.mark.parametrize('room',['hidden','easter','demos'])
+def test_hidden_tracks_are_excluded_from_public_research_but_keep_local_reviews(publication,tmp_path,room):
     import sys
     from test_publishing import ROOT
     sys.path.insert(0,str(ROOT/'_96_website/_tools'))
     from export_platform import export
-    review,_,_,_,_,_,_=publication
+    review,_,publisher,_,_,_,_=publication
     before=review.db.all('SELECT * FROM reviews')
-    prepare(publication,visibility='hidden')
+    if room=='demos':
+        settings=publisher.library.settings();settings['rooms'].append({'id':'demos','name':'Demos','entry_track_id':None,'enabled':True,'order':3})
+        publisher.library.save_settings(settings)
+    prepare(publication,visibility=room)
     payload=export(review.db.path,output=tmp_path/'research.json')
     assert payload['count']==0
     assert review.db.all('SELECT * FROM reviews')==before
@@ -164,6 +168,6 @@ def test_cover_api_requires_host_and_existing_csrf_header(publication):
         assert client.get('/api/releases/easter-egg/covers/unknown').status_code==400
         assert client.post('/api/releases/easter-egg',json={'track_id':'cover-api'}).status_code==403
         assert client.post('/api/releases/easter-egg',json={'track_id':'cover-api'},headers={'x-gbr-request':'1'}).status_code==200
-        assert client.post('/api/releases/none/publish',json={'visibility':'elsewhere'},headers={'x-gbr-request':'1'}).status_code==422
+        assert client.post('/api/releases/none/publish',json={'visibility':'../../elsewhere'},headers={'x-gbr-request':'1'}).status_code==422
     with TestClient(app,base_url='http://127.0.0.1',client=('203.0.113.9',1234)) as client:
         assert client.get('/api/releases/easter-egg').status_code in {401,403}

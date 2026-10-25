@@ -37,7 +37,10 @@ def router(root,review,local):
     routes=APIRouter(prefix='/api/preparation',dependencies=[Depends(host)])
 
     @routes.get('/projects')
-    def projects():return service.projects()
+    def projects(published:bool=False):
+        result=service.projects(include_completed=published)
+        if published:result['projects']=[p for p in result['projects'] if p['status']=='published']
+        return result
 
     @routes.post('/sync')
     def sync():
@@ -76,6 +79,14 @@ def router(root,review,local):
 
     @routes.get('/projects/{gid}/editorial')
     def editorial(gid: str,artifact: str | None=None):return service.editorial(gid,artifact)
+    @routes.get('/projects/{gid}/yaml')
+    def yaml_details(gid:str):
+        import json
+        row=service.db.one('SELECT raw_yaml,raw_yaml_bytes,parsed_json,yaml_sha256 FROM generation_metadata WHERE generation_id=?',(gid,))
+        if not row:raise HTTPException(404,'Recording YAML unavailable')
+        raw=row['raw_yaml_bytes']
+        return {'yaml':bytes(raw).decode('utf-8-sig') if raw is not None else row['raw_yaml'] or '',
+                'metadata':json.loads(row['parsed_json']),'sha256':row['yaml_sha256']}
 
     @routes.post('/projects/{gid}/editorial/{kind}')
     def save_editorial(gid: str,kind: Literal['lyric_edit','visual_edit'],body: dict):return service.save_editorial(gid,kind,body)

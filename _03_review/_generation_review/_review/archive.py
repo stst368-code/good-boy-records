@@ -205,6 +205,12 @@ class Archiver:
                     c.execute("""INSERT INTO media_files(audio_id,sha256,path,original_path,size,mtime_ns,storage_state,indexed_at)
                       VALUES(?,?,?,?,?,?,'archived',?)""", (op["audio_id"], digest(path), str(path), str(path), st.st_size, st.st_mtime_ns, now()))
                 c.execute("UPDATE archive_operations SET status='done',error=NULL,updated_at=? WHERE id=?", (now(), op["id"]))
+            if op.get('operation_type')=='prepare' and getattr(self,'on_preparation_ready',None):
+                try:self.on_preparation_ready(op['generation_id'])
+                except Exception:
+                    # Promotion is already verified and committed. The background
+                    # sweep retries scheduling without redoing the archive move.
+                    pass
         except Exception as exc:
             self.db.execute("UPDATE archive_operations SET status='failed',error=?,updated_at=? WHERE id=?", (str(exc), now(), op["id"]))
 

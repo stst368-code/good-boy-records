@@ -8,3 +8,4 @@ window.GBR_RELEASE_RESEARCH = "https://pub-a5c11159f6144ae885f7795a5bf7086a.r2.d
 window.GBR_EXPERIMENT_CATALOGUE = "https://pub-a5c11159f6144ae885f7795a5bf7086a.r2.dev/gbr/v2/experiments/catalogue.json";
 window.GBR_HIDDEN_CATALOGUE = "https://pub-a5c11159f6144ae885f7795a5bf7086a.r2.dev/gbr/v2/hidden/catalogue.json";
 window.GBR_EASTER_CONFIG = "https://pub-a5c11159f6144ae885f7795a5bf7086a.r2.dev/gbr/v2/easter-egg.json";
+window.GBR_LIBRARY_CONFIG = "https://pub-a5c11159f6144ae885f7795a5bf7086a.r2.dev/gbr/v2/library.json";

@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import threading
+import time
 import uuid
 from urllib.parse import urlparse, quote
 from urllib.request import Request, urlopen
@@ -135,19 +136,31 @@ class Publisher:
         self.secrets_path=self.config_path.with_name('publishing.secrets.json')
         self.pool=ThreadPoolExecutor(max_workers=1,thread_name_prefix='gbr-publishing')
         self.lock=threading.RLock();self.store_factory=store_factory
+        self.stopping=False
         from .showcase import Showcase
         self.showcase=Showcase(self)
         from .legacy_showcase import LegacyShowcase
         self.legacy=LegacyShowcase(self)
         from .easter_egg import EasterEgg
         self.easter=EasterEgg(self)
+        from .library import Library
+        self.library=Library(self)
+        from .library_import import LibraryImport
+        self.library_import=LibraryImport(self)
         # Interrupted requests are never replayed automatically. Publish retries
         # reconcile the remote pointer before changing local release state.
         if preparation.enabled:
             self.db.execute("UPDATE processing_tasks SET status='interrupted',error='Application restarted; retry explicitly to reconcile publication' WHERE kind IN ('release_prepare','release_publish') AND status IN ('queued','running')")
             self.db.execute("UPDATE processing_tasks SET status='interrupted',error='Application restarted; retry the legacy migration explicitly' WHERE kind='showcase_move' AND json_extract(recipe_json,'$.legacy_root') IS NOT NULL AND status IN ('queued','running')")
 
-    def close(self):self.pool.shutdown(wait=True,cancel_futures=False)
+    def close(self):
+        self.stopping=True
+        self.pool.shutdown(wait=True,cancel_futures=True)
+        if self.prep.enabled and self.library_import.running:
+            state=self.library_import.state()
+            if state['status']=='running':
+                state.update(status='interrupted',message='Application closed; resume the import in Library');self.library_import.persist(state)
+            self.library_import.running=False
 
     def settings(self):
         return {**DEFAULTS, **(json.loads(self.config_path.read_text(encoding="utf-8")) if self.config_path.is_file() else {})}
@@ -241,7 +254,8 @@ class Publisher:
         self.prep.require()
         row=self.db.one('''SELECT g.id,g.audio_id,p.status,m.parsed_json,m.yaml_sha256 FROM generations g
             JOIN publishing_selection p ON p.generation_id=g.id JOIN generation_metadata m ON m.generation_id=g.id
-            WHERE g.id=? AND p.status IN ('selected','published') AND EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id)''',(gid,))
+            WHERE g.id=? AND p.status IN ('selected','published') AND (EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id)
+            OR EXISTS(SELECT 1 FROM processing_tasks t WHERE t.generation_id=g.id AND t.kind='library_import' AND t.status='done'))''',(gid,))
         if not row:raise ValueError('Choose a reviewed recording flagged for distribution')
         return row
 
@@ -249,8 +263,20 @@ class Publisher:
         rows=[p for p in self.prep.projects(include_completed=True).get('projects',[]) if p['ready'] and p['status'] in {'selected','published'}]
         for row in rows:
             row['artworks']=self.db.all("SELECT id,kind FROM generation_artifacts WHERE kind IN ('album_artwork','cover_artwork') AND json_extract(metadata_json,'$.source_generation_id')=?",(row['generation_id'],))
-        return {'projects':[{k:p[k] for k in ('generation_id','audio_id','title','cluster','style','masters','artworks','status','completed')} for p in rows],
-                'releases':self.releases()}
+        queue=[]
+        for row in rows:
+            if row['status']=='published':continue
+            prepared=self.db.one("SELECT id,recipe_json FROM processing_tasks WHERE generation_id=? AND kind='release_prepare' AND status='done' ORDER BY rowid DESC LIMIT 1",(row['generation_id'],))
+            if prepared:
+                recipe=json.loads(prepared['recipe_json']);queue.append({**row,'prepared_id':prepared['id'],'track':recipe['track'],'files':recipe['files'],'options':recipe['options'],
+                    'can_return':not self.retained_preview(prepared['id'],row['generation_id'],recipe)})
+        return {'projects':queue,'releases':[r for r in self.releases() if not self.db.one("SELECT 1 FROM publishing_selection WHERE generation_id=? AND status='published'",(r['generation_id'],))]}
+
+    def finish_preparation(self,gid,options):
+        with self.lock:
+            self.prep.editable(gid)
+            active=self.db.one("SELECT id FROM processing_tasks WHERE generation_id=? AND kind='release_prepare' AND status IN ('queued','running')",(gid,))
+            return {'id':active['id']} if active else self.start_prepare(gid,{**options,'finish_preparation':True,'complete_publish':False})
 
     def releases(self):
         if not self.prep.enabled:return []
@@ -282,6 +308,7 @@ class Publisher:
 
     def start_prepare(self,gid,options):
         destination(options.get('visibility','public'))
+        self.library.room(options.get('visibility','public'))
         self.eligible(gid);_,source=self.prep.source(gid,artifact_id=options.get('master_id'))
         if options.get('artwork_id'):
             art=self.db.one("SELECT * FROM generation_artifacts WHERE id=? AND kind IN ('album_artwork','cover_artwork') AND json_extract(metadata_json,'$.source_generation_id')=?",(options['artwork_id'],gid))
@@ -308,15 +335,30 @@ class Publisher:
         try:
             task=self.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,));gid=task['generation_id']
             options=json.loads(task['recipe_json']);row=self.eligible(gid);meta=json.loads(row['parsed_json'])
+            reuse=None
+            if options.get('reuse_release_id'):
+                saved=self.db.one("SELECT recipe_json FROM processing_tasks WHERE id=? AND generation_id=? AND kind='release_prepare' AND status='done'",(options['reuse_release_id'],gid))
+                if not saved:raise ValueError('Previous library release is unavailable')
+                reuse=json.loads(saved['recipe_json'])
+            patch={}
+            if options.get('library_draft'):
+                draft=self.db.one("SELECT recipe_json FROM processing_tasks WHERE id=? AND generation_id=? AND kind='library_edit' AND status='done'",(options['library_draft'],gid))
+                if not draft:raise ValueError('Library revision is unavailable')
+                patch=json.loads(draft['recipe_json'])['changes'];meta.update(patch)
             _,source=self.prep.source(gid,artifact_id=options.get('master_id'))
             if digest(source)!=task['input_sha256']:raise ValueError('Working audio changed before preparation')
             import soundfile as sf
             info=sf.info(source)
             if info.frames<=0:raise ValueError('Working audio is empty')
-            if any(not re.fullmatch(r'[1-9][0-9]*',str(meta.get(key) or '')) for key in ('song_id','variant_id')):
+            if not reuse and any(not re.fullmatch(r'[1-9][0-9]*',str(meta.get(key) or '')) for key in ('song_id','variant_id')):
                 raise ValueError('Release YAML needs valid song_id and variant_id values; fix it before publishing')
             # Title/album identity comes from the current master catalogue.
-            song,title=self.catalogue_song(meta)
+            if reuse:
+                previous=reuse['track'];song={'album_name':previous.get('album',{}).get('name'),'album_position':previous.get('album',{}).get('position')};title=previous.get('displayTitle') or meta.get('title')
+            else:song,title=self.catalogue_song(meta)
+            title=patch.get('title',title)
+            for key in ('album_name','album_position'):
+                if key in patch:song[key]=patch[key]
             original=self.prep.source(gid)[1]
             bundle=original.parent.parent if original.resolve().is_relative_to(self.prep.showcase.resolve()) else self.prep.tracks/row['audio_id']
             directory=bundle/'_release'/identifier;directory.mkdir(parents=True)
@@ -325,11 +367,19 @@ class Publisher:
             ffmpeg=shutil.which('ffmpeg')
             if not ffmpeg:raise ValueError('FFmpeg is required to prepare web audio')
             mp3=directory/'audio.mp3'
-            result=subprocess.run([ffmpeg,'-nostdin','-v','error','-n','-i',str(source),'-map','0:a:0','-map_metadata','-1',
+            paths=[]
+            if reuse and reuse['source_sha256']==task['input_sha256']:
+                for item in reuse['files']:
+                    if item['content_type'] in {'audio/mpeg','audio/flac'}:
+                        path=Path(item['path'])
+                        if not path.is_file() or digest(path)!=item['sha256']:raise ValueError('Existing release audio changed; rebuild its audio explicitly')
+                        if item['content_type']!='audio/flac' or options.get('include_flac',True):paths.append((path,item['content_type']))
+            if not any(mime=='audio/mpeg' for _,mime in paths):
+                result=subprocess.run([ffmpeg,'-nostdin','-v','error','-n','-i',str(source),'-map','0:a:0','-map_metadata','-1',
                                    '-c:a','libmp3lame','-q:a','2','-ar','44100','-ac','2',str(mp3)],capture_output=True,text=True,timeout=900, encoding="utf-8", errors="replace")
-            if result.returncode:raise ValueError('Web audio encoding failed: '+result.stderr[-1200:])
-            paths=[(mp3,'audio/mpeg')]
-            if options.get('include_flac',True):
+                if result.returncode:raise ValueError('Web audio encoding failed: '+result.stderr[-1200:])
+                paths.append((mp3,'audio/mpeg'))
+            if options.get('include_flac',True) and info.format=='FLAC' and not any(mime=='audio/flac' for _,mime in paths):
                 flac=directory/'audio.flac';public_flac(source,flac)
                 paths.append((flac,'audio/flac'))
             art=None
@@ -342,6 +392,8 @@ class Publisher:
                 with Image.open(source_art) as image:
                     ImageOps.fit(ImageOps.exif_transpose(image).convert('RGB'),(1024,1024)).save(art,format='JPEG',quality=93)
                 paths.append((art,'image/jpeg'))
+            elif reuse:
+                paths.extend((Path(f['path']),f['content_type']) for f in reuse['files'] if f['content_type'].startswith('image/'))
             editorial=self.prep.editorial(gid,options.get('master_id'))
             legacy=self.legacy.identity(gid)
             lyrics_url=None
@@ -374,15 +426,22 @@ class Publisher:
             settings=self.settings();base=settings['public_base']
             files=[];urls={}
             for path,mime in paths:
+                logical='audio.mp3' if mime=='audio/mpeg' else 'audio.flac' if mime=='audio/flac' else 'cover.jpg' if mime.startswith('image/') else path.name
                 sha=digest(path);key='gbr/v2/objects/'+sha[:2]+'/'+sha+path.suffix
+                if reuse:
+                    previous=next((f for f in reuse['files'] if f['sha256']==sha and f['content_type']==mime and Path(f['path']).is_file()),None)
+                    if previous and digest(previous['path'])==sha:
+                        old=Path(previous['path'])
+                        if path!=old and path.is_relative_to(directory):path.unlink()
+                        path=old
                 files.append({'path':str(path),'sha256':sha,'key':key,'size':path.stat().st_size,'content_type':mime})
-                urls[path.name]=base+'/'+key
-            track_id='gbr-'+str(meta['song_id'])+'-'+str(meta.get('variant_id') or '1')+'-'+row['audio_id'][:16]
+                urls[logical]=base+'/'+key
+            track_id='gbr-'+str(meta.get('song_id'))+'-'+str(meta.get('variant_id') or '1')+'-'+row['audio_id'][:16]
             from .release_catalogue import share_token
-            track={'id':track_id,'displayTitle':title,'title':title,'composition':str(meta['song_id']),
+            track={'id':track_id,'displayTitle':title,'title':title,'composition':str(meta.get('song_id') or ''),
                 'shareToken':share_token(track_id,'release'),
                 'variant':str(meta.get('style') or meta.get('style_primary') or ''),'version':str(meta.get('style') or meta.get('style_primary') or ''),
-                'song_id':meta['song_id'],'variant_id':meta.get('variant_id'),'language':meta.get('language') or 'en',
+                'song_id':meta.get('song_id'),'variant_id':meta.get('variant_id'),'language':meta.get('language') or 'en',
                 'explicit':meta.get('explicit'),'duration':info.duration,'album':{'name':song.get('album_name') or None,'position':song.get('album_position') or None},
                 'genre':{'parent_genre':str(meta.get('cluster') or 'Unclassified'),'child_genre':str(meta.get('style') or meta.get('style_primary') or 'Unspecified'),
                          'parent_colour':'#a89069','child_colour':'#c4aa82','taxonomy_order':10000},
@@ -391,6 +450,11 @@ class Publisher:
                 'lyrics_url':urls.get('lyrics.json'),'playback_url':urls.get('playback.json'),
                 'release_id':identifier,'generation_datetime':meta.get('generation_datetime')}
             track['visibility']=options.get('visibility','public')
+            if reuse:
+                track.update(id=reuse['track']['id'],shareToken=reuse['track']['shareToken'])
+                if reuse['track'].get('legacy_id'):track['legacy_id']=reuse['track']['legacy_id']
+                if not patch.get('cluster') and reuse['track'].get('genre'):track['genre']={**reuse['track']['genre'],'child_genre':patch.get('style') or reuse['track']['genre'].get('child_genre','Unspecified')}
+            if 'display_order' in patch:track['display_order']=patch['display_order']
             def checkpoint(value):return str(value or '').replace('\\','/').rsplit('/',1)[-1]
             track['model']={'name':checkpoint(meta.get('model')),'dit':checkpoint(meta.get('dit')),'textEncoder':checkpoint(meta.get('text_encoder'))}
             from _review.indexer import number
@@ -415,11 +479,16 @@ class Publisher:
             recipe={'options':options,'track':track,'files':files,'source_sha256':task['input_sha256'],
                     'yaml_sha256':row['yaml_sha256'],'editorial':{k:editorial[k] for k in ('lyric_task_id','lighting_task_id','feature_artifact_id')},
                     'destination':{k:settings[k] for k in ('endpoint','bucket','public_base','website_url')}}
+            if reuse and reuse.get('showcase'):recipe['showcase']=reuse['showcase']
             self.eligible(gid)
             with self.db.transaction() as c:
                 c.execute("UPDATE processing_tasks SET status='done',recipe_json=?,telemetry_json=?,completed_at=?,error=NULL WHERE id=?",(canonical(recipe),canonical({'phase':'prepared','message':'Preview ready; nothing uploaded'}),now(),identifier))
                 for index,item in enumerate(files):
                     c.execute('INSERT INTO generation_artifacts VALUES(?,NULL,?,?,?,?,NULL,?)',(identifier+'-'+str(index),'release_asset',item['sha256'],item['path'],item['size'],canonical({'processing_task_id':identifier,'public_key':item['key']})))
+            # A metadata-only revision can reuse every asset from the previous
+            # release; keep no empty revision directory in that case.
+            try:directory.rmdir()
+            except OSError:pass
             if options.get('complete_publish'):self.start_publish(identifier)
         except Exception as exc:
             self.db.execute("UPDATE processing_tasks SET status='failed',error=?,completed_at=? WHERE id=?",(error_text(exc),now(),identifier))
@@ -432,6 +501,7 @@ class Publisher:
         self.eligible(task['generation_id']);recipe=json.loads(task['recipe_json'])
         visibility=visibility or recipe.get('options',{}).get('visibility','public')
         destination(visibility)
+        self.library.room(visibility)
         if not recipe.get('track'):raise ValueError('Release preview is incomplete')
         if not recipe.get('showcase') and not all(Path(f['path']).is_file() for f in recipe.get('files',[])):
             # A move may have committed before its receipt was saved. Its own
@@ -446,6 +516,16 @@ class Publisher:
                       (publish_id,task['generation_id'],'publish:'+identifier,canonical({'prepared_id':identifier,'title':recipe['track']['displayTitle'],'visibility':visibility}),task['input_sha256'],now()))
         self.pool.submit(self._publish,publish_id);return {'id':publish_id}
 
+    def validate_preview(self,gid,recipe):
+        row=self.eligible(gid)
+        _,source=self.prep.source(gid,artifact_id=recipe['options'].get('master_id'))
+        current=self.prep.editorial(gid,recipe['options'].get('master_id'))
+        included=[]
+        if recipe['options'].get('timed_lyrics'):included.append('lyric_task_id')
+        if recipe['track'].get('playback_url'):included.extend(('lighting_task_id','feature_artifact_id'))
+        if digest(source)!=recipe['source_sha256'] or row['yaml_sha256']!=recipe['yaml_sha256'] or not recipe.get('imported') and any(current[key]!=recipe['editorial'].get(key) for key in included):
+            raise ValueError('Audio, YAML or editorial approval changed; prepare a fresh preview')
+
     def _publish(self,identifier):
         try:
             task=self.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,));request=json.loads(task['recipe_json']);pid=request['prepared_id']
@@ -453,7 +533,15 @@ class Publisher:
             self.eligible(gid);settings=self.settings()
             if recipe['destination']!={k:settings[k] for k in recipe['destination']}:raise ValueError('Publishing destination changed; prepare a new preview')
             self.db.execute("UPDATE processing_tasks SET status='running',started_at=?,error=NULL WHERE id=?",(now(),identifier))
+            # Processing uses temporary paths inside this bundle. Let active
+            # alignment/renders finish before its verified move, then use the
+            # already-prepared public assets rather than race the worker.
+            while self.db.one("SELECT 1 FROM processing_tasks WHERE generation_id=? AND kind IN ('lyric_alignment','visuals','mix_preview','mix_master') AND status IN ('queued','running')",(gid,)):
+                if self.stopping:raise ValueError('Publication paused while processing; retry after restarting')
+                self.progress(identifier,phase='waiting_processing',message='Waiting for background alignment or audio processing before moving files')
+                time.sleep(.5)
             if 'showcase' not in recipe:
+                self.validate_preview(gid,recipe)
                 self.progress(identifier,phase='showcase',message='Verifying and moving completed recording')
                 # Clear only disposable, unreferenced mix auditions. Masters,
                 # YAML, corrected timing, light cues and artwork move together.
@@ -463,10 +551,13 @@ class Publisher:
                 prepared=self.db.one('SELECT * FROM processing_tasks WHERE id=?',(pid,))
                 recipe=json.loads(prepared['recipe_json']);recipe['showcase']=moved
                 self.db.execute('UPDATE processing_tasks SET recipe_json=? WHERE id=?',(canonical(recipe),pid))
-            else:
+            elif self.db.one("SELECT 1 FROM processing_tasks WHERE generation_id=? AND kind='showcase_move' AND status<>'cancelled'",(gid,)):
                 moved=self.showcase.move(gid,pid)
                 recipe['showcase']=moved
                 self.db.execute('UPDATE processing_tasks SET recipe_json=? WHERE id=?',(canonical(recipe),pid))
+            else:
+                folder=Path(recipe['showcase']['folder'])
+                if not folder.resolve().is_relative_to(self.prep.showcase.resolve()) or not folder.is_dir():raise ValueError('Managed Library bundle is unavailable')
             visibility=request.get('visibility') or recipe['options'].get('visibility','public')
             pointer,_=destination(visibility)
             recipe['options']['visibility']=visibility;recipe['track']['visibility']=visibility
@@ -475,20 +566,20 @@ class Publisher:
             present=next((t for t in catalogue['tracks'] if t.get('id')==recipe['track']['id']),None)
             # A new preview can replace its predecessor; an older receipt cannot
             # resurrect itself over a newer preview on either destination.
-            other,_=read_catalogue(store,'public' if visibility=='hidden' else 'hidden')
-            other_track=next((t for t in other['tracks'] if t.get('id')==recipe['track']['id']),None)
-            for current in (present,other_track):
+            other_tracks=[]
+            for room in self.library.room_ids():
+                if room==visibility:continue
+                other,_=read_catalogue(store,room)
+                other_tracks.extend(t for t in other['tracks'] if t.get('id')==recipe['track']['id'])
+            other_track=other_tracks[0] if other_tracks else None
+            for current in (present,*other_tracks):
                 if current and current.get('release_id') not in {None,pid}:
                     newer=self.db.one('SELECT rowid FROM processing_tasks WHERE id=?',(current['release_id'],))
                     mine=self.db.one('SELECT rowid FROM processing_tasks WHERE id=?',(pid,))
                     if not newer or newer['rowid']>=mine['rowid']:raise ValueError('A newer release replaced this preview; use that release instead')
             publish_pointer=None
             if not present or present.get('release_id')!=pid or recipe['track']['id'] in catalogue.get('withdrawn',[]):
-                row=self.eligible(gid)
-                _,source=self.prep.source(gid,artifact_id=recipe['options'].get('master_id'))
-                current=self.prep.editorial(gid,recipe['options'].get('master_id'))
-                if digest(source)!=recipe['source_sha256'] or row['yaml_sha256']!=recipe['yaml_sha256'] or any(current[k]!=v for k,v in recipe['editorial'].items()):
-                    raise ValueError('Audio, YAML or editorial approval changed; prepare a fresh preview')
+                self.validate_preview(gid,recipe)
                 origin=urlparse(settings['website_url']);origin=origin.scheme+'://'+origin.netloc
                 for index,item in enumerate(recipe['files']):
                     self.progress(identifier,phase='uploading',completed=index,total=len(recipe['files']),message=Path(item['path']).name)
@@ -505,7 +596,7 @@ class Publisher:
                 # One compare-and-swap prevents concurrent publishers losing tracks.
                 # An unknown response is reconciled by the next explicit retry.
                 publish_pointer=lambda:store.compare_put(pointer,raw,etag=etag)
-            remove_other(store,recipe['track'],visibility,other_track.get('release_id') if other_track else None)
+            remove_other(store,recipe['track'],visibility,other_track.get('release_id') if other_track else None,placements=self.library.room_ids())
             self._record_published(identifier,pid,gid,recipe,settings,publish_pointer)
         except Exception as exc:
             self.db.execute("UPDATE processing_tasks SET status='failed',error=?,completed_at=? WHERE id=?",(error_text(exc),now(),identifier))
@@ -577,7 +668,7 @@ class Publisher:
             if self.db.one("SELECT 1 FROM processing_tasks WHERE generation_id=? AND kind='release_publish' AND status IN ('queued','running')",(prepared['generation_id'],)):
                 raise ValueError('Wait for active publication before withdrawing')
             visibility=recipe.get('options',{}).get('visibility','public')
-            catalogues=[(v,*read_catalogue(store,v)) for v in (visibility,'public' if visibility=='hidden' else 'hidden')]
+            catalogues=[(v,*read_catalogue(store,v)) for v in self.library.room_ids()]
             for _,catalogue,_ in catalogues:
                 target=next((t for t in catalogue['tracks'] if t.get('id')==recipe['track']['id']),None)
                 if target and target.get('release_id')!=pid:raise ValueError('A newer release replaced this preview; withdraw that release instead')

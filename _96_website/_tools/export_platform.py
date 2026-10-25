@@ -102,13 +102,17 @@ def project(conn, style_sources=None):
     required = {'audio', 'generations', 'generation_metadata', 'songs', 'latest_reviewer_reviews', 'publishing_selection'}
     if required - tables:
         raise ValueError('Shared review schema is incomplete; missing: ' + ', '.join(sorted(required - tables)))
-    # Hidden-room recordings stay out of public research track listings too.
+    # Every nonpublic room stays out of public research track listings too.
     # The studio's original review, telemetry and analytical records remain intact.
     placements={}
     if 'processing_tasks' in tables:
-        for task in records(conn,"SELECT generation_id,recipe_json FROM processing_tasks WHERE kind='release_prepare' AND status='done' ORDER BY rowid"):
-            placements[task['generation_id']]=object_json(task['recipe_json']).get('options',{}).get('visibility','public')
-    hidden={gid for gid,value in placements.items() if value=='hidden'}
+        for task in records(conn,"SELECT generation_id,kind,recipe_json FROM processing_tasks WHERE kind IN ('release_prepare','release_publish') AND status='done' ORDER BY rowid"):
+            recipe=object_json(task['recipe_json'])
+            room=recipe.get('visibility') or recipe.get('options',{}).get('visibility','public')
+            # A nonpublic draft suppresses research immediately. Preparing a
+            # public revision cannot reveal it before publication succeeds.
+            if task['kind']=='release_publish' or room!='public':placements[task['generation_id']]=room
+    hidden={gid for gid,value in placements.items() if value!='public'}
     has_runs = {'generation_output_links', 'generation_runs', 'generation_attempts', 'worker_sessions',
                 'generation_timing_spans', 'generation_resource_measurements'} <= tables
     definitions = records(conn, 'SELECT id,category,label,active FROM review_tag_definitions ORDER BY category_order,sort_order,id') if 'review_tag_definitions' in tables else []

@@ -115,7 +115,8 @@ def test_success_verified_publication_merges_tracks_and_moves_one_local_bundle(p
     final=json.loads(review.db.one('SELECT recipe_json FROM processing_tasks WHERE id=?',(pid,))['recipe_json'])
     assert all(Path(item['path']).is_file() for item in final['files'])
     assert all(not Path(item['path']).exists() for item in recipe['files'])
-    assert not prep.projects()['projects'] and publisher.projects()['projects'][0]['completed']
+    assert not prep.projects()['projects'] and not publisher.projects()['projects']
+    assert publisher.library.projects()['items'][0]['generation_id']==gid
     assert not review.db.all('PRAGMA foreign_key_check')
     assert all(Path(a['uri']).is_file() for a in review.db.all("SELECT uri FROM generation_artifacts WHERE kind='release_asset'"))
     retry=publisher.start_publish(pid)['id'];assert wait(review.db,retry)['status']=='done'
@@ -302,7 +303,7 @@ def test_selection_page_withdrawal_removes_the_same_public_entry(publication):
     assert review.db.one('SELECT status FROM publishing_selection')['status']=='withdrawn'
 
 
-def test_one_action_completes_mp3_showcase_and_r2_without_changing_yaml(publication):
+def test_one_action_completes_mp3_showcase_and_r2_without_changing_yaml(publication,monkeypatch):
     review,prep,publisher,store,gid,source,yaml=publication
     before=source.read_bytes();reviews=review.db.all('SELECT * FROM reviews')
     pid=publisher.start_complete(gid,{'include_flac':True})['id']
@@ -324,7 +325,10 @@ def test_one_action_completes_mp3_showcase_and_r2_without_changing_yaml(publicat
     assert len(json.loads(store.objects[POINTER])['tracks'])==1
     assert all(not key.endswith(('.yaml','.source.yaml','.generation.json')) for key in store.objects)
     assert not prep.projects()['projects']
-    with pytest.raises(ValueError,match='Showcase'):prep.submit(gid,'mix_master',{'mix':{}})
+    monkeypatch.setattr(prep,'worker',ROOT/'_99_tools/_workers_processing/worker.py')
+    revision=wait(review.db,prep.submit(gid,'mix_master',{'mix':{}})['id'])
+    assert revision['status']=='done',revision['error']
+    assert prep.artifact(revision['id']+'-output').is_relative_to(prep.showcase)
 
 
 def test_same_song_variant_and_genre_have_distinct_recording_folders(publication):

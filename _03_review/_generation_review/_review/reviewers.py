@@ -62,6 +62,7 @@ class ReviewerQueues:
         rows = [dict(r) for r in c.execute(f"""SELECT g.id,g.audio_id,g.generation_timestamp,g.created_at,g.original_directory,{PROJECTION}
             FROM generations g JOIN songs s ON s.id=g.song_id LEFT JOIN generation_metadata m ON m.generation_id=g.id
             WHERE NOT EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id)
+            AND NOT EXISTS(SELECT 1 FROM publishing_selection p WHERE p.generation_id=g.id AND p.status='published')
             AND NOT EXISTS(SELECT 1 FROM queue_skips k WHERE k.audio_id=g.audio_id AND k.session_id=?)
             ORDER BY g.rowid""", (session["id"],))]
         rows=names.annotate(rows)
@@ -93,11 +94,13 @@ class ReviewerQueues:
         filters = prepare({**json.loads(session['filters_json']), **(overrides or {})}, names)
         rows = c.execute(f'''SELECT g.id,g.audio_id,g.original_directory,{PROJECTION},
             EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id) AS reviewed,
+            EXISTS(SELECT 1 FROM publishing_selection p WHERE p.generation_id=g.id AND p.status='published') AS published,
             EXISTS(SELECT 1 FROM queue_skips k WHERE k.audio_id=g.audio_id AND k.session_id=?) AS skipped
             FROM generations g JOIN songs s ON s.id=g.song_id LEFT JOIN generation_metadata m ON m.generation_id=g.id''', (session['id'],))
         seen, reviewed, skipped = set(), set(), set()
         present = available_audio(self.db)
         for row in names.annotate(rows):
+            if row['published'] and not row['reviewed']:continue
             if row['audio_id'] not in present or worker_intermediate(row['original_directory']):continue
             if not matches(row, filters):continue
             aid = row['audio_id']

@@ -14,3 +14,7 @@ CREATE INDEX IF NOT EXISTS idx_processing_generation ON processing_tasks(generat
 CREATE INDEX IF NOT EXISTS idx_processing_cache ON processing_tasks(fingerprint,status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_processing_active ON processing_tasks(fingerprint) WHERE status IN ('queued','running');
 CREATE INDEX IF NOT EXISTS idx_artifact_processing ON generation_artifacts(json_extract(metadata_json,'$.processing_task_id'));
+-- Shared platform preferences only. Recording metadata stays on its existing ledger.
+CREATE TABLE IF NOT EXISTS platform_settings (
+    key TEXT PRIMARY KEY, value_json TEXT NOT NULL, updated_at TEXT NOT NULL
+);

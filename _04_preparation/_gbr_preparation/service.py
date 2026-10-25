@@ -6,6 +6,7 @@ import math
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import socket
 import sqlite3
@@ -62,6 +63,7 @@ class Preparation:
         self.lock=threading.RLock()
         self.submitted=set()
         self.owner_nonce=uuid.uuid4().hex
+        self.closed=False;self.next_auto_sweep=0
         self.pool=ThreadPoolExecutor(max_workers=1,thread_name_prefix='gbr-preparation')
         self.enabled=self.db.one("SELECT COUNT(*) n FROM sqlite_master WHERE type='table' AND name IN ('generation_artifacts','worker_sessions','platform_migration_report')")['n']==3
         if self.enabled:
@@ -73,8 +75,10 @@ class Preparation:
             self.review.archiver.preparation_root=self.tracks
             self.review.archiver.showcase_root=self.showcase
         self.review.preparation=self
+        self.review.archiver.on_preparation_ready=self.auto_align
 
     def close(self):
+        self.closed=True
         self.pool.shutdown(wait=False,cancel_futures=True)
         for identifier in self.submitted:
             self.db.execute("UPDATE processing_tasks SET status='interrupted',error='Application closed before execution' WHERE id=? AND status='queued'",(identifier,))
@@ -105,14 +109,57 @@ class Preparation:
             for row in c.execute("SELECT generation_id FROM publishing_selection WHERE status IN ('selected','published')").fetchall():
                 self.queue_promotion(c,row[0])
 
+    def local_generation_busy(self):
+        return bool(self.db.one("""SELECT 1 FROM generation_attempts a LEFT JOIN worker_sessions w ON w.id=a.worker_session_id
+            WHERE a.status IN ('running','queued') AND (a.execution_mode='local' OR w.provider='local'
+                OR w.address LIKE '%127.0.0.1%' OR w.address LIKE '%localhost%') LIMIT 1"""))
+
+    def launch_waiting(self,task):
+        if self.closed or not self.alignment_python().is_file() or self.local_generation_busy():return task
+        telemetry=json.loads(task.get('telemetry_json') or '{}')
+        if telemetry.get('retry_after',0)>time.time():return task
+        if self.db.execute("UPDATE processing_tasks SET status='queued',error=NULL,telemetry_json=? WHERE id=? AND status='waiting'",(canonical({'owner':self.owner()}),task['id'])):
+            self.submitted.add(task['id']);self.pool.submit(self._run,task['id'])
+        return {'id':task['id'],'status':'queued'}
+
+    def auto_align(self,gid):
+        if self.closed or not self.enabled:return
+        if not self.db.one("SELECT 1 FROM publishing_selection WHERE generation_id=? AND status='selected'",(gid,)):return
+        with self.lock:
+            previous=self.db.one("SELECT * FROM processing_tasks WHERE generation_id=? AND kind IN ('lyric_alignment','lyric_edit') AND status<>'cancelled' ORDER BY rowid DESC LIMIT 1",(gid,))
+            if previous:
+                if previous['status']=='waiting':return self.launch_waiting(previous)
+                return previous
+            row,source=self.source(gid)
+            language=json.loads(row['parsed_json']).get('language') or 'en'
+            if not isinstance(language,str) or not re.fullmatch('[a-z]{2,3}',language):language='en'
+            identifier=self._insert(gid,'lyric_alignment',{'version':1,'language':language},digest(source),'waiting')
+            self.db.execute("UPDATE processing_tasks SET error=? WHERE id=?",('Waiting for a free local GPU and the processing environment',identifier))
+            return self.launch_waiting(self.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,)))
+
+    def auto_align_sweep(self):
+        if self.closed or not self.enabled or time.monotonic()<self.next_auto_sweep:return
+        self.next_auto_sweep=time.monotonic()+5
+        rows=self.db.all("""SELECT p.generation_id,a.archive_path FROM publishing_selection p JOIN generations g ON g.id=p.generation_id
+            JOIN audio a ON a.id=g.audio_id WHERE p.status='selected' AND a.archive_path IS NOT NULL""")
+        for row in rows:
+            path=Path(row['archive_path'])
+            if not path.resolve().is_relative_to(self.tracks.resolve()) or not path.is_file():continue
+            try:
+                self.auto_align(row['generation_id'])
+                self.db.execute('DELETE FROM scan_errors WHERE path=?',('lyric-alignment:'+row['generation_id'],))
+            except (OSError,ValueError) as exc:
+                self.review.indexer.error('lyric-alignment:'+row['generation_id'],str(exc))
+
     def projects(self,include_completed=False):
         if not self.enabled:return {'enabled':False,'projects':[]}
         rows=self.db.all('''SELECT g.id AS generation_id,g.audio_id,s.title,m.parsed_json,a.duration,a.archive_path,p.status
             FROM publishing_selection p JOIN generations g ON g.id=p.generation_id JOIN songs s ON s.id=g.song_id
             JOIN generation_metadata m ON m.generation_id=g.id JOIN audio a ON a.id=g.audio_id
-            WHERE (p.status IN ('selected','published') AND EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id))
+            WHERE (p.status IN ('selected','published') AND (EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id)
+                OR EXISTS(SELECT 1 FROM processing_tasks t WHERE t.generation_id=g.id AND t.kind='library_import' AND t.status='done')))
                OR a.archive_path LIKE ? ORDER BY p.selected_at,g.id''',(str(self.tracks)+'%',))
-        rows=[r for r in rows if include_completed or not (r['archive_path'] and Path(r['archive_path']).resolve().is_relative_to(self.showcase.resolve()))]
+        rows=[r for r in rows if include_completed or (r['status']=='selected' and not (r['archive_path'] and Path(r['archive_path']).resolve().is_relative_to(self.showcase.resolve())) and not self.db.one("SELECT 1 FROM processing_tasks WHERE generation_id=? AND kind='release_prepare' AND status='done'",(r['generation_id'],)))]
         for row in rows:
             meta=json.loads(row.pop('parsed_json'))
             row.update(cluster=meta.get('cluster'),style=meta.get('style') or meta.get('style_primary'),
@@ -159,8 +206,27 @@ class Preparation:
         return path
 
     def editable(self,gid):
+        published=self.db.one("SELECT 1 FROM publishing_selection WHERE generation_id=? AND status='published'",(gid,))
+        if published:
+            if self.db.one("SELECT 1 FROM processing_tasks WHERE generation_id=? AND kind IN ('release_publish','release_prepare','showcase_move','lyric_alignment','mix_master') AND status IN ('queued','running')",(gid,)):raise ValueError('Wait for active work on this Library recording')
+            return
         if self.db.one("SELECT 1 FROM processing_tasks t JOIN generations g ON g.id=t.generation_id WHERE g.audio_id=(SELECT audio_id FROM generations WHERE id=?) AND t.kind='showcase_move' AND t.status<>'cancelled'",(gid,)):
             raise ValueError('This recording is being completed or lives in Showcase; retry its publication from Publishing')
+
+    def bundle(self,gid):
+        row,source=self.source(gid)
+        return source.parent.parent if source.resolve().is_relative_to(self.showcase.resolve()) and source.parent.name=='_source' else self.tracks/row['audio_id']
+
+    def replace_lyrics(self,gid,text,language=None):
+        self.editable(gid);current=self.editorial(gid)
+        words=position_lyrics(lyric_words(text),current['duration'])
+        payload={'format':'gbr-lyrics-v1','source_sha256':current['source_sha256'],'language':language or current['language'],
+                 'words':words,'raw_lyrics':text,'approved':False,'unmatched_recognition':[]}
+        raw=canonical(payload).encode('utf-8');sha=hashlib.sha256(raw).hexdigest();path=self.bundle(gid)/'_derived'/(sha+'.json');path.parent.mkdir(parents=True,exist_ok=True)
+        if not path.exists():path.write_bytes(raw)
+        identifier=self._insert(gid,'lyric_edit',{'parent_task_id':current['lyric_task_id'],'replaced_text':True},current['source_sha256'],'done')
+        self.db.execute('INSERT INTO generation_artifacts VALUES(?,NULL,?,?,?,?,NULL,?)',(identifier+'-output','lyric_edit',sha,str(path),len(raw),canonical({'processing_task_id':identifier,'source_generation_id':gid})))
+        return identifier
 
     def import_artwork(self,gid,raw):
         import io
@@ -177,7 +243,7 @@ class Preparation:
             except (OSError,Image.DecompressionBombError) as exc:
                 raise ValueError('Cannot read this PNG, JPEG or WebP image') from exc
             content=output.getvalue();sha=hashlib.sha256(content).hexdigest()
-            destination=self.tracks/row['audio_id']/'_derived';destination.mkdir(parents=True,exist_ok=True)
+            destination=self.bundle(gid)/'_derived';destination.mkdir(parents=True,exist_ok=True)
             path=destination/(sha+'.png')
             if path.exists():
                 if digest(path)!=sha:raise ValueError('Artwork collision; retained both files')
@@ -253,8 +319,9 @@ class Preparation:
         fingerprint=hashlib.sha256(canonical([gid,kind,recipe,source_hash]).encode()).hexdigest()
         with self.lock:
             self.editable(gid)
-            cached=self.db.one("SELECT id,status FROM processing_tasks WHERE fingerprint=? AND status IN ('queued','running','done') ORDER BY created_at DESC LIMIT 1",(fingerprint,))
+            cached=self.db.one("SELECT * FROM processing_tasks WHERE fingerprint=? AND status IN ('waiting','queued','running','done') ORDER BY rowid DESC LIMIT 1",(fingerprint,))
             if cached:
+                if cached['status']=='waiting':return self.launch_waiting(cached)
                 artifacts=self.db.all("SELECT uri FROM generation_artifacts WHERE json_extract(metadata_json,'$.processing_task_id')=?",(cached['id'],))
                 if cached['status']!='done' or artifacts and all(Path(a['uri']).is_file() for a in artifacts):return cached
             identifier=self._insert(gid,kind,recipe,source_hash)
@@ -274,7 +341,7 @@ class Preparation:
             recipe=json.loads(task['recipe_json'])
             row,source=self.source(task['generation_id'],artifact_id=recipe.get('input_artifact_id'))
             if digest(source)!=task['input_sha256']:raise ValueError('Source bytes changed after job creation')
-            recipe=json.loads(task['recipe_json']);destination=self.tracks/row['audio_id']/'_derived'
+            recipe=json.loads(task['recipe_json']);destination=self.bundle(task['generation_id'])/'_derived'
             destination.mkdir(parents=True,exist_ok=True)
             with tempfile.TemporaryDirectory(prefix='.gbr-processing-',dir=destination) as temporary:
                 request={'kind':task['kind'],'source':str(source),'source_sha256':task['input_sha256'],'duration':row['duration'],'recipe':recipe,'output':str(Path(temporary)/'result')}
@@ -333,7 +400,8 @@ class Preparation:
                 except Exception as error:cleanup={'error':str(error)}
             self.db.execute("UPDATE processing_tasks SET status='done',completed_at=?,telemetry_json=? WHERE id=?",(now(),canonical({'wall_seconds':time.perf_counter()-clock,'measurements':result.get('measurements',{}),'cleanup':cleanup}),identifier))
         except Exception as error:
-            self.db.execute("UPDATE processing_tasks SET status='failed',completed_at=?,error=?,telemetry_json=? WHERE id=?",(now(),str(error),canonical({'wall_seconds':time.perf_counter()-clock,**failure_telemetry}),identifier))
+            waiting=task['kind']=='lyric_alignment' and 'Another GBR worker is already using this GPU' in str(error)
+            self.db.execute("UPDATE processing_tasks SET status=?,completed_at=?,error=?,telemetry_json=? WHERE id=?",('waiting' if waiting else 'failed',None if waiting else now(),str(error),canonical({'wall_seconds':time.perf_counter()-clock,**failure_telemetry,**({'retry_after':time.time()+15} if waiting else {})}),identifier))
 
     def retry(self,identifier):
         self.require()

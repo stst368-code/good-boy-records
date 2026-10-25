@@ -1,18 +1,21 @@
 """Public identity and separate main/hidden release catalogues."""
 import hashlib
 import json
+import re
 
 POINTER = 'gbr/v2/catalogue.json'
 HIDDEN_POINTER = 'gbr/v2/hidden/catalogue.json'
 
 
 def destination(visibility='public'):
-    if visibility not in {'public', 'hidden'}:raise ValueError('Choose Main player or Hidden room')
+    if not isinstance(visibility,str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,63}',visibility):raise ValueError('Choose a valid room')
+    if visibility not in {'public','hidden'}:return ('gbr/v2/rooms/'+visibility+'/catalogue.json','gbr-room-releases-v1')
     return (HIDDEN_POINTER, 'gbr-hidden-releases-v1') if visibility == 'hidden' else (POINTER, 'gbr-public-releases-v1')
 
 
 def release_url(settings, track, visibility='public'):
-    return settings['website_url'].rstrip('/')+'/'+('hidden.html' if visibility=='hidden' else '')+'?s='+track['shareToken']
+    page='' if visibility=='public' else 'easter.html' if visibility=='easter' else 'hidden.html'
+    return settings['website_url'].rstrip('/')+'/'+page+'?'+('room='+visibility+'&' if visibility not in {'public','hidden','easter'} else '')+'s='+track['shareToken']
 
 
 def read_catalogue(store, visibility='public'):
@@ -38,14 +41,19 @@ def write_catalogue(store, data, etag, visibility='public'):
     store.compare_put(pointer,raw,etag=etag)
 
 
-def remove_other(store, track, visibility, replace_release_id=None):
+def remove_other(store, track, visibility, replace_release_id=None,placements=None):
     """Remove the old placement before exposing a new one; retry fills any gap."""
     from .service import now
-    other='public' if visibility=='hidden' else 'hidden'
+    for other in placements or ('public','hidden'):
+        if other!=visibility:_remove_placement(store,track,other,replace_release_id)
+
+
+def _remove_placement(store,track,other,replace_release_id):
+    from .service import now
     data,etag=read_catalogue(store,other)
     present=next((t for t in data['tracks'] if t['id']==track['id']),None)
     # Hidden placement also suppresses an older entry in the saved main catalogue.
-    if not present and (other!='public' or track['id'] in data.get('withdrawn',[])):return
+    if not present and (other not in {'public','easter'} or track['id'] in data.get('withdrawn',[])):return
     if present and present.get('release_id') not in {None,track['release_id'],replace_release_id}:
         raise ValueError('A newer release replaced this preview; use that release instead')
     data['tracks']=[t for t in data['tracks'] if t['id']!=track['id']]

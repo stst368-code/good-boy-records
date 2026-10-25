@@ -4991,6 +4991,7 @@ body[data-view="knowledge"] #easterStoryOverlay{display:none!important}
 <audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
 <script src="showcase-host.js?v=20261025-eggs"></script>
 <script src="releases.js"></script>
+<script src="rooms.js"></script>
 <script src="easter-egg.js"></script>
 <script>
 const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext('2d'),audio=$('audio');
@@ -5034,6 +5035,7 @@ function variantOf(t){return t?.variant||t?.version||(typeof t?.style==='string'
 const secretPage=document.body.dataset.library==='hidden';
 const easterPage=document.body.dataset.library==='easter';
 const hiddenPage=secretPage||easterPage;
+const roomId=easterPage?'easter':secretPage?(new URLSearchParams(location.search).get('room')||'hidden'):'public';
 const SHARE_PARAM='s';
 const SHARE_ALPHABET='0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 let shareIndex=new Map(),shareTokensByKey=new Map();
@@ -5081,7 +5083,7 @@ function setEasterState(enabled){
   if(!tracks.length)tracks=mainTracks;
   hoverIndex=-1;activeParent=null;coverImages.clear();
   refreshParentLanes();buildNodes(true);
-  if(ui.brandText)ui.brandText.textContent=easter?'Good Boy Records / Easter Universe':'Good Boy Records / Sonic Landscape';
+  if(ui.brandText)ui.brandText.textContent=easter?'Good Boy Records / '+(window.GBRlibrary?.room(roomId)?.name||'Easter eggs'):'Good Boy Records / Sonic Landscape';
   if(openTab==='filter')renderFilterPanel()
 }
 function openSharedTrack(token){
@@ -5098,6 +5100,7 @@ function currentShareUrl(){
   const scope=easter?'e':'m',url=new URL(location.href);url.search='';url.hash='';
   url.pathname=url.pathname.replace(/\/index\.html$/i,'/')||'/';
   if(easter)url.pathname=url.pathname.replace(/[^/]*$/,easterPage?'easter.html':'hidden.html');
+  if(secretPage&&roomId!=='hidden')url.searchParams.set('room',roomId);
   url.searchParams.set(SHARE_PARAM,shareTokensByKey.get(`${scope}:${t.id}`)||shareTokenFor(t,scope));
   return url.href
 }
@@ -5646,6 +5649,11 @@ function buildGenreStrip(){
   }
 }
 function genreSequenceCompare(a,b){
+  const order=window.GBRlibrary?.settings.display_order;
+  if(order==='title')return titleOf(a).localeCompare(titleOf(b));
+  if(order==='album')return String(a.album?.name||'').localeCompare(String(b.album?.name||''))||(a.album?.position||0)-(b.album?.position||0)||titleOf(a).localeCompare(titleOf(b));
+  if(order==='newest')return String(b.generation_datetime||'').localeCompare(String(a.generation_datetime||''));
+  if(order==='manual')return (a.display_order||0)-(b.display_order||0)||titleOf(a).localeCompare(titleOf(b));
   const ap=oklch(a?.genre?.parent_colour||'#808080'),bp=oklch(b?.genre?.parent_colour||'#808080');
   const ac=oklch(a?.genre?.child_colour||'#808080'),bc=oklch(b?.genre?.child_colour||'#808080');
   return ap.h-bp.h || ap.l-bp.l || ac.h-bc.h || ac.l-bc.l || (a?.genre?.taxonomy_order??1e9)-(b?.genre?.taxonomy_order??1e9) || titleOf(a).localeCompare(titleOf(b));
@@ -5653,14 +5661,17 @@ function genreSequenceCompare(a,b){
 function sortGenreSequence(list){return list.sort(genreSequenceCompare)}
 function toggleEaster(){location.assign(new URL(easterPage?'./':'easter.html',document.baseURI))}
 async function load(){
+  await window.GBRlibrary?.load();
+  try{if(localStorage.getItem('gbr:fx-sensitivity')===null&&Number.isFinite(window.GBRlibrary?.settings.sensitivity))setFxSensitivity(Math.max(0,Math.min(1,window.GBRlibrary.settings.sensitivity/3)),false);}catch(_){}
   const candidates=['catalogue.json','data/catalogue.json','../data/catalogue.json'];let data=null;
   for(const url of candidates){try{const r=await fetch(url,{cache:'no-store'});if(r.ok){data=await r.json();break}}catch{}}
   if(hiddenPage){
-    const saved=easterPage?(Array.isArray(data?.easter_tracks)?data.easter_tracks:(data?.easter?.tracks||[])):[];
-    let hidden={tracks:saved};if(secretPage&&window.GBRloadReleases)hidden=await window.GBRloadReleases(hidden,{hidden:true});
+    const saved=easterPage&&window.GBRlibrary?.room(roomId)?(Array.isArray(data?.easter_tracks)?data.easter_tracks:(data?.easter?.tracks||[])):[];
+    let hidden={tracks:saved};if(window.GBRloadReleases)hidden=await window.GBRloadReleases(hidden,{hidden:true,room:roomId});
     hidden=externaliseShowcasePaths(hidden);mainTracks=[];easterTracks=hidden.tracks||[];tracks=easterTracks;easter=true;
     const back=document.createElement('button');back.className='utility-button';back.textContent='Main player';back.onclick=()=>location.assign(new URL('./',document.baseURI));ui.utilityNav.prepend(back);
-    document.body.dataset.easter='true';if(ui.brandText)ui.brandText.textContent=easterPage?'Good Boy Records / Easter Eggs':'Good Boy Records / Secret Room';
+    document.title='Good Boy Records — '+(window.GBRlibrary?.room(roomId)?.name||'Room unavailable');
+    document.body.dataset.easter='true';if(ui.brandText)ui.brandText.textContent='Good Boy Records / '+(window.GBRlibrary?.room(roomId)?.name||(easterPage?'Easter eggs':'Secret room'));
   }else{
     const egg=window.GBRcoverEgg?.load();
     if(window.GBRloadReleases)data=await window.GBRloadReleases(data);

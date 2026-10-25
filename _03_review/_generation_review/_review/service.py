@@ -74,6 +74,7 @@ class Service:
         next_scan = 0
         while not self.stop_event.is_set():
             try:
+                if getattr(self,'preparation',None):self.preparation.auto_align_sweep()
                 op = self.db.one("SELECT * FROM archive_operations WHERE status='pending' ORDER BY created_at,rowid LIMIT 1")
                 if op:
                     self.worker_state = "archiving"

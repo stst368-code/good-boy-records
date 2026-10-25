@@ -1,170 +1,125 @@
-"""Real app release flow against an isolated R2-compatible memory store."""
-import argparse,json,re,socket,sys,tempfile,threading,time
+"""Real Preparation -> Publish -> Library workflows, rooms and import on desktop/mobile."""
+import argparse
+import json
 from pathlib import Path
+import socket
+import shutil
+import sys
+import tempfile
+import threading
+import time
 import numpy as np
 import soundfile as sf
 import uvicorn
 from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parents[2]
-for p in [ROOT,ROOT/'_98_database',ROOT/'_03_review/_generation_review',Path(__file__).parent]:sys.path.insert(0,str(p))
+for path in [ROOT,ROOT/'_04_preparation',ROOT/'_98_database',ROOT/'_03_review/_generation_review',ROOT/'_03_review/_generation_review/_tests']:
+    sys.path.insert(0,str(path))
 from _gbr_database.initialize import initialize
 from _review.app import create_app
-from test_publishing import Store
+from conftest import complete,archive_all
+from test_publishing import Store,image_bytes
+
+
+def until(predicate,seconds=25):
+    deadline=time.monotonic()+seconds
+    while time.monotonic()<deadline:
+        if predicate():return
+        time.sleep(.03)
+    raise AssertionError('Workflow timed out')
 
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--browser',required=True);args=parser.parse_args()
-    errors=[]
-    with tempfile.TemporaryDirectory() as directory:
-        root=Path(directory);source=root/'input';source.mkdir();db=root/'shared.sqlite3';initialize(db)
-        config=root/'config.json';config.write_text(json.dumps({'input_directories':[str(source)],'database_path':str(db)}))
-        app=create_app(config,start_worker=False);review=app.state.service;prep=app.state.preparation;publisher=app.state.publisher
-        prep.tracks=root/'_tracks';review.archiver.preparation_root=prep.tracks
-        prep.showcase=root/'_05_showcase';publisher.showcase.root=prep.showcase;review.archiver.showcase_root=prep.showcase
-        publisher.config_path=root/'publishing.json';publisher.secrets_path=root/'publishing.secrets.json'
-        store=Store();publisher.store_factory=lambda settings:store
-        audio=source/'song.flac';t=np.arange(4*44100)/44100;sf.write(audio,np.stack([.1*np.sin(2*np.pi*330*t)]*2,axis=1),44100,subtype='PCM_24')
-        audio.with_suffix('.yaml').write_text('song_id: 13\nvariant_id: 2\ntitle: moses-supposes\ncluster: Rock\nstyle: Punk\nlanguage: en\nlyrics: |\n  one line\n  next line\n')
-        aid=review.indexer.index(audio);gid=review.db.one('SELECT id FROM generations')['id'];review.queues.open(review.default_reviewer_id,gid)
-        review.review(gid,dict(audio_quality=5,composition=4,consistency=4,realism=4),'full',distribution=True)
-        for op in review.db.all("SELECT * FROM archive_operations WHERE status='pending'"):review.archiver.process(op)
+    errors=[];failures=[];checks=[]
+    with tempfile.TemporaryDirectory() as temporary:
+        directory=Path(temporary);source=directory/'input';source.mkdir()
+        db=directory/'gbr.sqlite3';initialize(db)
+        config=directory/'config.json';config.write_text(json.dumps({'input_directories':[str(source)],'database_path':str(db)}),encoding='utf-8')
+        app=create_app(config,start_worker=False,database_path=db);review=app.state.service;prep=app.state.preparation;p=app.state.publisher
+        repo=directory/'repo';writing=repo/'_01_writing/_built';writing.mkdir(parents=True)
+        (writing/'track_list.csv').write_text('song_id,song_name,filename\n13,moses-supposes,song.yaml\n',encoding='utf-8')
+        refs=repo/'_01_writing/_references';refs.mkdir();(refs/'styles.csv').write_text('cluster,style_primary\nRock,Punk\nJazz,Swing\n',encoding='utf-8')
+        p.root=repo;p.config_path=directory/'publishing.json';p.secrets_path=directory/'publishing.secrets.json'
+        prep.tracks=directory/'_tracks';prep.showcase=repo/'_05_showcase';p.showcase.root=prep.showcase;prep.references=directory/'artwork-references'
+        prep.alignment_python=lambda:directory/'processing-not-installed'
+        review.archiver.preparation_root=prep.tracks;review.archiver.showcase_root=prep.showcase
+        store=Store();p.store_factory=lambda settings:store
+        p.save_settings({'endpoint':'https://test.r2.cloudflarestorage.com','bucket':'gbr-public','public_base':'https://media.test','website_url':'https://test.github.io/good-boy-records/'})
+        records=[]
+        for index in range(3):
+            audio=source/f'track-{index}.flac';t=np.arange(44100)/44100;wave=.15*np.sin(2*np.pi*(440+index*90)*t)
+            sf.write(audio,np.stack([wave,wave],axis=1),44100,subtype='PCM_24')
+            raw=('song_id: 13\r\nvariant_id: 2\r\ntitle: moses-supposes\r\ncluster: Rock\r\nstyle: Punk\r\nencoder_cfg: 1.7\r\ncaption: |\r\n  A Unicode caption: песня\r\nlyrics: |\r\n  first line\r\n  second line\r\n').encode('utf-8')
+            audio.with_suffix('.yaml').write_bytes(raw);aid=review.indexer.index(audio);gid=review.db.one('SELECT id FROM generations WHERE audio_id=?',(aid,))['id']
+            review.set_flags(gid,review.default_reviewer_id,distribution=True);complete(review,gid);archive_all(review);records.append((gid,raw))
+        cover=directory/'cover.png';cover.write_bytes(image_bytes())
         sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
         server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=port,log_level='error',loop='_review.server_loop:create_loop'))
         thread=threading.Thread(target=lambda:server.run(sockets=[sock]),daemon=True);thread.start()
         try:
-            deadline=time.monotonic()+20
-            while not server.started and time.monotonic()<deadline:time.sleep(.05)
-            assert server.started
+            until(lambda:server.started)
             with sync_playwright() as pw:
                 browser=pw.chromium.launch(executable_path=args.browser,headless=True,args=['--no-sandbox','--use-angle=swiftshader','--autoplay-policy=no-user-gesture-required'])
-                for width in [1440,390]:
-                    review.publishing(gid,'selected')
-                    page=browser.new_page(viewport={'width':width,'height':1000})
-                    page.on('pageerror',lambda e:errors.append(str(e)))
-                    page.goto(f'http://127.0.0.1:{port}');page.wait_for_selector('#reviewerDialog[open]')
-                    page.locator('#knownReviewers button',has_text='Simon').click();page.locator('#publishingTab').click()
-                    page.wait_for_function("()=>document.getElementById('pubProject').options.length===1")
-                    page.locator('#pubPrepare').click();page.wait_for_function("()=>document.getElementById('pubHistory').textContent.includes('Preview · prepared')",timeout=25000)
-                    if width==1440:
-                        page.locator('#pubHistory audio').first.evaluate('(a)=>a.play()')
-                        page.wait_for_timeout(4500)
-                        # An unchanged history poll keeps the same media element.
-                        assert page.locator('#pubHistory audio').first.evaluate('(a)=>a.currentTime')>1
-                        page.locator('#settingsButton').click();page.locator('#pubConfig summary').click()
-                        page.wait_for_function("()=>document.getElementById('pubConfig_public_base').value.startsWith('https://')")
-                        for field,value in [('endpoint','https://test.r2.cloudflarestorage.com'),('bucket','gbr-public'),('public_base','https://media.test'),('website_url','https://test.github.io/good-boy-records/'),('access_key','saved-key'),('secret_key','saved-secret')]:page.locator('#pubConfig_'+field).fill(value)
-                        from unittest.mock import patch
-                        with patch('_gbr_preparation.rclone.connection',return_value={'endpoint':'https://test.r2.cloudflarestorage.com','_access_key':'existing-rclone-key','_secret_key':'existing-rclone-secret','_session_token':''}):
-                            page.locator('#pubUseRclone').click()
-                            page.wait_for_function("()=>document.getElementById('pubConfigMessage').textContent.includes('using rclone r2')")
-                            assert publisher.settings()['rclone_remote']=='r2' and not publisher.secrets_path.exists()
-                            assert page.locator('#pubConfig_access_key').input_value()=='' and page.locator('#pubConfig_secret_key').input_value()==''
-                            assert 'existing-rclone-secret' not in page.locator('body').inner_text()
-                            page.screenshot(path='/tmp/gbr-rclone-settings.png',full_page=True)
-                        # Explicitly entering manual keys can still replace the source.
-                        page.locator('#pubConfig_access_key').fill('saved-key');page.locator('#pubConfig_secret_key').fill('saved-secret')
-                        page.locator('#pubSaveConfig').click();page.wait_for_function("()=>document.getElementById('pubConfigMessage').textContent==='Saved. Run the public connection check.'")
-                        assert page.locator('#pubConfig_secret_key').input_value()==''
-                        page.locator('#pubCheckConfig').click();page.wait_for_function("()=>document.getElementById('pubConfigMessage').textContent.includes('Ready')")
-                        page.locator('#settingsDialog [data-close=settingsDialog]').click()
-                        # Destination changed since the first preview: discard and
-                        # explicitly prepare against the saved bucket before publish.
-                        page.get_by_role('button',name='Discard preview').first.click();page.wait_for_function("()=>!document.querySelector('#pubHistory audio')")
-                        page.locator('#pubPrepare').click();page.wait_for_selector('#pubHistory audio')
-                        page.get_by_role('button',name='Complete & publish this preview').first.click()
-                        page.wait_for_selector('#pubHistory a',timeout=25000)
-                        assert '?s=' in page.locator('#pubHistory a').first.get_attribute('href')
-                        page.get_by_role('button',name='Withdraw from website').first.click()
-                        page.wait_for_function("()=>document.getElementById('pubProject').options.length===0")
-                    else:
-                        page.get_by_role('button',name='Discard preview').first.click()
-                    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
-                    page.screenshot(path=f'/tmp/gbr-publishing-{width}.png',full_page=True)
-                    page.close()
-                for width,frequency in [(1440,550),(390,660)]:
-                    # Exercise the single action in Preparation with fresh
-                    # recordings, not a republish of the earlier receipt.
-                    candidate=source/f'completion-{width}.flac'
-                    sf.write(candidate,np.stack([.1*np.sin(2*np.pi*frequency*t)]*2,axis=1),44100,subtype='PCM_24')
-                    raw=audio.with_suffix('.yaml').read_bytes() if audio.with_suffix('.yaml').exists() else review.db.one('SELECT raw_yaml_bytes FROM generation_metadata LIMIT 1')['raw_yaml_bytes']
-                    candidate.with_suffix('.yaml').write_bytes(raw)
-                    aid=review.indexer.index(candidate);current=review.db.one('SELECT id FROM generations WHERE audio_id=?',(aid,))['id']
-                    review.queues.open(review.default_reviewer_id,current)
-                    review.review(current,dict(audio_quality=5,composition=4,consistency=4,realism=4),'full',distribution=True)
-                    for op in review.db.all("SELECT * FROM archive_operations WHERE status='pending'"):review.archiver.process(op)
-                    page=browser.new_page(viewport={'width':width,'height':1000});page.on('pageerror',lambda e:errors.append(str(e)))
-                    page.goto(f'http://127.0.0.1:{port}');page.wait_for_selector('#reviewerDialog[open]')
-                    page.locator('#knownReviewers button',has_text='Simon').click();page.locator('#preparationTab').click()
-                    page.wait_for_selector('#prepWorkspace:not([hidden])');page.locator('#prepProject').select_option(current)
-                    from PIL import Image
-                    artwork=root/'cover.png';Image.new('RGB',(64,64),'#8f7755').save(artwork)
-                    page.locator('#prepArtworkFile').set_input_files(artwork);page.locator('#prepImportArtwork').click()
+                for width,(gid,raw) in zip([1440,3840,390],records):
+                    page=browser.new_page(viewport={'width':width,'height':1000},is_mobile=width<700,has_touch=width<700)
+                    page.on('pageerror',lambda error:errors.append(str(error)))
+                    page.on('response',lambda response:failures.append((response.status,response.url)) if response.status>=500 else None)
+                    page.goto(f'http://127.0.0.1:{port}');page.wait_for_selector('#reviewerDialog[open]');page.locator('#knownReviewers button',has_text='Simon').click()
+                    page.locator('#preparationTab').click();page.wait_for_selector('#prepProject option',state='attached');page.locator('#prepProject').select_option(gid)
+                    page.wait_for_function("()=>document.getElementById('prepYamlRaw').textContent.includes('encoder_cfg: 1.7')")
+                    assert 'песня' in page.locator('#prepYamlCaption').text_content()
+                    assert 'first line\n' in page.locator('#prepYamlLyrics').text_content().replace('\r\n','\n')
+                    assert 'Alignment: waiting' in page.locator('#prepAlignmentStatus').text_content()
+                    page.locator('#prepArtworkFile').set_input_files(cover);page.locator('#prepImportArtwork').click()
                     page.wait_for_function("()=>document.getElementById('prepReleaseArtwork').value!==''")
-                    page.screenshot(path=f'/tmp/gbr-completion-{width}.png',full_page=True)
-                    if width==390:page.locator('#prepReleaseVisibility').select_option('hidden')
-                    page.locator('#prepComplete').click()
-                    page.wait_for_selector('#publishingView:not([hidden])')
-                    page.wait_for_function("()=>document.getElementById('pubHistory').textContent.includes('Publication · published')",timeout=25000)
-                    deadline=time.monotonic()+20
-                    while time.monotonic()<deadline:
-                        if review.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(current,))['status']=='published':break
-                        time.sleep(.03)
-                    assert review.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(current,))['status']=='published'
-                    moved=prep.source(current)[1];assert moved.is_relative_to(prep.showcase)
-                    assert next(moved.parent.glob('*.yaml')).read_bytes()==raw
-                    assert not (prep.tracks/aid).exists()
-                    prepared=review.db.one("SELECT id,recipe_json FROM processing_tasks WHERE generation_id=? AND kind='release_prepare' AND status='done' ORDER BY rowid DESC LIMIT 1",(current,))
-                    public_track=json.loads(prepared['recipe_json'])['track']
-                    pointer='gbr/v2/hidden/catalogue.json' if width==390 else 'gbr/v2/catalogue.json'
-                    assert any(t['id']==public_track['id'] for t in json.loads(store.objects[pointer])['tracks'])
+                    page.locator('#prepApproveLyrics').click();page.wait_for_function("()=>document.getElementById('prepApproveLyrics').textContent==='Approved'")
+                    page.screenshot(path=f'/tmp/gbr-stage-preparation-{width}.png',full_page=True)
+                    page.locator('#prepComplete').click();page.wait_for_selector('#publishingView:not([hidden])')
+                    page.wait_for_selector(f'[data-pending] [data-publish]',timeout=25000)
+                    assert review.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(gid,))['status']=='selected'
+                    assert not any(item['generation_id']==gid for item in p.library.projects()['items'])
+                    assert not any(item['generation_id']==gid for item in prep.projects()['projects'])
+                    pending=p.projects()['projects'];assert any(item['generation_id']==gid for item in pending)
+                    page.screenshot(path=f'/tmp/gbr-stage-publish-{width}.png',full_page=True)
+                    page.locator('[data-publish]').first.click()
+                    until(lambda:review.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(gid,))['status']=='published')
+                    page.locator('#libraryTab').click();page.wait_for_selector(f'[data-edit="{gid}"]');page.locator(f'[data-edit="{gid}"]').click()
+                    page.wait_for_selector('#libraryEdit:not([hidden])');page.locator('#libraryTitle').fill('Retitled '+str(width));page.locator('#libraryPublish').click()
+                    until(lambda:p.library.record(gid)['track']['displayTitle']=='Retitled '+str(width))
+                    assert next(prep.source(gid)[1].parent.glob('*.yaml')).read_bytes()==raw
+                    assert not p.projects()['projects']
+                    page.locator('#libraryTimeline').click();page.wait_for_selector('#libraryEditorContainer #preparationView:not([hidden])')
+                    assert 'encoder_cfg: 1.7' in page.locator('#prepYamlRaw').text_content()
+                    page.locator('#prepBackLibrary').click();page.wait_for_selector('#libraryManager:not([hidden])')
+                    page.screenshot(path=f'/tmp/gbr-stage-library-{width}.png',full_page=True)
+                    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+2')
                     if width==390:
-                        assert not any(t['id']==public_track['id'] for t in json.loads(store.objects['gbr/v2/catalogue.json'])['tracks'])
-                    else:
-                        page.locator('#settingsButton').click();page.locator('#pubEaster summary').click()
-                        page.wait_for_function("()=>document.getElementById('pubEasterCover').options.length>1")
-                        page.locator('#pubEasterCover').select_option(public_track['id'])
-                        assert page.locator('#pubEasterPreview').is_visible()
-                        page.wait_for_function('()=>document.getElementById("pubEasterPreview").naturalWidth>0')
-                        page.locator('#pubEasterSave').click()
-                        page.wait_for_function("()=>document.getElementById('pubEasterStatus').textContent.includes('Saved')")
-                        assert json.loads(store.objects['gbr/v2/easter-egg.json'])['track_id']==public_track['id']
-                        page.screenshot(path='/tmp/gbr-easter-settings.png',full_page=True)
-                        page.locator('#settingsDialog [data-close=settingsDialog]').click()
-                    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
-                    page.close()
-                from test_legacy_showcase import make_legacy
-                publisher.root=root/'repo';writing=publisher.root/'_01_writing/_built';writing.mkdir(parents=True)
-                shutil=__import__('shutil');shutil.copyfile(ROOT/'_01_writing/_built/track_list.csv',writing/'track_list.csv')
-                for width,frequency in [(1440,770),(390,880)]:
-                    candidate=source/f'legacy-{width}.flac';sf.write(candidate,np.stack([.1*np.sin(2*np.pi*frequency*t)]*2,axis=1),44100,subtype='PCM_24')
-                    candidate.with_suffix('.yaml').write_bytes(raw)
-                    aid=review.indexer.index(candidate);current=review.db.one('SELECT id FROM generations WHERE audio_id=?',(aid,))['id']
-                    review.queues.open(review.default_reviewer_id,current);review.review(current,dict(audio_quality=5,composition=4,consistency=4,realism=4),'full',distribution=True)
-                    for op in review.db.all("SELECT * FROM archive_operations WHERE status='pending'"):review.archiver.process(op)
-                    old_source=prep.source(current)[1]
-                    legacy_data=make_legacy((review,prep,publisher,store,current,old_source,raw))
-                    old_root=legacy_data[7];track=legacy_data[8];track['id']=f'legacy-ui-{width}';track['shareToken']='ui'+str(width).zfill(6)
-                    (publisher.root/'_96_website/_data/catalogue.json').write_text(json.dumps({'tracks':[track]}))
-                    bad=old_root/'unmatched';bad.mkdir(exist_ok=True);(bad/'bad.flac').write_bytes(b'invalid audio')
-                    page=browser.new_page(viewport={'width':width,'height':1000});page.on('pageerror',lambda e:errors.append(str(e)))
-                    page.goto(f'http://127.0.0.1:{port}');page.wait_for_selector('#reviewerDialog[open]');page.locator('#knownReviewers button',has_text='Simon').click();page.locator('#publishingTab').click()
-                    page.locator('#pubLegacy summary').click();page.wait_for_function("()=>!document.getElementById('pubLegacyScan').disabled")
-                    page.locator('#pubLegacyScan').click();page.wait_for_function("()=>document.getElementById('pubLegacyStatus').textContent.includes('1 ready · 1 blocked')")
-                    assert page.locator('#pubLegacyRows input[type=checkbox]').count()==1
-                    page.locator('#pubLegacyApply').click();deadline=time.monotonic()+25
-                    while time.monotonic()<deadline:
-                        if review.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(current,))['status']=='published':break
-                        page.wait_for_timeout(100)
-                    assert review.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(current,))['status']=='published'
-                    assert prep.source(current)[1].is_relative_to(prep.showcase)
-                    public=next(t for t in json.loads(store.objects['gbr/v2/catalogue.json'])['tracks'] if t['id']==track['id'])
-                    assert public['shareToken']==track['shareToken'] and public['lyrics_url']
-                    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
-                    page.screenshot(path=f'/tmp/gbr-legacy-migration-{width}.png',full_page=True);page.close()
+                        page.locator('[data-library-tab=rooms]').click()
+                        for name,entry in [('Demos',records[0][0]),('Rarities',records[1][0])]:
+                            page.locator('#libraryAddRoom').click();row=page.locator('.library-room').last
+                            row.locator('[data-field=name]').fill(name);row.locator('[data-field=name]').dispatch_event('change')
+                            track_id=p.library.record(entry)['track']['id'];row.locator('[data-field=entry_track_id]').select_option(track_id)
+                        page.locator('#librarySaveRooms').click();page.wait_for_function("()=>document.getElementById('libraryStatus').textContent.includes('saved to the website')")
+                        rooms=p.library.settings()['rooms'];assert len(rooms)==5 and rooms[-1]['entry_track_id']!=rooms[-2]['entry_track_id']
+                        page.screenshot(path='/tmp/gbr-library-rooms-mobile.png',full_page=True)
+                        page.locator('[data-library-tab=recordings]').click();page.locator(f'[data-edit="{gid}"]').click()
+                        page.locator('#libraryRoom').select_option(rooms[-2]['id']);page.locator('#libraryPublish').click()
+                        until(lambda:p.library.record(gid)['visibility']==rooms[-2]['id'])
+                        assert 'room='+rooms[-2]['id'] in review.db.one('SELECT external_reference FROM publishing_selection WHERE generation_id=?',(gid,))['external_reference']
+                        page.locator('[data-library-tab=import]').click()
+                        old=directory/'porto-showcase'/'easter';old.mkdir(parents=True);mp3=old/'legacy.mp3'
+                        audio_source=next(Path(item['path']) for item in p.library.record(gid)['recipe']['files'] if item['content_type']=='audio/mpeg')
+                        shutil.copyfile(audio_source,mp3);mp3.with_suffix('.yaml').write_text('title: Legacy Easter sample\nlyrics: test\n',encoding='utf-8')
+                        page.locator('#libraryImportPath').fill(str(old.parent));page.locator('#libraryImportSync').uncheck();page.locator('#libraryImportStart').click()
+                        until(lambda:p.library_import.state()['status'] in {'done','completed_with_issues'})
+                        assert p.library_import.state()['completed']==1,p.library_import.state()
+                    checks.append({'width':width,'passed':True});print(json.dumps(checks[-1]),flush=True);page.close()
                 browser.close()
             assert not errors,errors
-            print('Browser publishing: desktop/mobile preview, settings, check, publication, share link, withdrawal, discard, artwork attachment, one-action completion and legacy migration/alignment passed.')
+            assert not failures,failures
+            print(json.dumps({'workflows':checks,'js_errors':errors,'server_errors':failures,'checks':'staged publication, YAML, local audio reuse, Library revisions, rooms and MP3-only import'}))
         finally:server.should_exit=True;thread.join(15)
 
 
