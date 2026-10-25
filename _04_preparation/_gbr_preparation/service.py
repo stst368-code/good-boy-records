@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 from .artwork import brief
-from .editorial import lyric_words,validate_lyrics,lighting
+from .editorial import lyric_words,position_lyrics,validate_lyrics,lighting
 
 DEFAULT_MIX = {'gain_db':0., 'bass_db':0., 'mid_db':0., 'treble_db':0.,
                'vocal_db':0., 'accompaniment_db':0., 'reverb':0., 'room_seconds':1.2, 'fade_in':0., 'fade_out':0., 'limiter_db':None}
@@ -401,6 +401,7 @@ class Preparation:
             if key=='lyric':result.update(language=data.get('language',result['language']),words=data['words'],approved=data.get('approved',False),lyric_task_id=task['id'],unmatched_recognition=data.get('unmatched_recognition',[]))
             elif key=='visual':result.update(features=data,feature_artifact_id=artifact['id'])
             else:result.update(sensitivity=data['sensitivity'],sections=data['sections'],lighting_task_id=task['id'])
+        result['words']=position_lyrics(result['words'],result['duration'])
         return result
 
     def save_editorial(self,gid,kind,data):
@@ -415,7 +416,6 @@ class Preparation:
                 words=validate_lyrics(data,current['words'],current['duration'])
                 approved=data.get('approved',False)
                 if type(approved) is not bool:raise ValueError('Invalid lyric approval')
-                if approved and any(not w['omitted'] and (w['start'] is None or not w['confirmed'] and (w.get('edited') or w['confidence'] is None or w['confidence']<.7)) for w in words):raise ValueError('Check and confirm every low-confidence or untimed lyric before approval')
                 payload={'format':'gbr-lyrics-v1','source_sha256':current['source_sha256'],'language':current['language'],
                          'words':words,'approved':approved,'unmatched_recognition':current.get('unmatched_recognition',[])}
             elif kind=='visual_edit':

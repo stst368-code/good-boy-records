@@ -235,16 +235,19 @@ def test_processing_history_download_is_complete_and_temporary_export_is_removed
 
 def test_editorial_revision_confidence_approval_and_source_binding(prepared):
     service,prep,path,aid,gid,raw=prepared;source=promote(prepared)
-    initial=prep.editorial(gid);assert all(w['start'] is None and w['confidence'] is None for w in initial['words'])
+    initial=prep.editorial(gid);assert all(w['start'] is not None and w['estimated'] and w['confidence'] is None and not w['confirmed'] for w in initial['words'])
+    assert not service.db.one("SELECT id FROM processing_tasks WHERE kind='lyric_edit'")
     body={'source_sha256':initial['source_sha256'],'parent_task_id':None,'words':initial['words'],'approved':True}
-    with pytest.raises(ValueError,match='confirm'):prep.save_editorial(gid,'lyric_edit',body)
-    body['approved']=False;first=prep.save_editorial(gid,'lyric_edit',body)
+    first=prep.save_editorial(gid,'lyric_edit',body)
+    assert first['approved'] and all(not w['confirmed'] for w in first['words'])
     assert prep.editorial(gid)['lyric_task_id']==first['id']
     with pytest.raises(ValueError,match='stale'):prep.save_editorial(gid,'lyric_edit',body)
-    body['parent_task_id']=first['id'];body['words'][0].update(start=.2,end=.6,confirmed=True,text='corrected')
-    for w in body['words'][1:]:w['omitted']=True
+    body['parent_task_id']=first['id'];body['words'][0].update(start=.2,end=.6,confirmed=False,text='corrected',estimated=False)
+    body['words'][1].update(start=None,end=None)
     body['approved']=True;second=prep.save_editorial(gid,'lyric_edit',body)
     assert second['approved'] and second['words'][0]['source_text']=='first'
+    assert second['words'][1]['estimated'] and second['words'][1]['start'] is not None
+    assert all(not w['confirmed'] for w in second['words'])
     old=json.loads(prep.artifact(first['id']+'-output').read_text());assert old['words'][0]['text']=='first'
     assert next(source.parent.glob('*.yaml')).read_bytes()==raw
     body['source_sha256']='0'*64;body['parent_task_id']=second['id']

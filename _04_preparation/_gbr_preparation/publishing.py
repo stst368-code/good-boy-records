@@ -342,7 +342,7 @@ class Publisher:
                 lines={}
                 for word in editorial['words']:
                     if word.get('omitted'):continue
-                    if word.get('start') is None or word.get('end') is None:raise ValueError('Approved lyrics contain untimed words')
+                    if word.get('start') is None or word.get('end') is None:continue
                     lines.setdefault(word['line'],[]).append({k:word[k] for k in ('text','start','end')})
                 payload={'format':'gbr-lyrics-public-v1','language':editorial['language'],'lines':[
                     {'text':' '.join(w['text'] for w in words),'start':min(w['start'] for w in words),'end':max(w['end'] for w in words),'words':words}

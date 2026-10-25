@@ -20,6 +20,38 @@ def lyric_words(lyrics):
     return words
 
 
+def position_lyrics(words,duration):
+    """Place missing timings between their neighbours, without changing anchors.
+
+    These are editable estimates, not recognition results or confirmations.
+    Reading an old sidecar never rewrites it; estimates persist on explicit save.
+    """
+    result=[{**word,'estimated':word.get('estimated',False)} for word in words]
+    active=[word for word in result if not word.get('omitted')]
+    if duration<=0:return result
+    index=0
+    while index<len(active):
+        if active[index].get('start') is not None and active[index].get('end') is not None:
+            index+=1;continue
+        first=index
+        while index<len(active) and (active[index].get('start') is None or active[index].get('end') is None):index+=1
+        previous=active[first-1] if first else None
+        following=active[index] if index<len(active) else None
+        left=previous['end'] if previous else 0
+        right=following['start'] if following else duration
+        if right<=left:
+            # Recognition anchors can overlap. Keep them intact and put the
+            # missing words nearby so they remain visible and draggable.
+            centre=max(0,min(duration,(left+right)/2))
+            span=min(duration,max(.1,(index-first)*.2))
+            left=max(0,min(duration-span,centre-span/2));right=left+span
+        step=(right-left)/(index-first)
+        for offset,word in enumerate(active[first:index]):
+            start=left+offset*step
+            word.update(start=start,end=min(duration,start+step*.9),estimated=True,confirmed=False)
+    return result
+
+
 def validate_lyrics(data, baseline, duration):
     incoming=data.get('words')
     if not isinstance(incoming,list) or len(incoming)!=len(baseline):raise ValueError('Keep every supplied lyric token; mark a missing word omitted instead of deleting it')
@@ -34,9 +66,9 @@ def validate_lyrics(data, baseline, duration):
         if start is not None:
             start=number(start,0,duration,'word start');end=number(end,start,duration,'word end')
             if end<=start:raise ValueError('Word end must follow its start')
-        if type(word.get('confirmed',False)) is not bool or type(word.get('omitted',False)) is not bool:raise ValueError('Invalid lyric confirmation')
+        if any(type(word.get(key,original.get(key,False))) is not bool for key in ('confirmed','omitted','estimated')):raise ValueError('Invalid lyric confirmation')
         edited=original.get('edited',False) or text!=original['text'] or start!=original['start'] or end!=original['end']
-        result.append({**original,'edited':edited,'text':text,'start':start,'end':end,'confirmed':word.get('confirmed',False),'omitted':word.get('omitted',False)})
+        result.append({**original,'edited':edited,'text':text,'start':start,'end':end,'confirmed':word.get('confirmed',False),'omitted':word.get('omitted',False),'estimated':word.get('estimated',original.get('estimated',False))})
     return result
 
 

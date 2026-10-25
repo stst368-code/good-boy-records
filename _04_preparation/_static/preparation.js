@@ -8,7 +8,12 @@ export function initPreparation({api,toast}){
  for(const input of root.querySelectorAll('[data-mix]'))input.oninput=()=>root.querySelector(`[data-value="${input.dataset.mix}"]`).textContent=input.value;
  let projects=[],selected='',timer,lastPreview=null,lastBrief=null,previewStart=0;
  const handle=fn=>async()=>{try{await fn()}catch(error){toast(error.message)}};
- const timeline=initTimeline({root,api,toast,audio:q('prepRaw'),getTime:()=>!q('prepProcessed').paused?q('prepProcessed').currentTime+previewStart:q('prepRaw').currentTime,seek:t=>{const playing=!q('prepRaw').paused||!q('prepProcessed').paused;q('prepProcessed').pause();q('prepRaw').currentTime=t;if(playing)q('prepRaw').play().catch(e=>toast(e.message));}});
+ const getTime=()=>!q('prepProcessed').paused?q('prepProcessed').currentTime+previewStart:q('prepRaw').currentTime;
+ const isPlaying=()=>!q('prepRaw').paused||!q('prepProcessed').paused;
+ const pause=()=>{const time=getTime();q('prepRaw').pause();q('prepProcessed').pause();q('prepRaw').currentTime=time;};
+ const play=async()=>{const time=getTime();q('prepProcessed').pause();q('prepRaw').currentTime=time;await q('prepRaw').play();};
+ const seek=time=>{const playing=isPlaying();q('prepProcessed').pause();q('prepRaw').currentTime=time;if(playing&&q('prepRaw').paused)q('prepRaw').play().catch(e=>toast(e.message));};
+ const timeline=initTimeline({root,api,toast,audio:q('prepRaw'),getTime,seek,play,pause,isPlaying,setRate:value=>{q('prepRaw').playbackRate=q('prepProcessed').playbackRate=value;}});
  q('prepHistoryHeading').before(q('prepComplete').closest('section'));
  timeline.onSourceChange(async artifact=>{q('prepProcessed').pause();q('prepProcessed').removeAttribute('src');lastPreview=null;q('prepRaw').src='/api/preparation/audio/'+encodeURIComponent(selected)+(artifact?'?'+new URLSearchParams({artifact}):'');});
  const project=()=>projects.find(p=>p.generation_id===selected);

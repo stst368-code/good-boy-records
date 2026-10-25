@@ -172,6 +172,23 @@ def test_timing_approval_is_exact_audio_bound_and_preview_discard_removes_deriva
     assert source.exists() and all(not Path(i['path']).exists() for i in recipe['files'])
 
 
+def test_approved_rough_timings_publish_without_word_checks_or_asr(publication):
+    review,prep,publisher,store,gid,source,yaml=publication
+    editorial=prep.editorial(gid)
+    assert all(w['estimated'] and not w['confirmed'] for w in editorial['words'])
+    editorial['words'][1].update(start=None,end=None)
+    saved=prep.save_editorial(gid,'lyric_edit',{'source_sha256':editorial['source_sha256'],'parent_task_id':None,'words':editorial['words'],'approved':True})
+    assert saved['approved'] and all(not w['confirmed'] for w in saved['words'])
+    _,recipe=prepare(publication,timed_lyrics=True)
+    item=next(item for item in recipe['files'] if Path(item['path']).name=='lyrics.json')
+    public=json.loads(Path(item['path']).read_text(encoding='utf-8'))
+    words=[word for line in public['lines'] for word in line['words']]
+    assert [w['text'] for w in words]==['first','line','second','line']
+    assert all(0<=w['start']<w['end']<=editorial['duration'] for w in words)
+    assert next(source.parent.glob('*.yaml')).read_bytes()==yaml
+    assert not review.db.all('PRAGMA foreign_key_check')
+
+
 def test_credentials_never_returned_in_configuration_or_release(publication):
     _,_,publisher,_,_,_,_=publication
     publisher.save_settings({'access_key':'private-key','secret_key':'private-secret'})

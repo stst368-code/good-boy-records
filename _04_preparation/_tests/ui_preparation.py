@@ -41,7 +41,7 @@ def main():
             assert server.started
             with sync_playwright() as pw:
                 browser=pw.chromium.launch(executable_path=args.browser,headless=True,args=['--no-sandbox','--use-angle=swiftshader','--autoplay-policy=no-user-gesture-required'])
-                for width in [1440,390,320]:
+                for width in [1440,3840,390,320]:
                     page=browser.new_page(viewport={'width':width,'height':950},is_mobile=width<700,has_touch=width<700)
                     page.on('pageerror',lambda e:errors.append(str(e)))
                     page.on('response',lambda response:failures.append((response.status,response.url)) if response.status>=500 else None)
@@ -54,6 +54,12 @@ def main():
                     page.locator('#prepPreview').click()
                     page.wait_for_function("()=>document.querySelector('#prepHistory').textContent.includes('mix preview · done')",timeout=25000)
                     page.wait_for_function("()=>document.getElementById('prepProcessed').src.includes('/artifacts/')")
+                    page.locator('#prepAB').click()
+                    page.wait_for_function("()=>!document.getElementById('prepProcessed').paused")
+                    page.locator('#prepTimelinePlay').click()
+                    page.wait_for_function("()=>document.getElementById('prepRaw').paused&&document.getElementById('prepProcessed').paused")
+                    page.locator('#prepTimelinePlay').click()
+                    page.wait_for_function("()=>!document.getElementById('prepRaw').paused")
                     page.locator('#prepAB').click()
                     page.wait_for_function("()=>!document.getElementById('prepProcessed').paused")
                     page.locator('#prepAB').click()
@@ -85,22 +91,71 @@ def main():
                     page.locator('#prepRaw').evaluate('async a=>{a.currentTime=.5;await a.play()}')
                     page.wait_for_function("()=>Number(document.getElementById('prepStar').style.opacity)>.15",timeout=6000)
                     page.locator('#prepRaw').evaluate('a=>a.pause()')
+                    page.locator('#prepTimelinePlay').click()
+                    page.wait_for_function("()=>!document.getElementById('prepRaw').paused")
+                    page.wait_for_function("()=>document.getElementById('prepTimelinePlay').textContent==='Pause'")
+                    page.locator('#prepTimelinePlay').click()
+                    page.wait_for_function("()=>document.getElementById('prepRaw').paused")
+                    page.locator('#prepTimelineSpeed').select_option('0.75')
+                    assert page.locator('#prepRaw').evaluate('a=>a.playbackRate')==.75
+                    page.locator('#prepTimelineScrub').fill('1')
+                    assert page.locator('#prepRaw').evaluate('a=>a.currentTime')==1
+                    page.locator('#prepTimelineBack').click()
+                    assert page.locator('#prepRaw').evaluate('a=>a.currentTime')==0
+                    assert page.locator('.prep-word-tag').count()==6
                     page.locator('#prepLyricWords [data-word]').first.click()
-                    page.locator('#prepWordStart').fill('0.3');page.locator('#prepWordEnd').fill('0.8');page.locator('#prepWordConfirmed').check();page.locator('#prepWordApply').click()
-                    page.locator('#prepTimelineWindow').select_option('10')
-                    tag=page.locator('.prep-word-tag').first;box=tag.bounding_box()
-                    page.mouse.move(box['x']+2,box['y']+10);page.mouse.down();page.mouse.move(box['x']+22,box['y']+10,steps=4);page.mouse.up()
-                    page.locator('#prepSaveLyrics').click()
+                    assert not page.locator('#prepWordStart').is_visible()
+                    initial=float(page.locator('#prepWordStart').input_value())
+                    stage=page.locator('#prepWordTimeline').bounding_box();scale=stage['width']/4
+                    def drag(locator,delta):
+                        locator.evaluate("el=>el.scrollIntoView({block:'center',inline:'nearest'})")
+                        box=locator.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
+                        hit=page.evaluate('p=>{const e=document.elementFromPoint(p.x,p.y);return {className:e?.className,word:e?.closest("[data-word]")?.dataset.word}}',{'x':x,'y':y})
+                        page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+delta,y,steps=5);page.mouse.up()
+                        return {'box':box,'hit':hit,'delta':delta}
+                    drag_info=drag(page.locator('.prep-word-tag').first,.2*scale)
+                    moved=float(page.locator('#prepWordStart').input_value())
+                    if moved<=initial:page.screenshot(path='/tmp/gbr-lyric-drag-failure.png')
+                    assert moved>initial,{'initial':initial,'moved':moved,'drag':drag_info,'errors':errors}
+                    page.locator('#prepUndoLyrics').click()
+                    assert float(page.locator('#prepWordStart').input_value())==initial
+                    page.locator('#prepRedoLyrics').click()
+                    assert float(page.locator('#prepWordStart').input_value())==moved
+                    drag(page.locator('.prep-word-tag').first.locator('[data-edge=start]'),-.05*scale)
+                    assert float(page.locator('#prepWordStart').input_value())<moved
+                    old_end=float(page.locator('#prepWordEnd').input_value())
+                    drag(page.locator('.prep-word-tag').first.locator('[data-edge=end]'),.1*scale)
+                    assert float(page.locator('#prepWordEnd').input_value())>old_end
+                    assert not page.locator('#prepWordConfirmed').is_checked()
+                    page.locator('.prep-word-tag').first.focus();page.keyboard.press('ArrowRight');page.keyboard.press('ArrowRight')
+                    assert page.locator('.prep-word-tag').first.evaluate('el=>el===document.activeElement')
+                    # Cancelling a pointer gesture must not commit its draft.
+                    before_cancel=page.locator('#prepWordStart').input_value()
+                    tag=page.locator('.prep-word-tag').first;tag.scroll_into_view_if_needed();box=tag.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
+                    page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+20,y,steps=3)
+                    tag.dispatch_event('pointercancel',{'pointerId':1,'bubbles':True});page.mouse.up()
+                    assert page.locator('#prepWordStart').input_value()==before_cancel
+                    page.locator('#prepApproveLyrics').click()
                     page.wait_for_function("()=>document.getElementById('prepTimelineStatus').textContent.includes('Lyric revision saved')")
-                    assert prep.editorial(gid)['words'][0]['start']>.3
-                    page.locator('#prepReloadTimeline').click()
-                    page.wait_for_function("()=>document.getElementById('prepSensitivity').value==='2'")
-                    assert page.locator('#prepLyricWords .untimed').count()>0
+                    saved=prep.editorial(gid)
+                    assert saved['approved'] and saved['words'][0]['start']>initial
+                    assert all(not word['confirmed'] for word in saved['words'])
+                    assert any(word['estimated'] for word in saved['words'])
+                    with page.expect_response(lambda response:'/editorial' in response.url and response.request.method=='GET'):
+                        page.locator('#prepReloadTimeline').click()
+                    page.wait_for_function("()=>document.getElementById('prepApproveLyrics').textContent==='Approved'")
+                    assert page.locator('.prep-word-tag.estimated').count()>0
+                    page.locator('#prepLyricWords').scroll_into_view_if_needed()
+                    transport=page.locator('#prepTimelinePlay').bounding_box()
+                    assert transport['y']>=0 and transport['y']+transport['height']<=950
+                    page.locator('.prep-timeline-toolbar').scroll_into_view_if_needed()
+                    page.screenshot(path=f'/tmp/gbr-lyric-timeline-{width}.png')
                     page.locator('#prepAudioSource').select_option(master_id:=(next(a['id'] for t in prep.tasks(gid) for a in t['artifacts'] if a['kind']=='master_candidate')))
                     page.wait_for_function("()=>document.getElementById('prepTimelineStatus').textContent.includes('Calculate visual features')")
-                    assert page.locator('.prep-word-tag').count()==0
+                    assert page.locator('.prep-word-tag.estimated').count()==6
+                    assert page.locator('#prepApproveLyrics').get_attribute('aria-pressed')=='false'
                     page.locator('#prepAudioSource').select_option('')
-                    page.wait_for_function("()=>document.querySelectorAll('.prep-word-tag').length>0")
+                    page.wait_for_function("()=>document.getElementById('prepApproveLyrics').getAttribute('aria-pressed')==='true'")
 
                     page.locator('#prepClean').click()
                     page.wait_for_function("()=>!document.getElementById('prepProcessed').getAttribute('src')")
