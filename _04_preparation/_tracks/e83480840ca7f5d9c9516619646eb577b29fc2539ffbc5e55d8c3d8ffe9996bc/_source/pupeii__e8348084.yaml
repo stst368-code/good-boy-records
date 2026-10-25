@@ -1,0 +1,126 @@
+song_id: 21
+variant_id:
+title: pupeii
+cluster:
+version: 1
+explicit:
+state: active
+genre: psychedelic
+inspiration: original, inspired by Pink Floyd, live at Pomepii
+language: en
+duration: 184.51737
+model: MiniMax Music 3 FP16
+cover: pupeii-v1.png
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+  Genre and sonic identity: extended instrumental progressive jam, tom-heavy tribal drumming, and improvisational and trippy. Emotional arc: psychedelic space rock. Rhythmic character: hypnotic slow-building groove should define the pocket and motion. Production profile: favour live in a vast empty stone amphitheatre, deep cavernous reverb, and raw analog 1970s warmth, with the mix and spatial character appropriate to the stated era. Vocal Details: Base the lead and supporting vocal treatment on wordless soaring choir-like vocals. Keep lead, backing, choir, spoken, and character roles clearly separated, and use vocal effects only where they serve the stated style. Arrangement: Follow the lyric-section timeline Intro → Verse 1 → Chorus → Verse 2 → Bridge → Outro. Section directives: Intro: echoing, distant, slow build; Verse 1: languid, stretched; Chorus: swelling, layered, hypnotic; Verse 2: drifting, building; Bridge: vast, organ swell, building to peak; Outro: dissolving into echo. Instrument lifecycle: swirling Hammond organ and atmospheric slide electric guitar drenched in tape echo should enter, recede, and return as one evolving arrangement rather than remain as a static stack. Shape transitions through changes in density, register, articulation, percussion, and ambience so the energy curve remains clearly audible. Keep melodic, harmonic, and rhythmic motifs recognisable across repeated sections, but vary orchestration and intensity enough that later returns feel developed rather than copied. Preserve natural dynamics and believable ensemble interaction, and let the arrangement breathe around the lead performance instead of filling every register continuously.
+lyrics: |
+  [Intro]
+  (Woof... woof...)
+  (slow) Yeah... two goldens...
+  drifting... drifting...
+
+  [Verse 1]
+  I am the golden one... copper and cold...
+  Drifting through the rooms that my grumbles control...
+  I don't chase the ball... no, the ball comes to me...
+  Queen of every shadow, all the world is my sea...
+  Earn your place, little one... bring me something sweet...
+  And the floor where I'm lying is my throne you can meet...
+
+  [Chorus]
+  Twooo goldens... one home in the haze...
+  One drifts like a queen through her echoing days...
+  One bounds like a comet, all sunlight and sound...
+  Twooo golden hearts turning the world around...
+  (distant) two goldens... drifting on...
+
+  [Verse 2]
+  And the big one comes slow... like a wave on the shore...
+  One thought in his mind, and that thought is no more...
+  Say the word go... and he's gone... and he's lost his own name...
+  Got a mouth soft as velvet and a heart full of flame...
+  He loves every soul... every stranger, every friend...
+  Only Teddy (why?)... and that mystery won't end...
+
+  [Bridge]
+  (rising) Two sides of a golden... one heart underneath...
+  She's the calm and the cunning... he's the joy and the teeth...
+  One little gremlin in the swirling light...
+  One slobbering comet burning soft through the night...
+  (peak) Doja... Bam Bam... drifting on...
+
+  [Outro]
+  Two goldens... one home... and we have it all...
+  (fading) go on... fetch... the ball...
+  Twenty twenty-six... walking on... on... on...
+  (echo, gone) I'm outside now... goodbye... woof...
+generation:
+  source_file: pupeii_V1_P0_00001.flac
+  source_sha256: f2cfead91512b44c5b084ade3006f32004a67f3dc55998f52918cd185e512fec
+  source_file_mtime_utc: '2026-08-24T18:52:35Z'
+  source_filename_version_label: 1
+  actual_audio_duration_seconds: 184.51737
+  max_duration_seconds: 220.0
+  model_file: minimax_music3_dit_fp16.safetensors
+  model_weight_dtype: default
+  vae_file: minimax_music3_dav.safetensors
+  clip_model: minimax_music3_text_encoder_pruned_int8_convrot.safetensors
+  clip_type: minimax
+  clip_device: default
+  batch_size: 1
+  seeds:
+    text_encoder_seed: 0
+    sampler_seed: 0
+  prompt_variant:
+    index: 0
+    cycler_node_id: 27:210
+    cycler_seed: 199
+    cycle_mode: sequential
+    variant_count: 1
+  text_conditioning:
+    cfg_scale: 1.7
+    top_k: 50
+  sampler:
+    steps: 30
+    cfg: 1.7
+    name: euler
+    scheduler: simple
+    denoise: 1.0
+  audio_encoding:
+    format: flac
+    duration: 184.51737
+    container_bit_rate: 949678
+    encoder: Lavf62.12.102
+    codec: flac
+    codec_long_name: FLAC (Free Lossless Audio Codec)
+    sample_rate_hz: 44100
+    channels: 2
+    channel_layout: stereo
+    bits_per_sample: 16
+    stream_bit_rate: null
+    stream_encoder: null
+  comfyui:
+    workflow_id: d0315e3e-da4d-4a0b-b9fa-009950f02c41
+    workflow_revision: 0
+    workflow_version: 0.4
+    frontend_version: 1.49.6
+    workflow_renderer_version: null
+  selected_graph_branch:
+    text_encoder_node_id: 27:224
+    sampler_node_id: 27:227
+    latent_node_id: 27:226
+    prompt_cycler_node_id: 27:210
+    version_node_id: 27:232
+    save_node_id: 27:235
+  caption_source: embedded_prompt_cycler_P0
+  lyrics_source: embedded_literal

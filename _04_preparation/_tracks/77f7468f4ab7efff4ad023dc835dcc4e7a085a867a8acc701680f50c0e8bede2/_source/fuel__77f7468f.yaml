@@ -1,0 +1,95 @@
+song_id: 89
+variant_id: 1
+title: fuel
+cluster: "Jazz, Swing & Big Band"
+version:
+explicit: yes
+language: en
+duration: 300.0
+style: "Vocal Jazz"
+model: MiniMaxAI/MiniMax-Music3
+dit: minimax_music3_dit_fp32.safetensors
+text_encoder: minimax_music3_text_encoder_pruned_bf16.safetensors
+encoder_cfg: 1.7
+encoder_seed: "11817477390346966890"
+top_k: 50
+sampler: seeds_2
+scheduler: ddim_uniform
+sampler_cfg: 1.7
+sampler_seed: "18199350101650602842"
+sampler_steps: 30
+generation_datetime: "2610251313"
+caption: |-
+  Global Metadata
+  Basic Attributes: bpm is 130. key is Bb, and scale is minor. Vocal Jazz / Big Band Swing.
+  Global Emotional Progression: The piece opens with a suave, intimate atmosphere that feels both romantic and slightly melancholic. As the arrangement progresses, the emotional tone shifts from personal reflection to confident declaration, culminating in an exuberant, high-energy climax during the instrumental break before settling back into a warm, resolved conclusion.
+  Application Scenarios & Imagery: A dimly lit, upscale cocktail lounge, a vintage film noir scene featuring a determined protagonist, or a sophisticated evening gathering where nostalgia meets celebration.
+  Sonics & Production Profile: The mix offers a classic, warm soundstage with a clear separation between the rhythm section and the horn ensemble. The frequency response emphasizes rich mid-range warmth for the vocals and brass, supported by a tight, woody low end from the upright bass. The dynamic aesthetic is lively and organic, capturing the natural swing of a live ensemble without excessive compression.
+  Vocal Details
+  Vocal Gender & Timbre: Singer A (Male). The vocalist possesses a smooth, resonant baritone with a velvety texture and precise diction, reminiscent of classic crooners.
+  Vocal Style: The performance begins with a relaxed, storytelling delivery that conveys intimacy and vulnerability. As the song builds towards the bridge and final chorus, the delivery becomes more assertive and dynamically powerful, matching the rising energy of the band, before returning to a gentle, reflective tone for the outro.
+  Harmony/Backing Vocals: No distinct backing vocal layers are present; the focus remains entirely on the solo lead vocal throughout the track.
+  Vocal FX: The vocal is treated with a subtle, short-decay plate reverb to add depth and place the singer within the acoustic space of the ensemble, maintaining a natural and unprocessed character.
+  Arrangement
+  Instrument Lifecycle Description (Primary/Secondary Layering):
+  Primary: An acoustic piano provides the core harmonic foundation with lush, extended jazz voicings, present from the Intro through to the Outro. An upright bass delivers a steady walking bassline that anchors the groove throughout the entire piece.
+  Secondary: A full brass and woodwind ensemble (trumpets, trombones, saxophones) enters subtly during the verses with soft swells, then expands into powerful, punctuated hits and melodic counter-lines during the choruses and the instrumental break. A clean electric guitar adds rhythmic comping and occasional melodic fills, primarily audible in the verses and bridge.
+  Groove & Foundation Progression: The rhythm section establishes a classic swing feel immediately, driven by a live drum kit using brushes on the snare for a softer texture in the verses. As the energy lifts in the choruses and the instrumental break, the drummer switches to sticks, introducing a sharper ride cymbal pattern and crisp snare accents that drive the momentum forward.
+  Embellishments, Textures & Spatial FX: Subtle cymbal swells and brass "shouts" act as transitional markers between sections. The instrumental break features a soaring saxophone solo that takes center stage, surrounded by responsive hits from the rest of the horn section, creating a dynamic call-and-response texture before the vocals return.
+lyrics: |
+  [chorus]
+  gimme fuel, gimme fire, gimme that which i desire, ooh
+  [verse]
+  yeah
+  turn on, i see red
+  adrenaline crash and crack my head
+  nitro junkie, paint me dead
+  and i see red
+  a hundred plus through black and white
+  war horse, warhead
+  fuck 'em, man, white-knuckle tight
+  through black and white
+  [pre-chorus]
+  ooh, on i burn
+  fuel is pumping engines, burning hard, loose and clean
+  and on i burn
+  churning my direction, quench my thirst with gasoline
+  [chorus]
+  so gimme fuel, gimme fire, gimme that which i desire
+  yeah
+  [verse]
+  turn on beyond the bone
+  swallow future, spit out home
+  burn your face upon the chrome
+  yeah, oh, yeah
+  take the corner, join the crash-ah
+  headlights (head on), headlines
+  another junkie lives too fast
+  yeah, lives way too fast (fast)
+  fast (fast), fast (fast), oh-oh
+  [pre-chorus]
+  ooh, on i burn
+  fuel is pumping engines, burning hard, loose and clean
+  and on i burn
+  churning my direction, quench my thirst with gasoline
+  [chorus]
+  so gimme fuel, gimme fire, gimme that which i desire
+  ooh, yeah-hey
+  [instrumental break]
+  [post-chorus]
+  white-knuckle tight
+  [solo]
+  [bridge]
+  (on and on and on and on)
+  give me fuel (on and on and on and on)
+  give me fire (on and on and on and on)
+  my desire (on and on and on and on)
+  [pre-chorus]
+  ooh, on i burn (on and on and on and on)
+  fuel is pumping engines (on and on and on and on), burning hard, loose and clean
+  (on and on and on and on) and on and on
+  churning my direction (on and on and on and on), quench my thirst with gasoline
+  [chorus]
+  gimme fuel, gimme fire, gimme that which i desire, ooh
+  [outro]
+  on i burn

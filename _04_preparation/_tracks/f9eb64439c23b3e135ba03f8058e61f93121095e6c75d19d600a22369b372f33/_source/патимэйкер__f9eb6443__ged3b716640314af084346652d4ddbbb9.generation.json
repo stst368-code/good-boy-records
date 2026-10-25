@@ -1,0 +1,107 @@
+{
+  "format_version": 1,
+  "run_id": "ed3b716640314af084346652d4ddbbb9",
+  "attempt_id": "a16c1d670abd48e695360ff366a97ebe",
+  "purpose": "production",
+  "source_sha256": "02755a2b7e809d5da5d2dc86c7a231f01380ea4cc7ee2c15c5df0da4cb5de5d9",
+  "completed_at": "2026-10-25T11:29:56.125135+00:00",
+  "files": {
+    "jazz-pop-0001.flac": "2806dc97c028aa366e6bad65f3c10da575572f5205fb9f89a3d7c392491e92e2",
+    "jazz-pop-0001.yaml": "6d978a1e6f10ecd84587177ebad6b29b50f538c46050bda2e614c942338ccc93",
+    "source.yaml": "02755a2b7e809d5da5d2dc86c7a231f01380ea4cc7ee2c15c5df0da4cb5de5d9"
+  },
+  "worker_result": {
+    "actual_parameters": {
+      "caption": "Global Metadata\nBasic Attributes: bpm is 118. key is Eb, and scale is major. Jazz Pop / Swing.\nGlobal Emotional Progression: The piece opens with a playful and slightly contentious atmosphere, driven by a light swing rhythm that suggests a whimsical debate. As the song progresses into the chorus sections, the mood shifts toward a warm, affectionate resolution, where the initial tension dissolves into a cozy sense of companionship. The bridge introduces a brief moment of dramatic exaggeration before settling back into a relaxed, contented groove for the finale.\nApplication Scenarios & Imagery: A bustling yet intimate café setting, a romantic comedy scene involving a couple's lighthearted argument, or a leisurely afternoon stroll through a city park with vintage aesthetics.\nSonics & Production Profile: The soundstage is balanced and organic, mimicking a live small-combo recording with clear instrument separation. The frequency response favors warm mids and crisp highs, particularly from the woodwinds and percussion, while maintaining a rounded low end from the upright bass. The dynamic aesthetic is natural and uncompressed, preserving the nuances of the acoustic performance and the vocalist's breath control.\nVocal Details\nVocal Gender & Timbre: Singer A (Female). The vocalist possesses a clear, sweet, and agile mezzo-soprano timbre with a slightly breathy quality that enhances the intimate feel.\nVocal Style: The delivery is conversational and storytelling-oriented in the verses, utilizing subtle rhythmic syncopation to match the swing feel. In the choruses, the style becomes more melodic and sustained, emphasizing emotional warmth and resolution. The performance includes expressive phrasing and occasional scat-like vocalizations that blend seamlessly with the instrumental texture.\nHarmony/Backing Vocals: Subtle, close-harmony backing vocals appear primarily in the choruses and the final refrain, sung by the lead vocalist herself via multi-tracking. These layers are soft and blended, adding depth without overpowering the main melody line.\nVocal FX: The vocal track is treated with a short, warm plate reverb to create a sense of space consistent with a jazz club environment. Light compression is applied to maintain consistency, but no heavy processing or pitch correction artifacts are audible, preserving the natural character of the voice.\nArrangement\nInstrument Lifecycle Description (Primary/Secondary Layering):\nPrimary: An acoustic piano provides the core harmonic structure with comping chords and occasional melodic fills, present throughout the entire track from Intro to Outro.\nSecondary: An upright bass plays a walking bassline that anchors the rhythm and harmony, entering at the start and continuing uninterrupted. An acoustic drum kit with brushes on the snare establishes the swing groove, maintaining a steady pulse. A clarinet (Acoustic Woodwind) serves as a primary counter-melody instrument, weaving around the vocal lines in the verses and taking short soloistic breaks between sections.\nGroove & Foundation Progression: The rhythm section relies on a classic swing pattern; the drums utilize brushes for a soft, swishing texture in the verses, which opens up slightly with more defined ride cymbal patterns in the choruses to lift the energy. The walking bass remains constant, providing forward momentum, while the piano's rhythmic density increases subtly during the bridge to support the lyrical climax.\nEmbellishments, Textures & Spatial FX: Occasional brass stabs (likely muted trumpet or trombone) punctuate key lyrical moments, adding a playful accent. Background textures include faint room ambience that simulates a live performance space. Transitional elements such as piano runs and clarinet glissandos are used to smoothly connect verses to choruses, enhancing the fluidity of the arrangement.",
+      "cluster": "Jazz, Swing & Big Band",
+      "dit": "minimax_music3_dit_fp32.safetensors",
+      "duration": 300.0,
+      "encoder_cfg": 1.7,
+      "encoder_seed": "16664016760741369",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "sampler": "seeds_2",
+      "sampler_cfg": 1.7,
+      "sampler_seed": "16192965848964990905",
+      "sampler_steps": 30,
+      "scheduler": "ddim_uniform",
+      "style": "Jazz Pop",
+      "text_encoder": "minimax_music3_text_encoder_pruned_bf16.safetensors",
+      "top_k": 50
+    },
+    "attempt_id": "a16c1d670abd48e695360ff366a97ebe",
+    "completed_at": "2026-10-25T11:29:56.125135+00:00",
+    "encoding": {
+      "cache_hit": false,
+      "key": null,
+      "mode": "comfy_graph"
+    },
+    "hardware": {
+      "address": "https://q3ser89iqyphlf-8188.proxy.runpod.net",
+      "cuda_device": 0,
+      "free_vram_bytes_at_start": 24673168998,
+      "gpu_name": "cuda:0 NVIDIA GeForce RTX 3090 : cudaMallocAsync",
+      "gpu_peak_vram_bytes": null,
+      "gpu_uuid": null,
+      "memory_profile": "server_managed",
+      "provider": "comfyui_url",
+      "usable_vram_bytes": 25298141184
+    },
+    "models": {
+      "checkpoint_sha256": null,
+      "dit": "minimax_music3_dit_fp32.safetensors",
+      "identity_kind": "workflow-and-checkpoint-names",
+      "node_classes": [
+        "CLIPLoader",
+        "ConditioningZeroOut",
+        "EmptyMiniMaxMusic3LatentAudio",
+        "KSampler",
+        "MiniMaxMusic3TextEncode",
+        "SaveAudio",
+        "UNETLoader",
+        "VAEDecodeAudio",
+        "VAELoader"
+      ],
+      "revision": "7d597d1e6e8296784b2ebb7859bfb3779d26e265",
+      "source_workflow_sha256": "b30ac791a329e7e4eae0c0d9a1f15e685fff56d2009ae4f4f679741af0a74cec",
+      "text_encoder": "minimax_music3_text_encoder_pruned_bf16.safetensors",
+      "vae": "minimax_music3_dav.safetensors"
+    },
+    "protocol": 1,
+    "remote": {
+      "download_sha256": "ac7cc02f8ab801a93881c787e8d298f98e6e3d63475486b2c4666f7d42d60f8d",
+      "file": {
+        "filename": "a16c1d670abd48e695360ff366a97ebe_00001.flac",
+        "subfolder": "gbr",
+        "type": "output"
+      },
+      "prompt_id": "f42b5ca5-7c72-42b3-8271-df64b8afd8d2"
+    },
+    "run_id": "ed3b716640314af084346652d4ddbbb9",
+    "status": "succeeded",
+    "telemetry_limitations": [
+      "Per-prompt peak VRAM is unavailable from stock ComfyUI; checkpoint hashes require the GBR bridge."
+    ],
+    "workflow_sha256": "dc9ca0ba5714e41212b2a7be61ca2fa9c0a17bc14adf3cef467349c500db6c70"
+  },
+  "yaml_timezone": "Europe/London",
+  "worker_audio_sha256": "ac7cc02f8ab801a93881c787e8d298f98e6e3d63475486b2c4666f7d42d60f8d",
+  "audio_conversion": {
+    "original": {
+      "format": "FLAC",
+      "subtype": "PCM_16",
+      "channels": 2,
+      "sample_rate": 44100,
+      "frames": 4839936
+    },
+    "output": {
+      "format": "FLAC",
+      "subtype": "PCM_24",
+      "channels": 2,
+      "sample_rate": 44100,
+      "frames": 4839936
+    },
+    "converted": true,
+    "resampled": false,
+    "mono_duplicated": false
+  }
+}

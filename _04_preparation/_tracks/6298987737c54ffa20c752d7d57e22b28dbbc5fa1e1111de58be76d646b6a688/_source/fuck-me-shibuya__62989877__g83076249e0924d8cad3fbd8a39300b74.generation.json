@@ -1,0 +1,107 @@
+{
+  "format_version": 1,
+  "run_id": "83076249e0924d8cad3fbd8a39300b74",
+  "attempt_id": "4d653636458b411f8e0c052a42548b7a",
+  "purpose": "production",
+  "source_sha256": "1e218b2799195002dbc329cb7750244a79895a670c0d4ae5a84cd1cfd45beb84",
+  "completed_at": "2026-10-25T15:21:39.515668+00:00",
+  "files": {
+    "fuck-me-shibuya-contemporary-r-b-0002.flac": "746e61f8c5572a0722accf8fe12a4c21fc37d7986f7119426f09a42952162d6b",
+    "fuck-me-shibuya-contemporary-r-b-0002.yaml": "7ecbde78f2e3acd9f9570312aed31f78bcbc9dfc0b5815402ec597b7add31c3d",
+    "source.yaml": "1e218b2799195002dbc329cb7750244a79895a670c0d4ae5a84cd1cfd45beb84"
+  },
+  "worker_result": {
+    "actual_parameters": {
+      "caption": "Global Metadata\nBasic Attributes: bpm is 87. key is Ab, and scale is major. Contemporary R&B / Dream Pop.\nGlobal Emotional Progression: The piece opens with an ethereal and floating atmosphere, establishing a sense of vastness and introspection. As the track moves into the verses, the emotion becomes more grounded yet remains wistful, building subtle tension through layered harmonies. The choruses expand this feeling into a sweeping, cinematic release that balances melancholy with a sense of wonder, before receding into a delicate, fading outro that leaves a lingering sense of unresolved longing.\nApplication Scenarios & Imagery: Stargazing on a quiet rooftop, late-night contemplation in a modern apartment, or visual sequences depicting cosmic travel and emotional distance.\nSonics & Production Profile: The soundstage is exceptionally wide and deep, utilizing extensive reverb to create a cavernous, dream-like space. The frequency response emphasizes airy highs and a clean, rounded low-mid range, avoiding harshness. The dynamic aesthetic is polished and smooth, with gentle compression that maintains a consistent, immersive flow without aggressive peaks.\nVocal Details\nVocal Gender & Timbre: A single female vocalist delivers the performance with a soft, breathy, and crystalline timbre. Her voice possesses a light, airy quality that feels intimate yet distant, perfectly suited to the track's atmospheric nature.\nVocal Style: The vocalist employs a fluid, melodic style characterized by extensive use of falsetto and delicate runs. The delivery is consistently gentle and emotive, starting with a whisper-like intimacy in the verses and swelling into a more resonant, soaring tone during the choruses, while maintaining an underlying sense of vulnerability throughout.\nHarmony/Backing Vocals: Multi-layered self-harmonies are a defining feature, appearing prominently in the choruses and the bridge. These harmonies are often stacked in close intervals or octaves, creating a lush, choral texture that envelops the lead line. Ad-libbed vocal runs and echoes are scattered throughout, adding depth and movement to the arrangement.\nVocal FX: The vocals are heavily processed with long-tail hall reverb and subtle delay, enhancing the sense of space and distance. Light pitch-correction is applied for a sleek, modern sheen, and occasional filtering effects are used on background ad-libs to create a telephone-like or distant memory effect.\nArrangement\nInstrument Lifecycle Description (Primary/Secondary Layering):\nPrimary: A warm, electric piano serves as the core harmonic foundation, playing sustained chords and gentle arpeggios from the Intro through to the Outro. Its tone is mellow and slightly detuned, contributing to the dreamy aesthetic.\nSecondary: Atmospheric synth pads enter early on, filling the stereo field with evolving textures that swell and recede. A deep, sub-bass synth provides a smooth low-end anchor, entering with the first verse and remaining present to support the groove without overpowering the mix.\nGroove & Foundation Progression: The rhythm section is driven by a programmed drum machine featuring a soft, thumping kick and a crisp, snappy snare/clap hybrid. The pattern is restrained in the verses, focusing on the kick and subtle hi-hats. In the choruses, the groove expands with the addition of open hi-hats and layered percussion elements, increasing the rhythmic momentum while retaining a laid-back feel.\nEmbellishments, Textures & Spatial FX: Subtle risers and reverse cymbal swells mark transitions between sections, guiding the listener smoothly from verses to choruses. Occasional glitchy vocal chops and synthesized bell tones appear as decorative accents, adding sparkle to the upper frequencies. The overall mix is drenched in ambient textures that blur the lines between instruments, reinforcing the track's cohesive, immersive soundscape.",
+      "cluster": "Modern R&B & Neo-Soul",
+      "dit": "minimax_music3_dit_fp32.safetensors",
+      "duration": 300.0,
+      "encoder_cfg": 1.7,
+      "encoder_seed": "14918211710653894568",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "sampler": "seeds_2",
+      "sampler_cfg": 1.7,
+      "sampler_seed": "4599928869469062880",
+      "sampler_steps": 30,
+      "scheduler": "ddim_uniform",
+      "style": "Contemporary R&B",
+      "text_encoder": "minimax_music3_text_encoder_pruned_bf16.safetensors",
+      "top_k": 50
+    },
+    "attempt_id": "4d653636458b411f8e0c052a42548b7a",
+    "completed_at": "2026-10-25T15:21:39.515668+00:00",
+    "encoding": {
+      "cache_hit": false,
+      "key": null,
+      "mode": "comfy_graph"
+    },
+    "hardware": {
+      "address": "https://q3ser89iqyphlf-8188.proxy.runpod.net",
+      "cuda_device": 0,
+      "free_vram_bytes_at_start": 24666615398,
+      "gpu_name": "cuda:0 NVIDIA GeForce RTX 3090 : cudaMallocAsync",
+      "gpu_peak_vram_bytes": null,
+      "gpu_uuid": null,
+      "memory_profile": "server_managed",
+      "provider": "comfyui_url",
+      "usable_vram_bytes": 25298141184
+    },
+    "models": {
+      "checkpoint_sha256": null,
+      "dit": "minimax_music3_dit_fp32.safetensors",
+      "identity_kind": "workflow-and-checkpoint-names",
+      "node_classes": [
+        "CLIPLoader",
+        "ConditioningZeroOut",
+        "EmptyMiniMaxMusic3LatentAudio",
+        "KSampler",
+        "MiniMaxMusic3TextEncode",
+        "SaveAudio",
+        "UNETLoader",
+        "VAEDecodeAudio",
+        "VAELoader"
+      ],
+      "revision": "7d597d1e6e8296784b2ebb7859bfb3779d26e265",
+      "source_workflow_sha256": "b30ac791a329e7e4eae0c0d9a1f15e685fff56d2009ae4f4f679741af0a74cec",
+      "text_encoder": "minimax_music3_text_encoder_pruned_bf16.safetensors",
+      "vae": "minimax_music3_dav.safetensors"
+    },
+    "protocol": 1,
+    "remote": {
+      "download_sha256": "90224acc7d51ad656312361815d4687932404673079f91ebbd860faf8bdf2072",
+      "file": {
+        "filename": "4d653636458b411f8e0c052a42548b7a_00001.flac",
+        "subfolder": "gbr",
+        "type": "output"
+      },
+      "prompt_id": "b0e67789-8e86-412f-9c1f-65ae32adfe80"
+    },
+    "run_id": "83076249e0924d8cad3fbd8a39300b74",
+    "status": "succeeded",
+    "telemetry_limitations": [
+      "Per-prompt peak VRAM is unavailable from stock ComfyUI; checkpoint hashes require the GBR bridge."
+    ],
+    "workflow_sha256": "dbb611b8f2acda93f6d42b26c3b2341402c13220bdd09bba2a5b819cf67dd8f2"
+  },
+  "yaml_timezone": "Europe/London",
+  "worker_audio_sha256": "90224acc7d51ad656312361815d4687932404673079f91ebbd860faf8bdf2072",
+  "audio_conversion": {
+    "original": {
+      "format": "FLAC",
+      "subtype": "PCM_16",
+      "channels": 2,
+      "sample_rate": 44100,
+      "frames": 7801856
+    },
+    "output": {
+      "format": "FLAC",
+      "subtype": "PCM_24",
+      "channels": 2,
+      "sample_rate": 44100,
+      "frames": 7801856
+    },
+    "converted": true,
+    "resampled": false,
+    "mono_duplicated": false
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "format_version": 1,
+  "run_id": "e47d0d9ef337448895cd518e37fead9d",
+  "attempt_id": "8af93b77e44b4f5fb2a689a7bdb79b20",
+  "purpose": "production",
+  "source_sha256": "6e123a31f37a8bf615da6336c0fbcded716c7c5e3bb74a5ecc42f5f953c99274",
+  "completed_at": "2026-10-25T11:09:15.807139+00:00",
+  "files": {
+    "source.yaml": "6e123a31f37a8bf615da6336c0fbcded716c7c5e3bb74a5ecc42f5f953c99274",
+    "welcome-to-russia-nu-metal-0001.flac": "0277e7e8125bfb18f0fe71107dfcfd0ac8d3d69be50a94c1554f4f6705ab8cc2",
+    "welcome-to-russia-nu-metal-0001.yaml": "0e9d37c38763f0c10b733a8533b3aaf59bf6fe74971242188b08c0b0efe0ea8e"
+  },
+  "worker_result": {
+    "actual_parameters": {
+      "caption": "Global Metadata\nBasic Attributes: bpm is 95. key is C#, and scale is minor. Nu-Metal / Rap Rock.\nGlobal Emotional Progression: The track launches immediately with high-octane aggression and confrontational energy, maintaining a relentless intensity through the verses. The choruses expand this tension into a massive, anthemic release characterized by soaring melodic hooks, while the bridge introduces a brief, chaotic breakdown that heightens the sense of impending doom before returning to the driving main theme for a climactic finish.\nApplication Scenarios & Imagery: High-intensity action sequences in video games or films, volcanic eruptions, scenes of geological upheaval, or competitive sports montages requiring a soundtrack of raw power and dominance.\nSonics & Production Profile: The mix is heavily compressed and dense, creating a \"wall of sound\" aesthetic with a wide stereo field. Distorted guitars dominate the mid-range frequencies, while the low end is thickened by layered bass and sub-synths. The production is polished yet retains a gritty, industrial edge, ensuring every percussive hit cuts through the distortion.\nVocal Details\nVocal Gender & Timbre: Singer A (Male). The vocalist possesses a gritty, forceful baritone texture capable of shifting between rapid-fire articulation and sustained, melodic projection.\nVocal Style: The performance is primarily aggressive rap-rock, characterized by fast-paced, rhythmic delivery in the verses that emphasizes percussive consonants. In the choruses, the style evolves into a powerful, melodic singing approach with a slightly strained, shouting quality to match the instrumental intensity. Occasional ad-libs and shouted interjections add to the chaotic atmosphere.\nHarmony/Backing Vocals: Layered backing vocals appear prominently in the choruses, providing thick, unison harmonies that reinforce the main melody. Shouted gang-vocal textures are utilized in transitional sections to amplify the anthemic feel.\nVocal FX: The vocal chain includes moderate saturation and distortion to blend with the heavy instrumentation. Reverb is used sparingly in verses for clarity but expands into a larger, hall-like space during the choruses to enhance the epic scale. Occasional delay throws accentuate specific rhythmic phrases.\nArrangement\nInstrument Lifecycle Description (Primary/Secondary Layering):\nPrimary: Heavily distorted electric guitars playing chugging, palm-muted riffs serve as the core harmonic and rhythmic driver, present from the Intro through to the Outro.\nSecondary: A deep, overdriven bass guitar locks tightly with the kick drum to reinforce the low-end punch. Synthesizer layers, including atmospheric pads and rising sweep effects, enter during pre-choruses and bridges to build tension and add textural depth.\nGroove & Foundation Progression: The rhythm section is anchored by a hard-hitting acoustic drum kit with a punchy kick and a sharp, cracking snare on beats 2 and 4. The groove remains steady and driving throughout, but the intensity escalates in the choruses with the addition of open hi-hats and more frequent cymbal crashes. The bridge features a half-time feel with heavier, slower drum hits to create a momentary shift in momentum before the final surge.\nEmbellishments, Textures & Spatial FX: Transitional elements include riser synths, reverse cymbal swells, and impact hits that signal section changes. Industrial noise textures and subtle glitch effects are woven into the background during breakdowns to enhance the chaotic theme. The outro utilizes a fading distortion loop and lingering synth drones to leave a resonant, ominous aftertaste.",
+      "cluster": "Metal & Heavy Rock",
+      "dit": "minimax_music3_dit_fp32.safetensors",
+      "duration": 300.0,
+      "encoder_cfg": 1.7,
+      "encoder_seed": "2978327220549598793",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "sampler": "seeds_2",
+      "sampler_cfg": 1.7,
+      "sampler_seed": "8544042823468416775",
+      "sampler_steps": 30,
+      "scheduler": "ddim_uniform",
+      "style": "Nu-Metal",
+      "text_encoder": "minimax_music3_text_encoder_pruned_bf16.safetensors",
+      "top_k": 50
+    },
+    "attempt_id": "8af93b77e44b4f5fb2a689a7bdb79b20",
+    "completed_at": "2026-10-25T11:09:15.807139+00:00",
+    "encoding": {
+      "cache_hit": false,
+      "key": null,
+      "mode": "comfy_graph"
+    },
+    "hardware": {
+      "address": "https://q3ser89iqyphlf-8188.proxy.runpod.net",
+      "cuda_device": 0,
+      "free_vram_bytes_at_start": 24673168998,
+      "gpu_name": "cuda:0 NVIDIA GeForce RTX 3090 : cudaMallocAsync",
+      "gpu_peak_vram_bytes": null,
+      "gpu_uuid": null,
+      "memory_profile": "server_managed",
+      "provider": "comfyui_url",
+      "usable_vram_bytes": 25298141184
+    },
+    "models": {
+      "checkpoint_sha256": null,
+      "dit": "minimax_music3_dit_fp32.safetensors",
+      "identity_kind": "workflow-and-checkpoint-names",
+      "node_classes": [
+        "CLIPLoader",
+        "ConditioningZeroOut",
+        "EmptyMiniMaxMusic3LatentAudio",
+        "KSampler",
+        "MiniMaxMusic3TextEncode",
+        "SaveAudio",
+        "UNETLoader",
+        "VAEDecodeAudio",
+        "VAELoader"
+      ],
+      "revision": "7d597d1e6e8296784b2ebb7859bfb3779d26e265",
+      "source_workflow_sha256": "b30ac791a329e7e4eae0c0d9a1f15e685fff56d2009ae4f4f679741af0a74cec",
+      "text_encoder": "minimax_music3_text_encoder_pruned_bf16.safetensors",
+      "vae": "minimax_music3_dav.safetensors"
+    },
+    "protocol": 1,
+    "remote": {
+      "download_sha256": "06c1528b8225ec911a8a6e3e8542259397eaf516e3be2410ac0164e7bc26c553",
+      "file": {
+        "filename": "8af93b77e44b4f5fb2a689a7bdb79b20_00001.flac",
+        "subfolder": "gbr",
+        "type": "output"
+      },
+      "prompt_id": "2d42f618-cfd7-45b8-b584-3b945315c11c"
+    },
+    "run_id": "e47d0d9ef337448895cd518e37fead9d",
+    "status": "succeeded",
+    "telemetry_limitations": [
+      "Per-prompt peak VRAM is unavailable from stock ComfyUI; checkpoint hashes require the GBR bridge."
+    ],
+    "workflow_sha256": "eb86ca501e109876e345429a30bd0b9f2d779edb7bd18f9668ad55afb3eb02c0"
+  },
+  "yaml_timezone": "Europe/London",
+  "worker_audio_sha256": "06c1528b8225ec911a8a6e3e8542259397eaf516e3be2410ac0164e7bc26c553",
+  "audio_conversion": {
+    "original": {
+      "format": "FLAC",
+      "subtype": "PCM_16",
+      "channels": 2,
+      "sample_rate": 44100,
+      "frames": 5048320
+    },
+    "output": {
+      "format": "FLAC",
+      "subtype": "PCM_24",
+      "channels": 2,
+      "sample_rate": 44100,
+      "frames": 5048320
+    },
+    "converted": true,
+    "resampled": false,
+    "mono_duplicated": false
+  }
+}

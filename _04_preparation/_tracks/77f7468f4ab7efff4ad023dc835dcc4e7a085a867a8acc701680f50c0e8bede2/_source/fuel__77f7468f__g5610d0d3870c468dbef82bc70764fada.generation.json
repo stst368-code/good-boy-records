@@ -1,0 +1,107 @@
+{
+  "format_version": 1,
+  "run_id": "5610d0d3870c468dbef82bc70764fada",
+  "attempt_id": "100084d6b36e46539efd5d9f95dd8112",
+  "purpose": "production",
+  "source_sha256": "175b55e588c528117426ff5c5bcf40e402ffdea34ce01e0ecb5cfcfddfbd9916",
+  "completed_at": "2026-10-25T13:13:03.638442+00:00",
+  "files": {
+    "fuel-vocal-jazz-0001.flac": "b08a1187768dcf59231bc423247f3816919a8ae1cf3649251d0c2f8ce6ebd377",
+    "fuel-vocal-jazz-0001.yaml": "0097189632102bef1da630386006ee388469e5d4b5920ccf4311658da1ee4c98",
+    "source.yaml": "175b55e588c528117426ff5c5bcf40e402ffdea34ce01e0ecb5cfcfddfbd9916"
+  },
+  "worker_result": {
+    "actual_parameters": {
+      "caption": "Global Metadata\nBasic Attributes: bpm is 130. key is Bb, and scale is minor. Vocal Jazz / Big Band Swing.\nGlobal Emotional Progression: The piece opens with a suave, intimate atmosphere that feels both romantic and slightly melancholic. As the arrangement progresses, the emotional tone shifts from personal reflection to confident declaration, culminating in an exuberant, high-energy climax during the instrumental break before settling back into a warm, resolved conclusion.\nApplication Scenarios & Imagery: A dimly lit, upscale cocktail lounge, a vintage film noir scene featuring a determined protagonist, or a sophisticated evening gathering where nostalgia meets celebration.\nSonics & Production Profile: The mix offers a classic, warm soundstage with a clear separation between the rhythm section and the horn ensemble. The frequency response emphasizes rich mid-range warmth for the vocals and brass, supported by a tight, woody low end from the upright bass. The dynamic aesthetic is lively and organic, capturing the natural swing of a live ensemble without excessive compression.\nVocal Details\nVocal Gender & Timbre: Singer A (Male). The vocalist possesses a smooth, resonant baritone with a velvety texture and precise diction, reminiscent of classic crooners.\nVocal Style: The performance begins with a relaxed, storytelling delivery that conveys intimacy and vulnerability. As the song builds towards the bridge and final chorus, the delivery becomes more assertive and dynamically powerful, matching the rising energy of the band, before returning to a gentle, reflective tone for the outro.\nHarmony/Backing Vocals: No distinct backing vocal layers are present; the focus remains entirely on the solo lead vocal throughout the track.\nVocal FX: The vocal is treated with a subtle, short-decay plate reverb to add depth and place the singer within the acoustic space of the ensemble, maintaining a natural and unprocessed character.\nArrangement\nInstrument Lifecycle Description (Primary/Secondary Layering):\nPrimary: An acoustic piano provides the core harmonic foundation with lush, extended jazz voicings, present from the Intro through to the Outro. An upright bass delivers a steady walking bassline that anchors the groove throughout the entire piece.\nSecondary: A full brass and woodwind ensemble (trumpets, trombones, saxophones) enters subtly during the verses with soft swells, then expands into powerful, punctuated hits and melodic counter-lines during the choruses and the instrumental break. A clean electric guitar adds rhythmic comping and occasional melodic fills, primarily audible in the verses and bridge.\nGroove & Foundation Progression: The rhythm section establishes a classic swing feel immediately, driven by a live drum kit using brushes on the snare for a softer texture in the verses. As the energy lifts in the choruses and the instrumental break, the drummer switches to sticks, introducing a sharper ride cymbal pattern and crisp snare accents that drive the momentum forward.\nEmbellishments, Textures & Spatial FX: Subtle cymbal swells and brass \"shouts\" act as transitional markers between sections. The instrumental break features a soaring saxophone solo that takes center stage, surrounded by responsive hits from the rest of the horn section, creating a dynamic call-and-response texture before the vocals return.",
+      "cluster": "Jazz, Swing & Big Band",
+      "dit": "minimax_music3_dit_fp32.safetensors",
+      "duration": 300.0,
+      "encoder_cfg": 1.7,
+      "encoder_seed": "11817477390346966890",
+      "model": "MiniMaxAI/MiniMax-Music3",
+      "sampler": "seeds_2",
+      "sampler_cfg": 1.7,
+      "sampler_seed": "18199350101650602842",
+      "sampler_steps": 30,
+      "scheduler": "ddim_uniform",
+      "style": "Vocal Jazz",
+      "text_encoder": "minimax_music3_text_encoder_pruned_bf16.safetensors",
+      "top_k": 50
+    },
+    "attempt_id": "100084d6b36e46539efd5d9f95dd8112",
+    "completed_at": "2026-10-25T13:13:03.638442+00:00",
+    "encoding": {
+      "cache_hit": false,
+      "key": null,
+      "mode": "comfy_graph"
+    },
+    "hardware": {
+      "address": "https://q3ser89iqyphlf-8188.proxy.runpod.net",
+      "cuda_device": 0,
+      "free_vram_bytes_at_start": 24671071846,
+      "gpu_name": "cuda:0 NVIDIA GeForce RTX 3090 : cudaMallocAsync",
+      "gpu_peak_vram_bytes": null,
+      "gpu_uuid": null,
+      "memory_profile": "server_managed",
+      "provider": "comfyui_url",
+      "usable_vram_bytes": 25298141184
+    },
+    "models": {
+      "checkpoint_sha256": null,
+      "dit": "minimax_music3_dit_fp32.safetensors",
+      "identity_kind": "workflow-and-checkpoint-names",
+      "node_classes": [
+        "CLIPLoader",
+        "ConditioningZeroOut",
+        "EmptyMiniMaxMusic3LatentAudio",
+        "KSampler",
+        "MiniMaxMusic3TextEncode",
+        "SaveAudio",
+        "UNETLoader",
+        "VAEDecodeAudio",
+        "VAELoader"
+      ],
+      "revision": "7d597d1e6e8296784b2ebb7859bfb3779d26e265",
+      "source_workflow_sha256": "b30ac791a329e7e4eae0c0d9a1f15e685fff56d2009ae4f4f679741af0a74cec",
+      "text_encoder": "minimax_music3_text_encoder_pruned_bf16.safetensors",
+      "vae": "minimax_music3_dav.safetensors"
+    },
+    "protocol": 1,
+    "remote": {
+      "download_sha256": "09adcfc2375168a2f40c26f1e06a921a679288da82ce5bbe5bbb4d78aa18b130",
+      "file": {
+        "filename": "100084d6b36e46539efd5d9f95dd8112_00001.flac",
+        "subfolder": "gbr",
+        "type": "output"
+      },
+      "prompt_id": "cc3935d4-23ac-4e61-8d35-3b3a20178a7e"
+    },
+    "run_id": "5610d0d3870c468dbef82bc70764fada",
+    "status": "succeeded",
+    "telemetry_limitations": [
+      "Per-prompt peak VRAM is unavailable from stock ComfyUI; checkpoint hashes require the GBR bridge."
+    ],
+    "workflow_sha256": "99a83d97f095d2583b3ff58b41dce607a6a5ea9028292b1924c077a2e705d837"
+  },
+  "yaml_timezone": "Europe/London",
+  "worker_audio_sha256": "09adcfc2375168a2f40c26f1e06a921a679288da82ce5bbe5bbb4d78aa18b130",
+  "audio_conversion": {
+    "original": {
+      "format": "FLAC",
+      "subtype": "PCM_16",
+      "channels": 2,
+      "sample_rate": 44100,
+      "frames": 9080832
+    },
+    "output": {
+      "format": "FLAC",
+      "subtype": "PCM_24",
+      "channels": 2,
+      "sample_rate": 44100,
+      "frames": 9080832
+    },
+    "converted": true,
+    "resampled": false,
+    "mono_duplicated": false
+  }
+}

@@ -1,0 +1,77 @@
+song_id: 89
+variant_id: 1
+title: fuel
+cluster:
+version:
+explicit: yes
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |
+  [chorus]
+  gimme fuel, gimme fire, gimme that which i desire, ooh
+  [verse]
+  yeah
+  turn on, i see red
+  adrenaline crash and crack my head
+  nitro junkie, paint me dead
+  and i see red
+  a hundred plus through black and white
+  war horse, warhead
+  fuck 'em, man, white-knuckle tight
+  through black and white
+  [pre-chorus]
+  ooh, on i burn
+  fuel is pumping engines, burning hard, loose and clean
+  and on i burn
+  churning my direction, quench my thirst with gasoline
+  [chorus]
+  so gimme fuel, gimme fire, gimme that which i desire
+  yeah
+  [verse]
+  turn on beyond the bone
+  swallow future, spit out home
+  burn your face upon the chrome
+  yeah, oh, yeah
+  take the corner, join the crash-ah
+  headlights (head on), headlines
+  another junkie lives too fast
+  yeah, lives way too fast (fast)
+  fast (fast), fast (fast), oh-oh
+  [pre-chorus]
+  ooh, on i burn
+  fuel is pumping engines, burning hard, loose and clean
+  and on i burn
+  churning my direction, quench my thirst with gasoline
+  [chorus]
+  so gimme fuel, gimme fire, gimme that which i desire
+  ooh, yeah-hey
+  [instrumental break]
+  [post-chorus]
+  white-knuckle tight
+  [solo]
+  [bridge]
+  (on and on and on and on)
+  give me fuel (on and on and on and on)
+  give me fire (on and on and on and on)
+  my desire (on and on and on and on)
+  [pre-chorus]
+  ooh, on i burn (on and on and on and on)
+  fuel is pumping engines (on and on and on and on), burning hard, loose and clean
+  (on and on and on and on) and on and on
+  churning my direction (on and on and on and on), quench my thirst with gasoline
+  [chorus]
+  gimme fuel, gimme fire, gimme that which i desire, ooh
+  [outro]
+  on i burn

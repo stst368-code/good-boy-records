@@ -1,0 +1,112 @@
+song_id: 96
+variant_id: 1
+title: a-tribute
+cluster:
+version:
+explicit: yes
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |
+  [intro]
+  listen up
+  this isn't a love song
+  this is a tribute
+  (to you)
+  [verse]
+  long time ago, in a place far far away
+  there was this girl named Alex
+  she had to move away
+  Alex packed her things, ta-ta, cya later
+  two-thousand kilometers, fly through the night
+  a land cold and foreign,
+  no manele in sight
+  [pre-chorus]
+  a better life...
+  she hoped...
+  she just might...
+  find
+  [chorus]
+  Alex, oh Alex
+  not what you were looking for, not at the start
+  you marched into my life and took my heart
+  like a wrecking ball you knocked my course
+  [post-chrous]
+  i'm a stereo
+  that's what she said
+  i looked at her blankly
+  man, did this alcohol go to my head
+  i'm a stereo, i'm a stereo, repeated in stereo
+  [bridge]
+  (hey google...)
+  (whats a japanese phrase which sounds like i'm a stereo?)
+  aishiteru, aishiteru... 
+  [verse]
+  i'm in love with you
+  freight train, my brain, my little world never the same
+  a kiss, a car, dark night, spark ignited
+  fuck it, we're doin it live, you only live once
+  so lets sample the night
+  [bridge]
+  as a child i always thought to myself
+  somewhere out there, my future wife, by herself
+  it always felt funny
+  unaware, unknown and destined to collide
+  [pre-chorus]
+  this is just a tribute to you
+  my Alex, my love
+  [chorus]
+  Alex, oh Alex
+  you marched into my life and took my heart
+  wasn't what you went looking for at start
+  head strong, you got your own system
+  like a wrecking ball you knocked my course
+  [post-chrous]
+  from speaking in code, to sharing a home
+  [verse]
+  a pandemic, home cinema, bookie showing off
+  two more, new home, knock knock at the door
+  life changing, worlds changing, stay together forever more
+  side by side with my human, the one i adore
+  [bridge]
+  another home, new fluff, one with teeth n' tail n' stuff
+  had to get another, one wasn't enough
+  [verse]
+  one day, we were workin', want for a wander outside
+  down on one knee, what you doin'?
+  marry me you replied
+  a tradition i'd never heard of, you seized it
+  [pre-chorus]
+  now we're married
+  live together
+  two dogs by our side
+  [chorus]
+  Alex, oh Alex
+  not what you were looking for, not at the start
+  you marched into my life and took my heart
+  like a wrecking ball you knocked my course
+  [post-chorus]
+  hard to write a song about such lovin'
+  too many words come to mind
+  [verse]
+  so for this ending, imma tell you
+  that at the start of this song i lied
+  i fucking love you
+  yes i do
+  more than the stars and the galaxies combined
+  so here's a tribute to you
+  my love
+  my life
+  Alex
+  [outro]
