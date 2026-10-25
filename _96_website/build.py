@@ -68,6 +68,7 @@ def stage(root, target):
     shutil.copyfile(root / '_data/catalogue.json', target / 'catalogue.json')
     shutil.copyfile(root / 'showcase-host.js', target / 'showcase-host.js')
     shutil.copyfile(root / 'releases.js', target / 'releases.js')
+    shutil.copyfile(root / 'easter-egg.js', target / 'easter-egg.js')
     for name in ('display.css', 'display.js'):
         shutil.copyfile(root / name, target / name)
     for name in ('index.html', 'landscape.html'):
@@ -101,6 +102,12 @@ def stage(root, target):
     making = stage_making(root, target)
     subprocess.run([sys.executable, str(root / '_tools/integrate_making.py'),
                     str(target / 'index.html'), str(target / 'landscape.html')], check=True)
+    # A separate unlisted page reuses the player and its public asset allow-list.
+    hidden_page=(target/'index.html').read_text(encoding='utf-8')
+    hidden_page=hidden_page.replace('<body data-power="on">','<body data-power="on" data-library="hidden">',1)
+    hidden_page=hidden_page.replace('<title>Good Boy Records — Sonic Landscape</title>',
+                                    '<title>Good Boy Records — Hidden Room</title><meta name="robots" content="noindex,nofollow">',1)
+    (target/'hidden.html').write_text(hidden_page,encoding='utf-8')
     (target / '.nojekyll').write_text('', encoding='utf-8')
     player = (target / 'index.html').read_text(encoding='utf-8')
     for anchor in ('crossorigin="anonymous"', 'id="knowledgeButton"', 'FALLBACK_ART', 'id="gbrAnalyticsButton"', 'id="gbrObservatory"'):

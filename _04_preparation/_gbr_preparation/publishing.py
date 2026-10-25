@@ -16,12 +16,13 @@ from urllib.request import Request, urlopen
 
 from .service import canonical, digest, now
 from .editorial import lighting
+from .release_catalogue import (POINTER, destination, read_catalogue, remove_other,
+                                release_url)
 
 PUBLIC_BASE = 'https://pub-a5c11159f6144ae885f7795a5bf7086a.r2.dev'
 DEFAULTS = {'endpoint': '', 'bucket': '', 'public_base': PUBLIC_BASE,
             'website_url': 'https://stst368-code.github.io/good-boy-records/',
             'profile': '', 'access_key_env': 'GBR_R2_ACCESS_KEY_ID', 'secret_key_env': 'GBR_R2_SECRET_ACCESS_KEY'}
-POINTER = 'gbr/v2/catalogue.json'
 
 
 def encoded(value):return (canonical(value)+'\n').encode('utf-8')
@@ -126,6 +127,8 @@ class Publisher:
         self.showcase=Showcase(self)
         from .legacy_showcase import LegacyShowcase
         self.legacy=LegacyShowcase(self)
+        from .easter_egg import EasterEgg
+        self.easter=EasterEgg(self)
         # Interrupted requests are never replayed automatically. Publish retries
         # reconcile the remote pointer before changing local release state.
         if preparation.enabled:
@@ -222,6 +225,7 @@ class Publisher:
             row['title']=recipe.get('track',{}).get('displayTitle') or (recipe.get('legacy_track') or {}).get('displayTitle') or recipe.get('title','Release')
             row['legacy_migration']=bool(recipe.get('legacy_root'))
             row['prepared_id']=recipe.get('prepared_id');row['track']=recipe.get('track')
+            row['visibility']=recipe.get('visibility') or recipe.get('options',{}).get('visibility','public')
             row['files']=recipe.get('files',[])
             row['can_retry']=row['kind']=='release_publish' and row['status'] in {'failed','interrupted'}
             row['retained']=self.retained_preview(row['id'],row['generation_id'],recipe) if row['kind']=='release_prepare' else False
@@ -242,6 +246,7 @@ class Publisher:
             return self.start_prepare(gid,{**options,'complete_publish':True})
 
     def start_prepare(self,gid,options):
+        destination(options.get('visibility','public'))
         self.eligible(gid);_,source=self.prep.source(gid,artifact_id=options.get('master_id'))
         if options.get('artwork_id'):
             art=self.db.one("SELECT * FROM generation_artifacts WHERE id=? AND kind IN ('album_artwork','cover_artwork') AND json_extract(metadata_json,'$.source_generation_id')=?",(options['artwork_id'],gid))
@@ -350,6 +355,7 @@ class Publisher:
                 'artwork_url':urls.get('cover.jpg'),'lyrics':{'raw':str(meta.get('lyrics') or '')},
                 'lyrics_url':urls.get('lyrics.json'),'playback_url':urls.get('playback.json'),
                 'release_id':identifier,'generation_datetime':meta.get('generation_datetime')}
+            track['visibility']=options.get('visibility','public')
             def checkpoint(value):return str(value or '').replace('\\','/').rsplit('/',1)[-1]
             track['model']={'name':checkpoint(meta.get('model')),'dit':checkpoint(meta.get('dit')),'textEncoder':checkpoint(meta.get('text_encoder'))}
             from _review.indexer import number
@@ -384,11 +390,13 @@ class Publisher:
             self.db.execute("UPDATE processing_tasks SET status='failed',error=?,completed_at=? WHERE id=?",(error_text(exc),now(),identifier))
             if directory:shutil.rmtree(directory,ignore_errors=True)
 
-    def start_publish(self,identifier):
+    def start_publish(self,identifier,visibility=None):
         self.prep.require()
         task=self.db.one("SELECT * FROM processing_tasks WHERE id=? AND kind='release_prepare' AND status='done'",(identifier,))
         if not task:raise ValueError('Prepare and review a release first')
         self.eligible(task['generation_id']);recipe=json.loads(task['recipe_json'])
+        visibility=visibility or recipe.get('options',{}).get('visibility','public')
+        destination(visibility)
         if not recipe.get('track'):raise ValueError('Release preview is incomplete')
         if not recipe.get('showcase') and not all(Path(f['path']).is_file() for f in recipe.get('files',[])):
             # A move may have committed before its receipt was saved. Its own
@@ -397,15 +405,15 @@ class Publisher:
                 raise ValueError('Historical preview files are unavailable; prepare a fresh release to create its local MP3')
         publish_id=uuid.uuid4().hex
         with self.db.transaction() as c:
-            active=c.execute("SELECT id FROM processing_tasks WHERE kind='release_publish' AND fingerprint=? AND status IN ('queued','running')",('publish:'+identifier,)).fetchone()
+            active=c.execute("SELECT id FROM processing_tasks WHERE kind='release_publish' AND generation_id=? AND status IN ('queued','running')",(task['generation_id'],)).fetchone()
             if active:return {'id':active[0]}
             c.execute("INSERT INTO processing_tasks(id,generation_id,kind,status,fingerprint,recipe_json,input_sha256,created_at) VALUES(?,?,'release_publish','queued',?,?,?,?)",
-                      (publish_id,task['generation_id'],'publish:'+identifier,canonical({'prepared_id':identifier,'title':recipe['track']['displayTitle']}),task['input_sha256'],now()))
+                      (publish_id,task['generation_id'],'publish:'+identifier,canonical({'prepared_id':identifier,'title':recipe['track']['displayTitle'],'visibility':visibility}),task['input_sha256'],now()))
         self.pool.submit(self._publish,publish_id);return {'id':publish_id}
 
     def _publish(self,identifier):
         try:
-            task=self.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,));pid=json.loads(task['recipe_json'])['prepared_id']
+            task=self.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,));request=json.loads(task['recipe_json']);pid=request['prepared_id']
             prepared=self.db.one('SELECT * FROM processing_tasks WHERE id=?',(pid,));recipe=json.loads(prepared['recipe_json']);gid=task['generation_id']
             self.eligible(gid);settings=self.settings()
             if recipe['destination']!={k:settings[k] for k in recipe['destination']}:raise ValueError('Publishing destination changed; prepare a new preview')
@@ -424,10 +432,21 @@ class Publisher:
                 moved=self.showcase.move(gid,pid)
                 recipe['showcase']=moved
                 self.db.execute('UPDATE processing_tasks SET recipe_json=? WHERE id=?',(canonical(recipe),pid))
-            store=self.store();existing,etag=store.read(POINTER)
-            catalogue=json.loads(existing) if existing else {'format':'gbr-public-releases-v1','tracks':[]}
-            if catalogue.get('format')!='gbr-public-releases-v1' or not isinstance(catalogue.get('tracks'),list):raise ValueError('Unknown public catalogue format; retained it')
+            visibility=request.get('visibility') or recipe['options'].get('visibility','public')
+            pointer,_=destination(visibility)
+            recipe['options']['visibility']=visibility;recipe['track']['visibility']=visibility
+            self.db.execute('UPDATE processing_tasks SET recipe_json=? WHERE id=?',(canonical(recipe),pid))
+            store=self.store();catalogue,etag=read_catalogue(store,visibility)
             present=next((t for t in catalogue['tracks'] if t.get('id')==recipe['track']['id']),None)
+            # A new preview can replace its predecessor; an older receipt cannot
+            # resurrect itself over a newer preview on either destination.
+            other,_=read_catalogue(store,'public' if visibility=='hidden' else 'hidden')
+            other_track=next((t for t in other['tracks'] if t.get('id')==recipe['track']['id']),None)
+            for current in (present,other_track):
+                if current and current.get('release_id') not in {None,pid}:
+                    newer=self.db.one('SELECT rowid FROM processing_tasks WHERE id=?',(current['release_id'],))
+                    mine=self.db.one('SELECT rowid FROM processing_tasks WHERE id=?',(pid,))
+                    if not newer or newer['rowid']>=mine['rowid']:raise ValueError('A newer release replaced this preview; use that release instead')
             publish_pointer=None
             if not present or present.get('release_id')!=pid or recipe['track']['id'] in catalogue.get('withdrawn',[]):
                 row=self.eligible(gid)
@@ -443,21 +462,23 @@ class Publisher:
                 catalogue['tracks']=[t for t in catalogue['tracks'] if t.get('id')!=recipe['track']['id']]+[recipe['track']]
                 catalogue['withdrawn']=[t for t in catalogue.get('withdrawn',[]) if t!=recipe['track']['id']]
                 catalogue['generated_at']=now();raw=encoded(catalogue)
-                snapshot='gbr/v2/catalogues/'+hashlib.sha256(raw).hexdigest()+'.json'
+                snapshot=pointer.rsplit('/',1)[0]+'/catalogues/'+hashlib.sha256(raw).hexdigest()+'.json'
                 try:store.compare_put(snapshot,raw,immutable=True)
                 except Exception:
                     saved,_=store.read(snapshot)
                     if saved!=raw:raise
                 # One compare-and-swap prevents concurrent publishers losing tracks.
                 # An unknown response is reconciled by the next explicit retry.
-                publish_pointer=lambda:store.compare_put(POINTER,raw,etag=etag)
+                publish_pointer=lambda:store.compare_put(pointer,raw,etag=etag)
+            remove_other(store,recipe['track'],visibility,other_track.get('release_id') if other_track else None)
             self._record_published(identifier,pid,gid,recipe,settings,publish_pointer)
         except Exception as exc:
             self.db.execute("UPDATE processing_tasks SET status='failed',error=?,completed_at=? WHERE id=?",(error_text(exc),now(),identifier))
 
     def _record_published(self,identifier,pid,gid,recipe,settings,publish_pointer=None):
-        progress={'phase':'published','url':settings['website_url'].rstrip('/')+'/?s='+recipe['track']['shareToken'],
-                  'catalogue_url':settings['public_base']+'/'+POINTER}
+        visibility=recipe.get('options',{}).get('visibility','public')
+        progress={'phase':'published','url':release_url(settings,recipe['track'],visibility),'visibility':visibility,
+                  'catalogue_url':settings['public_base']+'/'+destination(visibility)[0]}
         if recipe.get('showcase'):
             progress.update(showcase=recipe['showcase']['folder'],cleanup_pending=recipe['showcase']['cleanup_pending'])
         with self.db.transaction() as c:
@@ -465,7 +486,7 @@ class Publisher:
             if not old or old[0] not in {'selected','published'}:raise ValueError('Distribution selection changed; publication was not approved')
             if publish_pointer:publish_pointer()
             from .release_catalogue import share_token
-            url=settings['website_url'].rstrip('/')+'/?s='+recipe['track']['shareToken']
+            url=progress['url']
             c.execute("UPDATE publishing_selection SET status='published',published_at=?,external_reference=?,updated_at=? WHERE generation_id=?",(now(),url,now(),gid))
             c.execute("INSERT INTO publishing_history(generation_id,old_status,new_status,external_reference,created_at) VALUES(?,?,'published',?,?)",(gid,old[0] if old else None,url,now()))
             for item in recipe['files']:
@@ -518,17 +539,20 @@ class Publisher:
         recipe=json.loads(prepared['recipe_json']);settings=self.settings();store=self.store()
         if recipe.get('destination')!={k:settings[k] for k in recipe.get('destination',{})}:raise ValueError('Use the original publishing destination to withdraw this release')
         with self.lock:
-            raw,etag=store.read(POINTER)
-            catalogue=json.loads(raw) if raw else {'format':'gbr-public-releases-v1','tracks':[]}
-            if catalogue.get('format')!='gbr-public-releases-v1':raise ValueError('Unknown public catalogue; retained it')
-            target=next((t for t in catalogue['tracks'] if t.get('id')==recipe['track']['id']),None)
-            if target and target.get('release_id')!=pid:raise ValueError('A newer release replaced this preview; withdraw that release instead')
-            catalogue['tracks']=[t for t in catalogue['tracks'] if t.get('id')!=recipe['track']['id']]
-            catalogue['withdrawn']=list(dict.fromkeys([*catalogue.get('withdrawn',[]),recipe['track']['id']]))
-            # Even an uncertain/missing prior write is fenced by a conditional
-            # catalogue revision, so an in-flight publish cannot appear later.
-            catalogue['generated_at']=now();catalogue['revision']=uuid.uuid4().hex
-            store.compare_put(POINTER,encoded(catalogue),etag=etag)
+            if self.db.one("SELECT 1 FROM processing_tasks WHERE generation_id=? AND kind='release_publish' AND status IN ('queued','running')",(prepared['generation_id'],)):
+                raise ValueError('Wait for active publication before withdrawing')
+            visibility=recipe.get('options',{}).get('visibility','public')
+            catalogues=[(v,*read_catalogue(store,v)) for v in (visibility,'public' if visibility=='hidden' else 'hidden')]
+            for _,catalogue,_ in catalogues:
+                target=next((t for t in catalogue['tracks'] if t.get('id')==recipe['track']['id']),None)
+                if target and target.get('release_id')!=pid:raise ValueError('A newer release replaced this preview; withdraw that release instead')
+            for placement,catalogue,etag in catalogues:
+                if placement!=visibility and not any(t.get('id')==recipe['track']['id'] for t in catalogue['tracks']):continue
+                catalogue['tracks']=[t for t in catalogue['tracks'] if t.get('id')!=recipe['track']['id']]
+                catalogue['withdrawn']=list(dict.fromkeys([*catalogue.get('withdrawn',[]),recipe['track']['id']]))
+                # Fence an uncertain write as well as an already-visible entry.
+                catalogue['generated_at']=now();catalogue['revision']=uuid.uuid4().hex
+                store.compare_put(destination(placement)[0],encoded(catalogue),etag=etag)
             self.review.publishing(prepared['generation_id'],'withdrawn')
             return {'withdrawn':True,'media_retained':True}
 

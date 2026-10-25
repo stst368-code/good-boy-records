@@ -4989,8 +4989,9 @@ body[data-view="knowledge"] #easterStoryOverlay{display:none!important}
   <span class="rack-collapse-label" aria-hidden="true">CTRL</span>
 </button>
 <audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
-<script src="showcase-host.js"></script>
+<script src="showcase-host.js?v=20261025-eggs"></script>
 <script src="releases.js"></script>
+<script src="easter-egg.js"></script>
 <script>
 const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext('2d'),audio=$('audio');
 audio.crossOrigin='anonymous';
@@ -5030,6 +5031,7 @@ function variantOf(t){return t?.variant||t?.version||(typeof t?.style==='string'
 /* Share links are deliberately opaque and short. The track id itself never appears
    in the shared URL, and the ?s= token is removed from the address bar immediately
    on arrival before the catalogue is fetched. */
+const hiddenPage=document.body.dataset.library==='hidden';
 const SHARE_PARAM='s';
 const SHARE_ALPHABET='0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 let shareIndex=new Map(),shareTokensByKey=new Map();
@@ -5083,6 +5085,7 @@ function setEasterState(enabled){
 function openSharedTrack(token){
   const target=shareIndex.get(String(token||''));
   if(!target)return false;
+  if(target.scope==='e'&&!hiddenPage){location.replace(new URL('hidden.html?s='+encodeURIComponent(token),document.baseURI));return true;}
   setEasterState(target.scope==='e');
   const i=tracks.findIndex(t=>t.id===target.id);
   if(i<0)return false;
@@ -5092,6 +5095,7 @@ function currentShareUrl(){
   const t=tracks[index];if(!t)return'';
   const scope=easter?'e':'m',url=new URL(location.href);url.search='';url.hash='';
   url.pathname=url.pathname.replace(/\/index\.html$/i,'/')||'/';
+  if(easter)url.pathname=url.pathname.replace(/[^/]*$/,'hidden.html');
   url.searchParams.set(SHARE_PARAM,shareTokensByKey.get(`${scope}:${t.id}`)||shareTokenFor(t,scope));
   return url.href
 }
@@ -5645,14 +5649,25 @@ function genreSequenceCompare(a,b){
   return ap.h-bp.h || ap.l-bp.l || ac.h-bc.h || ac.l-bc.l || (a?.genre?.taxonomy_order??1e9)-(b?.genre?.taxonomy_order??1e9) || titleOf(a).localeCompare(titleOf(b));
 }
 function sortGenreSequence(list){return list.sort(genreSequenceCompare)}
-function toggleEaster(){const entering=!easter;easter=entering;document.body.dataset.easter=easter?'true':'false';audio.pause();tracks=easter?(easterTracks.length?easterTracks:mainTracks):mainTracks;if(!tracks.length)tracks=mainTracks;index=0;hoverIndex=-1;activeParent=null;coverImages.clear();refreshParentLanes();buildNodes(true);select(0,false);setExplorationStart();if(ui.brandText)ui.brandText.textContent=easter?(easterTracks.length?'Good Boy Records / Easter Universe':'Good Boy Records / Easter Universe · no hidden catalogue found'):'Good Boy Records / Sonic Landscape'}
+function toggleEaster(){location.assign(new URL(hiddenPage?'./':'hidden.html',document.baseURI))}
 async function load(){
   const candidates=['catalogue.json','data/catalogue.json','../data/catalogue.json'];let data=null;
   for(const url of candidates){try{const r=await fetch(url,{cache:'no-store'});if(r.ok){data=await r.json();break}}catch{}}
-  if(window.GBRloadReleases)data=await window.GBRloadReleases(data);
-  data=externaliseShowcasePaths(data);mainTracks=Array.isArray(data)?data:(data?.tracks||[]);easterTracks=Array.isArray(data?.easter_tracks)?data.easter_tracks:(Array.isArray(data?.easter?.tracks)?data.easter.tracks:[]);tracks=mainTracks;
-  if(!tracks.length)throw new Error('No catalogue tracks found');
-  sortGenreSequence(mainTracks);sortGenreSequence(easterTracks);tracks=mainTracks;
+  if(hiddenPage){
+    const saved=Array.isArray(data?.easter_tracks)?data.easter_tracks:(data?.easter?.tracks||[]);
+    let hidden={tracks:saved};if(window.GBRloadReleases)hidden=await window.GBRloadReleases(hidden,{hidden:true});
+    hidden=externaliseShowcasePaths(hidden);mainTracks=[];easterTracks=hidden.tracks||[];tracks=easterTracks;easter=true;
+    const back=document.createElement('button');back.className='utility-button';back.textContent='Main player';back.onclick=()=>location.assign(new URL('./',document.baseURI));ui.utilityNav.prepend(back);
+    document.body.dataset.easter='true';if(ui.brandText)ui.brandText.textContent='Good Boy Records / Hidden Room';
+  }else{
+    const egg=window.GBRcoverEgg?.load();
+    if(window.GBRloadReleases)data=await window.GBRloadReleases(data);
+    await egg;
+    data=externaliseShowcasePaths(data);mainTracks=Array.isArray(data)?data:(data?.tracks||[]);
+    easterTracks=Array.isArray(data?.easter_tracks)?data.easter_tracks:(data?.easter?.tracks||[]);tracks=mainTracks;
+  }
+  if(!tracks.length){ui.loading.textContent=hiddenPage?'The hidden room is waiting for its first track.':'No catalogue tracks found';return;}
+  sortGenreSequence(mainTracks);sortGenreSequence(easterTracks);
   const parentMap=new Map();for(const tr of tracks){const name=tr.genre?.parent_genre||'Unclassified';if(!parentMap.has(name))parentMap.set(name,{name,colour:tr.genre?.parent_colour||'#808080',order:tr.genre?.parent_order??tr.genre?.taxonomy_order??1e9})}
   parentLanes=[...parentMap.values()].sort((a,b)=>colourCompare(a.colour,b.colour)||a.order-b.order||a.name.localeCompare(b.name));buildGenreStrip();rebuildShareIndex();ui.loading.hidden=true;setVolume(.5);setLamp(.5);if(!openSharedTrack(pendingShareToken))select(0,false);resize()
 }
@@ -5749,7 +5764,7 @@ function setLyricTypography(t){
   else if(/pop|disco|dance|club|city.?pop|hyper.?pop/.test(raw)) family='pop';
   document.body.dataset.lyricFont=family;
 }
-function select(i,autoplay=true){if(!tracks.length)return;index=(i%tracks.length+tracks.length)%tracks.length;const t=tracks[index],candidates=audioCandidates(t),src=candidates[0]||'';audioCandidateIndex=0;loadPlaybackVisuals(t);accent(t);setLyricTypography(t);updateFormatButtons(t);ui.title.textContent=titleOf(t);ui.variant.textContent=variantOf(t);ui.mobileSongTitle.textContent=String(titleOf(t)||'').toLowerCase();ui.genreParent.textContent=t.genre?.parent_genre||'Unclassified';ui.genreChild.textContent=t.genre?.child_genre||variantOf(t);ui.metaTitle.textContent=titleOf(t);ui.metaSub.textContent=[variantOf(t),t.genre?.cluster].filter(Boolean).join(' · ');updateEasterStory(t);syncMediaSession(t);loadLyrics(t);ui.cover.onload=paintFixedCover;ui.cover.onerror=()=>{if(ui.cover.src!==FALLBACK_ART)ui.cover.src=FALLBACK_ART};ui.fixedCover.onerror=()=>{if(ui.fixedCover.src!==FALLBACK_ART)ui.fixedCover.src=FALLBACK_ART};if(ui.playingCoverScreen)ui.playingCoverScreen.onerror=()=>{if(ui.playingCoverScreen.src!==FALLBACK_ART)ui.playingCoverScreen.src=FALLBACK_ART};const artwork=artOf(t);ui.cover.src=artwork;ui.fixedCover.src=artwork;if(ui.playingCoverScreen)ui.playingCoverScreen.src=artwork;ui.cover.alt=`Album artwork for ${titleOf(t)}`;ui.fixedCover.alt=`Now playing artwork for ${titleOf(t)}`;if(ui.playingCoverScreen)ui.playingCoverScreen.alt=`Now playing artwork for ${titleOf(t)}`;if(src&&audio.src!==new URL(src,location.href).href){audio.src=src;audio.load()}if(autoplay&&src&&power)startPlaybackNow();if(openTab==='tracks')renderTrackRows();if(openTab==='story')renderStoryPanel()}
+function select(i,autoplay=true){window.GBRcoverEgg?.reset();if(!tracks.length)return;index=(i%tracks.length+tracks.length)%tracks.length;const t=tracks[index],candidates=audioCandidates(t),src=candidates[0]||'';audioCandidateIndex=0;loadPlaybackVisuals(t);accent(t);setLyricTypography(t);updateFormatButtons(t);ui.title.textContent=titleOf(t);ui.variant.textContent=variantOf(t);ui.mobileSongTitle.textContent=String(titleOf(t)||'').toLowerCase();ui.genreParent.textContent=t.genre?.parent_genre||'Unclassified';ui.genreChild.textContent=t.genre?.child_genre||variantOf(t);ui.metaTitle.textContent=titleOf(t);ui.metaSub.textContent=[variantOf(t),t.genre?.cluster].filter(Boolean).join(' · ');updateEasterStory(t);syncMediaSession(t);loadLyrics(t);ui.cover.onload=paintFixedCover;ui.cover.onerror=()=>{if(ui.cover.src!==FALLBACK_ART)ui.cover.src=FALLBACK_ART};ui.fixedCover.onerror=()=>{if(ui.fixedCover.src!==FALLBACK_ART)ui.fixedCover.src=FALLBACK_ART};if(ui.playingCoverScreen)ui.playingCoverScreen.onerror=()=>{if(ui.playingCoverScreen.src!==FALLBACK_ART)ui.playingCoverScreen.src=FALLBACK_ART};const artwork=artOf(t);ui.cover.src=artwork;ui.fixedCover.src=artwork;if(ui.playingCoverScreen)ui.playingCoverScreen.src=artwork;ui.cover.alt=`Album artwork for ${titleOf(t)}`;ui.fixedCover.alt=`Now playing artwork for ${titleOf(t)}`;if(ui.playingCoverScreen)ui.playingCoverScreen.alt=`Now playing artwork for ${titleOf(t)}`;if(src&&audio.src!==new URL(src,location.href).href){audio.src=src;audio.load()}if(autoplay&&src&&power)startPlaybackNow();if(openTab==='tracks')renderTrackRows();if(openTab==='story')renderStoryPanel()}
 function seededUnit(text){let h=2166136261;for(const ch of String(text)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return((h>>>0)%10000)/10000}
 
 const KNOWLEDGE_MANIFEST_URL='knowledge-manifest.json';
@@ -6963,18 +6978,28 @@ if(ui.deskFormatToggle)ui.deskFormatToggle.onclick=()=>{
 function hitNode(clientX,clientY){if(viewMode==='knowledge')return hitKnowledgeNode(clientX,clientY);const r=canvas.getBoundingClientRect(),sx=clientX-r.left,sy=clientY-r.top,anchor=viewToScreen(playingAnchor.x,playingAnchor.y),mobileCore=matchMedia('(max-width:900px)').matches,coreSize=GBRDisplay.coverSize,coreMargin=(mobileCore?52:76)*GBRDisplay.scale;let best=null;for(const n of nodes){if(n.i===index)continue;const settled=viewToScreen(n.x,n.y),baseSize=nodeDisplaySize(n,false,false,false),halfCore=coreSize/2+coreMargin;if(settled.x+baseSize/2>anchor.x-halfCore&&settled.x-baseSize/2<anchor.x+halfCore&&settled.y+baseSize/2>anchor.y-halfCore&&settled.y-baseSize/2<anchor.y+halfCore+GBRDisplay.lyricHeight+coreMargin*.72)continue;const shimmerX=(Math.sin(phase*(.72+n.seed1*.65)+n.seed2*6.283)*n.drift+Math.cos(phase*(.37+n.seed3*.44)+n.seed4*6.283)*n.drift*.35),shimmerY=(Math.cos(phase*(.69+n.seed2*.72)+n.seed1*6.283)*n.drift*.82+Math.sin(phase*(.41+n.seed4*.38)+n.seed3*6.283)*n.drift*.28),sp=viewToScreen(n.x+shimmerX,n.y+shimmerY),hit=Math.max(34,nodeDisplaySize(n,false,false,false)*.58),d=Math.hypot(sx-sp.x,sy-sp.y);if(d<hit&&(!best||d<best.d))best={d,n,sp}}return{best,sx,sy,r}}
 canvas.addEventListener('mousemove',e=>{if(pointer.down)return;const {best,sx,sy,r}=hitNode(e.clientX,e.clientY);if(viewMode==='knowledge'){knowledgeHoverId=best?.n?.id||null;hoverIndex=-1;if(best){ui.mapTip.style.display='block';ui.mapTip.style.left=`${Math.min(r.width-260,sx+16)}px`;ui.mapTip.style.top=`${Math.max(44,sy-22)}px`;ui.mapTip.querySelector('strong').textContent=best.n.title;ui.mapTip.querySelector('small').textContent=best.n.kind==='root'?"HOW IT'S MADE":best.n.kind==='document'?`${best.n.title} · STAGE`:best.n.kind==='chain'?`${best.n.docLabel} · DOCUMENT`:`${best.n.docLabel} · DETAIL`}else ui.mapTip.style.display='none';return}hoverIndex=best?best.n.i:-1;if(best){ui.mapTip.style.display='block';ui.mapTip.style.left=`${Math.min(r.width-260,sx+16)}px`;ui.mapTip.style.top=`${Math.max(44,sy-22)}px`;ui.mapTip.querySelector('strong').textContent=titleOf(best.n.t);ui.mapTip.querySelector('small').textContent=[best.n.t.genre?.child_genre||variantOf(best.n.t),best.n.t.genre?.parent_genre,isTrackEligible(best.n.t)?'AUTOPLAY ON':'AUTOPLAY FILTERED','ORBIT = PARENT · RADIUS = CHILD'].filter(Boolean).join(' · ')}else ui.mapTip.style.display='none'});
 canvas.addEventListener('mouseleave',()=>{if(!pointer.down){hoverIndex=-1;knowledgeHoverId=null;ui.mapTip.style.display='none'}});
-ui.stage.addEventListener('pointerdown',e=>{if(e.target.closest('.utility-nav,.knowledge-density,.knowledge-reader,.knowledge-world-card,.side-panel,.genre-strip,.zoom-controls'))return;if(!power)return;try{ui.stage.setPointerCapture(e.pointerId)}catch(_){};if(e.pointerType==='touch'){touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2){const pts=[...touches.values()],cx=(pts[0].x+pts[1].x)/2,cy=(pts[0].y+pts[1].y)/2,d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y),r=canvas.getBoundingClientRect();pinch={distance:d,zoom:camera.targetZoom,world:screenToWorld(cx-r.left,cy-r.top)};pointer.down=false}else if(touches.size===1){pointer={down:true,id:e.pointerId,startX:e.clientX,startY:e.clientY,camX:camera.targetX,camY:camera.targetY,moved:false}}}else pointer={down:true,id:e.pointerId,startX:e.clientX,startY:e.clientY,camX:camera.targetX,camY:camera.targetY,moved:false};ui.stage.classList.add('is-panning')});
-ui.stage.addEventListener('pointermove',e=>{if(e.pointerType==='touch'&&touches.has(e.pointerId)){touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2&&pinch){const pts=[...touches.values()],cx=(pts[0].x+pts[1].x)/2,cy=(pts[0].y+pts[1].y)/2,d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y),r=canvas.getBoundingClientRect(),next=Math.max(cameraMinZoom(),Math.min(10,pinch.zoom*d/Math.max(1,pinch.distance))),sx=cx-r.left,sy=cy-r.top,w=ui.stage.clientWidth,h=ui.stage.clientHeight;camera.targetZoom=next;camera.targetX=pinch.world.x-(sx-w/2)/next;camera.targetY=pinch.world.y-(sy-h/2)/next;updateZoomLabel();return}}if(!pointer.down||pointer.id!==e.pointerId)return;const dx=e.clientX-pointer.startX,dy=e.clientY-pointer.startY;if(Math.hypot(dx,dy)>4)pointer.moved=true;camera.targetX=pointer.camX-dx/camera.targetZoom;camera.targetY=pointer.camY-dy/camera.targetZoom;});
+ui.stage.addEventListener('pointerdown',e=>{if(e.button>0)return;if(e.target.closest('.utility-nav,.knowledge-density,.knowledge-reader,.knowledge-world-card,.side-panel,.genre-strip,.zoom-controls'))return;if(!power)return;try{ui.stage.setPointerCapture(e.pointerId)}catch(_){};if(e.pointerType==='touch'){touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2){window.GBRcoverEgg?.reset();const pts=[...touches.values()],cx=(pts[0].x+pts[1].x)/2,cy=(pts[0].y+pts[1].y)/2,d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y),r=canvas.getBoundingClientRect();pinch={distance:d,zoom:camera.targetZoom,world:screenToWorld(cx-r.left,cy-r.top)};pointer.down=false}else if(touches.size===1){pointer={down:true,id:e.pointerId,startX:e.clientX,startY:e.clientY,camX:camera.targetX,camY:camera.targetY,moved:false}}}else pointer={down:true,id:e.pointerId,startX:e.clientX,startY:e.clientY,camX:camera.targetX,camY:camera.targetY,moved:false};ui.stage.classList.add('is-panning')});
+ui.stage.addEventListener('pointermove',e=>{if(e.pointerType==='touch'&&touches.has(e.pointerId)){touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2&&pinch){const pts=[...touches.values()],cx=(pts[0].x+pts[1].x)/2,cy=(pts[0].y+pts[1].y)/2,d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y),r=canvas.getBoundingClientRect(),next=Math.max(cameraMinZoom(),Math.min(10,pinch.zoom*d/Math.max(1,pinch.distance))),sx=cx-r.left,sy=cy-r.top,w=ui.stage.clientWidth,h=ui.stage.clientHeight;camera.targetZoom=next;camera.targetX=pinch.world.x-(sx-w/2)/next;camera.targetY=pinch.world.y-(sy-h/2)/next;updateZoomLabel();return}}if(!pointer.down||pointer.id!==e.pointerId)return;const dx=e.clientX-pointer.startX,dy=e.clientY-pointer.startY;if(Math.hypot(dx,dy)>4){pointer.moved=true;window.GBRcoverEgg?.reset();}camera.targetX=pointer.camX-dx/camera.targetZoom;camera.targetY=pointer.camY-dy/camera.targetZoom;});
+function coverEggTap(e){
+  if(hiddenPage||viewMode!=='tracks')return false;
+  const rect=ui.playingCoverScreen?.getBoundingClientRect();
+  if(rect&&e.clientX>=rect.left&&e.clientX<=rect.right&&e.clientY>=rect.top&&e.clientY<=rect.bottom){
+    window.GBRcoverEgg?.tap(tracks[index]);return true;
+  }
+  window.GBRcoverEgg?.reset();return false;
+}
 function endPointer(e){
+  if(e.type==='pointercancel'){window.GBRcoverEgg?.reset();touches.delete(e.pointerId);pinch=null;pointer.down=false;ui.stage.classList.remove('is-panning');return;}
+
   if(e.pointerType==='touch'){
     const wasSingle=touches.size===1&&touches.has(e.pointerId),wasTap=wasSingle&&pointer.down&&pointer.id===e.pointerId&&!pointer.moved;
     touches.delete(e.pointerId);if(touches.size<2)pinch=null;
-    if(wasTap){pointer.down=false;ui.stage.classList.remove('is-panning');const {best}=hitNode(e.clientX,e.clientY);if(best){clickSound();if(viewMode==='knowledge')knowledgeToggleNode(best.n);else select(best.n.i,true)}return}
+    if(wasTap){pointer.down=false;ui.stage.classList.remove('is-panning');if(coverEggTap(e))return;const {best}=hitNode(e.clientX,e.clientY);if(best){clickSound();if(viewMode==='knowledge')knowledgeToggleNode(best.n);else select(best.n.i,true)}return}
     if(touches.size===1){const [id,p]=[...touches.entries()][0];pointer={down:true,id,startX:p.x,startY:p.y,camX:camera.targetX,camY:camera.targetY,moved:true}}
     else if(!touches.size){pointer.down=false;ui.stage.classList.remove('is-panning')}
     return
   }
-  if(!pointer.down||pointer.id!==e.pointerId)return;const moved=pointer.moved;pointer.down=false;ui.stage.classList.remove('is-panning');if(!moved){const {best}=hitNode(e.clientX,e.clientY);if(best){clickSound();if(viewMode==='knowledge')knowledgeToggleNode(best.n);else select(best.n.i,true)}}
+  if(!pointer.down||pointer.id!==e.pointerId)return;const moved=pointer.moved;pointer.down=false;ui.stage.classList.remove('is-panning');if(moved)window.GBRcoverEgg?.reset();if(!moved){if(coverEggTap(e))return;const {best}=hitNode(e.clientX,e.clientY);if(best){clickSound();if(viewMode==='knowledge')knowledgeToggleNode(best.n);else select(best.n.i,true)}}
 }
 ui.stage.addEventListener('pointerup',endPointer);ui.stage.addEventListener('pointercancel',endPointer);
 ui.stage.addEventListener('wheel',e=>{if(e.target.closest('.side-panel,.utility-nav,.knowledge-reader,.knowledge-world-card,.genre-strip,.zoom-controls'))return;if(!power)return;e.preventDefault();const r=canvas.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,Math.exp(-e.deltaY*.0015))},{passive:false});

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse,Response
 from pydantic import BaseModel,ConfigDict,Field,StrictBool
+from typing import Literal
 from .publishing import Publisher
 
 
@@ -10,6 +11,17 @@ class Prepare(BaseModel):
     artwork_id:str|None=None
     include_flac:StrictBool=True
     timed_lyrics:StrictBool=False
+    visibility:Literal['public','hidden']='public'
+
+
+class Publish(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    visibility:Literal['public','hidden']|None=None
+
+
+class CoverTrigger(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    track_id:str|None=Field(default=None,max_length=200)
 
 
 class Settings(BaseModel):
@@ -52,6 +64,12 @@ def router(root,review,preparation,local):
             raise HTTPException(400,error_text(exc)) from exc
     @routes.get('/projects')
     def projects():return service.projects()
+    @routes.get('/easter-egg')
+    def easter_egg():return service.easter.configuration()
+    @routes.post('/easter-egg')
+    def save_easter_egg(body:CoverTrigger):return service.easter.save(body.track_id)
+    @routes.get('/easter-egg/covers/{track_id}')
+    def cover_preview(track_id:str):return Response(service.easter.cover(track_id),media_type='image/jpeg',headers={'Cache-Control':'private,max-age=300'})
     @routes.get('/legacy')
     def legacy():return service.legacy.configuration()
     @routes.post('/legacy/preview')
@@ -73,7 +91,7 @@ def router(root,review,preparation,local):
     @routes.post('/projects/{gid}/reset-completion')
     def reset(gid:str):return service.showcase.reset(gid)
     @routes.post('/{identifier}/publish')
-    def publish(identifier:str):return service.start_publish(identifier)
+    def publish(identifier:str,body:Publish|None=None):return service.start_publish(identifier,body.visibility if body else None)
     @routes.post('/{identifier}/discard')
     def discard(identifier:str):return service.discard(identifier)
     @routes.post('/{identifier}/withdraw')

@@ -92,6 +92,7 @@ def main():
                     page.locator('#prepArtworkFile').set_input_files(artwork);page.locator('#prepImportArtwork').click()
                     page.wait_for_function("()=>document.getElementById('prepReleaseArtwork').value!==''")
                     page.screenshot(path=f'/tmp/gbr-completion-{width}.png',full_page=True)
+                    if width==390:page.locator('#prepReleaseVisibility').select_option('hidden')
                     page.locator('#prepComplete').click()
                     page.wait_for_selector('#publishingView:not([hidden])')
                     page.wait_for_function("()=>document.getElementById('pubHistory').textContent.includes('Publication · published')",timeout=25000)
@@ -103,6 +104,23 @@ def main():
                     moved=prep.source(current)[1];assert moved.is_relative_to(prep.showcase)
                     assert next(moved.parent.glob('*.yaml')).read_bytes()==raw
                     assert not (prep.tracks/aid).exists()
+                    prepared=review.db.one("SELECT id,recipe_json FROM processing_tasks WHERE generation_id=? AND kind='release_prepare' AND status='done' ORDER BY rowid DESC LIMIT 1",(current,))
+                    public_track=json.loads(prepared['recipe_json'])['track']
+                    pointer='gbr/v2/hidden/catalogue.json' if width==390 else 'gbr/v2/catalogue.json'
+                    assert any(t['id']==public_track['id'] for t in json.loads(store.objects[pointer])['tracks'])
+                    if width==390:
+                        assert not any(t['id']==public_track['id'] for t in json.loads(store.objects['gbr/v2/catalogue.json'])['tracks'])
+                    else:
+                        page.locator('#settingsButton').click();page.locator('#pubEaster summary').click()
+                        page.wait_for_function("()=>document.getElementById('pubEasterCover').options.length>1")
+                        page.locator('#pubEasterCover').select_option(public_track['id'])
+                        assert page.locator('#pubEasterPreview').is_visible()
+                        page.wait_for_function('()=>document.getElementById("pubEasterPreview").naturalWidth>0')
+                        page.locator('#pubEasterSave').click()
+                        page.wait_for_function("()=>document.getElementById('pubEasterStatus').textContent.includes('Saved')")
+                        assert json.loads(store.objects['gbr/v2/easter-egg.json'])['track_id']==public_track['id']
+                        page.screenshot(path='/tmp/gbr-easter-settings.png',full_page=True)
+                        page.locator('#settingsDialog [data-close=settingsDialog]').click()
                     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
                     page.close()
                 from test_legacy_showcase import make_legacy

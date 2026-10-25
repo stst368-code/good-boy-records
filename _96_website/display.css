@@ -52,3 +52,6 @@
 @media(min-width:901px) and (max-width:1250px){
   .gbr-player .side-panel{top:132px!important;height:calc(var(--display-height) - 148px)!important}
 }
+/* Keep the hidden room's navigation focused on its own recordings. */
+body[data-library="hidden"] #knowledgeButton,
+body[data-library="hidden"] #gbrAnalyticsButton{display:none!important}

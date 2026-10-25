@@ -1,12 +1,12 @@
 /* Add approved R2 releases without rebuilding the legacy catalogue or share IDs. */
-window.GBRloadReleases=async function(base){
-  const source=window.GBR_RELEASE_CATALOGUE;
+window.GBRloadReleases=async function(base,{hidden=false}={}){
+  const source=hidden?window.GBR_HIDDEN_CATALOGUE:window.GBR_RELEASE_CATALOGUE;
   if(!source)return base;
   try{
     const response=await fetch(source,{cache:'no-store',signal:AbortSignal.timeout(5000)});
     if(!response.ok)return base;
     const data=await response.json();
-    if(data.format!=='gbr-public-releases-v1'||!Array.isArray(data.tracks))throw Error('Invalid release catalogue');
+    if(data.format!==(hidden?'gbr-hidden-releases-v1':'gbr-public-releases-v1')||!Array.isArray(data.tracks))throw Error('Invalid release catalogue');
     const safeUrl=value=>{if(value==null)return true;try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password;}catch{return false;}};
     const ids=new Set();
     const original=Array.isArray(base)?{tracks:base}:base||{tracks:[]};
@@ -18,8 +18,9 @@ window.GBRloadReleases=async function(base){
     }
     if(data.withdrawn!==undefined&&(!Array.isArray(data.withdrawn)||!data.withdrawn.every(validId)))throw Error('Invalid withdrawal list');
     const withdrawn=new Set(data.withdrawn||[]);
-    const tracks=new Map((original.tracks||[]).filter(track=>!withdrawn.has(track.id)).map(track=>[track.id,track]));
-    for(const track of data.tracks)if(!withdrawn.has(track.id))tracks.set(track.id,track);
+    const hiddenIds=new Set(hidden?[]:data.tracks.filter(track=>track.visibility==='hidden').map(track=>track.id));
+    const tracks=new Map((original.tracks||[]).filter(track=>!withdrawn.has(track.id)&&!hiddenIds.has(track.id)&&(hidden||track.visibility!=='hidden')).map(track=>[track.id,track]));
+    for(const track of data.tracks)if(!withdrawn.has(track.id)&&(hidden||track.visibility!=='hidden'))tracks.set(track.id,track);
     return {...original,tracks:[...tracks.values()],trackCount:tracks.size};
   }catch(error){console.warn('New releases unavailable; using the saved catalogue.',error.message);return base;}
 };

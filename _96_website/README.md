@@ -42,6 +42,26 @@ separate ledger and are not assigned to new recordings.
 
 ## Curated player catalogue
 
+Choose **Hidden room · Easter egg only** as the website destination in
+Preparation or Release preview to publish a secret track through the same
+MP3/FLAC, artwork and lyric pipeline. Its entry lives in
+`gbr/v2/hidden/catalogue.json`; the main catalogue suppresses older copies.
+Release history can move an existing publication between the two destinations,
+reusing its stable ID and audio assets. Withdrawal works in either destination.
+There is one local showcase bundle and one shared publishing ledger, with no
+database migration. Hidden recordings are omitted from future public research
+exports; local reviews and performance data remain intact.
+
+In **Settings → Website · Easter egg**, select an available main-player cover,
+preview it and save. Three clicks/taps on that recording's playing cover, with
+no more than 1.4 seconds between taps, open `hidden.html`. Changing tracks,
+panning or pinching resets the gesture. Disabled is the default. The public
+configuration is `gbr/v2/easter-egg.json`, so changing it needs no site rebuild.
+The unlisted, no-index page loads hidden releases directly from R2, supports
+playback and share links, and has a Main player return button. Existing hidden
+tracks remain supported. This is discovery by a secret gesture, not access
+control: someone with the URL can visit or share it.
+
 New recordings publish from **GBR → Publish**, after a reviewed distribution
 selection reaches Preparation. Choose the prepared source or an exact master,
 optional registered artwork (otherwise the GBR sleeve), lossless download and

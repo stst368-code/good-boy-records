@@ -114,7 +114,7 @@ def main():
                     page.evaluate('setEasterState('+str(hidden).lower()+');select('+('0' if hidden else 'Math.min(4,tracks.length-1)')+',false)')
                     identifier = page.evaluate('tracks[index].id')
                     link = page.evaluate('currentShareUrl()')
-                    assert urlsplit(link).path == prefix
+                    assert urlsplit(link).path == prefix+('hidden.html' if hidden else '')
                     page.goto(link, wait_until='domcontentloaded')
                     try:page.wait_for_function('typeof tracks!=="undefined" && tracks[index]?.id==='+json.dumps(identifier))
                     except Exception:
@@ -122,6 +122,8 @@ def main():
                         raise
                     assert urlsplit(page.url).query == ''
                     assert page.evaluate('easter') == hidden
+                page.get_by_role('button',name='Main player',exact=True).click()
+                page.wait_for_function('typeof tracks!=="undefined"&&!easter&&tracks.length>0')
                 page.locator('#gbrAnalyticsButton').click()
                 frame = page.frame_locator('#gbrObservatory iframe')
                 frame.locator('#sideCount').wait_for(state='attached')
@@ -147,7 +149,7 @@ def main():
     assert not errors, errors
     assert not failures, failures
     assert media_paths and any('/showcase/' in path for path in media_paths)
-    assert all('/showcase/' in path or path in {'/gbr/v2/catalogue.json','/gbr/v2/research.json'} for path in media_paths)
+    assert all('/showcase/' in path or path in {'/gbr/v2/catalogue.json','/gbr/v2/research.json','/gbr/v2/hidden/catalogue.json','/gbr/v2/easter-egg.json'} for path in media_paths)
     print(json.dumps({'workflows':completed,'tracks':len(catalogue['tracks']),'hidden_tracks':len(catalogue['easter']['tracks']),
                       'historical_analytics_records':len(recordings),'javascript_errors':errors,'asset_errors':failures,'media':'synthetic'}))
 

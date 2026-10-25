@@ -227,6 +227,13 @@ _Reviewed/
 !/_02_generation/_tests/
 !/_02_generation/_tests/test_*.py
 /_99_tools/_workers_infdit/runtime/
+/_96_website/_site/
+!/_04_preparation/_tests/
+!/_04_preparation/_tests/test_*.py
+!/_04_preparation/_tests/ui_*.py
+!/_96_website/_tests/
+!/_96_website/_tests/test_*.py
+!/_96_website/_tests/ui_*.py
 !/_03_review/_generation_review/_tests/
 !/_03_review/_generation_review/_tests/test_*.py
 !/_03_review/_generation_review/_tests/ui_*.py

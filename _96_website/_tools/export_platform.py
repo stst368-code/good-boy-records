@@ -102,6 +102,13 @@ def project(conn, style_sources=None):
     required = {'audio', 'generations', 'generation_metadata', 'songs', 'latest_reviewer_reviews', 'publishing_selection'}
     if required - tables:
         raise ValueError('Shared review schema is incomplete; missing: ' + ', '.join(sorted(required - tables)))
+    # Hidden-room recordings stay out of public research track listings too.
+    # The studio's original review, telemetry and analytical records remain intact.
+    placements={}
+    if 'processing_tasks' in tables:
+        for task in records(conn,"SELECT generation_id,recipe_json FROM processing_tasks WHERE kind='release_prepare' AND status='done' ORDER BY rowid"):
+            placements[task['generation_id']]=object_json(task['recipe_json']).get('options',{}).get('visibility','public')
+    hidden={gid for gid,value in placements.items() if value=='hidden'}
     has_runs = {'generation_output_links', 'generation_runs', 'generation_attempts', 'worker_sessions',
                 'generation_timing_spans', 'generation_resource_measurements'} <= tables
     definitions = records(conn, 'SELECT id,category,label,active FROM review_tag_definitions ORDER BY category_order,sort_order,id') if 'review_tag_definitions' in tables else []
@@ -123,7 +130,7 @@ def project(conn, style_sources=None):
     output = []
     for audio in records(conn, 'SELECT id,pcm_sha256,duration FROM audio ORDER BY id'):
         choices = generations[audio['id']]
-        if not choices:
+        if not choices or any(g['id'] in hidden for g in choices):
             continue
         current = reviews[audio['id']]
         # Prefer metadata actually reviewed. Aliases of identical PCM cannot multiply N.
