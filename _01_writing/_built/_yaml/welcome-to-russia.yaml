@@ -1,0 +1,64 @@
+song_id: 95
+variant_id: 1
+title: welcome-to-russia
+cluster:
+version:
+explicit: yes
+language: ru
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |
+  [intro]
+  рашн мьюзик. качали даже твой тетрис блять
+  длб
+  поехали
+  [chorus]
+  (оу!) ехали медведи
+  (уау!) на блатной карете
+  (у!) а за ними лэйди
+  (бич!) сверху на ракете
+  это бэнгеры с окраин
+  на расстроенной гитаре
+  бас ебашит как базука
+  welcome to russia, suka
+  suka
+  welcome to russia, suka
+  [verse]
+  сука течёт от фаст флоу
+  на блоке так опасно
+  я - самый белый русский
+  но как всегда за красных
+  (оу!) копы любят доебаться
+  (но) я прикинусь иностранцем
+  я на hennessy и квасе
+  типа mint and spicy
+  [chorus]
+  (оу!) ехали медведи
+  (уау!) на блатной карете
+  (у!) а за ними лэйди
+  (бич!) сверху на ракете
+  это бэнгеры с окраин
+  на расстроенной гитаре
+  бас ебашит как базука
+  welcome to russia, suka
+  suka
+  welcome to russia, suka
+  [verse]
+  maybe sex? eurodance?
+  я не пью, вот те крест
+  я так люблю бруснику, девятки и басы
+  я так люблю россию, что намокли все трусы
+  (pizdec nahuy blyat)
+  [outro]
+  welcome to russia, suka

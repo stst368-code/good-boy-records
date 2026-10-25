@@ -1,0 +1,76 @@
+song_id: 92
+variant_id: 1
+title: crystalised
+cluster:
+version:
+explicit: no
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |
+  [verse]
+  you've applied the pressure
+  to have me crystalised
+  and you've got the faith
+  that i could bring paradise
+  [verse]
+  i'll forgive and forget
+  before i'm paralysed
+  do i have to keep up the pace
+  to keep you satisfied?
+  [pre-chorus]
+  things have gotten closer to the sun
+  and i've done things in small doses
+  so don't think that i'm pushing you away
+  when you're the one that i've kept closest
+  [chorus]
+  ahh, ahh, ahh
+  ahh, ahh, ahh
+  ahh, ahh, ahh
+  ahh, ahh, ahh
+  [verse]
+  you don't move slow
+  taking steps in my direction
+  the sound resounds, echo
+  does it lessen your affection? no
+  [verse]
+  you say i'm foolish
+  for pushing this aside
+  but burn down our home
+  i won't leave alive
+  [pre-chorus]
+  glaciers have melted to the sea
+  i wish the tide would take me over
+  i've been down on my knees
+  and you just keep on getting closer
+  [chorus: romy & oliver]
+  ahh, ahh, ahh
+  ahh, ahh, ahh
+  ahh, ahh, ahh
+  ahh, ahh, ahh
+  [bridge]
+  glaciers have melted to the sea
+  (things have gotten closer to the sun)
+  i wish the tide would take me over
+  (and i've done things in small doses)
+  i've been down onto my knees
+  (so don't think that i'm pushing you away)
+  and you just keep on getting closer
+  (when you're the one that i've kept closest)
+  [outro]
+  go slow
+  go slow
+  go slow
+  go slow
+  go slow

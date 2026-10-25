@@ -1,0 +1,99 @@
+song_id: 88
+variant_id: 1
+title: bodies
+cluster:
+version:
+explicit: yes
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |
+  [intro]
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  [verse 1]
+  beaten, why for? (why for?)
+  can't take much more
+  (here we go, here we go, here we go now)
+  [pre-chorus]
+  one, nothing wrong with me
+  two, nothing wrong with me
+  three, nothing wrong with me
+  four, nothing wrong with me
+  one, something's got to give
+  two, something's got to give
+  three, something's got to give
+  now
+  [chorus]
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  [post-chorus]
+  move
+  [verse 2]
+  push me again (again)
+  this is the end
+  (here we go, here we go, here we go now)
+  [pre-chorus]
+  one, nothing wrong with me
+  two, nothing wrong with me
+  three, nothing wrong with me
+  four, nothing wrong with me
+  one, something's got to give
+  two, something's got to give
+  three, something's got to give
+  now
+  [chorus]
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  [bridge]
+  skin against skin, blood and bone
+  you're all by yourself, but you're not alone
+  you wanted in and now you're here
+  driven by hate, consumed by fear
+  [chorus]
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  [pre-chorus]
+  one, nothing wrong with me
+  two, nothing wrong with me
+  three, nothing wrong with me
+  four, nothing wrong with me
+  one, something's got to give
+  two, something's got to give
+  three, something's got to give
+  now
+  [chorus]
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  let the bodies hit the floor
+  [outro]
+  hey, go
+  hey, go
+  hey, go
+  hey, go

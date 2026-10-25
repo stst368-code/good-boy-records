@@ -1,0 +1,93 @@
+song_id: 91
+variant_id: 1
+title: volkera-volkera
+cluster:
+version:
+explicit: no
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |
+  [verse]
+  lucky you were built that far away so
+  we could both make fun of distance
+  lucky that i love a foreign land for
+  the lucky fact of your existence
+  baby, i would climb the andes solely
+  to count the celcius on the wall
+  never could imagine there were only
+  ten million ways to warm somebody
+  [pre-chorus]
+  le-do-lo-le-lo-le
+  le-do-lo-le-lo-le
+  can't you see?
+  i'm at your feet
+  [chorus]
+  volkera, volkera
+  we're meant to be together
+  i'll be cold, and you'll be warm
+  and that's the deal, my dear
+  thereover, hereunder
+  you'll never have to wonder
+  we can always play by feel
+  but that's the deal, my dear
+  [verse]
+  lucky that my lips shake and mumble
+  they spill shivers like a fountain
+  lucky that my wardrobes not small and humble
+  so you don't get rushed and tumble
+  lucky i have strong legs like my mother
+  to run for cover when i need it
+  and these two eyes, that for no other
+  the day you leave, will cry a river
+  [pre-chorus]
+  le-do-lo-le-lo-le
+  le-do-lo-le-lo-le
+  at your feet
+  i'm at your feet
+  [chorus]
+  volkera, volkera
+  we're meant to be together
+  i'll be cold, and you'll be warm
+  and that's the deal, my dear
+  thereover, hereunder
+  you'll never have to wonder
+  we can always play by feel
+  but that's the deal, my dear
+  [bridge]
+  le-do-lo-le-lo-le
+  le-do-lo-le-lo-le
+  warm up loud
+  say it again
+  le-do-lo-le-lo-le-lo-le
+  tell me one more time
+  that you'll heat
+  water for my hands
+  [chorus]
+  volkera, volkera
+  we're meant to be together
+  i'll be cold, and you'll be warm
+  and that's the deal, my dear
+  thereover, hereunder
+  you've got me head over heels
+  there's nothing left to fear
+  if you really feel the way i feel
+  volkera, volkera
+  please warm my skin its cold
+  i'll be cold, and you'll be warm
+  and that's the deal, my dear
+  thereover, hereunder
+  you've got me head over heels
+  there's nothing left to fear
+  if you really feel the way i feel the cold

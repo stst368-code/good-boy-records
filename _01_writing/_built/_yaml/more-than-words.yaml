@@ -1,0 +1,80 @@
+song_id: 90
+variant_id: 1
+title: more-than-words
+cluster:
+version:
+explicit: no
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |
+  [verse]
+  saying, "i love you"
+  is not the words i want to hear from you
+  it's not that i want you
+  not to say, but if you only knew
+  how easy it would be to show me how you feel
+  [pre-chorus]
+  more than words
+  is all you have to do to make it real
+  then you wouldn't have to say that you love me
+  'cause i'd already know
+  [chorus]
+  what would you do
+  if my heart was torn in two?
+  more than words to show you feel
+  that your love for me is real
+  what would you say
+  if i took those words away?
+  then you couldn't make things new
+  just by saying, "i love you"
+  [post-chorus]
+  da-de-da-la-de-da
+  la-de-dei-dei-dei
+  more than words
+  da-de-da-la-de-da
+  [verse]
+  now that i've tried to
+  talk to you and make you understand
+  all you have to do is close your eyes
+  and just reach out your hands
+  and touch me, hold me close, don't ever let me go
+  [pre-chorus]
+  more than words
+  is all i ever needed you to show
+  then you wouldn't have to say that you love me
+  'cause i'd already know
+  [chorus]
+  what would you do
+  if my heart was torn in two?
+  more than words to show you feel
+  that your love for me is real
+  what would you say
+  if i took those words away?
+  then you couldn't make things new
+  just by saying, "i love you"
+  [post-chorus]
+  da-de-da-la-de-da
+  la-de-dei-dei-dei
+  more than words
+  da-de-da-la-de-da
+  la-de-dei-dei-dei
+  more than words
+  la-de-dei-dei-dei
+  la-de-dei-dei-dei
+  la-de-dei-dei-dei
+  more than words
+  more than words
+  [outro]
+  more than words

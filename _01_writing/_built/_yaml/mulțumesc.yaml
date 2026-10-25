@@ -1,0 +1,74 @@
+Mulțumescsong_id: 93
+variant_id: 1
+title: mulțumesc
+cluster:
+version:
+explicit: no
+language: ro
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |
+  [verse]
+  cu o mână i-am șters lacrimile, și cu alta
+  i-am adus la viață visele
+  trecutul apăsa umerii ei, i-am spus „gata
+  e timpul să oprim suspinele”
+  [pre-chorus]
+  și ce norocos sunt, nu se mai gândește la el
+  din ruine, din ruine am făcut iar castel
+  ce norocos sunt, suntem în al nouălea cer
+  ne e bine, în fine...
+  [chorus]
+  ție vreau să-ți mulțumesc
+  că n-ai știut s-o iubești
+  ție vreau să-ți mulțumesc
+  c-ai știut doar s-o rănești
+  n-o să te mai sune, acum e pe mâini bune
+  am reparat tot ce-ai stricat
+  ție vreau să-ți mulțumesc că n-ai știut s-o iubești
+  [verse]
+  îi lipsea o stea din constelație, i-am pus alta
+  i-am făcut haine cu fir de dragoste
+  cu răbdare i-am întors rotițele, i-am spus „fată
+  n-ai de ce să-ți speli cu lacrimi mâinile”
+  [pre-chorus]
+  și ce norocos sunt, nu se mai gândește la el
+  din ruine, din ruine am făcut iar castel
+  ce norocos sunt, suntem în al nouălea cer
+  ne e bine, în fine...
+  [chorus]
+  ție vreau să-ți mulțumesc
+  că n-ai știut s-o iubești
+  ție vreau să-ți mulțumesc
+  c-ai știut doar s-o rănești
+  n-o să te mai sune, acum e pe mâini bune
+  am reparat tot ce-ai stricat
+  ție vreau să-ți mulțumesc că n-ai știut s-o iubești
+  [bridge]
+  am făcut o minune
+  cu un strop de afecțiune
+  știi, miracolele
+  se fac cu dragoste
+  toată ura din lume
+  cu iubirea nu se pune
+  știi, miracolele
+  se fac cu dragoste
+  [chorus]
+  ție vreau să-ți mulțumesc
+  că n-ai știut s-o iubești
+  ție vreau să-ți mulțumesc
+  c-ai știut doar s-o rănești
+  n-o să te mai sune, acum e pe mâini bune
+  am reparat tot ce-ai stricat
+  ție vreau să-ți mulțumesc că n-ai știut s-o iubești
