@@ -154,7 +154,7 @@ def test_stale_or_conflicting_releases_never_replace_public_catalogue(publicatio
     review,_,publisher,store,gid,source,_=publication
     pid,recipe=prepare(publication)
     if change=='source':source.write_bytes(source.read_bytes()+b'changed')
-    elif change=='yaml':review.db.execute("UPDATE generation_metadata SET yaml_sha256='changed' WHERE generation_id=?",(gid,))
+    elif change=='yaml':source.with_suffix('.yaml').write_bytes(source.with_suffix('.yaml').read_bytes()+b'album_name: changed\n')
     elif change=='selection':review.publishing(gid,'withdrawn')
     elif change=='conflict':store.conflict=True
     if change=='selection':

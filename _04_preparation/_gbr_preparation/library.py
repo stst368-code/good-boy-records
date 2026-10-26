@@ -168,8 +168,8 @@ class Library:
             # Validate and render before committing a draft or replacing lyric
             # sidecars; a malformed historical YAML must not half-save changes.
             from .library_yaml import update
-            row=self.db.one('SELECT raw_yaml_bytes FROM generation_metadata WHERE generation_id=?',(gid,))
-            updated=update(row['raw_yaml_bytes'] or b'title: Unknown\n',merged,self.publisher.root)
+            raw=self.prep.metadata.read(gid)['_raw_bytes']
+            updated=update(raw or b'title: Unknown\n',merged,self.publisher.root)
             self.db.execute("INSERT INTO processing_tasks(id,generation_id,kind,status,fingerprint,recipe_json,input_sha256,created_at,completed_at) VALUES(?,?,'library_edit','done',?,?,?,?,?)",(identifier,gid,identifier,canonical({'parent_id':current['id'],'changes':merged}),self.prep.source(gid)[0]['audio_id'],now(),now()))
             if 'lyrics' in changes and changes['lyrics']!=current['changes'].get('lyrics',record['track'].get('lyrics',{}).get('raw','')):
                 self.prep.replace_lyrics(gid,changes['lyrics'],changes.get('language'))

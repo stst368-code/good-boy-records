@@ -36,3 +36,5 @@
 @media(min-width:1900px){.library-form{grid-template-columns:repeat(4,minmax(0,1fr))}.library-list{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:750px){.library-form{grid-template-columns:repeat(2,minmax(0,1fr))}.library-room{grid-template-columns:minmax(0,1fr)}.library-room small{grid-column:1}.library-card{align-items:start;flex-wrap:wrap}.library-card-actions{max-width:none;width:100%}.prep-yaml dl{grid-template-columns:minmax(0,1fr)}#libraryView{padding:10px}.library-filters label{min-width:110px}}
 @media(max-width:400px){.library-form{grid-template-columns:minmax(0,1fr)}}
+/* Managed source paths must wrap without widening the mobile viewport. */
+#prepYamlSource{overflow-wrap:anywhere;word-break:break-word}#prepIdentity label{min-width:0;flex:1 1 160px}#prepIdentity select{max-width:100%}

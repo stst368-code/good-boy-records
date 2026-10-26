@@ -257,6 +257,7 @@ class Publisher:
             WHERE g.id=? AND p.status IN ('selected','published') AND (EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id)
             OR EXISTS(SELECT 1 FROM processing_tasks t WHERE t.generation_id=g.id AND t.kind='library_import' AND t.status='done'))''',(gid,))
         if not row:raise ValueError('Choose a reviewed recording flagged for distribution')
+        row.update(self.prep.metadata_row(gid))
         return row
 
     def projects(self):
@@ -351,7 +352,7 @@ class Publisher:
             info=sf.info(source)
             if info.frames<=0:raise ValueError('Working audio is empty')
             if not reuse and any(not re.fullmatch(r'[1-9][0-9]*',str(meta.get(key) or '')) for key in ('song_id','variant_id')):
-                raise ValueError('Release YAML needs valid song_id and variant_id values; fix it before publishing')
+                raise ValueError('Set song_id and variant_id in Preparation → YAML details using Save song / variant IDs, or edit the current Preparation YAML file shown there')
             # Title/album identity comes from the current master catalogue.
             if reuse:
                 previous=reuse['track'];song={'album_name':previous.get('album',{}).get('name'),'album_position':previous.get('album',{}).get('position')};title=previous.get('displayTitle') or meta.get('title')

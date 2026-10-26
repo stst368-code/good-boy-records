@@ -52,6 +52,7 @@ def main():
             audio=source/f'track-{index}.flac';t=np.arange(44100)/44100;wave=.15*np.sin(2*np.pi*(440+index*90)*t)
             sf.write(audio,np.stack([wave,wave],axis=1),44100,subtype='PCM_24')
             raw=('song_id: 13\r\nvariant_id: 2\r\ntitle: moses-supposes\r\ncluster: Rock\r\nstyle: Punk\r\nencoder_cfg: 1.7\r\ncaption: |\r\n  A Unicode caption: песня\r\nlyrics: |\r\n  first line\r\n  second line\r\n').encode('utf-8')
+            if index==0:raw=raw.replace(b'song_id: 13\r\nvariant_id: 2\r\n',b'')
             audio.with_suffix('.yaml').write_bytes(raw);aid=review.indexer.index(audio);gid=review.db.one('SELECT id FROM generations WHERE audio_id=?',(aid,))['id']
             review.set_flags(gid,review.default_reviewer_id,distribution=True);complete(review,gid);archive_all(review);records.append((gid,raw))
         cover=directory/'cover.png';cover.write_bytes(image_bytes())
@@ -71,8 +72,16 @@ def main():
                     page.wait_for_function("()=>document.getElementById('prepYamlRaw').textContent.includes('encoder_cfg: 1.7')")
                     assert 'песня' in page.locator('#prepYamlCaption').text_content()
                     assert 'first line\n' in page.locator('#prepYamlLyrics').text_content().replace('\r\n','\n')
-                    assert 'Alignment: waiting' in page.locator('#prepAlignmentStatus').text_content()
-                    page.locator('#prepArtworkFile').set_input_files(cover);page.locator('#prepImportArtwork').click()
+                    page.wait_for_function("()=>document.getElementById('prepAlignmentStatus').textContent.includes('Alignment: waiting')")
+                    original_raw=raw
+                    if width==1440:
+                        page.locator('#prepIdentitySong').select_option('13');page.locator('#prepIdentityVariant').select_option('2');page.locator('#prepSaveIdentity').click()
+                        page.wait_for_function("()=>document.getElementById('prepYamlRaw').textContent.includes('song_id: 13')")
+                        raw=raw.replace(b'title:',b'song_id: 13\r\nvariant_id: 2\r\ntitle:')+b'explicit: yes\r\n'
+                        Path(prep.metadata.read(gid)['path']).write_bytes(raw)
+                        page.wait_for_function("()=>document.getElementById('prepYamlRaw').textContent.includes('explicit: yes')")
+                    page.locator('#prepArtworkFile').set_input_files(cover)
+                    page.locator('#prepImportArtwork').click()
                     page.wait_for_function("()=>document.getElementById('prepReleaseArtwork').value!==''")
                     page.locator('#prepApproveLyrics').click();page.wait_for_function("()=>document.getElementById('prepApproveLyrics').textContent==='Approved'")
                     page.screenshot(path=f'/tmp/gbr-stage-preparation-{width}.png',full_page=True)
@@ -89,6 +98,7 @@ def main():
                     page.wait_for_selector('#libraryEdit:not([hidden])');page.locator('#libraryTitle').fill('Retitled '+str(width));page.locator('#libraryPublish').click()
                     until(lambda:p.library.record(gid)['track']['displayTitle']=='Retitled '+str(width))
                     assert next(prep.source(gid)[1].parent.glob('*.yaml')).read_bytes()==raw
+                    assert review.db.one('SELECT raw_yaml_bytes FROM generation_metadata WHERE generation_id=?',(gid,))['raw_yaml_bytes']==original_raw
                     assert not p.projects()['projects']
                     page.locator('#libraryTimeline').click();page.wait_for_selector('#libraryEditorContainer #preparationView:not([hidden])')
                     assert 'encoder_cfg: 1.7' in page.locator('#prepYamlRaw').text_content()

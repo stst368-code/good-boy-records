@@ -30,6 +30,13 @@ class ArtworkImport(BaseModel):
     content:str=Field(max_length=14*1024**2)
 
 
+class RecordingIdentity(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    song_id:StrictInt=Field(gt=0)
+    variant_id:StrictInt=Field(gt=0)
+    expected_sha256:str=Field(pattern=r'^[a-f0-9]{64}$')
+
+
 def router(root,review,local):
     service=Preparation(root,review)
     def host(request: Request):
@@ -81,12 +88,15 @@ def router(root,review,local):
     def editorial(gid: str,artifact: str | None=None):return service.editorial(gid,artifact)
     @routes.get('/projects/{gid}/yaml')
     def yaml_details(gid:str):
-        import json
-        row=service.db.one('SELECT raw_yaml,raw_yaml_bytes,parsed_json,yaml_sha256 FROM generation_metadata WHERE generation_id=?',(gid,))
-        if not row:raise HTTPException(404,'Recording YAML unavailable')
-        raw=row['raw_yaml_bytes']
-        return {'yaml':bytes(raw).decode('utf-8-sig') if raw is not None else row['raw_yaml'] or '',
-                'metadata':json.loads(row['parsed_json']),'sha256':row['yaml_sha256']}
+        return {k:v for k,v in service.metadata.read(gid).items() if not k.startswith('_')}
+
+    @routes.get('/projects/{gid}/identity')
+    def identity(gid:str):return service.metadata.catalogue(gid)
+
+    @routes.post('/projects/{gid}/identity')
+    def save_identity(gid:str,body:RecordingIdentity):
+        try:return {k:v for k,v in service.metadata.set_identity(gid,**body.model_dump()).items() if not k.startswith('_')}
+        except OSError as exc:raise HTTPException(409,'Cannot update the Preparation YAML; close any application holding the file and retry. '+str(exc)) from exc
 
     @routes.post('/projects/{gid}/editorial/{kind}')
     def save_editorial(gid: str,kind: Literal['lyric_edit','visual_edit'],body: dict):return service.save_editorial(gid,kind,body)

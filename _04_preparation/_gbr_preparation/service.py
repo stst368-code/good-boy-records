@@ -75,7 +75,17 @@ class Preparation:
             self.review.archiver.preparation_root=self.tracks
             self.review.archiver.showcase_root=self.showcase
         self.review.preparation=self
+        from .metadata import PreparationMetadata
+        self.metadata=PreparationMetadata(self)
         self.review.archiver.on_preparation_ready=self.auto_align
+
+    def metadata_row(self,gid):
+        data=self.metadata.read(gid)
+        return {'parsed_json':canonical(data['metadata']),'yaml_sha256':data['sha256'],'yaml_revision_id':data['revision_id']}
+
+    def lyric_recipe(self,gid,recipe):
+        data=self.metadata.read(gid)
+        return {**recipe,'lyrics_sha256':data['lyrics_sha256'],'words':lyric_words(data['metadata'].get('lyrics',''))}
 
     def close(self):
         self.closed=True
@@ -126,14 +136,16 @@ class Preparation:
         if self.closed or not self.enabled:return
         if not self.db.one("SELECT 1 FROM publishing_selection WHERE generation_id=? AND status='selected'",(gid,)):return
         with self.lock:
-            previous=self.db.one("SELECT * FROM processing_tasks WHERE generation_id=? AND kind IN ('lyric_alignment','lyric_edit') AND status<>'cancelled' ORDER BY rowid DESC LIMIT 1",(gid,))
+            data=self.metadata.read(gid)
+            self.db.execute("UPDATE processing_tasks SET status='cancelled',completed_at=?,error='Superseded by changed Preparation lyrics or language' WHERE generation_id=? AND kind='lyric_alignment' AND status IN ('waiting','queued') AND COALESCE(json_extract(recipe_json,'$.lyrics_sha256'),?)<>?",(now(),gid,data['original_lyrics_sha256'],data['lyrics_sha256']))
+            previous=self.db.one("SELECT * FROM processing_tasks WHERE generation_id=? AND kind IN ('lyric_alignment','lyric_edit') AND status<>'cancelled' AND COALESCE(json_extract(recipe_json,'$.lyrics_sha256'),?)=? ORDER BY rowid DESC LIMIT 1",(gid,data['original_lyrics_sha256'],data['lyrics_sha256']))
             if previous:
                 if previous['status']=='waiting':return self.launch_waiting(previous)
                 return previous
             row,source=self.source(gid)
             language=json.loads(row['parsed_json']).get('language') or 'en'
             if not isinstance(language,str) or not re.fullmatch('[a-z]{2,3}',language):language='en'
-            identifier=self._insert(gid,'lyric_alignment',{'version':1,'language':language},digest(source),'waiting')
+            identifier=self._insert(gid,'lyric_alignment',self.lyric_recipe(gid,{'version':1,'language':language}),digest(source),'waiting')
             self.db.execute("UPDATE processing_tasks SET error=? WHERE id=?",('Waiting for a free local GPU and the processing environment',identifier))
             return self.launch_waiting(self.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,)))
 
@@ -161,7 +173,11 @@ class Preparation:
                OR a.archive_path LIKE ? ORDER BY p.selected_at,g.id''',(str(self.tracks)+'%',))
         rows=[r for r in rows if include_completed or (r['status']=='selected' and not (r['archive_path'] and Path(r['archive_path']).resolve().is_relative_to(self.showcase.resolve())) and not self.db.one("SELECT 1 FROM processing_tasks WHERE generation_id=? AND kind='release_prepare' AND status='done'",(r['generation_id'],)))]
         for row in rows:
+            try:row.update(self.metadata_row(row['generation_id']))
+            except (ValueError,OSError) as exc:row['yaml_error']=str(exc)
             meta=json.loads(row.pop('parsed_json'))
+            row['yaml_sha256']=row.get('yaml_sha256')
+            row['title']=meta.get('title') or row['title']
             row.update(cluster=meta.get('cluster'),style=meta.get('style') or meta.get('style_primary'),
                        song_id=meta.get('song_id'),variant_id=meta.get('variant_id'))
             row['completed']=bool(row['archive_path'] and Path(row['archive_path']).resolve().is_relative_to(self.showcase.resolve()))
@@ -177,6 +193,7 @@ class Preparation:
                           FROM generations g JOIN audio a ON a.id=g.audio_id
                           JOIN generation_metadata m ON m.generation_id=g.id WHERE g.id=?''',(gid,))
         if not row:raise KeyError('Recording not found')
+        row.update(self.metadata_row(gid))
         source=self.review.archiver.available(row['audio_id'])
         if not source:raise FileNotFoundError('Recording unavailable')
         if ready and not any(source.resolve().is_relative_to(p.resolve()) for p in (self.tracks,self.showcase)):
@@ -281,6 +298,7 @@ class Preparation:
         return {'id':identifier,**recipe}
 
     def _insert(self,gid,kind,recipe,source_hash,status='queued'):
+        if kind=='lyric_edit':recipe={**recipe,'lyrics_sha256':self.metadata.read(gid)['lyrics_sha256']}
         identifier=uuid.uuid4().hex
         fingerprint=hashlib.sha256(canonical([gid,kind,recipe,source_hash]).encode()).hexdigest()
         if kind=='artwork_brief':
@@ -304,6 +322,7 @@ class Preparation:
             language=data.get('language') or json.loads(row['parsed_json']).get('language') or 'en'
             if not isinstance(language,str) or not __import__('re').fullmatch('[a-z]{2,3}',language):raise ValueError('Use an ISO language code, e.g. en or de')
             recipe={'version':1,'language':language}
+            recipe=self.lyric_recipe(gid,recipe)
             if not self.alignment_python().is_file():raise ValueError('Install the isolated processing environment with run_gbr.py setup-processing first')
         if data.get('input_artifact_id'):recipe['input_artifact_id']=data['input_artifact_id']
         if kind=='mix_preview':
@@ -353,7 +372,7 @@ class Preparation:
                     request['stems']={key:value['path'] for key,value in stems.items()}
                 timeout=600
                 if task['kind']=='lyric_alignment':
-                    request['recipe']['words']=lyric_words(json.loads(row['parsed_json']).get('lyrics',''))
+                    request['recipe']['words']=recipe.get('words',lyric_words(json.loads(row['parsed_json']).get('lyrics','')))
                     command=[str(self.alignment_python()),str(self.worker.with_name('alignment.py'))];timeout=7200
                 environment=os.environ.copy()
                 environment.update(PYTHONUTF8='1',PYTHONIOENCODING='utf-8')
@@ -453,12 +472,15 @@ class Preparation:
 
     def editorial(self,gid,artifact_id=None):
         self.require();row,source=self.source(gid,artifact_id=artifact_id);sha=digest(source)
+        metadata=self.metadata.read(gid)
         result={'source_sha256':sha,'duration':row['duration'],'language':json.loads(row['parsed_json']).get('language') or 'en',
                 'words':lyric_words(json.loads(row['parsed_json']).get('lyrics','')),'approved':False,'lyric_task_id':None,
                 'features':None,'feature_artifact_id':None,'lighting_task_id':None,'sensitivity':1,'sections':[]}
         for kinds,key in [(('lyric_edit','lyric_alignment'),'lyric'),(('visuals',),'visual'),(('visual_edit',),'light')]:
             placeholders=','.join('?' for _ in kinds)
-            task=self.db.one(f"SELECT * FROM processing_tasks WHERE generation_id=? AND input_sha256=? AND kind IN ({placeholders}) AND status='done' ORDER BY rowid DESC LIMIT 1",(gid,sha,*kinds))
+            extra=" AND COALESCE(json_extract(recipe_json,'$.lyrics_sha256'),?)=?" if key=='lyric' else ''
+            args=(gid,sha,*kinds,*((metadata['original_lyrics_sha256'],metadata['lyrics_sha256']) if key=='lyric' else ()))
+            task=self.db.one(f"SELECT * FROM processing_tasks WHERE generation_id=? AND input_sha256=? AND kind IN ({placeholders}) AND status='done'{extra} ORDER BY rowid DESC LIMIT 1",args)
             if not task:continue
             artifact=self.db.one("SELECT id,sha256 FROM generation_artifacts WHERE json_extract(metadata_json,'$.processing_task_id')=? AND kind IN ('lyric_alignment','lyric_edit','visual_features','visual_edit')",(task['id'],))
             if not artifact:continue
@@ -491,6 +513,7 @@ class Preparation:
                 payload=lighting(data,current['features'])
             else:raise ValueError('Unknown editorial kind')
             recipe={'parent_task_id':current[key],'input_artifact_id':data.get('input_artifact_id'),'feature_artifact_id':current['feature_artifact_id'] if kind=='visual_edit' else None}
+            if kind=='lyric_edit':recipe['lyrics_sha256']=self.metadata.read(gid)['lyrics_sha256']
             raw=canonical(payload).encode('utf-8');sha=hashlib.sha256(raw).hexdigest();recipe['output_sha256']=sha
             _,source=self.source(gid,artifact_id=data.get('input_artifact_id'));destination=source.parent.parent/'_derived';destination.mkdir(parents=True,exist_ok=True)
             path=destination/(sha+'.json')

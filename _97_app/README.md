@@ -156,6 +156,17 @@ environment and a free local GPU; failures stay visible with a manual retry.
 the recording's original YAML, with its metadata, caption and lyrics available
 without editing the source.
 
+Preparation automatically reads edits to the recording's bound YAML file. Its
+current path, current content and original imported YAML appear in YAML details.
+Each accepted edit is a revision in the existing processing ledger; generation
+provenance, identity and review history remain intact. Missing legacy IDs can be
+assigned with **Master song → Variant → Save song / variant IDs**, using the
+catalogues. Only those fields change in the Preparation copy, preserving its
+format. ID-only changes retain lyric approval; changed lyrics or language require
+fresh timing approval and queue alignment for the new text. Invalid or missing
+YAML blocks publication with an error. If a package was already built, return it
+from Publish to Preparation and finish it again to include subsequent edits.
+
 Choose **Finish preparation → Publish queue** after saving lyric/lighting edits
 and choosing the source or master and artwork. This local step always makes an
 MP3 of that exact audio and does not require R2. **Publish** lists only completed

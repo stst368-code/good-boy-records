@@ -53,7 +53,7 @@ class Showcase:
                 if self.db.one("SELECT 1 FROM archive_operations WHERE audio_id=? AND status IN ('pending','running','failed')",(row['audio_id'],)):
                     raise ValueError('Finish the pending archive operation before completing this recording')
                 source=self.prep.tracks/row['audio_id']
-                destination=recording_folder(self.root,json.loads(row['parsed_json']),row['audio_id'])
+                destination=recording_folder(self.root,json.loads(self.prep.metadata_row(gid)['parsed_json']),row['audio_id'])
                 if not source.is_dir():raise ValueError('Preparation bundle is unavailable')
                 if destination.exists():raise ValueError('Showcase destination already exists without a move journal; retained both locations')
                 items=self.inventory(source)
