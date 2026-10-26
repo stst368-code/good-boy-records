@@ -77,6 +77,8 @@ class Preparation:
         self.review.preparation=self
         from .metadata import PreparationMetadata
         self.metadata=PreparationMetadata(self)
+        from .processing import ProcessingQueue
+        self.processing=ProcessingQueue(self)
         self.review.archiver.on_preparation_ready=self.auto_align
 
     def metadata_row(self,gid):
@@ -120,14 +122,14 @@ class Preparation:
                 self.queue_promotion(c,row[0])
 
     def local_generation_busy(self):
-        return bool(self.db.one("""SELECT 1 FROM generation_attempts a LEFT JOIN worker_sessions w ON w.id=a.worker_session_id
-            WHERE a.status IN ('running','queued') AND (a.execution_mode='local' OR w.provider='local'
-                OR w.address LIKE '%127.0.0.1%' OR w.address LIKE '%localhost%') LIMIT 1"""))
+        return self.processing.generation_busy()
 
     def launch_waiting(self,task):
-        if self.closed or not self.alignment_python().is_file() or self.local_generation_busy():return task
-        telemetry=json.loads(task.get('telemetry_json') or '{}')
-        if telemetry.get('retry_after',0)>time.time():return task
+        if self.closed:return task
+        reason=self.processing.reason(task)
+        if reason:
+            self.db.execute("UPDATE processing_tasks SET error=? WHERE id=? AND status='waiting'",(reason,task['id']))
+            return {**task,'error':reason}
         if self.db.execute("UPDATE processing_tasks SET status='queued',error=NULL,telemetry_json=? WHERE id=? AND status='waiting'",(canonical({'owner':self.owner()}),task['id'])):
             self.submitted.add(task['id']);self.pool.submit(self._run,task['id'])
         return {'id':task['id'],'status':'queued'}
@@ -152,6 +154,7 @@ class Preparation:
     def auto_align_sweep(self):
         if self.closed or not self.enabled or time.monotonic()<self.next_auto_sweep:return
         self.next_auto_sweep=time.monotonic()+5
+        self.processing.resume()
         rows=self.db.all("""SELECT p.generation_id,a.archive_path FROM publishing_selection p JOIN generations g ON g.id=p.generation_id
             JOIN audio a ON a.id=g.audio_id WHERE p.status='selected' AND a.archive_path IS NOT NULL""")
         for row in rows:
@@ -343,7 +346,8 @@ class Preparation:
                 if cached['status']=='waiting':return self.launch_waiting(cached)
                 artifacts=self.db.all("SELECT uri FROM generation_artifacts WHERE json_extract(metadata_json,'$.processing_task_id')=?",(cached['id'],))
                 if cached['status']!='done' or artifacts and all(Path(a['uri']).is_file() for a in artifacts):return cached
-            identifier=self._insert(gid,kind,recipe,source_hash)
+            identifier=self._insert(gid,kind,recipe,source_hash,'waiting' if kind=='lyric_alignment' else 'queued')
+            if kind=='lyric_alignment':return self.launch_waiting(self.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,)))
             self.submitted.add(identifier)
             self.pool.submit(self._run,identifier)
             return {'id':identifier,'status':'queued'}
@@ -378,7 +382,7 @@ class Preparation:
                 environment.update(PYTHONUTF8='1',PYTHONIOENCODING='utf-8')
                 environment.setdefault('HF_HOME',str(self.worker.parent/'_runtime/huggingface'))
                 environment.setdefault('TORCH_HOME',str(self.worker.parent/'_runtime/torch'))
-                process=subprocess.run(command,input=canonical(request).encode('utf-8'),capture_output=True,timeout=timeout,env=environment)
+                process=self.processing.execute(identifier,command,request,environment,temporary,timeout) if task['kind']=='lyric_alignment' else subprocess.run(command,input=canonical(request).encode('utf-8'),capture_output=True,timeout=timeout,env=environment)
                 if process.returncode:
                     resource_file=Path(temporary)/'resources.ndjson'
                     if resource_file.is_file():
@@ -412,20 +416,25 @@ class Preparation:
                     for index,(kind,sha,target) in enumerate(published):
                         c.execute('INSERT OR IGNORE INTO generation_artifacts VALUES(?,NULL,?,?,?,?,NULL,?)',
                             (identifier+('-output' if index==0 else '-'+str(index)),kind,sha,str(target),target.stat().st_size,canonical({'processing_task_id':identifier,'source_generation_id':task['generation_id']})))
-                    c.execute("UPDATE processing_tasks SET worker_session_id=?,telemetry_json=? WHERE id=?",(session,canonical({'wall_seconds':time.perf_counter()-clock,'measurements':result.get('measurements',{})}),identifier))
+                    c.execute("UPDATE processing_tasks SET worker_session_id=? WHERE id=?",(session,identifier))
             cleanup={}
             if task['kind']=='mix_preview':
                 try:cleanup=self.clean_previews(task['generation_id'],keep=identifier)
                 except Exception as error:cleanup={'error':str(error)}
-            self.db.execute("UPDATE processing_tasks SET status='done',completed_at=?,telemetry_json=? WHERE id=?",(now(),canonical({'wall_seconds':time.perf_counter()-clock,'measurements':result.get('measurements',{}),'cleanup':cleanup}),identifier))
+            previous=json.loads(self.db.one('SELECT telemetry_json FROM processing_tasks WHERE id=?',(identifier,))['telemetry_json'])
+            self.db.execute("UPDATE processing_tasks SET status='done',completed_at=?,telemetry_json=? WHERE id=?",(now(),canonical({**previous,'phase':'complete','message':'Processing complete','wall_seconds':time.perf_counter()-clock,'measurements':result.get('measurements',{}),'cleanup':cleanup}),identifier))
         except Exception as error:
             waiting=task['kind']=='lyric_alignment' and 'Another GBR worker is already using this GPU' in str(error)
-            self.db.execute("UPDATE processing_tasks SET status=?,completed_at=?,error=?,telemetry_json=? WHERE id=?",('waiting' if waiting else 'failed',None if waiting else now(),str(error),canonical({'wall_seconds':time.perf_counter()-clock,**failure_telemetry,**({'retry_after':time.time()+15} if waiting else {})}),identifier))
+            previous=json.loads(self.db.one('SELECT telemetry_json FROM processing_tasks WHERE id=?',(identifier,))['telemetry_json'])
+            status='waiting' if waiting else 'interrupted' if self.closed and task['kind']=='lyric_alignment' else 'failed'
+            self.db.execute("UPDATE processing_tasks SET status=?,completed_at=?,error=?,telemetry_json=? WHERE id=?",(status,None if waiting else now(),str(error),canonical({**previous,'phase':'waiting_gpu' if waiting else status,'wall_seconds':time.perf_counter()-clock,**failure_telemetry,**({'retry_after':time.time()+15} if waiting else {})}),identifier))
 
     def retry(self,identifier):
         self.require()
         task=self.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,))
         if not task:raise KeyError('Processing task not found')
+        if task['kind']=='lyric_alignment' and self.processing.alive(json.loads(task['telemetry_json']).get('child',{})):
+            raise ValueError('The alignment worker process is still running; inspect the local processing queue before retrying')
         if task['status'] in {'queued','running'}:
             owner=json.loads(task['telemetry_json']).get('owner')
             if not owner or owner.get('host')!=socket.gethostname():
@@ -448,7 +457,15 @@ class Preparation:
         with self.lock:
             self.editable(task['generation_id'])
             self.db.execute("UPDATE processing_tasks SET status='interrupted' WHERE id=? AND status IN ('queued','running')",(identifier,))
-            new_id=self._insert(task['generation_id'],task['kind'],json.loads(task['recipe_json']),task['input_sha256'])
+            recipe=json.loads(task['recipe_json'])
+            if task['kind']=='lyric_alignment':
+                current=self.metadata.read(task['generation_id'])
+                if recipe.get('lyrics_sha256',current['original_lyrics_sha256'])!=current['lyrics_sha256']:recipe['language']=current['metadata'].get('language') or 'en'
+                recipe=self.lyric_recipe(task['generation_id'],recipe)
+            new_id=self._insert(task['generation_id'],task['kind'],recipe,task['input_sha256'],'waiting' if task['kind']=='lyric_alignment' else 'queued')
+            if task['kind']=='lyric_alignment':
+                result=self.launch_waiting(self.db.one('SELECT * FROM processing_tasks WHERE id=?',(new_id,)))
+                return {'id':new_id,'status':result['status'],'previous_task_id':identifier}
             self.submitted.add(new_id);self.pool.submit(self._run,new_id)
         return {'id':new_id,'status':'queued','previous_task_id':identifier}
 
@@ -488,10 +505,12 @@ class Preparation:
             if digest(path)!=artifact['sha256']:raise ValueError('Editorial sidecar bytes changed; restore the registered version')
             data=json.loads(path.read_text(encoding="utf-8"))
             if data.get('source_sha256')!=sha:raise ValueError('Sidecar refers to different audio')
-            if key=='lyric':result.update(language=data.get('language',result['language']),words=data['words'],approved=data.get('approved',False),lyric_task_id=task['id'],unmatched_recognition=data.get('unmatched_recognition',[]))
+            if key=='lyric':result.update(language=data.get('language',result['language']),words=data['words'],approved=data.get('approved',False),lyric_task_id=task['id'],unmatched_recognition=data.get('unmatched_recognition',[]),timing_source='WhisperX alignment' if task['kind']=='lyric_alignment' else 'Saved lyric corrections')
             elif key=='visual':result.update(features=data,feature_artifact_id=artifact['id'])
             else:result.update(sensitivity=data['sensitivity'],sections=data['sections'],lighting_task_id=task['id'])
         result['words']=position_lyrics(result['words'],result['duration'])
+        result['timing_source']=result.get('timing_source','Estimated positions only; audio alignment has not completed')
+        result['timed_words']=sum(w.get('start') is not None and w.get('end') is not None and not w.get('estimated') for w in result['words'])
         return result
 
     def save_editorial(self,gid,kind,data):

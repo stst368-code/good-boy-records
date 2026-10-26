@@ -119,7 +119,7 @@ def test_busy_alignment_worker_waits_on_the_same_task_instead_of_failing(prepare
     monkeypatch.setattr(prep,'local_generation_busy',lambda:False)
     monkeypatch.setattr(prep.pool,'submit',lambda fn,identifier:submitted.append(identifier))
     queued=prep.auto_align(gid);identifier=queued['id']
-    monkeypatch.setattr('_gbr_preparation.service.subprocess.run',lambda *args,**kwargs:SimpleNamespace(returncode=1,stderr=b'Another GBR worker is already using this GPU'))
+    monkeypatch.setattr(prep.processing,'execute',lambda *args,**kwargs:SimpleNamespace(returncode=1,stderr=b'Another GBR worker is already using this GPU'))
     prep._run(identifier)
     task=review.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,))
     assert task['status']=='waiting' and task['completed_at'] is None

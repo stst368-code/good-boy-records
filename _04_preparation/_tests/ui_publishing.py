@@ -70,6 +70,8 @@ def main():
                     page.goto(f'http://127.0.0.1:{port}');page.wait_for_selector('#reviewerDialog[open]');page.locator('#knownReviewers button',has_text='Simon').click()
                     page.locator('#preparationTab').click();page.wait_for_selector('#prepProject option',state='attached');page.locator('#prepProject').select_option(gid)
                     page.wait_for_function("()=>document.getElementById('prepYamlRaw').textContent.includes('encoder_cfg: 1.7')")
+                    page.wait_for_selector('#prepQueueJobs .prep-task')
+                    assert 'Processing environment missing' in page.locator('#prepQueueStatus').text_content()
                     assert 'песня' in page.locator('#prepYamlCaption').text_content()
                     assert 'first line\n' in page.locator('#prepYamlLyrics').text_content().replace('\r\n','\n')
                     page.wait_for_function("()=>document.getElementById('prepAlignmentStatus').textContent.includes('Alignment: waiting')")

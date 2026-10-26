@@ -167,6 +167,21 @@ fresh timing approval and queue alignment for the new text. Invalid or missing
 YAML blocks publication with an error. If a package was already built, return it
 from Publish to Preparation and finish it again to include subsequent edits.
 
+**Preparation → Local processing queue** shows all active and waiting processing,
+the running song, current stage, elapsed time, actual CPU/CUDA device and a live
+worker log (including model downloads). Alignment runs one local task at a time;
+queuing several tracks does not launch several model instances. Missing setup,
+a live generation lock and a queue position have separate explanations. Historical
+generation status rows alone cannot reserve the GPU. **Check / resume queue**
+rechecks waiting tasks; stopped controllers are labelled interrupted and can be
+retried. Run `py -3.12 _97_app/run_gbr.py setup-processing` if its environment is
+missing. First use downloads the required models.
+
+Split and roughly positioned words are labelled **Estimated positions only**
+until real timing results arrive. Completed alignment reports the number of words
+actually timed; unmatched words remain estimates. Zero matches is an explicit
+alignment failure, not a successful result. Saved manual approval remains optional.
+
 Choose **Finish preparation → Publish queue** after saving lyric/lighting edits
 and choosing the source or master and artwork. This local step always makes an
 MP3 of that exact audio and does not require R2. **Publish** lists only completed

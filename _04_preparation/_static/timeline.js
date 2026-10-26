@@ -146,7 +146,7 @@ export function initTimeline({root,api,toast,audio,getTime,seek,play=()=>audio.p
   q('prepWordEditor').hidden=true;q('prepRecognitionDifferences').textContent=(data.unmatched_recognition||[]).map(w=>w.word).join(' ')||'No additional recognition tokens recorded.';
   q('prepLanguage').value=data.language;q('prepSensitivity').value=data.sensitivity;q('prepSensitivityValue').value=Number(data.sensitivity).toFixed(2);q('prepTimelineScrub').max=data.duration;
   const estimated=data.words.filter(w=>w.estimated&&!w.omitted).length;
-  q('prepTimelineStatus').textContent=(data.features?'Visual features ready. ':'Calculate visual features to preview star reactions. ')+(estimated?`${estimated} words roughly positioned in lyric order. `:'')+(data.approved?'Lyrics approved.':'You can approve without checking every word.');
+  q('prepTimelineStatus').textContent=(data.timing_source?data.timing_source+' · '+data.timed_words+'/'+data.words.length+' words timed. ':'')+(data.features?'Visual features ready. ':'Calculate visual features to preview star reactions. ')+(estimated?`${estimated} words roughly positioned in lyric order. `:'')+(data.approved?'Lyrics approved.':'You can approve without checking every word.');
   approval();paint();cues();reaction();if(!frame)tick();
  }
  const payload=()=>({source_sha256:data.source_sha256,input_artifact_id:artifact||null});
@@ -183,7 +183,7 @@ export function initTimeline({root,api,toast,audio,getTime,seek,play=()=>audio.p
  q('prepAlign').onclick=handle(async()=>{if(!data)return;await api(`/preparation/projects/${gid}/jobs`,{kind:'lyric_alignment',language:q('prepLanguage').value.trim(),input_artifact_id:artifact||null});q('prepTimelineStatus').textContent='Separation/alignment queued; output will appear when complete';});
  let lastWidth=0;new ResizeObserver(entries=>{const width=entries[0].contentRect.width;if(width!==lastWidth){lastWidth=width;timeline();}}).observe(q('prepWordTimeline'));
  return {chooseSource:async id=>{q('prepAudioSource').value=id;await q('prepAudioSource').onchange();},canSwitch:()=>!dirty&&!lightDirty&&!saving&&!dragging,artifact:()=>artifact,update:async(p)=>{
-  if(!p?.ready)return;const alignment=p.tasks.find(t=>t.kind==='lyric_alignment');q('prepAlignmentStatus').textContent=alignment?'Alignment: '+alignment.status+(alignment.status==='waiting'?' · processing setup or local GPU pending':''):'Automatic alignment pending';const changedSong=gid!==p.generation_id,nextSig=p.tasks.map(t=>t.id+t.status).join('|');
+  if(!p?.ready)return;const alignment=p.tasks.find(t=>t.kind==='lyric_alignment');q('prepAlignmentStatus').textContent=alignment?'Alignment: '+alignment.status+' · '+(alignment.status==='waiting'?alignment.error||'Queued':alignment.telemetry?.message||alignment.error||'See local processing queue'):'Estimated words only · alignment has not started';const changedSong=gid!==p.generation_id,nextSig=p.tasks.map(t=>t.id+t.status).join('|');
   if(changedSong){gid=p.generation_id;artifact='';signature='';dirty=lightDirty=false;viewStart=0;auditionEnd=null;}
   const source=q('prepAudioSource'),old=artifact;source.replaceChildren(new Option('Reviewed source',''));
   for(const a of p.masters||p.tasks.flatMap(t=>t.artifacts.filter(a=>a.available&&a.kind==='master_candidate').map(a=>({...a,created_at:t.created_at}))))source.append(new Option(`Master · ${a.created_at}`,a.id));source.value=old;

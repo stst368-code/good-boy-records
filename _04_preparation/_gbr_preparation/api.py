@@ -57,6 +57,12 @@ def router(root,review,local):
     @routes.get('/references')
     def references():return {'references':service.reference_list()}
 
+    @routes.get('/processing')
+    def processing():return service.processing.status()
+
+    @routes.post('/processing/resume')
+    def resume_processing():return service.processing.resume()
+
     @routes.post('/projects/{gid}/jobs')
     def job(gid: str,body: Job):return service.submit(gid,body.kind,body.model_dump(exclude={'kind'}))
 
