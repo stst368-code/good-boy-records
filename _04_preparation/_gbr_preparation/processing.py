@@ -87,6 +87,9 @@ class ProcessingQueue:
     def resume(self):
         self.recover()
         for row in self.db.all("SELECT * FROM processing_tasks WHERE kind='lyric_alignment' AND status='waiting' ORDER BY rowid"):
+            selection=self.db.one('SELECT status,COALESCE(published_at,updated_at) AS published_at FROM publishing_selection WHERE generation_id=?',(row['generation_id'],))
+            if not selection or selection['status'] not in {'selected','published'} or (selection['status']=='published' and selection['published_at'] and row['created_at']<=selection['published_at']):
+                self.db.execute("UPDATE processing_tasks SET status='cancelled',error='Publication was completed or deselected after this alignment was queued' WHERE id=?",(row['id'],));continue
             try:
                 data=self.prep.metadata.read(row['generation_id']);recipe=json.loads(row['recipe_json'])
                 if recipe.get('lyrics_sha256',data['original_lyrics_sha256'])!=data['lyrics_sha256']:

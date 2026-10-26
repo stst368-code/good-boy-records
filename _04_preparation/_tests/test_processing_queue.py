@@ -6,6 +6,7 @@ import sys
 import time
 
 from test_preparation import prepared,promote,wait
+from test_publishing import publication
 
 
 def test_missing_environment_is_reported_as_setup_not_gpu_overload(prepared):
@@ -55,6 +56,22 @@ def test_dead_controller_is_visible_as_interrupted_and_live_child_is_preserved(p
     review.db.execute('UPDATE processing_tasks SET telemetry_json=? WHERE id=?',(json.dumps({'owner':owner}),task['id']))
     status=prep.processing.status()
     assert status['failed']==1 and status['items'][0]['status']=='interrupted'
+
+
+def test_resume_does_not_start_obsolete_published_work_but_allows_explicit_library_alignment(publication,monkeypatch):
+    from test_library_workflow import published
+    review,prep,_,_,gid,_,_=publication
+    published(publication)
+    old=review.db.one("SELECT id FROM processing_tasks WHERE kind='lyric_alignment' AND status='waiting'")
+    submitted=[];monkeypatch.setattr(prep.pool,'submit',lambda fn,identifier:submitted.append(identifier))
+    monkeypatch.setattr(prep,'alignment_python',lambda:Path(sys.executable))
+    monkeypatch.setattr(prep,'local_generation_busy',lambda:False)
+    prep.processing.resume()
+    assert not submitted and review.db.one('SELECT status FROM processing_tasks WHERE id=?',(old['id'],))['status']=='cancelled'
+    monkeypatch.setattr(prep,'local_generation_busy',lambda:True)
+    new=prep.submit(gid,'lyric_alignment',{'language':'en','force':True});assert new['status']=='waiting'
+    monkeypatch.setattr(prep,'local_generation_busy',lambda:False)
+    prep.processing.resume();assert submitted==[new['id']]
 
 
 def test_alignment_streams_stages_unicode_logs_and_publishes_real_timing_result(prepared,monkeypatch):
