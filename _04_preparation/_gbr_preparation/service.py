@@ -345,7 +345,7 @@ class Preparation:
             if cached:
                 if cached['status']=='waiting':return self.launch_waiting(cached)
                 artifacts=self.db.all("SELECT uri FROM generation_artifacts WHERE json_extract(metadata_json,'$.processing_task_id')=?",(cached['id'],))
-                if cached['status']!='done' or artifacts and all(Path(a['uri']).is_file() for a in artifacts):return cached
+                if cached['status']!='done' or not (kind=='lyric_alignment' and data.get('force')) and artifacts and all(Path(a['uri']).is_file() for a in artifacts):return cached
             identifier=self._insert(gid,kind,recipe,source_hash,'waiting' if kind=='lyric_alignment' else 'queued')
             if kind=='lyric_alignment':return self.launch_waiting(self.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,)))
             self.submitted.add(identifier)

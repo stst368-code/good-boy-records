@@ -1,7 +1,7 @@
 """Preparation inside GBR, protected by the app's existing authentication."""
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt,StrictBool
 from typing import Literal
 from .service import Preparation
 
@@ -12,6 +12,7 @@ class Job(BaseModel):
     stem_task_id: str | None=None
     input_artifact_id: str | None=None
     language: str | None=None
+    force:StrictBool=False
     mix: dict=Field(default_factory=dict)
     start: float=Field(default=0,ge=0,allow_inf_nan=False)
     seconds: StrictInt=Field(default=30,ge=1,le=60)

@@ -85,3 +85,8 @@ print(json.dumps({'output':str(path),'artifact_kind':'lyric_alignment','software
     assert 'песня' in data['log_tail'] and data['phase']=='complete'
     editorial=prep.editorial(gid);assert editorial['timed_words']==4 and editorial['timing_source']=='WhisperX alignment'
     assert not list(prep.tracks.rglob('.gbr-processing-*')) and not review.db.all('PRAGMA foreign_key_check')
+    assert prep.submit(gid,'lyric_alignment',{'language':'en'})['id']==identifier
+    submitted=[];monkeypatch.setattr(prep.pool,'submit',lambda fn,new_id:submitted.append(new_id))
+    rerun=prep.submit(gid,'lyric_alignment',{'language':'en','force':True})
+    assert rerun['id']!=identifier and submitted==[rerun['id']]
+    assert prep.submit(gid,'lyric_alignment',{'language':'en','force':True})['id']==rerun['id']
