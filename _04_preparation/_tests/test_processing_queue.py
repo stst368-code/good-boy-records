@@ -50,7 +50,10 @@ def test_dead_controller_is_visible_as_interrupted_and_live_child_is_preserved(p
     review,prep,_,_,gid,_=prepared;promote(prepared)
     task=review.db.one("SELECT * FROM processing_tasks WHERE kind='lyric_alignment'")
     owner=prep.owner();owner.update(pid=99999999,created_at=1)
-    review.db.execute("UPDATE processing_tasks SET status='running',telemetry_json=? WHERE id=?",(json.dumps({'owner':owner,'child':{'pid':os.getpid(),'created_at':None}}),task['id']))
+    # Keep this recovery test independent of container PID namespaces: /proc
+    # and os.getpid() need not expose the same PID on a sandboxed test host.
+    monkeypatch.setattr(prep.processing,'alive',lambda identity:identity.get('pid')==12345)
+    review.db.execute("UPDATE processing_tasks SET status='running',telemetry_json=? WHERE id=?",(json.dumps({'owner':owner,'child':{'pid':12345,'created_at':None}}),task['id']))
     prep.processing.recover()
     assert review.db.one('SELECT status FROM processing_tasks WHERE id=?',(task['id'],))['status']=='running'
     review.db.execute('UPDATE processing_tasks SET telemetry_json=? WHERE id=?',(json.dumps({'owner':owner}),task['id']))
