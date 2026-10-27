@@ -92,6 +92,8 @@ def preflight(inputs, specification, styles=None, template_root=None, require_pa
                         issues.append(Issue("unknown_style_pair", "cluster/style is absent from styles.csv"))
                 if specification.get("template_id") or not values.get("caption") and cluster and style and styles is not None:
                     row = styles.choose(cluster, style, specification.get("template_id"))
+                    if row.get('song_id') and str(row['song_id'])!=str(item.song_id):
+                        raise ValueError('This caption is linked to another song; choose an unlinked caption or one linked to this song')
                     if template_root is None:
                         raise ValueError("Template selection requires --template-root")
                     root = Path(template_root).resolve(strict=True)

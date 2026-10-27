@@ -285,14 +285,31 @@ The desktop workspace is fluid up to 1920 px; the preparation page uses that wid
 The public GBR site now lives in `_96_website`; startup migrates local website files from
 `_04_website` and `_05_website`, including untracked media, without rewriting their bytes.
 
-Writing connects to a running llama.cpp server under Settings → Writing model settings
+Writing opens on **Base**. Enter a song name and lyrics, with optional writing/author,
+inspiration artist/song and album/position. Save lowercases these entries, removes blank
+lyric lines and hyphenates the title. It creates a template-based YAML under `_built/_yaml`,
+appends `track_list.csv` and registers the song and base variant in the existing shared
+catalogue tables. IDs respect both CSV and database records. Choose an existing track or
+variant under Start from to load its lyrics and metadata; saving creates the next variant
+and appends `variant_list.csv`, preserving the original source and unrelated YAML fields.
+
+**Captions** is independent of lyrics. Its three sections contain editable subsection
+boxes, each with searchable reference examples. Loading an example copies only that
+subsection. Cluster is required, version is optional; occupied cluster/version pairs
+receive a numeric suffix. Custom captions use `_references/_custom_templates` and the
+existing `styles.csv` index, extended with `version` and optional `song_id` columns when
+needed. An unlinked caption can be used with any track; generation excludes captions
+linked to other songs. Saves and retries use the existing writing ledger, with no new
+database, one-time setup script or schema migration.
+
+The **Model assistant** retains the existing draft workflow. It connects to a running llama.cpp server under Settings → Writing model settings
 (or Worker settings → Writing model). Binaries remain in `_99_tools/_llama_cpp`; query the
 server's loaded model before sending a brief. No model downloads occur on app startup.
 New songs, lyric/caption rewrites, combined rewrites and translations produce editable
 drafts. Lore and caption references are optional; an empty `_references/_lyrics` folder
 is a valid fallback. Put tagged song examples there as UTF-8 TXT, Markdown or YAML files.
 
-Only adding a reviewed draft to Built changes the active writing collection. New songs
+For model requests, only adding a reviewed draft to Built changes the active writing collection. New songs
 receive the next song ID; keep-original rewrites receive a new variant ID. Archive-and-replace
 moves the exact original YAML into `_01_writing/_archive/<draft-id>` and retains its IDs.
 Catalogue publication is journalled and can finish after interruption. Unrequested YAML

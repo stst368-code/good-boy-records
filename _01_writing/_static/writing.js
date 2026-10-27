@@ -1,4 +1,5 @@
 import {toggleChoices,selectChoices,languageChoices} from "/static/choices.js";
+import {initAuthoring} from './authoring.js';
 export function initWriting({api,toast,onPublished}) {
   const root = document.getElementById('writingView'), settings = document.getElementById('writingSettingsDialog');
   root.innerHTML = `<div class="section-heading writing-heading"><h1>Writing</h1><button id="writeSettings" type="button">Writing model settings</button></div>
@@ -100,7 +101,9 @@ export function initWriting({api,toast,onPublished}) {
   $('writeRetry').onclick=guard(async()=>{const result=await api('/writing/tasks/'+state.current.id+'/action',{action:'retry'});await refresh();await openTask(result.tasks[0]);});
   $('writeCancel').onclick=guard(async()=>{paint(await api('/writing/tasks/'+state.current.id+'/action',{action:'cancel'}));await refresh();});
   window.addEventListener('beforeunload',event=>{if(state.dirty){event.preventDefault();event.returnValue='';}});
+  const authoring=initAuthoring({root,api,toast,onPublished,refreshDrafts:refresh});
   return {openSettings,close:()=>clearInterval(state.timer),async open(){
+    await authoring.open();
     await scan();state.templates=(await api('/generation/templates')).templates;templatePicker.load(state.templates.map(t=>({value:t.id,label:t.cluster+' / '+t.style+' · '+(t.version||t.id)})));styleChoices('writeCluster','writeStyle');styleChoices('writeDraftCluster','writeDraftStyle');state.loaded=true;
     await refresh();mode();clearInterval(state.timer);state.timer=setInterval(()=>{if(root.hidden){clearInterval(state.timer);return;}refresh().catch(error=>toast(error.message));},2500);
   }};

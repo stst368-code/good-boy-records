@@ -231,6 +231,7 @@ class GenerationService:
                 caption_style = data.get('caption_style') or (rating_filter or {}).get('style')
                 caption_pool = [key for key, row in styles.by_id.items()
                         if (caption_templates is None or key in caption_templates)
+                        and (not row.get('song_id') or str(row['song_id'])==str(item.song_id))
                         and (not caption_cluster or row['cluster'].casefold() == caption_cluster.strip().casefold())
                         and (not caption_style or row['style_primary'].casefold() == caption_style.strip().casefold())]
                 if caption_count > len(caption_pool):

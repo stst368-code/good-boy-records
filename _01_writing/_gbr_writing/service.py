@@ -99,6 +99,7 @@ class WritingService:
     def catalogue(self):
         catalogue = Catalogue(self.built)
         return {'inputs':[{'file':str(i.path.relative_to(self.built)),'song_id':i.song_id,'variant_id':i.variant_id,
+                         'title':i.metadata.get('song_name') or i.path.stem,'metadata':i.metadata,
                          'issues':[issue.message for issue in i.issues]} for i in catalogue.inputs], 'root':str(self.built)}
 
     def source(self, filename):
@@ -236,6 +237,10 @@ class WritingService:
                     number = old_variant;catalogue = master if number == 1 else variant;target = source
                 elif mode == 'keep':
                     numbers = [int(r['variant_id']) for r in variants if r['song_id'] == str(song) and str(r['variant_id']).isdigit()]
+                    numbers += [int(r['variant_id']) for r in self.review.db.all('SELECT variant_id FROM catalogue_variants WHERE song_id=?',(str(song),)) if str(r['variant_id']).isdigit()]
+                    for pending in self.review.db.all("SELECT publication_json FROM writing_tasks WHERE status='publishing'"):
+                        saved=json.loads(pending['publication_json'])
+                        if str(saved.get('song_id'))==str(song):numbers.append(int(saved['variant_id']))
                     number = max([1,*numbers])+1;catalogue = variant
                     target = source.with_name((title_key(values['title']) or 'song')+'__v'+str(number)+'.yaml')
                 else:raise ValueError('Choose keep-original or archive-and-replace')
@@ -244,13 +249,18 @@ class WritingService:
                 if len(source_rows) != 1:raise ValueError('Source IDs and filename must match one catalogue record')
                 row = dict(source_rows[0])
             else:
-                song = max([0,*[int(r['song_id']) for r in masters if str(r['song_id']).isdigit()]])+1
+                reserved = [int(r['song_id']) for r in self.review.db.all('SELECT song_id FROM catalogue_songs') if str(r['song_id']).isdigit()]
+                for pending in self.review.db.all("SELECT publication_json FROM writing_tasks WHERE status='publishing'"):
+                    value=json.loads(pending['publication_json']).get('song_id')
+                    if value:reserved.append(int(value))
+                song = max([0,*reserved,*[int(r['song_id']) for r in masters+variants if str(r['song_id']).isdigit()]])+1
                 number = 1;catalogue = master;target = self.built/'_yaml'/((title_key(values['title']) or 'song')+'.yaml');row = {}
             if target.exists() and target != source:raise ValueError('Destination YAML already exists; choose another title or fix the catalogue')
             raw = patch_fields(raw,{'song_id':song,'variant_id':number},self.template)
             row.setdefault('author','gbr')
             row.update(song_id=str(song),variant_id=str(number),filename=str(target.relative_to(self.built)).replace('\\','/'),
                        song_name=values['title'])
+            row.update(json.loads(task['request_json']).get('catalogue_metadata',{}))
             original_values = YamlDocument(task['source_yaml']).values
             if not source or any(values.get(k) != original_values.get(k) for k in ('cluster','style')):
                 cluster,style = values.get('cluster') or '',values.get('style') or ''
@@ -296,37 +306,58 @@ class WritingService:
                 temporary.replace(catalogue)
             finally:temporary.unlink(missing_ok=True)
         with self.review.db.transaction() as connection:
+            # Register the published recipe in the existing central catalogue tables.
+            # CSV and YAML are verified first; an interrupted commit can be resumed.
+            masters=list(csv.DictReader(io.StringIO((self.built/'track_list.csv').read_bytes().decode('utf-8-sig'))))
+            variants=list(csv.DictReader(io.StringIO((self.built/'variant_list.csv').read_bytes().decode('utf-8-sig'))))
+            master=next(r for r in masters if str(r['song_id'])==str(plan['song_id']))
+            connection.execute('INSERT INTO catalogue_songs VALUES(?,?,?) ON CONFLICT(song_id) DO UPDATE SET title=excluded.title,metadata_json=excluded.metadata_json',
+                               (str(plan['song_id']),master.get('song_name',''),packed(master)))
+            connection.execute('INSERT INTO catalogue_variants VALUES(?,?,?,?) ON CONFLICT(song_id,variant_id) DO UPDATE SET filename=excluded.filename,metadata_json=excluded.metadata_json',
+                               (str(plan['song_id']),'1',master['filename'],packed(master)))
+            record=next(r for r in (masters if plan['variant_id']==1 else variants) if str(r['song_id'])==str(plan['song_id']) and (plan['variant_id']==1 or str(r['variant_id'])==str(plan['variant_id'])))
+            connection.execute('INSERT INTO catalogue_variants VALUES(?,?,?,?) ON CONFLICT(song_id,variant_id) DO UPDATE SET filename=excluded.filename,metadata_json=excluded.metadata_json',
+                               (str(plan['song_id']),str(plan['variant_id']),record['filename'],packed(record)))
             plan.pop('after_csv',None)
             plan['published_at'] = now()
             connection.execute("UPDATE writing_tasks SET status='published',publication_json=? WHERE id=?",(packed(plan),identifier))
         return self.public(identifier)
 
-    def save_caption_template(self, identifier, template_id):
+    def save_caption_template(self, identifier, template_id, source='llm', extra=None):
         if not re.fullmatch('[a-z0-9][a-z0-9_-]{1,119}',template_id):raise ValueError('Use a unique lowercase template ID with letters, digits, underscores or hyphens')
         folder = self.root/'_01_writing/_references';catalogue = folder/'styles.csv'
         with self.lock,gpu_lock('gbr-caption-catalogue:'+str(folder.resolve())):
             task = self.task(identifier)
             if task['status'] not in {'ready','published'}:raise ValueError('Save a completed draft first')
             values = YamlDocument(task['result_yaml']).values;caption = values.get('caption') or ''
-            validate_template_format(caption,'llm')
+            validate_template_format(caption,source)
             if not values.get('cluster') or not values.get('style'):raise ValueError('Set cluster and style on this draft before saving a template')
             details = json.loads(task['result_json']);plans = details.setdefault('caption_templates',{})
             plan = plans.get(template_id)
             if plan and plan.get('complete'):
                 if plan['caption_sha256'] != sha(caption.encode()):raise ValueError('This template ID already contains an earlier caption; use another ID')
                 return plan
-            target = folder/'_llm_templates'/(template_id+'.txt')
+            template_folder='_custom_templates' if source=='custom' else '_llm_templates'
+            target = folder/template_folder/(template_id+'.txt')
             if not plan:
                 before = catalogue.read_bytes();rows = list(csv.DictReader(io.StringIO(before.decode('utf-8-sig'))))
                 if any(r['ID'] == template_id for r in rows) or target.exists():raise ValueError('Template ID or file already exists')
                 row = {'ID':template_id,'cluster':values['cluster'],'style_primary':values['style'],
-                       'template':'_llm_templates/'+template_id+'.txt','template_source':'llm'}
+                       'template':template_folder+'/'+template_id+'.txt','template_source':source,**(extra or {})}
                 # Styles uses ID rather than filename; retain every existing row byte.
                 names = next(csv.reader(io.StringIO(before.decode('utf-8-sig'))));out = io.StringIO(newline='')
                 eol = '\r\n' if b'\r\n' in before else '\n'
                 if 'template_source' not in names:raise ValueError('styles.csv requires template_source before adding LLM templates')
+                missing=[key for key in (extra or {}) if key not in names]
+                if missing:
+                    # Extend the shared index once, retaining every original row and column.
+                    names+=missing
+                    writer=csv.DictWriter(out,names,lineterminator=eol);writer.writeheader();writer.writerows(rows)
+                    bom=b'\xef\xbb\xbf' if before.startswith(b'\xef\xbb\xbf') else b''
+                    prefix=bom+out.getvalue().encode('utf8');out=io.StringIO(newline='')
+                else:prefix=before+(eol.encode() if not before.endswith((b'\r',b'\n')) else b'')
                 csv.DictWriter(out,names,lineterminator=eol).writerow({k:row.get(k,'') for k in names})
-                after = before + (eol.encode() if not before.endswith((b'\r',b'\n')) else b'') + out.getvalue().encode()
+                after = prefix + out.getvalue().encode()
                 plan = {'id':template_id,'path':str(target),'caption':caption,'caption_sha256':sha(caption.encode()),'before_sha':sha(before),'after_csv':after.decode('utf8'),'complete':False}
                 plans[template_id] = plan
                 with self.review.db.transaction() as connection:connection.execute('UPDATE writing_tasks SET result_json=? WHERE id=?',(packed(details),identifier))

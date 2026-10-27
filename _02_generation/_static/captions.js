@@ -17,7 +17,7 @@ export function initCaptions({root,onChange}){
       button.onclick=()=>{includeNew=false;groups[cluster].enabled=!groups[cluster].enabled;paint();onChange();};
       const versions=document.createElement('details');versions.className='caption-versions';const summary=document.createElement('summary');summary.textContent='Versions';summary.setAttribute('aria-label','Template versions for '+cluster);
       const select=document.createElement('select');select.setAttribute('aria-label','Template version for '+cluster);select.append(new Option('All styles / versions',''));
-      const items=templates.filter(t=>t.cluster===cluster);for(const t of items)select.append(new Option(`${t.style} · ${t.version||t.id} · ${t.source||'template'}`,t.id));
+      const items=templates.filter(t=>t.cluster===cluster);for(const t of items)select.append(new Option(`${t.style} · ${t.version||t.id} · ${t.source||'template'}${t.song_id?' · song #'+t.song_id:''}`,t.id));
       const old=groups[cluster];if(old.template_id==='@saved')select.append(new Option('Saved selection · '+old.template_ids.length+' versions','@saved'));else if(old.template_id&&!items.some(t=>t.id===old.template_id))select.append(new Option('Unavailable · '+old.template_id,old.template_id));
       select.onchange=()=>{groups[cluster].template_id=select.value;groups[cluster].enabled=true;paint();onChange();};versions.append(summary,select);row.append(button,versions);grid.append(row);controls.set(cluster,{row,button,select});
     }

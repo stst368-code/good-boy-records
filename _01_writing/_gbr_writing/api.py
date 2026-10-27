@@ -2,6 +2,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from .service import WritingService
+from .authoring import Authoring
 
 
 class Body(BaseModel):
@@ -40,12 +41,43 @@ class Template(Body):
 class Action(Body):
     action: Literal['retry','cancel']
 
+class BaseSave(Body):
+    request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    file: str = Field(default='',max_length=2000)
+    source_sha256: str = Field(default='',max_length=64)
+    title: str = Field(min_length=1,max_length=500)
+    lyrics: str = Field(min_length=1,max_length=200000)
+    author: str = Field(default='gbr',max_length=1000)
+    inspiration_author: str = Field(default='',max_length=1000)
+    inspiration_track: str = Field(default='',max_length=1000)
+    album_name: str = Field(default='',max_length=1000)
+    album_position: int | None = Field(default=None,ge=1,strict=True)
+
+class CaptionSave(Body):
+    request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    cluster: str = Field(min_length=1,max_length=500)
+    version: str = Field(default='',max_length=500)
+    song_id: str = Field(default='',max_length=30)
+    fields: dict[str,str] = Field(max_length=12)
+
 
 def router(root, review, local, reviewer_id):
     service = WritingService(root,review)
+    authoring = Authoring(service)
     def host_only(request: Request):
         if not local(request):raise HTTPException(403,'Open Writing on the host computer to edit recipes or send model requests')
     routes = APIRouter(prefix='/api/writing',dependencies=[Depends(host_only)])
+
+    @routes.get('/authoring')
+    def options():return authoring.options()
+    @routes.get('/base')
+    def source(file: str):return authoring.source(file)
+    @routes.post('/base')
+    def save_base(body: BaseSave,request: Request):return authoring.save_base(body.model_dump(),reviewer_id(request))
+    @routes.get('/caption-examples')
+    def examples(field: str,q: str='',cluster: str=''):return authoring.examples(field,q,cluster)
+    @routes.post('/captions')
+    def save_caption(body: CaptionSave,request: Request):return authoring.save_caption(body.model_dump(),reviewer_id(request))
 
     @routes.get('/settings')
     def settings():return service.settings()

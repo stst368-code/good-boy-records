@@ -162,7 +162,8 @@ def router(root, review_service, local):
                 if not path.is_file() or not path.read_text(encoding='utf-8-sig').strip():continue
             except (OSError,UnicodeError):continue
             rows.append({'id':row['ID'],'cluster':row['cluster'],'style':row['style_primary'],
-                         'source':row.get('template_source'),'version':row.get('version') or row.get('template_version')})
+                         'source':row.get('template_source'),'version':row.get('version') or row.get('template_version'),
+                         'song_id':row.get('song_id') or None})
         return {'templates':rows}
 
     @routes.get('/workers')

@@ -19,6 +19,7 @@ jobs:
       - run: python -m pip install -r _03_review/_generation_review/requirements-dev.txt
       - run: python -m pytest _01_writing/_tests _04_preparation/_tests _02_generation/_tests/test_layout.py -q
       - run: node --input-type=module --check < _01_writing/_static/writing.js
+      - run: node --input-type=module --check < _01_writing/_static/authoring.js
       - run: node --input-type=module --check < _03_review/_generation_review/_review/_static/app.js
       - run: node --input-type=module --check < _03_review/_generation_review/_review/_static/choices.js
       - run: node --input-type=module --check < _99_tools/_yaml_editor/_static/editor.js
