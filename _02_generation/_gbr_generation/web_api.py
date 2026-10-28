@@ -67,6 +67,20 @@ class AutoWorkers(Body):
 class WorkerQuery(WorkerChoice):
     activate: StrictBool = False
 
+class RunpodSettings(Body):
+    # Validate secret length in the credential layer so validation responses
+    # cannot echo an overlong key as Pydantic's `input` value.
+    api_key: str = Field(default='',repr=False,exclude=True)
+    enabled: StrictBool = False
+    interval: int = Field(default=30,ge=10,le=3600,strict=True)
+    candidate_ports: list[int] = Field(default_factory=lambda:[8188],max_length=8)
+    identity_file: str = Field(default='',max_length=4000)
+    native: StrictBool = True
+
+class DiscoveredWorker(WorkerChoice):
+    enabled: StrictBool
+    auto_allocate: StrictBool
+
 
 class RatingFilter(Body):
     threshold: float = Field(ge=0, le=5, allow_inf_nan=False)
@@ -169,6 +183,25 @@ def router(root, review_service, local):
     @routes.get('/workers')
     def workers(refresh: bool = False):
         return {'workers': service.workers.list(refresh)}
+
+    @routes.get('/runpod')
+    def runpod_status():return service.runpod.status()
+    @routes.post('/runpod/settings')
+    def runpod_save(body:RunpodSettings):return service.runpod.save({**body.model_dump(),'api_key':body.api_key})
+    @routes.post('/runpod/refresh')
+    def runpod_refresh():return service.runpod.refresh()
+    @routes.post('/runpod/test')
+    def runpod_test():
+        # The same read-only asynchronous operation tests authentication and
+        # reports account errors separately from subsequent service failures.
+        return service.runpod.refresh()
+    @routes.post('/runpod/inspect')
+    def runpod_inspect(body:WorkerChoice):
+        if not service.workers.get(body.worker_id).get('runpod'):raise ValueError('Choose a discovered RunPod worker')
+        return service.runpod.refresh(body.worker_id)
+    @routes.post('/runpod/worker')
+    def runpod_worker(body:DiscoveredWorker):
+        return service.workers.set_discovered(body.worker_id,body.enabled,body.auto_allocate)
 
     @routes.post('/workers')
     def save_worker(body: WorkerSettings):

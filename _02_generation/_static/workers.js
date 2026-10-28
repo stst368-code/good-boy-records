@@ -1,9 +1,10 @@
 import {selectChoices} from "/static/choices.js";
+import {initRunpod} from './runpod.js';
 export function workerLabel(worker) {
-  const c = worker.connection;
+  const c = worker.connection||{backend:'unknown'};
   const name = {local: 'Native · this PC', comfyui: 'ComfyUI', runpod_dedicated: 'Pod', runpod_serverless: 'Serverless'}[c.backend];
   const s = worker.status;
-  return `${name}${c.address ? ' · ' + c.address : ''}${worker.enabled === false ? ' · disabled' : s?.online ? s.busy ? ' · busy' : ' · idle' : s?.online === false ? ' · offline' : ' · unchecked'}`;
+  return `${worker.runpod?.name||name||'Unknown pod'}${c.address ? ' · ' + c.address : ''}${worker.enabled === false ? ' · disabled' : s?.online ? s.busy ? ' · busy' : ' · idle' : s?.online === false ? ' · offline' : ' · unchecked'}`;
 }
 
 export function initWorkers({api, toast, onChange, configureWriting}) {
@@ -19,7 +20,7 @@ export function initWorkers({api, toast, onChange, configureWriting}) {
     <label id="workerSetupWrap" class="generation-check"><input id="workerSetup" type="checkbox" checked>Prepare native worker automatically</label>
     <label class="generation-check"><input id="workerEnabled" type="checkbox" checked>Include in Automatic selection</label>
     <details id="workerLauncher"><summary>Local ComfyUI start file</summary><label>Absolute start-file path<input id="workerStartFile" placeholder="E:\\ComfyUI_windows_portable\\run_nvidia_gpu.bat"></label><label>Arguments <span class="subtle">(JSON list, optional)</span><input id="workerStartArgs" placeholder='["--listen", "127.0.0.1"]'></label><label>Working folder <span class="subtle">(blank uses start-file folder)</span><input id="workerStartCwd"></label><label>Python for a .py start file <span class="subtle">(optional)</span><input id="workerStartPython"></label><label class="generation-check"><input id="workerAutoStart" type="checkbox">Auto-start when a generation needs this worker</label></details>
-    <div id="workerServerless" hidden><label>RunPod API key <span class="subtle">(session only)</span><input id="workerApiKey" type="password" autocomplete="new-password"></label><details><summary>S3 / R2 result transfer</summary><label>Endpoint<input id="workerStorageEndpoint"></label><label>Bucket<input id="workerStorageBucket"></label><label>Region<input id="workerStorageRegion" value="auto"></label><label>Access key<input id="workerStorageAccess" type="password" autocomplete="new-password"></label><label>Secret key<input id="workerStorageSecret" type="password" autocomplete="new-password"></label></details></div>
+    <div id="workerServerless" hidden><p class="subtle small">Uses the RunPod account key configured above.</p><details><summary>S3 / R2 result transfer</summary><label>Endpoint<input id="workerStorageEndpoint"></label><label>Bucket<input id="workerStorageBucket"></label><label>Region<input id="workerStorageRegion" value="auto"></label><label>Access key<input id="workerStorageAccess" type="password" autocomplete="new-password"></label><label>Secret key<input id="workerStorageSecret" type="password" autocomplete="new-password"></label></details></div>
     <div class="generation-inline"><button id="workerSave" class="primary" type="button">Save worker</button><button id="workerDelete" type="button">Remove</button></div>
   </section><section class="generation-panel"><h2>Discovery & defaults</h2><div class="generation-inline"><button id="workerQuery" type="button">Query models & GPU</button><button id="workerStart" type="button">Start / query</button><button id="workerPrepare" type="button">Prepare worker</button></div>
     <p id="workerStatus" class="subtle small" role="status"></p><p id="workerGpu" class="small"></p><p id="workerSupport" class="subtle small"></p>
@@ -75,6 +76,7 @@ export function initWorkers({api, toast, onChange, configureWriting}) {
   }
   function fill(entry = null) {
     current = entry?.id || null;
+    $('workerDelete').textContent=entry?.runpod?'Disable discovered worker':'Remove';
     const c = entry?.connection || {backend:'comfyui', memory_profile:'auto', auto_setup:true};
     $('workerBackend').value = c.backend; $('workerAddress').value = c.address || ''; $('workerKey').value = c.identity_file || '';keyChoices();
     $('workerPython').value = c.worker_python || ''; $('workerMemory').value = c.memory_profile || 'auto'; $('workerSetup').checked = c.auto_setup !== false; $('workerEnabled').checked = entry?.enabled !== false;
@@ -100,11 +102,11 @@ export function initWorkers({api, toast, onChange, configureWriting}) {
       enabled:$('workerEnabled').checked, defaults,
       launcher:localComfy() ? {path:$('workerStartFile').value.trim(),args:$('workerStartArgs').value.trim() ? JSON.parse($('workerStartArgs').value) : [],cwd:$('workerStartCwd').value.trim(),python:$('workerStartPython').value.trim(),auto_start:$('workerAutoStart').checked} : {},
       storage_endpoint:$('workerStorageEndpoint').value.trim(),storage_bucket:$('workerStorageBucket').value.trim(),storage_region:$('workerStorageRegion').value.trim() || 'auto',
-      secrets:{api_key:$('workerApiKey').value,s3_access_key:$('workerStorageAccess').value,s3_secret_key:$('workerStorageSecret').value}};
+      secrets:{s3_access_key:$('workerStorageAccess').value,s3_secret_key:$('workerStorageSecret').value}};
   }
   async function save() {
     const entry = await api('/generation/workers', body()); current = entry.id;
-    for (const id of ['workerApiKey','workerStorageAccess','workerStorageSecret']) $(id).value = '';
+    for (const id of ['workerStorageAccess','workerStorageSecret']) $(id).value = '';
     await load(); return entry;
   }
   $('workersClose').onclick = () => root.close();
@@ -121,6 +123,7 @@ export function initWorkers({api, toast, onChange, configureWriting}) {
   $('workerQuery').onclick = query(false); $('workerStart').onclick = query(true);
   $('workerPrepare').onclick = guarded(async () => {await save(); await api('/generation/workers/prepare', {worker_id:current}); toast('Worker preparation started. Progress appears in Generation jobs.');});
   $('workerDelete').onclick = guarded(async () => {if (!current) return; await api('/generation/workers/remove', {worker_id:current}); current = null; await load(); fill();});
+  const runpod=initRunpod({root,api,toast,onChange:()=>load()});
   return {async open() {
     root.showModal();
     const controls=[...root.querySelectorAll('input,select,button:not(#workersClose)')];controls.forEach(node=>node.disabled=true);$('workerStatus').textContent='Loading workers…';
@@ -128,9 +131,9 @@ export function initWorkers({api, toast, onChange, configureWriting}) {
     const prefs = await api('/generation/preferences');
     sshKeys=prefs.key_candidates||[];
     for (const [id,key] of [['workerStorageEndpoint','storage_endpoint'],['workerStorageBucket','storage_bucket'],['workerStorageRegion','storage_region']]) $(id).value = prefs[key] || '';
-    $('workerApiKey').placeholder = prefs.has_api_key ? 'Configured for this session' : 'RUNPOD_API_KEY is also supported';
     $('workerStorageSecret').placeholder = prefs.has_storage_key ? 'Configured for this session' : '';
     await load(); fill(entries.find(e => e.id === current) || entries.at(-1));
+    await runpod.open(sshKeys);
     } finally {controls.forEach(node=>node.disabled=false);}
   }};
 }

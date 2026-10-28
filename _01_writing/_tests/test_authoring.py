@@ -160,3 +160,31 @@ def test_caption_unicode_names_and_retry_after_locked_index_preserve_references(
     assert styles.by_id[result['id']]['version']=='Été'
     assert len([r for r in styles.rows if r['ID']==result['id']])==1
     assert not list(f.root.rglob('*.tmp'))
+
+
+def test_caption_auditions_match_exact_elements_good_latest_ratings_and_available_audio(app):
+    import numpy as np
+    import soundfile as sf
+    f,w=app;service=w.review
+    reference=compose({'vocal_style':'Gentle lead vocals','basic':'Rock band'})
+    (f.root/'_01_writing/_references/_minimax_templates/base.txt').write_text(reference)
+    def recording(name,score,caption_text):
+        path=f.root/(name+'.flac');sf.write(path,np.sin(np.arange(16000)*(.03+score*.001)),16000,subtype='PCM_24')
+        path.with_suffix('.yaml').write_text('title: '+name+'\ncaption: '+json.dumps(caption_text)+'\nlyrics: words\n')
+        aid=service.indexer.index(path);gid=service.db.one('SELECT id FROM generations WHERE audio_id=?',(aid,))['id'];rid=service.default_reviewer_id
+        with service.db.transaction() as db:
+            session=service.queues.session(db,rid)
+            db.execute('INSERT INTO queue_reservations VALUES(?,?,?,?,?,?)',(aid,rid,gid,0,service.queues.clock(),service.queues.clock()+180))
+            db.execute('UPDATE sessions SET current_generation_id=? WHERE id=?',(gid,session['id']))
+        service.review(gid,dict.fromkeys(['audio_quality','composition','consistency','realism'],score),'quick')
+        return gid,path
+    good,audio=recording('good-song',5,compose({'vocal_style':'Gentle lead vocals','primary':'Different instruments'}))
+    poor,_=recording('poor-song',3,reference)
+    other,_=recording('other-song',4,compose({'vocal_style':'Rough shouted vocals'}))
+    response=f.client.get('/api/writing/caption-auditions',params={'field':'vocal_style','template_id':'base'})
+    assert response.status_code==200,response.text
+    rows=response.json()['recordings'];assert [row['id'] for row in rows]==[good]
+    assert rows[0]['bucket']==5 and rows[0]['playback_url'].startswith('/api/playback/')
+    playback=f.client.get(rows[0]['playback_url']);assert playback.status_code==200 and playback.headers['content-type']=='audio/flac'
+    audio.unlink()
+    assert not f.client.get('/api/writing/caption-auditions',params={'field':'vocal_style','template_id':'base'}).json()['recordings']

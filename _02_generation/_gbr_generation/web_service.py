@@ -36,6 +36,8 @@ class GenerationService:
         self.workers = Workers(self)
         from .dispatch import Dispatcher
         self.dispatcher=Dispatcher(self)
+        from .runpod_account import RunpodDiscovery
+        self.runpod=RunpodDiscovery(self)
 
     @property
     def runtime(self):
@@ -84,7 +86,7 @@ class GenerationService:
     def preferences(self):
         saved = deepcopy(self.review.config.values.get('generation', {}))
         keys = key_candidates()
-        connections = [e['connection'] for e in saved['workers']] if 'workers' in saved else saved.get('connections', [])
+        connections = [e['connection'] for e in saved['workers'] if e.get('connection')] if 'workers' in saved else saved.get('connections', [])
         if not connections and 'workers' not in saved:
             connections = [normalize({'backend': 'local'})]
             latest = self.runtime / 'local_test/latest.json'
@@ -102,7 +104,7 @@ class GenerationService:
                 'storage_endpoint': saved.get('storage_endpoint', os.environ.get('GBR_S3_ENDPOINT', '')),
                 'storage_bucket': saved.get('storage_bucket', os.environ.get('GBR_S3_BUCKET', '')),
                 'storage_region': saved.get('storage_region', os.environ.get('AWS_DEFAULT_REGION', 'auto')),
-                'has_api_key': bool(self.secrets.get('api_key') or os.environ.get('RUNPOD_API_KEY')),
+                'has_api_key': bool(self.runpod.credential.get()),
                 'has_storage_key': bool(self.secrets.get('s3_secret_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')),
                 'shared_database_ready': self.shared_ready()}
 
@@ -366,10 +368,12 @@ class GenerationService:
                 del self.previews[next(iter(self.previews))]
             token = uuid.uuid4().hex
             self.previews[token] = {'created': now, 'checked': checked, 'spec': spec, 'connection': connection,
+                'worker_id':(data.get('_worker') or {}).get('id',connection_key(connection)),
                 'launcher': (data.get('_worker') or {}).get('launcher'),
                 'workers':data.get('_pool'),
                 'root': catalogue.root, 'layout': data.get('layout', 'single'),
                 'selection': {key: data.get(key) for key in ('purpose','experiment_label','worker_id','files', 'all_inputs', 'songs', 'albums', 'order', 'rating_filter', 'parameter_priority', 'template_id', 'catalogue_captions', 'caption_mode', 'caption_count', 'caption_cluster', 'caption_style','caption_templates', 'experiments')}}
+            self.previews[token]['selection']['resolved_worker_id']=(data.get('_worker') or {}).get('id',connection_key(connection))
             if rating_evidence is not None:
                 self.previews[token]['selection']['review_filter'] = rating_evidence
         return {'token': token, 'inputs': [record.summary() for record in checked], 'ready': sum(record.ready for record in checked),
@@ -377,16 +381,18 @@ class GenerationService:
                 'purpose': spec['purpose'], 'experiment_label': spec['experiment_label'],
                 'output_root': str(self.experimental if spec['purpose'] == 'experiment' else self.generated),
                 'generation_count': sum(len(r.planned_runs or [{}]) for r in checked if r.ready),
-                'execution': spec['execution'], 'parameters': spec['defaults'], 'worker_id': connection_key(connection)}
+                'execution': spec['execution'], 'parameters': spec['defaults'], 'worker_id': self.previews[token]['worker_id']}
 
     def launch(self, task, credentials=None):
+        if str(task.get('worker_id','')).startswith('runpod|'):
+            task={**task,'runpod_pod_id':task['worker_id'].split('|',1)[1]}
         folder = self.runtime / 'app_jobs' / uuid.uuid4().hex
         folder.mkdir(parents=True)
         path = folder / 'task.json'
         path.write_text(json_text(task), encoding='utf-8')
         env = python_environment()
         for name, variable in SECRET_ENV.items():
-            value = (credentials or {}).get(name) or self.secrets.get(name)
+            value = (credentials or {}).get(name) or (self.runpod.credential.get() if name=='api_key' else self.secrets.get(name))
             if value:
                 env[variable] = value
         saved = self.review.config.values.get('generation', {})
@@ -454,7 +460,7 @@ class GenerationService:
             else:
                 result = self.launch({'manifest': str(manifest), 'batch_id': batch_id, 'connection': preview['connection'],
                                       'launcher': preview.get('launcher'),
-                                      'install': preview['connection']['auto_setup'],'worker_id':connection_key(preview['connection'])})
+                                      'install': preview['connection']['auto_setup'],'worker_id':preview['worker_id']})
             self.review.scan_event.set()
             return result
 
@@ -473,6 +479,7 @@ class GenerationService:
             active = self.active(folder.name)
             item = {'id': folder.name, 'connection': task['connection'], 'batch_id': task.get('batch_id'), **state,
                     'active': active, 'manifest': task.get('manifest'),'worker_id':task.get('worker_id'),
+                    'runpod_pod_id':task.get('runpod_pod_id') or (str(task['worker_id']).split('|',1)[1] if str(task.get('worker_id','')).startswith('runpod|') else None),
                     'created_at':folder.stat().st_ctime}
             log = folder / 'controller.log'
             if include_logs and log.is_file():
@@ -491,7 +498,7 @@ class GenerationService:
                     def owns(attempt_id):
                         try:
                             target=json.loads((attempts_root/attempt_id/'request.json').read_text(encoding="utf-8"))['execution']['diffusion']
-                            return target['backend']+'|'+(target.get('address') or '')==task['worker_id']
+                            return target['backend']+'|'+(target.get('address') or '')==connection_key(task['connection'])
                         except (OSError,ValueError,KeyError):return False
                     attempts=self.review.db.all('SELECT a.id,a.run_id FROM generation_attempts a JOIN generation_runs r ON r.id=a.run_id WHERE r.batch_id=? ORDER BY a.started_at DESC,a.rowid DESC',(task['batch_id'],))
                     latest={}

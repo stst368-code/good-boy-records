@@ -58,7 +58,8 @@ class Dispatcher:
         from client import Client
         path,manifest=Jobs(self.g).batch(batch_id)
         entry=self.g.workers.get(worker_id)
-        if not entry['enabled']:raise ValueError('Enable this worker in Worker settings first')
+        if not entry['enabled'] or not entry.get('connection') or entry.get('runpod') and not entry['runpod'].get('eligible'):
+            raise ValueError('Enable a healthy compatible worker in Worker settings first')
         report=report or self.g.workers.query(entry)
         if not report.get('online') or not report.get('compatible',True):raise ValueError(report.get('error') or 'Worker is offline or has no compatible MiniMax models')
         with self.g.lock,gpu_lock('gbr-admit:'+str(self.g.review.config.database)):
@@ -125,7 +126,7 @@ class Dispatcher:
         if not self.g.shared_ready():return
         tasks=self.g.tasks(False);active={t.get('batch_id') for t in tasks if t['active'] and t.get('batch_id')}
         if not active:return
-        entries=[e for e in self.g.workers.entries() if e['enabled']]
+        entries=[e for e in self.g.workers.entries() if self.g.workers.automatic(e)]
         for batch_id in active:
             if self.stop.is_set():return
             if not self.g.review.db.one("SELECT 1 FROM generation_runs WHERE batch_id=? AND status='prepared'",(batch_id,)):continue

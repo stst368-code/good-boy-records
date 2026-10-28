@@ -42,12 +42,13 @@ def runs_for(path,manifest,worker_id):
     registered=policy(manifest).get('worker_assignments',{})
     shared=any(r.get('worker_options') for r in manifest['runs'])
     if shared and not worker_id:raise ValueError('This shared batch requires a worker identity')
-    if not shared and not registered:return [r for r in manifest['runs'] if not worker_id or target_id(r)==worker_id],worker_id
+    def original(run):return target_id(run)==worker_id or manifest.get('selection',{}).get('resolved_worker_id')==worker_id
+    if not shared and not registered:return [r for r in manifest['runs'] if not worker_id or original(r)],worker_id
     worker_id=worker_id or target_id(manifest['runs'][0])
     additions=admission(path,manifest,worker_id) or {}
     result=[]
     for run in manifest['runs']:
         option=additions.get(run['id']) or next((o for o in run.get('worker_options',[]) if o['worker_id']==worker_id),None)
         if option:result.append({**run,**{k:option[k] for k in ('effective','provenance','execution','model_revision')}})
-        elif not run.get('worker_options') and target_id(run)==worker_id:result.append(run)
+        elif not run.get('worker_options') and original(run):result.append(run)
     return result,worker_id

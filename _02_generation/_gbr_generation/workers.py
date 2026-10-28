@@ -5,10 +5,12 @@ import hashlib
 import ipaddress
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
 import time
+import threading
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
@@ -163,6 +165,7 @@ class Workers:
     def __init__(self, generation):
         self.generation = generation
         self.reports = {}
+        self.lock = threading.RLock()
 
     def entries(self):
         saved = self.generation.review.config.values.get('generation', {})
@@ -171,10 +174,13 @@ class Workers:
             # Read old connections in place. A settings save performs the single,
             # idempotent migration, without a second registry or database.
             entries = [{'connection': c} for c in self.generation.preferences()['connections']]
-        return [self.normalize(e) for e in entries]
+        return [self.normalize(e) for e in deepcopy(entries)]
 
     def normalize(self, value):
-        connection = normalize(value['connection'])
+        external=deepcopy(value.get('runpod'))
+        if external and not re.fullmatch('[A-Za-z0-9_-]{1,100}',str(external.get('pod_id',''))):raise ValueError('Invalid RunPod identity')
+        connection = normalize(value['connection']) if value.get('connection') else None
+        if connection is None and not external:raise ValueError('A manual worker requires a connection')
         defaults = deepcopy(value.get('defaults', {}))
         if not isinstance(defaults, dict) or set(defaults) - DEFAULT_FIELDS:
             raise ValueError('Worker defaults accept generation controls only')
@@ -186,8 +192,47 @@ class Workers:
         defaults = {k: resolved[k] for k in defaults}
         if type(value.get('enabled', True)) is not bool:
             raise ValueError('Invalid worker enabled setting')
-        return {'id': connection_key(connection), 'connection': connection, 'enabled': value.get('enabled', True),
-                'defaults': defaults, 'launcher': launcher_settings(value.get('launcher'), connection)}
+        result={'id': 'runpod|'+external['pod_id'] if external else connection_key(connection), 'connection': connection, 'enabled': value.get('enabled', True),
+                'defaults': defaults, 'launcher': launcher_settings(value.get('launcher'), connection) if connection else {}}
+        if external:result['runpod']=external
+        return result
+
+    def automatic(self,entry):
+        pod=entry.get('runpod')
+        return bool(entry['enabled'] and entry.get('connection') and (not pod or pod.get('eligible') and pod.get('auto_allocate',True)))
+
+    def discovered(self,metadata,connection,report):
+        """Upsert one pod in the same saved worker list, retaining user preferences."""
+        g=self.generation;identifier='runpod|'+metadata['pod_id']
+        with self.lock,g.lock,g.review.config_lock:
+            entries=self.entries();previous=next((e for e in entries if e['id']==identifier),None)
+            if previous is None:
+                candidates={connection_key(c) for c in metadata.get('endpoints',[]) if c}
+                if connection:candidates.add(connection_key(connection))
+                previous=next((e for e in entries if not e.get('runpod') and e.get('connection') and connection_key(e['connection']) in candidates),None)
+            old=(previous or {}).get('runpod',{})
+            metadata={**old,**metadata,'auto_allocate':old.get('auto_allocate',True)}
+            errors=[{'at':check.get('at',time.time()),'endpoint':check.get('endpoint'),'error':check['error']}
+                    for check in metadata.get('recent_checks',[]) if check.get('error')]
+            metadata['recent_errors']=(old.get('recent_errors',[])+errors)[-10:]
+            entry=self.normalize({**(previous or {}),'connection':connection or (previous or {}).get('connection'),'runpod':metadata})
+            saved=deepcopy(g.review.config.values.get('generation',{}))
+            saved['workers']=[e for e in entries if e['id'] not in {identifier,(previous or {}).get('id')}]+[entry];saved.pop('connections',None)
+            g.review.config.values['generation']=saved;g.review.config.save()
+            self.reports[identifier]=report or {'online':False,'compatible':False,'error':metadata.get('last_error'),'checked_at':time.time()}
+        g.dispatcher.wake.set()
+        return entry
+
+    def set_discovered(self,identifier,enabled,auto_allocate):
+        entry=self.get(identifier)
+        if not entry.get('runpod'):raise ValueError('Choose an automatically discovered RunPod worker')
+        with self.generation.lock,self.generation.review.config_lock:
+            entries=self.entries()
+            for item in entries:
+                if item['id']==identifier:item['enabled']=enabled;item['runpod']['auto_allocate']=auto_allocate
+            saved=deepcopy(self.generation.review.config.values.get('generation',{}));saved['workers']=entries;saved.pop('connections',None)
+            self.generation.review.config.values['generation']=saved;self.generation.review.config.save()
+        self.generation.dispatcher.wake.set();return self.get(identifier)
 
     def get(self, identifier):
         for entry in self.entries():
@@ -196,9 +241,12 @@ class Workers:
         raise ValueError('Worker was removed or changed; choose a saved worker again')
 
     def save(self, value, previous_id=None):
-        entry = self.normalize(value)
         g = self.generation
         with g.lock, g.review.config_lock:
+            if previous_id:
+                previous=next((e for e in self.entries() if e['id']==previous_id),None)
+                if previous and previous.get('runpod'):value={**value,'runpod':previous['runpod']}
+            entry = self.normalize(value)
             entries = [e for e in self.entries() if e['id'] not in {entry['id'], previous_id}]
             entries.append(entry)
             saved = deepcopy(g.review.config.values.get('generation', {}))
@@ -210,7 +258,10 @@ class Workers:
         return entry
 
     def delete(self, identifier):
-        self.get(identifier)
+        entry=self.get(identifier)
+        if entry.get('runpod'):
+            self.set_discovered(identifier,False,False)
+            return
         g = self.generation
         with g.lock, g.review.config_lock:
             saved = deepcopy(g.review.config.values.get('generation', {}))
@@ -233,15 +284,17 @@ class Workers:
         if backend == 'comfyui':
             from client import Client
             client = Client(connection['address'])
-            inventory = client.inventory(timeout=5)
-            queue = client.request('/queue', timeout=5)
+            timeout=entry.get('_probe_timeout',5)
+            inventory = client.inventory(timeout=timeout)
+            queue = client.request('/queue', timeout=timeout)
             if not isinstance(queue.get('queue_running'), list) or not isinstance(queue.get('queue_pending'), list):
                 raise ValueError('ComfyUI queue status is unavailable')
-            return {**g.comfy_choices(inventory), 'busy': bool(queue['queue_running'] or queue['queue_pending']),
+            history=client.request('/history?max_items=1',timeout=timeout) if entry.get('runpod') else None
+            return {**g.comfy_choices(inventory), 'history_available':isinstance(history,dict), 'busy': bool(queue['queue_running'] or queue['queue_pending']),
                     'queue_running': len(queue['queue_running']), 'queue_pending': len(queue['queue_pending']),
                     '_inventory': inventory}
         if backend == 'runpod_serverless':
-            key = g.secrets.get('api_key') or os.environ.get('RUNPOD_API_KEY')
+            key = g.runpod.credential.get()
             if not key:
                 raise ValueError('Set the RunPod API key in Worker settings')
             request = Request('https://api.runpod.ai/v2/' + connection['address'] + '/health', headers={'Authorization': 'Bearer ' + key})
@@ -260,10 +313,12 @@ class Workers:
             if not python.is_file():
                 raise ValueError('Native worker is not installed; use Prepare worker')
             report = json.loads(subprocess.check_output([str(python), str(WORKER / 'worker.py'), 'doctor'], timeout=15, stderr=subprocess.PIPE, env=python_environment()))
-        return {'busy': False, 'hardware': report.get('hardware'), 'report': report, 'models': g.native_choices()}
+        return {'busy': False, 'compatible':bool(report.get('protocol')==1 and (report.get('hardware') or {}).get('gpu_name')), 'hardware': report.get('hardware'), 'report': report, 'models': g.native_choices()}
 
-    def query(self, entry, activate=False):
+    def query(self, entry, activate=False,cache=True):
         connection = entry['connection']
+        if not connection or entry.get('runpod') and not entry['runpod'].get('eligible'):
+            return {'online':False,'compatible':False,'error':(entry.get('runpod') or {}).get('last_error') or 'No validated generation endpoint','checked_at':time.time()}
         # Imports are rooted at the installed app, not a user-selected catalogue.
         sys.path.insert(0, str(Path(__file__).resolve().parents[2] / '_99_tools/_workers_comfyui'))
         try:
@@ -273,13 +328,20 @@ class Workers:
             if connection['backend'] == 'comfyui':
                 models = report.get('models', {})
                 report['compatible'] = not report.get('missing_nodes') and all(models.get(k) for k in ('text_encoders', 'diffusion_models', 'vaes'))
+                if report['compatible'] and entry.get('runpod'):
+                    from client import Client
+                    inventory=deepcopy(report['_inventory']);inventory['capabilities']={**inventory.get('capabilities',{}),'checkpoint_sha256':False}
+                    parameters=self.generation.worker_parameters({'connection':connection},entry,inventory)
+                    parameters.update(caption='GBR service compatibility inspection',encoder_seed='0',sampler_seed='0')
+                    Client(connection['address']).prepare({'parameters':parameters,'lyrics':'[verse]\ninspection','attempt_id':'discovery'},inventory)
+                    report['capabilities']['minimax_workflow_validated']=True
             report.update(online=True, busy=bool(report.get('busy') or self.busy(connection)), checked_at=time.time())
-        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        except (OSError, ValueError, RuntimeError, KeyError,TypeError,subprocess.SubprocessError) as error:
             message = f'{connection["backend"]}: HTTP {error.code} at {error.url}' if isinstance(error, HTTPError) else str(error)
             if isinstance(error, subprocess.CalledProcessError) and error.stderr:
                 message += '\n' + error.stderr.decode('utf-8', errors='replace')[-2000:]
             report = {'online': False, 'busy': None, 'error': message, 'checked_at': time.time()}
-        self.reports[entry['id']] = report
+        if cache:self.reports[entry['id']] = report
         return report
 
     def list(self, refresh=False):
@@ -290,7 +352,7 @@ class Workers:
         return [{**e, 'status': {k: v for k, v in self.reports.get(e['id'], {}).items() if not k.startswith('_')}} for e in entries]
 
     def select(self, identifier, automatic=False):
-        entries = [e for e in self.entries() if e['enabled']] if automatic else [self.get(identifier)]
+        entries = [e for e in self.entries() if self.automatic(e)] if automatic else [self.get(identifier)]
         if not entries:
             raise ValueError('Add or enable a worker in Worker settings first')
         if automatic:
@@ -304,18 +366,18 @@ class Workers:
             entries = [e for e in entries if e['launcher']['auto_start']]
         for entry in entries:
             report = self.query(entry, activate=entry['launcher']['auto_start'])
-            if report['online'] and (not automatic or report.get('compatible', True)):
+            if report['online'] and (not automatic and not entry.get('runpod') or report.get('compatible', True)):
                 return entry, report
             if not automatic:
                 # Native setup belongs to the background controller. Explicitly
                 # selected fresh installs can still be prepared there.
-                if entry['connection']['backend'] in {'local', 'runpod_dedicated'} and entry['connection']['auto_setup']:
+                if not entry.get('runpod') and entry['connection']['backend'] in {'local', 'runpod_dedicated'} and entry['connection']['auto_setup']:
                     return entry, report
-                raise ValueError(report['error'])
+                raise ValueError(report.get('error') or 'Worker is incompatible or unavailable')
         raise ValueError('No enabled worker is online. Query workers or enable local ComfyUI auto-start in Worker settings.')
 
     def pool(self):
-        entries=[e for e in self.entries() if e['enabled']]
+        entries=[e for e in self.entries() if self.automatic(e)]
         with ThreadPoolExecutor(max_workers=4) as pool:
             reports=list(pool.map(self.query,entries))
         candidates=[(e,r) for e,r in zip(entries,reports) if r['online'] and r.get('compatible',True)]

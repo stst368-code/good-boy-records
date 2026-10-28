@@ -71,13 +71,19 @@ export function initAuthoring({root,api,toast,onPublished,refreshDrafts}) {
         let choices=[],serial=0,timer;
         async function query(){const id=++serial;try{const result=await api('/writing/caption-examples?field='+field.key+'&q='+encodeURIComponent(search.value));if(id!==serial)return;choices=result.examples;pick.replaceChildren(new Option(result.total?`Choose example (${result.total}${result.total>100?' · first 100':''})`:'No matching labelled examples',''),...choices.map((r,i)=>new Option(r.cluster+' / '+r.version+' · '+r.text.slice(0,90),String(i))));}catch(error){pick.replaceChildren(new Option(error.message,''));}}
         search.oninput=()=>{clearTimeout(timer);timer=setTimeout(query,300);};pick.onfocus=()=>{if(!choices.length)query();};
-        pick.onchange=()=>{if(pick.value==='')return;text.value=choices[Number(pick.value)].text;captionChanged();pick.value='';text.focus();};
-        references.append(search,pick);group.append(label,references);panel.append(group);
+        const auditions=document.createElement('div');auditions.className='caption-auditions';auditions.setAttribute('role','group');auditions.setAttribute('aria-label',field.label+' listening examples');let auditionRequest=0;
+        text.addEventListener('input',()=>{auditionRequest++;for(const audio of auditions.querySelectorAll('audio'))audio.pause();auditions.replaceChildren();});
+        pick.onchange=async()=>{if(pick.value==='')return;const chosen=choices[Number(pick.value)];text.value=chosen.text;captionChanged();pick.value='';text.focus();const id=++auditionRequest;auditions.textContent='Finding recordings rated 4–5…';
+          try{const result=await api('/writing/caption-auditions?field='+field.key+'&template_id='+encodeURIComponent(chosen.id));if(id!==auditionRequest)return;auditions.replaceChildren();const note=document.createElement('span');note.className='subtle small';note.textContent=result.recordings.length?'Recordings using this element · latest overall rating 4–5':'No available recordings rated 4–5 using this element.';auditions.append(note);
+            for(const recording of result.recordings){const row=document.createElement('div');row.className='caption-audition-row';const title=document.createElement('span');title.textContent=recording.title+' · '+recording.score.toFixed(1)+'/5';const audio=document.createElement('audio');audio.controls=true;audio.preload='none';audio.src=recording.playback_url;audio.setAttribute('aria-label','Play '+recording.title);audio.onplay=()=>{for(const other of root.querySelectorAll('audio'))if(other!==audio)other.pause();};audio.onerror=()=>{title.textContent=recording.title+' · playback unavailable';};row.append(title,audio);auditions.append(row);}
+          }catch(error){if(id===auditionRequest)auditions.textContent=error.message;}
+        };
+        references.append(search,pick);group.append(label,references,auditions);panel.append(group);
       }
       $('captionSections').append(panel);
     }
   }
-  $('captionClear').onclick=()=>{for(const node of caption.querySelectorAll('[data-caption-field],input'))node.value='';$('captionSong').value='';captionChanged();$('captionStatus').textContent='';};
+  $('captionClear').onclick=()=>{for(const audio of caption.querySelectorAll('audio'))audio.pause();for(const node of caption.querySelectorAll('[data-caption-field],input')){node.value='';node.dispatchEvent(new Event('input'));}$('captionSong').value='';captionChanged();$('captionStatus').textContent='';};
   $('captionSave').onclick=guard($('captionSave'),$('captionStatus'),async()=>{
     const request=captionRequest||{request_id:key(),cluster:$('captionCluster').value,version:$('captionVersion').value,song_id:$('captionSong').value,fields:fields()};captionRequest=request;
     const result=await api('/writing/captions',request);options=await api('/writing/authoring');buildOptions();await refreshDrafts();onPublished?.('template');

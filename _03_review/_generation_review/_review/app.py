@@ -150,8 +150,10 @@ def create_app(config_path, start_worker=True, database_path=None):
         if start_worker:
             service.start()
             app.state.generation.dispatcher.start()
+            app.state.generation.runpod.start()
         yield
         app.state.publisher.close()
+        app.state.generation.runpod.close()
         app.state.generation.dispatcher.close()
         service.close()
 

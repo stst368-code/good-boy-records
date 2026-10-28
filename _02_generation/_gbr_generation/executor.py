@@ -103,11 +103,13 @@ def read_events(directory):
     return events
 
 
-def store_observations(conn, attempt_id, run_id, events):
+def store_observations(conn, attempt_id, run_id, events, worker_id=None):
     parent = attempt_id + "-total"
     hardware_event = next((e for e in events if e.get("event") == "worker"), None)
     if hardware_event:
-        hardware = hardware_event["hardware"]
+        hardware = dict(hardware_event["hardware"])
+        if str(worker_id or '').startswith('runpod|'):
+            hardware.update(provider='runpod',provider_instance_id=worker_id.split('|',1)[1],gbr_worker_id=worker_id)
         session = attempt_id + "-worker"
         conn.execute("INSERT OR IGNORE INTO worker_sessions VALUES(?,?,?,?,?,?,?,?,?,?)", (
             session, hardware["address"], hardware.get("provider"), hardware.get("provider_instance_id"),
@@ -570,7 +572,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                 conn.execute("UPDATE generation_runs SET status='publishing' WHERE id=?",(run['id'],));conn.commit()
                 notify('publishing')
                 with conn:
-                    store_observations(conn, attempt_id, run["id"], read_events(directory))
+                    store_observations(conn, attempt_id, run["id"], read_events(directory),worker_id)
                 state = dict(conn.execute("SELECT * FROM generation_execution_state WHERE run_id=?", (run["id"],)).fetchone())
                 marker = publish_bundle(directory, run, state, result, (manifest_path.parent / run["snapshot"]).read_bytes(), attempt_id, timezone_name)
                 with conn:
@@ -606,7 +608,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             finally:
                 ended = now()
                 with conn:
-                    store_observations(conn, attempt_id, run["id"], read_events(directory))
+                    store_observations(conn, attempt_id, run["id"], read_events(directory),worker_id)
                     duration = (datetime.fromisoformat(ended) - datetime.fromisoformat(started)).total_seconds() if resuming else time.perf_counter() - clock
                     if publication is None:
                         conn.execute("UPDATE generation_timing_spans SET completed_at=?,duration_seconds=? WHERE id=?",

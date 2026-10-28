@@ -130,6 +130,38 @@ class Authoring:
                 'version':row.get('version') or row['style_primary'],'text':value})
         return {'examples':result[:100],'total':len(result),'issues':issues}
 
+    def auditions(self,field,template_id):
+        if field not in LABELS:raise ValueError('Choose a caption subsection')
+        folder=self.w.root/'_01_writing/_references';row=Styles(folder/'styles.csv').by_id.get(template_id)
+        if not row:raise ValueError('Caption reference was not found')
+        path=(folder/row['template'].replace('\\','/')).resolve()
+        if not path.is_relative_to(folder.resolve()):raise ValueError('Caption reference is outside _references')
+        raw=path.read_bytes();wanted=split_caption(raw.decode('utf-8-sig'))[field]
+        key=lambda text:' '.join(text.casefold().split())
+        if not wanted:return {'recordings':[],'rating':'Latest overall review bucket 4 or 5'}
+        # Use the existing review, generation-provenance and playback records.
+        # Exact subsection matches also find mix-and-match custom captions.
+        records=self.w.review.db.all('''SELECT g.id,g.audio_id,s.title,r.average,r.bucket,
+            m.parsed_json,gr.effective_json,gr.template_id,gr.template_sha256
+            FROM generations g JOIN songs s ON s.id=g.song_id
+            JOIN latest_reviews r ON r.audio_id=g.audio_id
+            JOIN generation_metadata m ON m.generation_id=g.id
+            LEFT JOIN generation_output_links link ON link.review_generation_id=g.id
+            LEFT JOIN generation_runs gr ON gr.id=link.run_id
+            WHERE r.bucket IN (4,5) ORDER BY r.average DESC,r.created_at DESC,g.id LIMIT 2000''')
+        result=[];seen=set()
+        for record in records:
+            if record['audio_id'] in seen:continue
+            metadata=json.loads(record['parsed_json']);effective=json.loads(record['effective_json'] or '{}')
+            caption=effective.get('caption') or metadata.get('caption')
+            matched=isinstance(caption,str) and key(split_caption(caption)[field])==key(wanted)
+            if not caption:matched=record['template_id']==template_id and record['template_sha256']==sha(raw)
+            if not matched or not self.w.review.archiver.available(record['audio_id']):continue
+            seen.add(record['audio_id']);result.append({'id':record['id'],'title':record['title'],'score':record['average'],
+                'bucket':record['bucket'],'match':'Exact caption subsection','playback_url':'/api/playback/'+record['id']+'?mode=full'})
+            if len(result)>=8:break
+        return {'recordings':result,'rating':'Latest overall review bucket 4 or 5'}
+
     def save_caption(self,request,reviewer):
         folder=self.w.root/'_01_writing/_references'
         with self.w.lock:

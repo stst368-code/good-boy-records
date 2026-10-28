@@ -280,6 +280,52 @@ source YAMLs. Artwork stays at brief preparation until the API workflow is suppl
 
 ## Writing and workflow
 
+Worker settings → **RunPod account & discovered pods** stores a single account key
+in the OS keyring (Windows Credential Manager, macOS Keychain or a native Linux
+secret store). The key is never written to config/database JSON, returned by API,
+or sent to pod HTTP services. `RUNPOD_API_KEY` remains a supported alternative on
+headless machines without an unlocked secret store. Existing session credentials
+continue to work. Updating dependencies through the normal launcher installs keyring.
+
+Automatic discovery defaults to 30 seconds once credentials are available; disable
+it or adjust the interval in this panel. Refresh Pods, Test Account Connection and
+per-pod Inspect run asynchronously. The expandable status panel reports account
+errors, current pods, endpoint checks, timestamps, counts and the next discovery.
+REST v2 cursor pagination includes cluster member pods; each running pod's detail
+endpoint supplies live ports/utilisation that the list response omits. Rate limits
+and account failures back off without changing healthy workers or running jobs.
+
+Pods use stable `runpod|<pod-id>` identities in the existing saved worker list.
+Discovery preserves defaults, enabled status and Auto Allocate preferences across
+stops, restarts and address changes. Removing a discovered worker disables it so
+rediscovery cannot silently reset its preferences. Unknown/incompatible pods remain
+visible but cannot receive automatic work. Existing manual workers remain supported;
+a matching manual endpoint is adopted into the same pod record with its preferences.
+Generation's existing dispatcher admits compatible new pods to active automatic
+batches. It never retries or transfers an unresolved in-progress attempt. Existing
+task files and `worker_sessions.provider_instance_id` record pod ownership; no new
+registry or database tables are introduced.
+
+External RunPod requirements: the account key needs `pods:read`; the service must
+already run and its HTTP port must be exposed. Advertised ports, configured candidate
+ports and saved ComfyUI ports are probed. Proxy 403, 404 and 405 responses are service
+errors, not evidence of a stopped pod. Direct TCP mappings can be used when public.
+For native workers, expose SSH TCP port 22, register the matching public key with
+RunPod once, and select the local private key (or use the SSH agent/default identity).
+The existing GBR native worker must be prepared on the pod/template. Discovery is
+read-only and never installs software, starts/stops paid pods, modifies access rules
+or uploads SSH keys. A pod restart can change endpoints for future jobs; running
+controllers retain their frozen endpoint and recovery/ownership rules.
+
+Caption subsection reference choices show up to eight available recordings whose
+latest overall review bucket is 4 or 5. They match the actual subsection text, including
+mixed custom captions, rather than guessing from genre/model names. A missing caption
+may use verified template ID plus unchanged template SHA evidence. Playback reuses the
+existing review audio endpoint/cache; editing the copied text removes the examples
+because they no longer describe that edited element. No matching recording is valid.
+The lookup scans the 2000 highest/recently rated candidate generation rows and does not
+generate audio or add reviews. No database migration or new audio copies are required.
+
 The workflow tabs are Writing → YAML editor → Generation → Review → Selection → Preparation → Publish → Library.
 The desktop workspace is fluid up to 1920 px; the preparation page uses that width too.
 The public GBR site now lives in `_96_website`; startup migrates local website files from
