@@ -9,6 +9,7 @@ from _gbr_worker.hardware import gpu_lock
 from _review.reviewers import Conflict
 from _review.util import now
 from .service import packed, patch_fields, sha
+from .lyrics import normalize_lyrics
 
 
 SECTIONS = [
@@ -94,7 +95,7 @@ class Authoring:
             existing=self.existing(request)
             if not existing:
                 title=re.sub(r'\s+','-',normal(request['title']))
-                lyrics=normal(request['lyrics'])
+                lyrics=normalize_lyrics(request['lyrics'])
                 if not title or not title_key(title) or not lyrics:raise ValueError('Song name and lyrics are required')
                 if any(char in title for char in '/\\\x00'):raise ValueError('Song name cannot contain directory separators')
                 # Only the expressly edited writing fields change in a variant.

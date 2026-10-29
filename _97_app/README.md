@@ -339,6 +339,17 @@ catalogue tables. IDs respect both CSV and database records. Choose an existing 
 variant under Start from to load its lyrics and metadata; saving creates the next variant
 and appends `variant_list.csv`, preserving the original source and unrelated YAML fields.
 
+Base and variant lyric saves also canonicalise bracketed sections to MiniMax's
+`intro`, `verse`, `pre-chorus`, `chorus`, `post-chorus`, `bridge`, `instrumental`,
+`solo` and `outro` tags. Descriptions and numbering are removed, e.g.
+`[Intro: alalala]` → `[intro]`, `[Verse2]` → `[verse]`. Refrain/hook map to chorus;
+gap/silence/pause/interlude/breakdown map to instrumental; named instrument solos
+map to solo; middle eight maps to bridge and coda/fade-out to outro. Common chorus
+misspellings and pre/post-chorus separator variants are accepted. Each tag gets its
+own line without dropping sung words outside the brackets. Unknown or malformed
+tags are reported before saving. This does not rewrite existing input files or
+apply normalization during generation. The mappings live in `_gbr_writing/lyrics.py`.
+
 **Captions** is independent of lyrics. Its three sections contain editable subsection
 boxes, each with searchable reference examples. Loading an example copies only that
 subsection. Cluster is required, version is optional; occupied cluster/version pairs

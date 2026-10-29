@@ -11,6 +11,7 @@ from test_writing import app, CAPTION
 from _gbr_generation.catalogue import Catalogue, Styles
 from _gbr_generation.yaml_document import YamlDocument
 from _gbr_writing.authoring import SECTIONS, split_caption, compose
+from _gbr_writing.lyrics import normalize_lyrics
 
 HEADERS='song_id,song_name,filename,author,inspiration_author,inspiration_track,album_bool,album_name,album_position,styles_linked,original_cluster,original_style'
 
@@ -188,3 +189,49 @@ def test_caption_auditions_match_exact_elements_good_latest_ratings_and_availabl
     playback=f.client.get(rows[0]['playback_url']);assert playback.status_code==200 and playback.headers['content-type']=='audio/flac'
     audio.unlink()
     assert not f.client.get('/api/writing/caption-auditions',params={'field':'vocal_style','template_id':'base'}).json()['recordings']
+
+
+@pytest.mark.parametrize('source,expected',[
+    ('[Intro: alalala]','[intro]'),('[Verse 2: soft]','[verse]'),('[Verse2]','[verse]'),
+    ('[PRE_CHORUS 1]','[pre-chorus]'),('[Pre–Chorus: building]','[pre-chorus]'),
+    ('[Refrain]','[chorus]'),('[Hook 2]','[chorus]'),('[CHROUS]','[chorus]'),
+    ('[Final Chorus: big]','[chorus]'),('[Post Chorus]','[post-chorus]'),
+    ('[Middle 8]','[bridge]'),('[Gap]','[instrumental]'),('[Silence: 4 bars]','[instrumental]'),
+    ('[Instrumental Break]','[instrumental]'),('[Breakdown]','[instrumental]'),
+    ('[Guitar Solo: distorted]','[solo]'),('[Flute solo]','[solo]'),
+    ('[Verse: guitar solo behind the singer]','[verse]'),('[Coda]','[outro]'),
+    ('[Spoken Intro]','[intro]'),('[2nd Verse]','[verse]'),
+])
+def test_lyric_section_aliases_and_descriptions(source,expected):
+    assert normalize_lyrics(source)==expected
+    assert normalize_lyrics(expected)==expected
+
+
+def test_section_normalisation_keeps_inline_sung_words_and_removes_blank_lines():
+    assert normalize_lyrics('[Intro: gentle] HELLO\n\nÉCHO [Refrain] SING AGAIN\n[Gap][Solo]')==(
+        '[intro]\nhello\nécho\n[chorus]\nsing again\n[instrumental]\n[solo]')
+
+
+@pytest.mark.parametrize('lyrics',['[Mystery Section]\nwords','[Verse\nwords','[verse]]\nwords','[[verse]]\nwords'])
+def test_invalid_tags_fail_before_any_save(app,lyrics):
+    f,w=app;before=(f.built/'track_list.csv').read_bytes()
+    response=f.client.post('/api/writing/base',headers=f.headers,json=base(lyrics=lyrics))
+    assert response.status_code==400 and 'tag' in response.text
+    assert not w.tasks() and (f.built/'track_list.csv').read_bytes()==before
+
+
+def test_base_and_variant_save_canonical_tags_without_rewriting_source_or_other_fields(app):
+    f,w=app;setup(f);original=f.source.read_bytes()
+    request=base(lyrics='[Intro: alalala]\nHELLO\n\n[Refrain 2]\nÉCHO\n[Silence]\n[Flute Solo]')
+    first=post(f,'base',request);assert first['values']['lyrics']=='[intro]\nhello\n[chorus]\nécho\n[instrumental]\n[solo]'
+    source=f.client.get('/api/writing/base',params={'file':'_yaml/gbr-local-smoke.yaml'}).json()
+    variant=post(f,'base',base(file=source['file'],source_sha256=source['sha256'],lyrics='[Verse2: quiet] KEEP THESE WORDS'))
+    result=Path(variant['publication']['target']).read_bytes()
+    assert variant['values']['lyrics']=='[verse]\nkeep these words'
+    from _gbr_yaml_editor.document import Source
+    before,after=Source(original),Source(result)
+    for entry in before.entries:
+        if entry.name in {'title','lyrics','song_id','variant_id'}:continue
+        actual=after.one(entry.name)
+        assert before.text[entry.start:entry.end]==after.text[actual.start:actual.end]
+    assert f.source.read_bytes()==original and not list(f.root.rglob('*.tmp'))
