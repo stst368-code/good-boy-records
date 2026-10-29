@@ -4,13 +4,13 @@ from contextlib import closing
 import csv
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import threading
-import time
 import uuid
 from urllib.parse import urlparse, quote
 from urllib.request import Request, urlopen
@@ -137,6 +137,7 @@ class Publisher:
         self.pool=ThreadPoolExecutor(max_workers=1,thread_name_prefix='gbr-publishing')
         self.lock=threading.RLock();self.store_factory=store_factory
         self.stopping=False
+        self.waiting=set();self.wake=threading.Event();self.wait_thread=None
         from .showcase import Showcase
         self.showcase=Showcase(self)
         from .legacy_showcase import LegacyShowcase
@@ -152,10 +153,16 @@ class Publisher:
         if preparation.enabled:
             self.db.execute("UPDATE processing_tasks SET status='interrupted',error='Application restarted; retry explicitly to reconcile publication' WHERE kind IN ('release_prepare','release_publish') AND status IN ('queued','running')")
             self.db.execute("UPDATE processing_tasks SET status='interrupted',error='Application restarted; retry the legacy migration explicitly' WHERE kind='showcase_move' AND json_extract(recipe_json,'$.legacy_root') IS NOT NULL AND status IN ('queued','running')")
+            self.wait_thread=threading.Thread(target=self._resume_waiting,name='gbr-publication-wait',daemon=True)
+            self.wait_thread.start()
 
     def close(self):
-        self.stopping=True
+        with self.lock:
+            self.stopping=True;self.wake.set()
+        if self.wait_thread:self.wait_thread.join()
         self.pool.shutdown(wait=True,cancel_futures=True)
+        if self.prep.enabled:
+            self.db.execute("UPDATE processing_tasks SET status='interrupted',error='Application closed; retry publication to continue',completed_at=? WHERE kind='release_publish' AND status IN ('queued','running')",(now(),))
         if self.prep.enabled and self.library_import.running:
             state=self.library_import.state()
             if state['status']=='running':
@@ -270,8 +277,49 @@ class Publisher:
             prepared=self.db.one("SELECT id,recipe_json FROM processing_tasks WHERE generation_id=? AND kind='release_prepare' AND status='done' ORDER BY rowid DESC LIMIT 1",(row['generation_id'],))
             if prepared:
                 recipe=json.loads(prepared['recipe_json']);queue.append({**row,'prepared_id':prepared['id'],'track':recipe['track'],'files':recipe['files'],'options':recipe['options'],
-                    'can_return':not self.retained_preview(prepared['id'],row['generation_id'],recipe)})
+                    'can_return':not self.retained_preview(prepared['id'],row['generation_id'],recipe),
+                    'publication':self.publication_state(row['generation_id'])})
         return {'projects':queue,'releases':[r for r in self.releases() if not self.db.one("SELECT 1 FROM publishing_selection WHERE generation_id=? AND status='published'",(r['generation_id'],))]}
+
+    def publication_state(self,gid):
+        # Query each pending recording directly: the global recent-job limit must
+        # not hide its failure or let an older failure override a newer attempt.
+        row=self.db.one("SELECT id,status,error,telemetry_json,created_at,started_at,completed_at,recipe_json FROM processing_tasks WHERE generation_id=? AND kind='release_publish' ORDER BY rowid DESC LIMIT 1",(gid,))
+        if row:
+            request=json.loads(row.pop('recipe_json'))
+            row.update(progress=json.loads(row.pop('telemetry_json')),prepared_id=request.get('prepared_id'),visibility=request.get('visibility'))
+        return row
+
+    def processing_blockers(self,gid):
+        return self.db.all("""SELECT t.id,t.kind,t.status FROM processing_tasks t
+            JOIN generations g ON g.id=t.generation_id
+            WHERE g.audio_id=(SELECT audio_id FROM generations WHERE id=?)
+            AND t.kind IN ('lyric_alignment','visuals','mix_preview','mix_master','release_prepare')
+            AND t.status IN ('queued','running')""",(gid,))
+
+    def defer_publication(self,identifier,blockers):
+        with self.lock:
+            if self.stopping:raise ValueError('Publication paused while processing; retry after restarting')
+            message='Waiting for '+', '.join(dict.fromkeys(t['kind'].replace('_',' ') for t in blockers))+' before moving files'
+            self.progress(identifier,phase='waiting_processing',message=message,blocking_tasks=blockers)
+            self.waiting.add(identifier)
+
+    def _resume_waiting(self):
+        # Waiting for one track's GPU work must release the single publication
+        # executor, so unrelated prepared recordings can still be uploaded.
+        while not self.wake.wait(.5):
+            with self.lock:
+                if self.stopping:return
+                for identifier in list(self.waiting):
+                    try:
+                        task=self.db.one('SELECT generation_id,status FROM processing_tasks WHERE id=?',(identifier,))
+                        if not task or task['status'] not in {'queued','running'}:
+                            self.waiting.discard(identifier);continue
+                        if self.processing_blockers(task['generation_id']):continue
+                        self.waiting.remove(identifier)
+                        self.pool.submit(self._publish,identifier)
+                    except Exception:
+                        logging.getLogger(__name__).exception('Unable to resume waiting publication %s',identifier)
 
     def finish_preparation(self,gid,options):
         with self.lock:
@@ -513,8 +561,8 @@ class Publisher:
         with self.db.transaction() as c:
             active=c.execute("SELECT id FROM processing_tasks WHERE kind='release_publish' AND generation_id=? AND status IN ('queued','running')",(task['generation_id'],)).fetchone()
             if active:return {'id':active[0]}
-            c.execute("INSERT INTO processing_tasks(id,generation_id,kind,status,fingerprint,recipe_json,input_sha256,created_at) VALUES(?,?,'release_publish','queued',?,?,?,?)",
-                      (publish_id,task['generation_id'],'publish:'+identifier,canonical({'prepared_id':identifier,'title':recipe['track']['displayTitle'],'visibility':visibility}),task['input_sha256'],now()))
+            c.execute("INSERT INTO processing_tasks(id,generation_id,kind,status,fingerprint,recipe_json,input_sha256,created_at,telemetry_json) VALUES(?,?,'release_publish','queued',?,?,?,?,?)",
+                      (publish_id,task['generation_id'],'publish:'+identifier,canonical({'prepared_id':identifier,'title':recipe['track']['displayTitle'],'visibility':visibility}),task['input_sha256'],now(),canonical({'phase':'queued','message':'Queued for publication'})))
         self.pool.submit(self._publish,publish_id);return {'id':publish_id}
 
     def validate_preview(self,gid,recipe):
@@ -533,14 +581,13 @@ class Publisher:
             prepared=self.db.one('SELECT * FROM processing_tasks WHERE id=?',(pid,));recipe=json.loads(prepared['recipe_json']);gid=task['generation_id']
             self.eligible(gid);settings=self.settings()
             if recipe['destination']!={k:settings[k] for k in recipe['destination']}:raise ValueError('Publishing destination changed; prepare a new preview')
-            self.db.execute("UPDATE processing_tasks SET status='running',started_at=?,error=NULL WHERE id=?",(now(),identifier))
             # Processing uses temporary paths inside this bundle. Let active
             # alignment/renders finish before its verified move, then use the
             # already-prepared public assets rather than race the worker.
-            while self.db.one("SELECT 1 FROM processing_tasks WHERE generation_id=? AND kind IN ('lyric_alignment','visuals','mix_preview','mix_master') AND status IN ('queued','running')",(gid,)):
-                if self.stopping:raise ValueError('Publication paused while processing; retry after restarting')
-                self.progress(identifier,phase='waiting_processing',message='Waiting for background alignment or audio processing before moving files')
-                time.sleep(.5)
+            blockers=self.processing_blockers(gid)
+            if blockers:
+                self.defer_publication(identifier,blockers);return
+            self.db.execute("UPDATE processing_tasks SET status='running',started_at=COALESCE(started_at,?),error=NULL WHERE id=?",(now(),identifier))
             if 'showcase' not in recipe:
                 self.validate_preview(gid,recipe)
                 self.progress(identifier,phase='showcase',message='Verifying and moving completed recording')

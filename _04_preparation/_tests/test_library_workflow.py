@@ -163,3 +163,92 @@ def test_new_alignment_does_not_invalidate_a_package_without_timed_lyrics(public
     current=prep.editorial(gid)
     prep.save_editorial(gid,'lyric_edit',{'source_sha256':current['source_sha256'],'parent_task_id':current['lyric_task_id'],'words':current['words'],'approved':True})
     result=wait(review.db,publisher.start_publish(pid)['id']);assert result['status']=='done',result['error']
+
+
+def test_pending_recording_exposes_its_latest_failure_even_beyond_recent_history(publication):
+    review,prep,publisher,store,gid,source,raw=publication
+    pid,_=prepare(publication);store.fail_key='.mp3'
+    first=wait(review.db,publisher.start_publish(pid,'hidden')['id'])
+    assert first['status']=='failed'
+    # A busy library can have more than 100 subsequent preparation events. The
+    # recording still needs its own current status, outside that history window.
+    for index in range(101):
+        review.db.execute("INSERT INTO processing_tasks(id,generation_id,kind,status,fingerprint,recipe_json,input_sha256,created_at) VALUES(?,?,'release_prepare','failed',?,'{}','test','2026-10-29')",('old-history-'+str(index),gid,'old-history-'+str(index)))
+    result=publisher.projects();item=result['projects'][0]
+    assert not any(r['id']==first['id'] for r in result['releases'])
+    assert item['publication']['id']==first['id']
+    assert item['publication']['status']=='failed'
+    assert item['publication']['error']=='simulated upload failure'
+    assert item['publication']['visibility']=='hidden'
+    assert item['publication']['prepared_id']==pid
+    assert item['publication']['completed_at']
+    store.fail_key=None
+    second=wait(review.db,publisher.start_publish(pid,'hidden')['id'])
+    assert second['status']=='done'
+    assert publisher.publication_state(gid)['id']==second['id']
+    assert not publisher.projects()['projects']
+    assert publisher.library.projects()['items'][0]['generation_id']==gid
+    assert not review.db.all('PRAGMA foreign_key_check')
+
+
+def test_waiting_publication_releases_executor_for_other_tracks_and_resumes_same_job(publication):
+    import time
+    import numpy as np
+    import soundfile as sf
+    review,prep,publisher,store,gid,source,raw=publication
+    pid,_=prepare(publication)
+    # A second recording of the same song must not wait for the first one's
+    # alignment. It has a different decoded audio identity and managed bundle.
+    audio=review.config.inputs[0]/'second.flac'
+    signal=.15*np.sin(2*np.pi*550*np.arange(44100)/44100)
+    sf.write(audio,np.stack([signal,signal],axis=1),44100,subtype='PCM_24')
+    audio.with_suffix('.yaml').write_bytes(raw)
+    aid=review.indexer.index(audio);other_gid=review.db.one('SELECT id FROM generations WHERE audio_id=?',(aid,))['id']
+    review.queues.open(review.default_reviewer_id,other_gid)
+    review.review(other_gid,dict(audio_quality=5,composition=4,consistency=4,realism=4),'full',distribution=True)
+    for op in review.db.all("SELECT * FROM archive_operations WHERE status='pending'"):review.archiver.process(op)
+    other_pid=publisher.start_prepare(other_gid,{'include_flac':True})['id']
+    assert wait(review.db,other_pid)['status']=='done'
+    alignment=review.db.one("SELECT id FROM processing_tasks WHERE generation_id=? AND kind='lyric_alignment'",(gid,))['id']
+    review.db.execute("UPDATE processing_tasks SET status='running' WHERE id=?",(alignment,))
+    first=publisher.start_publish(pid)['id']
+    try:
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline:
+            state=publisher.publication_state(gid)
+            if state['progress'].get('phase')=='waiting_processing':break
+            time.sleep(.025)
+        assert state['progress']['phase']=='waiting_processing'
+        assert state['progress']['blocking_tasks'][0]['id']==alignment
+        assert publisher.start_publish(pid)['id']==first
+        second=wait(review.db,publisher.start_publish(other_pid)['id'])
+        assert second['status']=='done',second['error']
+        assert source.is_file()
+        assert review.db.one('SELECT status FROM processing_tasks WHERE id=?',(first,))['status']=='queued'
+    finally:
+        review.db.execute("UPDATE processing_tasks SET status='done' WHERE id=?",(alignment,))
+    result=wait(review.db,first);assert result['status']=='done',result['error']
+    assert len(review.db.all("SELECT id FROM processing_tasks WHERE generation_id=? AND kind='release_publish'",(gid,)))==1
+    assert len(publisher.library.projects()['items'])==2
+    assert not publisher.projects()['projects']
+    assert not review.db.all('PRAGMA foreign_key_check')
+
+
+def test_closing_a_waiting_publication_interrupts_it_without_moving_files(publication):
+    import time
+    review,prep,publisher,store,gid,source,raw=publication
+    pid,_=prepare(publication)
+    alignment=review.db.one("SELECT id FROM processing_tasks WHERE generation_id=? AND kind='lyric_alignment'",(gid,))['id']
+    review.db.execute("UPDATE processing_tasks SET status='running' WHERE id=?",(alignment,))
+    identifier=publisher.start_publish(pid)['id']
+    deadline=time.monotonic()+5
+    while time.monotonic()<deadline:
+        if publisher.publication_state(gid)['progress'].get('phase')=='waiting_processing':break
+        time.sleep(.025)
+    publisher.close()
+    assert not publisher.wait_thread.is_alive()
+    row=review.db.one('SELECT status,error FROM processing_tasks WHERE id=?',(identifier,))
+    assert row['status']=='interrupted' and 'retry publication' in row['error']
+    assert source.is_file() and source.with_suffix('.yaml').read_bytes()==raw
+    assert not store.objects
+    review.db.execute("UPDATE processing_tasks SET status='done' WHERE id=?",(alignment,))

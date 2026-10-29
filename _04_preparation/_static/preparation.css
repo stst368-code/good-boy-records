@@ -39,3 +39,8 @@
 /* Managed source paths must wrap without widening the mobile viewport. */
 #prepYamlSource{overflow-wrap:anywhere;word-break:break-word}#prepIdentity label{min-width:0;flex:1 1 160px}#prepIdentity select{max-width:100%}
 .prep-processing{border:1px solid var(--line);padding:14px;border-radius:10px;margin:12px 0}.prep-processing h2{margin:0}.prep-processing pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;font-size:11px}.prep-processing .prep-task{overflow-wrap:anywhere}
+
+#publishQueue .library-card>div:first-child{flex:1}
+#publishQueue [data-publication-status]{line-height:1.5;color:var(--gold);overflow-wrap:anywhere}
+#publishQueue [data-publication-status][data-state=failed],#publishQueue [data-publication-status][data-state=interrupted],#publishQueue [data-publication-error],#pubError{color:#f0aaa1;white-space:pre-wrap;overflow-wrap:anywhere}
+#pubError:empty,#publishQueue [data-publication-error]:empty{display:none}

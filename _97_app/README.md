@@ -204,6 +204,13 @@ cleanup pending; release the file and retry cleanup. Uncommitted failed moves ca
 be reset if both copies still verify. Existing legacy public URLs and share IDs
 remain supported; re-releasing an indexed legacy recording through Preparation
 uses the new layout. Existing Windows/R2 data is not renamed by pulling code.
+Each pending recording shows its latest publication status, timestamp, progress
+and error directly on its card; errors remain visible during automatic refresh.
+Multiple Publish clicks for different recordings are queued. A recording waiting
+for alignment or rendering releases the publication executor so other ready
+recordings can publish, then resumes the same job when that processing finishes.
+Closing GBR marks unfinished publications interrupted; retry them explicitly
+after restarting to reconcile any remote writes.
 **Library → Recordings** manages published titles, genre, language, explicit flags,
 albums, covers, lyrics and room placement. Save a local draft or **Update website**;
 the timing/light/audio editor reuses the Preparation tools. Revisions preserve
