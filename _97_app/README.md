@@ -447,3 +447,52 @@ and YAML editor metadata/field/template selectors use their existing catalogues.
 Worker SSH keys use discovered file choices with an explicit Other key file option.
 Text entry remains available for authored content, new field names/values and paths.
 These controls add no tables or database migrations.
+
+### Experimental ComfyUI workspace
+
+Branch `codex/comfyui-gbr-workspace` adds a local ComfyUI node pack. Start GBR
+normally against its existing database, then install its loader once:
+
+```powershell
+py -3.12 _99_tools/_comfyui_gbr/install.py --comfy-dir "E:\path\to\ComfyUI"
+```
+
+Choose the directory containing ComfyUI's `main.py` and `custom_nodes` directory.
+The loader references this checkout directly; no copied application, models,
+credentials or database are installed into ComfyUI. Restart ComfyUI, then open
+**GBR → GBR workspace** from its menu or the **GBR** bottom panel. The loader
+requires no Windows symlink privileges. Remove `custom_nodes/gbr_workspace` and
+restart ComfyUI to uninstall. Keep this checkout on the experimental branch while
+testing; switching it back to main removes the referenced prototype files.
+
+The workspace connects to `http://127.0.0.1:8765` by default. A different GBR port
+can be selected with `GBR_APP_URL` in the environment used to start ComfyUI. Only
+loopback HTTP origins are accepted. This first prototype requires the controlling
+ComfyUI and GBR to run on the same computer, opened from that computer. Remote
+compute still uses GBR's existing local/native/RunPod/ComfyUI worker registry.
+Password-protected GBR installations can sign in inside the workspace; sessions
+stay in an HttpOnly cookie, separate from workflow files. Select your existing
+reviewer name in the workspace header.
+
+Song and Caption panels can create bases/variants, save custom captions, mix
+reference subsections and audition matching recordings rated 4–5. **Add nodes to
+graph** creates connected **GBR Song → GBR Generation plan ← GBR Caption** nodes.
+Their outputs include ordinary lyric/caption strings for connecting other nodes.
+Queuing the plan only prepares graph data. Open the plan's **GBR workspace**,
+**Preview request**, inspect validation, then **Launch this preview** explicitly.
+Edits to source lyrics must be saved as a variant before dispatch; preview checks
+the saved source hash. Source YAML files are never rewritten during dispatch.
+
+Generation defaults to **Experiment**, so tests retain performance/provenance
+without entering production statistics or review. Choose **Production** to send
+new recordings to review. Jobs show existing GBR batches; expand one to audition
+experiment outputs or open an unreviewed production recording. The Review panel
+uses GBR's existing reviewer leases, flags, tags and atomic fourth-rating
+submission. Tags/reason are optional and must be selected before the fourth
+rating. A **GBR Review recording** node can target a known generation ID.
+
+This is an integration prototype. Sampling uses the existing worker workflow and
+its model/sampler/scheduler defaults; direct editable sampling graphs, sweeps,
+historical review revisions, mastering timelines and publishing/library panels
+are not ported yet. These remain in the normal GBR app. No database migration is
+introduced. Closing ComfyUI does not cancel jobs already owned by GBR.

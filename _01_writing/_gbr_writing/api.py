@@ -76,6 +76,8 @@ def router(root, review, local, reviewer_id):
     def save_base(body: BaseSave,request: Request):return authoring.save_base(body.model_dump(),reviewer_id(request))
     @routes.get('/caption-examples')
     def examples(field: str,q: str='',cluster: str=''):return authoring.examples(field,q,cluster)
+    @routes.get('/caption-source')
+    def caption_source(template_id:str):return authoring.caption_source(template_id)
     @routes.get('/caption-auditions')
     def auditions(field:str,template_id:str):return authoring.auditions(field,template_id)
     @routes.post('/captions')

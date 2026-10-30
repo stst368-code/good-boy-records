@@ -1,0 +1,20 @@
+name: GBR ComfyUI prototype
+on:
+  push:
+    branches: [codex/comfyui-gbr-workspace]
+  pull_request:
+    paths: ['_99_tools/_comfyui_gbr/**', '_01_writing/_gbr_writing/**', '_02_generation/_gbr_generation/jobs.py', '.github/workflows/comfyui.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r _03_review/_generation_review/requirements-dev.txt 'aiohttp>=3.12,<4'
+      - run: python -m pytest _99_tools/_comfyui_gbr/_tests _01_writing/_tests _02_generation/_tests/test_job_dashboard.py -q
+      - run: node --input-type=module --check < _99_tools/_comfyui_gbr/_web/extension.js
+      - run: node --input-type=module --check < _99_tools/_comfyui_gbr/_static/workspace.js

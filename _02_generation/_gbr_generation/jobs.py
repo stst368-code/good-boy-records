@@ -75,6 +75,8 @@ class Jobs:
         rows=self.g.review.db.all('SELECT id,title,song_id,variant_id,status,effective_json,started_at,completed_at FROM generation_runs WHERE batch_id=? ORDER BY '+ordering[sort]+' LIMIT ? OFFSET ?',(batch_id,limit,offset))
         result=[]
         for row in rows:
+            link=self.g.review.db.one('SELECT review_generation_id FROM generation_output_links WHERE run_id=?',(row['id'],))
+            row['review_generation_id']=link['review_generation_id'] if link else None
             parameters=json.loads(row.pop('effective_json'));parameters.pop('caption',None)
             attempts=self.g.review.db.all('SELECT id,status,error,started_at FROM generation_attempts WHERE run_id=? ORDER BY rowid DESC LIMIT 1',(row['id'],))
             attempt=attempts[0] if attempts else None;worker=None;stage=row['status'];extra={}

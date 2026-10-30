@@ -235,3 +235,19 @@ def test_base_and_variant_save_canonical_tags_without_rewriting_source_or_other_
         actual=after.one(entry.name)
         assert before.text[entry.start:entry.end]==after.text[actual.start:actual.end]
     assert f.source.read_bytes()==original and not list(f.root.rglob('*.tmp'))
+
+
+def test_caption_source_is_read_only_and_matches_central_caption_schema(app):
+    f,w=app
+    fields={'basic':'Bright guitars','vocal_style':'Dry, close vocal','groove':'Steady pulse'}
+    text=compose(fields);path=w.root/'_01_writing/_references/_minimax_templates/base.txt'
+    path.write_text(text,encoding='utf-8');before=path.read_bytes()
+    result=f.client.get('/api/writing/caption-source',params={'template_id':'base'})
+    assert result.status_code==200,result.text
+    assert result.json()['fields']==split_caption(text) and result.json()['cluster']=='Rock'
+    assert path.read_bytes()==before
+    assert f.client.get('/api/writing/caption-source',params={'template_id':'../private'}).status_code==400
+    import importlib.util
+    spec=importlib.util.spec_from_file_location('gbr_comfy_nodes',Path(__file__).resolve().parents[2]/'_99_tools/_comfyui_gbr/nodes.py')
+    nodes=importlib.util.module_from_spec(spec);spec.loader.exec_module(nodes)
+    assert nodes.SECTIONS==SECTIONS and nodes.compose(fields)==compose(fields)

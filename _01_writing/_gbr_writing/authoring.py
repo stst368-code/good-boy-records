@@ -131,6 +131,18 @@ class Authoring:
                 'version':row.get('version') or row['style_primary'],'text':value})
         return {'examples':result[:100],'total':len(result),'issues':issues}
 
+    def caption_source(self,template_id):
+        folder=self.w.root/'_01_writing/_references'
+        row=Styles(folder/'styles.csv').by_id.get(template_id)
+        if not row:raise ValueError('Caption reference was not found')
+        path=(folder/row['template'].replace('\\','/')).resolve()
+        if not path.is_relative_to(folder.resolve()):raise ValueError('Caption reference is outside _references')
+        if path.stat().st_size>200000:raise ValueError('Reference exceeds 200 KB')
+        raw=path.read_bytes()
+        return {'id':template_id,'cluster':row['cluster'],'style':row['style_primary'],
+                'song_id':row.get('song_id') or '', 'sha256':sha(raw),
+                'fields':split_caption(raw.decode('utf-8-sig'))}
+
     def auditions(self,field,template_id):
         if field not in LABELS:raise ValueError('Choose a caption subsection')
         folder=self.w.root/'_01_writing/_references';row=Styles(folder/'styles.csv').by_id.get(template_id)
