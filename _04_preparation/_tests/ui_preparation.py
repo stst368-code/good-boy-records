@@ -161,7 +161,7 @@ def main():
                     page.wait_for_function("()=>!document.getElementById('prepProcessed').getAttribute('src')")
                     assert page.locator('#prepHistory a',has_text='master_candidate').count()
                     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+2')
-                    page.locator('#reviewTab').click()
+                    page.locator('#listenTab').click()
                     assert page.locator('#preparationView').is_hidden()
                     assert next(prep.source(gid)[1].parent.glob('*.yaml')).read_bytes()==raw
                     checks.append({'width':width,'passed':True});print(json.dumps(checks[-1]),flush=True);page.close()

@@ -96,7 +96,7 @@ def main():
                     page.screenshot(path=f'/tmp/gbr-stage-publish-{width}.png',full_page=True)
                     page.locator('[data-publish]').first.click()
                     until(lambda:review.db.one('SELECT status FROM publishing_selection WHERE generation_id=?',(gid,))['status']=='published')
-                    page.locator('#libraryTab').click();page.wait_for_selector(f'[data-edit="{gid}"]');page.locator(f'[data-edit="{gid}"]').click()
+                    page.locator('#listenTab').click();page.locator('#libraryTab').click();page.wait_for_selector(f'[data-edit="{gid}"]');page.locator(f'[data-edit="{gid}"]').click()
                     page.wait_for_selector('#libraryEdit:not([hidden])');page.locator('#libraryTitle').fill('Retitled '+str(width));page.locator('#libraryPublish').click()
                     until(lambda:p.library.record(gid)['track']['displayTitle']=='Retitled '+str(width))
                     assert next(prep.source(gid)[1].parent.glob('*.yaml')).read_bytes()==raw

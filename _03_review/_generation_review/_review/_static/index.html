@@ -7,29 +7,49 @@
   <title>GBR</title><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/tools/yaml-editor/editor.css"><link rel="stylesheet" href="/tools/generation/generation.css">
   <link rel="stylesheet" href="/tools/preparation/preparation.css">
 <link rel="stylesheet" href="/tools/writing/writing.css">
+  <link rel="stylesheet" href="/static/listening.css">
 </head>
 <body>
-<header class="topbar"><a class="wordmark" href="#review" aria-label="Good Boy Records review"><span class="logo">GBR</span><span>GOOD BOY RECORDS<small>REVIEW ROOM</small></span></a>
-  <nav aria-label="Main"><button id="writingTab" class="tab">Writing</button><button id="yamlTab" class="tab">YAML editor</button><button id="generationTab" class="tab">Generation</button><button id="reviewTab" class="tab active">Review</button><button id="selectionTab" class="tab">Selection</button><button id="preparationTab" class="tab">Preparation</button><button id="publishingTab" class="tab">Publish</button><button id="libraryTab" class="tab">Library</button><button id="settingsButton" class="icon-button" aria-label="Settings" title="Settings">⚙</button></nav>
+<header class="topbar"><a class="wordmark" href="#listenView" aria-label="Good Boy Records Listen"><span class="logo">GBR</span><span>GOOD BOY RECORDS<small>STUDIO</small></span></a>
+  <nav aria-label="Main"><button id="writingTab" class="tab">Writing</button><button id="yamlTab" class="tab">YAML editor</button><button id="generationTab" class="tab">Generation</button><button id="listenTab" class="tab active" aria-current="page">Listen</button><button id="preparationTab" class="tab">Preparation</button><button id="publishingTab" class="tab">Publish</button><button id="settingsButton" class="icon-button" aria-label="Settings" title="Settings">⚙</button></nav>
 </header>
 <main>
   <section id="preparationView" hidden aria-label="Preparation"></section>
   <section id="publishingView" hidden aria-label="Publishing"></section>
-  <section id="libraryView" hidden aria-label="Library"></section>
-  <div id="reviewerBar" class="reviewer-bar" hidden><span>Reviewing as <strong id="reviewerName"></strong></span><button id="changeUser" class="quiet-button">Change user</button></div>
+  <section id="listenView" aria-labelledby="listenHeading">
+    <header class="listen-heading">
+      <h1 id="listenHeading">Listen</h1>
+      <nav class="listen-sources" aria-label="Listening collections">
+        <button id="reviewTab" type="button" aria-controls="reviewView queueView" aria-current="true">Review queue</button>
+        <button id="selectionTab" type="button" aria-controls="selectionView">Selection</button>
+        <button id="libraryTab" type="button" aria-controls="libraryView" hidden>Library</button>
+      </nav>
+      <button id="jumpQueue" class="quiet-button" type="button">Browse queue ↓</button>
+      <div id="reviewerBar" class="reviewer-bar" hidden><span>Reviewing as <strong id="reviewerName"></strong></span><button id="changeUser" class="quiet-button">Change user</button></div>
+    </header>
+    <div class="listen-content" data-source="review">
+  <aside id="queueView" class="listen-queue" aria-labelledby="reviewQueueHeading">
+    <div class="listen-queue-heading">
+      <div><h2 id="reviewQueueHeading">Review queue</h2><span id="queueCount" class="queue-count" role="status" aria-live="polite"></span></div>
+      <button id="queueButton" class="quiet-button">Queue options</button>
+    </div>
+    <div id="queueList" class="listen-list"></div>
+    <button id="moreQueue" class="quiet-button more-tracks" type="button" hidden>Load more</button>
+  </aside>
   <section id="reviewView" aria-label="Music review">
-    <div class="queue-toolbar"><button id="queueButton" class="quiet-button">Queue options <span aria-hidden="true">⌄</span></button><span id="queueCount" class="queue-count" role="status" aria-live="polite"></span></div>
     <div id="empty" class="empty" hidden><div class="empty-icon" aria-hidden="true">♫</div><h1>Ready when you are.</h1><p id="emptyText">Choose your input folders in Settings. Tracks will appear here automatically.</p><div class="actions"><button id="rescanEmpty">Rescan</button><button id="returnSkipped" hidden>Return skipped tracks</button></div></div>
     <div id="reviewCard" hidden>
       <div class="track-heading"><div><p id="trackGenre" class="genre"></p><h1 id="trackTitle"></h1></div><span id="correctionBadge" class="badge" hidden>Editing previous review</span></div>
-      <section class="player" aria-label="Audio player">
+      <section class="player" aria-label="Review waveform">
         <div class="player-top"><div class="mode-tabs" role="group" aria-label="Listening mode"><button data-mode="fast">Fast</button><button data-mode="quick" class="active">Quick</button><button data-mode="standard">Standard</button><button data-mode="full">Full</button></div><span id="modeDescription" class="subtle">20-second overview</span></div>
         <div class="wave-wrap"><canvas id="waveform" aria-label="Recording waveform. Tap to seek, or select a listening range." tabindex="0"></canvas><span id="waveStatus">Preparing waveform…</span></div>
         <div class="wave-tools"><button id="selectRange" class="quiet-button">Select range</button><button id="playRange" class="quiet-button" hidden>Play selection</button><button id="nextPoint" class="quiet-button" title="Listen around the next detected point">Next point</button><button id="spectralToggle" class="quiet-button" aria-expanded="false">Spectrum</button></div>
         <div id="spectralWrap" class="spectral-wrap" hidden><img id="spectrogram" alt="Frequency content over time, from 30 Hz at the bottom to 8 kHz at the top"><div id="spectralCursor"></div><span class="freq-top">8 kHz</span><span class="freq-low">30 Hz</span></div>
         <div id="snippets" class="snippets" aria-label="Listening sections"></div>
-        <div class="transport"><div class="transport-buttons"><button id="play" class="play-button" aria-label="Play">▶</button><button id="restart" class="icon-button" aria-label="Restart" title="Restart">↺</button></div><div class="progress"><input id="progress" type="range" min="0" max="1000" value="0" aria-label="Playback progress"><div class="time-line"><span id="elapsed">0:00</span><span id="duration">0:00</span></div></div></div>
-        <div class="volume-line"><label class="autoplay-label"><input id="autoplayNext" type="checkbox"> Autoplay<span class="autoplay-extra"> next song</span></label><label>Volume <input id="volume" type="range" min="0" max="100" value="50" aria-label="Volume"></label><button id="compatibility" class="quiet-button" title="Use lossless WAV if this browser cannot play FLAC">Playback compatibility</button></div>
+        <div class="review-listen-controls">
+          <button id="reviewPlay" type="button">Play review audio</button>
+          <label class="autoplay-label"><input id="autoplayNext" type="checkbox"> Autoplay after review or skip</label>
+        </div>
       </section>
       <section id="technicalChecks" class="technical-checks" aria-label="Automatic technical checks">
         <div class="technical-heading"><strong>Technical checks</strong><span id="technicalStatus" role="status">Waiting for analysis</span></div>
@@ -51,12 +71,82 @@
     </div>
     <footer class="review-footer"><label id="autoSubmitLabel" class="auto-submit-label"><input id="autoSubmit" type="checkbox" checked> Auto-submit</label><button id="submitReview" class="primary" hidden disabled>Submit review</button><button id="retryReview" class="secondary" hidden>Retry save</button><button id="back" class="secondary">← Back</button><button id="resumeQueue" class="secondary" hidden>Resume queue</button><span id="reviewMessage" role="status" aria-live="polite"></span><button id="skip" class="secondary">Skip →</button></footer>
   </section>
-  <section id="selectionView" hidden aria-label="Publishing selection"><div class="section-heading"><div><p class="eyebrow">THE NEXT LISTEN</p><h1>Publishing selection</h1><p class="subtle">Keep the versions you want to publish. Selection leaves ratings unchanged.</p></div></div><div class="selection-filters"><label>Archive <select id="selectionBucket"><option value="5">Bucket 5</option><option value="4">Bucket 4</option><option value="3">Bucket 3</option><option value="2">Bucket 2</option><option value="1">Bucket 1</option><option value="0">Bucket 0</option><option value="">All flagged / reviewed</option></select></label><label>Status <select id="selectionStatus"><option value="">All</option><option value="selected">Flagged for distribution</option><option value="published">Published</option><option value="not_selected">Not selected</option><option value="rejected">Rejected</option><option value="passed">Passed</option><option value="withdrawn">Withdrawn</option></select></label><label>Bookmarks <select id="selectionBookmarks"><option value="">All</option><option value="only">Bookmarked by me</option></select></label></div><div class="catalogue-filters selection-choices"><div id="selectionSong"></div><div id="selectionCluster"></div><div id="selectionGenre"></div></div><div class="selection-actions"><button id="compare" disabled>Compare two versions</button><a href="/api/publishing-manifest" target="_blank" rel="noopener" class="quiet-button">Selection manifest ↗</a></div><div id="candidateList" class="candidate-list"></div><div class="page-controls"><button id="previousPage" class="secondary" disabled>← Previous</button><button id="nextPage" class="secondary" disabled>Next →</button></div></section>
+      <section id="selectionView" hidden aria-label="Publishing selection">
+        <div class="selection-filters">
+          <label>Archive
+            <select id="selectionBucket">
+              <option value="5">Bucket 5</option>
+              <option value="4">Bucket 4</option>
+              <option value="3">Bucket 3</option>
+              <option value="2">Bucket 2</option>
+              <option value="1">Bucket 1</option>
+              <option value="0">Bucket 0</option>
+              <option value="">All flagged / reviewed</option>
+            </select>
+          </label>
+          <label>Status
+            <select id="selectionStatus">
+              <option value="">All</option>
+              <option value="selected">Flagged for distribution</option>
+              <option value="published">Published</option>
+              <option value="not_selected">Not selected</option>
+              <option value="rejected">Rejected</option>
+              <option value="passed">Passed</option>
+              <option value="withdrawn">Withdrawn</option>
+            </select>
+          </label>
+          <label>Bookmarks
+            <select id="selectionBookmarks">
+              <option value="">All</option>
+              <option value="only">Bookmarked by me</option>
+            </select>
+          </label>
+        </div>
+        <details id="selectionFilters" class="listen-filters">
+          <summary>Song, cluster and style <span id="selectionFilterCount"></span></summary>
+          <div class="catalogue-filters selection-choices"><div id="selectionSong"></div><div id="selectionCluster"></div><div id="selectionGenre"></div></div>
+        </details>
+        <div class="selection-actions">
+          <button id="compare" disabled>Compare two versions</button>
+          <a href="/api/publishing-manifest" target="_blank" rel="noopener" class="quiet-button">Selection manifest ↗</a>
+        </div>
+        <div id="candidateList" class="listen-list"></div>
+        <button id="moreCandidates" class="quiet-button more-tracks" type="button" hidden>Load more</button>
+      </section>
+      <section id="libraryView" hidden aria-label="Library"></section>
+    </div>
+  </section>
 <section id="yamlView" aria-label="YAML editor" hidden></section>
 <section id="writingView" aria-label="Writing" hidden></section>
 <section id="generationView" aria-label="Generation" hidden></section>
 </main>
-<audio id="audio" preload="metadata"></audio>
+<section id="nowPlaying" class="now-playing" aria-label="Now playing" hidden>
+  <div class="now-playing-inner">
+    <div class="playing-track">
+      <span class="playing-note" aria-hidden="true">♫</span>
+      <div class="playing-text"><strong id="playerTitle" aria-live="polite">Nothing playing</strong><span id="playerContext"></span></div>
+    </div>
+    <div class="playing-transport">
+      <div class="playing-buttons">
+        <button id="playerPrevious" type="button" class="player-button" aria-label="Previous track" title="Previous track or restart" disabled><span class="player-skip player-skip-back" aria-hidden="true"></span></button>
+        <button id="play" type="button" class="player-button player-toggle" aria-label="Play" disabled><span class="play-symbol" aria-hidden="true"></span></button>
+        <button id="playerNext" type="button" class="player-button" aria-label="Next track" title="Next track" disabled><span class="player-skip" aria-hidden="true"></span></button>
+      </div>
+      <div class="playing-timeline">
+        <span id="elapsed">0:00</span><input id="progress" type="range" min="0" max="1000" value="0" aria-label="Playback position" disabled><span id="duration">0:00</span>
+      </div>
+    </div>
+    <details class="playing-options">
+      <summary class="quiet-button" aria-label="Playback options" title="Playback options">⋯</summary>
+      <div class="playing-options-panel">
+        <label>Volume <input id="volume" type="range" min="0" max="100" value="50"></label>
+        <label><input id="playContinuously" type="checkbox"> Play through collection</label>
+        <button id="compatibility" type="button" class="quiet-button" title="Switch between lossless FLAC and WAV">FLAC</button>
+      </div>
+    </details>
+  </div>
+  <audio id="audio" preload="metadata"></audio>
+</section>
 <div id="toast" role="status" aria-live="polite" hidden></div>
 <dialog id="loginDialog"><form id="loginForm"><p class="eyebrow">GOOD BOY RECORDS</p><h2>Enter the review room.</h2><label>Access code or password <input id="password" type="password" autocomplete="current-password" required></label><p id="loginError" class="error"></p><button class="primary" type="submit">Sign in</button></form></dialog>
 <dialog id="reviewerDialog"><form id="reviewerForm"><div class="dialog-heading"><h2>Who’s reviewing?</h2><button id="cancelReviewer" type="button" class="close" data-close="reviewerDialog" aria-label="Cancel" hidden>×</button></div><label>Your name <input id="newReviewerName" autocomplete="name" maxlength="100" required></label><button class="primary" type="submit">Continue</button><p class="subtle small">Or choose a name:</p><div id="knownReviewers" class="known-reviewers"></div><p id="reviewerError" class="error"></p></form></dialog>

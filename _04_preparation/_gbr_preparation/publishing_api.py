@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse,Response
 from pydantic import BaseModel,ConfigDict,Field,StrictBool
@@ -79,7 +82,26 @@ def router(root,review,preparation,local):
     @routes.get('/projects')
     def projects():return service.projects()
     @routes.get('/library')
-    def library():return service.library.projects()
+    def library():
+        result = service.library.projects()
+        if not result['items']:
+            return result
+        prepared_ids = json.dumps([item['prepared_id'] for item in result['items']])
+        assets = service.db.all("""SELECT task.id, asset.key AS file_index, json_extract(asset.value,'$.path') AS path
+            FROM processing_tasks task, json_each(task.recipe_json,'$.files') asset
+            WHERE task.id IN (SELECT value FROM json_each(?))
+              AND task.kind='release_prepare' AND task.status='done'
+              AND json_extract(asset.value,'$.content_type')='audio/mpeg'
+            ORDER BY asset.key""", (prepared_ids,))
+        audio = {}
+        for asset in assets:
+            if asset['path'] and Path(asset['path']).is_file():
+                audio.setdefault(asset['id'], asset['file_index'])
+        for item in result['items']:
+            prepared_id = item['prepared_id']
+            index = audio.get(prepared_id)
+            item['playback_url'] = f'/api/releases/{prepared_id}/assets/{index}' if index is not None else None
+        return result
     @routes.get('/library/settings')
     def library_settings():return service.library.configuration()
     @routes.post('/library/settings')

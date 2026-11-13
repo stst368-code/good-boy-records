@@ -70,6 +70,7 @@ def main():
             page.wait_for_function("()=>document.getElementById('reviewCard').hidden===true")
             assert service.db.one('SELECT COUNT(*) n FROM reviews')['n']==1
             page.locator('#selectionTab').click();page.wait_for_selector('.candidate')
+            page.locator('#selectionFilters summary').click()
             page.locator('#selectionSong').get_by_role('button',name='Track names: Other',exact=True).click()
             page.locator('#selectionCluster').get_by_role('button',name='Clusters: Rock',exact=True).click()
             page.wait_for_function("()=>document.querySelectorAll('.candidate').length===1")
@@ -78,7 +79,8 @@ def main():
             assert page.locator('#genRatingCluster option[value=Rock]').count()==1
             assert page.locator('#genRatingStyle option[value=Jazz]').count()==1
             assert page.locator('#genRatingStyle option[value=Punk]').count()==0
-            page.locator('#writingTab').click();page.wait_for_selector('#writeCluster option[value=Rock]',state='attached')
+            page.locator('#writingTab').click();page.get_by_role('tab',name='Model assistant').click()
+            page.wait_for_selector('#writeCluster option[value=Rock]',state='attached')
             page.locator('#writeCluster').select_option('Rock');page.locator('#writeStyle').select_option('Punk')
             assert page.locator('#writeLanguage').input_value()=='en'
             assert page.locator('#writeLanguage option').count()>180
@@ -108,7 +110,7 @@ def main():
                 path.with_suffix('.yaml').write_text(f'title: {title}\ncluster: Rock\nstyle: Punk\n'+(f'song_id: {sid}\n' if sid else ''))
                 aid=service.indexer.index(path);gid=service.db.one('SELECT id FROM generations WHERE audio_id=?',(aid,))['id']
                 if i<3:generated.append(gid)
-            page.locator('#reviewTab').click();page.locator('#queueButton').click();page.wait_for_selector('#queueDialog[open]')
+            page.locator('#listenTab').click();page.locator('#reviewTab').click();page.locator('#queueButton').click();page.wait_for_selector('#queueDialog[open]')
             for id,label in [('filterSong','Any track'),('filterCluster','Any cluster'),('filterGenre','Any style')]:page.locator('#'+id).get_by_role('button',name=label,exact=True).click()
             page.locator('#filterDirectory').select_option('')
             velvet=page.locator('#filterSong').get_by_role('button',name='Track names: paws off the velvet',exact=True)

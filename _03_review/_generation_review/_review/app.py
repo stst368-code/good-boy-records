@@ -259,6 +259,7 @@ def create_app(config_path, start_worker=True, database_path=None):
         queue_directories = sorted(queue_directories)
         return {"authenticated": authenticated(request), "can_configure": local(request), "queue": session,
                 "reviewer": reviewer, "reviewers": service.queues.names() if authenticated(request) else [],
+                "library_available": local(request) and app.state.preparation.enabled,
                 "heartbeat_seconds": min(10, config.values["reservation_seconds"] // 3),
                 "input_directories": [str(p) for p in config.inputs] if authenticated(request) else [],
                 "queue_directories": queue_directories,
@@ -308,6 +309,10 @@ def create_app(config_path, start_worker=True, database_path=None):
         if include_preview:
             result["preview"] = track_preview(result["track"]["id"]) if result["track"] else None
         return result
+
+    @app.get("/api/queue/browse")
+    def browse_queue(request: Request, offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100)):
+        return service.queues.browse(reviewer_id(request), offset, limit)
 
     @app.post("/api/queue/prefetch")
     def prefetch(body: PrefetchBody, request: Request):
@@ -471,7 +476,7 @@ def create_app(config_path, start_worker=True, database_path=None):
         filters = filtering.prepare({'song':song,'titles':titles or [],'clusters':clusters or [],'genres':genres or []}, names)
         rows = [row for row in filtering.publishing_rows(service,rid,bucket,status,bookmarked,names) if filtering.matches(row,filters)]
         rows.sort(key=lambda row:(row['title'].casefold(),row['generation_id']))
-        columns = ('generation_id','title','genre','song_id','publishing_status','external_reference','bucket','reviewer_id','review_id')
+        columns = ('generation_id','title','genre','song_id','publishing_status','external_reference','bucket','reviewer_id','review_id','audio_duration')
         items = [{key:row[key] for key in columns} for row in rows[offset:offset+limit]]
         for item in items:
             own = service.db.one('SELECT r.id FROM latest_reviewer_reviews r JOIN generations g ON g.audio_id=r.audio_id WHERE g.id=? AND r.reviewer_id=?', (item['generation_id'], rid))

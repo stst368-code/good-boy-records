@@ -52,6 +52,7 @@ def test_identity_required_and_names_are_trimmed_casefolded(clients):
     blank = TestClient(create_app(s.config.path, False), base_url='http://localhost')
     assert blank.get('/api/bootstrap').json()['reviewer'] is None
     assert blank.get('/api/queue/next').status_code == 428
+    assert blank.get('/api/queue/browse').status_code == 428
     for name in ('', '   ', '\t\n'):
         assert blank.post('/api/reviewer/select', json={'name': name}, headers=WRITE).status_code == 400
     assert select(blank, '  sImOn  ') == simon
@@ -76,6 +77,29 @@ def test_concurrent_allocation_is_exclusive_and_server_persisted(clients):
     assert {r['reviewer_id'] for r in rows} == {ar, br}
     assert current(a)['track']['audio_id'] == one
     assert current(b)['track']['audio_id'] == two
+
+
+def test_browsing_review_queue_is_read_only_and_excludes_other_reservations(clients):
+    s, a, b, ar, br = clients
+    seed(s, 12)
+    ga = current(a)['track']['id']
+    current(b)
+    leases = s.db.all('SELECT * FROM queue_reservations ORDER BY audio_id')
+    sessions = s.db.all('SELECT * FROM sessions ORDER BY id')
+    other = {row['generation_id'] for row in leases if row['reviewer_id'] == br}
+
+    first = a.get('/api/queue/browse?limit=3').json()
+    rest = a.get('/api/queue/browse?offset=3').json()
+    ids = [item['id'] for item in first['items'] + rest['items']]
+    assert first['items'][0]['id'] == ga
+    assert first['has_more'] and not rest['has_more']
+    assert len(ids) == len(set(ids)) == 12 - len(other)
+    assert not other.intersection(ids)
+    assert a.get('/api/queue/browse?limit=3').json() == first
+    assert s.db.all('SELECT * FROM sessions ORDER BY id') == sessions
+    assert s.db.all('SELECT * FROM queue_reservations ORDER BY audio_id') == leases
+    assert a.post('/api/queue/open', json={'generation_id': ids[-1]}, headers=WRITE).json()['track']['id'] == ids[-1]
+    assert s.db.all('SELECT * FROM queue_skips') == []
 
 
 def test_duplicate_audio_and_yaml_cannot_bypass_reservation(clients):
