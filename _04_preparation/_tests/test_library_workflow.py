@@ -4,10 +4,13 @@ import json
 from pathlib import Path
 import sys
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 import pytest
 
 from test_publishing import publication,wait,image_bytes,prepare,POINTER
 from test_preparation import prepared,promote
+from _gbr_preparation import publishing_api
 from _gbr_preparation.release_catalogue import destination
 
 
@@ -20,7 +23,7 @@ def published(data,art=False):
     return pid,json.loads(review.db.one('SELECT recipe_json FROM processing_tasks WHERE id=?',(pid,))['recipe_json'])
 
 
-def test_finish_preparation_is_offline_and_only_publish_places_it_in_library(publication):
+def test_finish_preparation_is_offline_and_only_publish_places_it_in_library(publication, monkeypatch):
     review,prep,publisher,store,gid,_,_=publication
     assert prep.projects()['projects'] and not publisher.projects()['projects'] and not publisher.library.projects()['items']
     task=wait(review.db,publisher.finish_preparation(gid,{'include_flac':True})['id'])
@@ -30,7 +33,20 @@ def test_finish_preparation_is_offline_and_only_publish_places_it_in_library(pub
     assert not publisher.library.projects()['items']
     assert wait(review.db,publisher.start_publish(task['id'])['id'])['status']=='done'
     assert not publisher.projects()['projects'] and not prep.projects()['projects']
-    assert publisher.library.projects()['items'][0]['generation_id']==gid
+    monkeypatch.setattr(publishing_api, 'Publisher', lambda *_: publisher)
+    routes, _ = publishing_api.router(publisher.root, review, prep, lambda _: True)
+    app = FastAPI()
+    app.include_router(routes)
+    with TestClient(app) as client:
+        recording = client.get('/api/releases/library').json()['items'][0]
+        assert recording['generation_id'] == gid
+        url = recording['playback_url']
+        response = client.get(url, headers={'Range': 'bytes=0-99'})
+        assert response.status_code == 206 and response.headers['content-type'] == 'audio/mpeg'
+        assert len(response.content) == 100
+        audio, _ = publisher.asset(recording['prepared_id'], int(url.rsplit('/', 1)[1]))
+        audio.unlink()
+        assert client.get('/api/releases/library').json()['items'][0]['playback_url'] is None
 
 
 def test_metadata_revision_reuses_audio_and_preserves_source_reviews_and_identity(publication):

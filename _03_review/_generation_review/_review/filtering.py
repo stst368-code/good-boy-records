@@ -63,7 +63,7 @@ def publishing_rows(service,rid,bucket='',status='',bookmarked=False,names=None)
         where+=' AND EXISTS(SELECT 1 FROM bookmarks b WHERE b.generation_id=analytics_dataset.generation_id AND b.reviewer_id=?)';args.append(rid)
     for field,value in [('bucket',bucket),('publishing_status',status or None)]:
         if value is not None:where+=' AND '+field+'=?';args.append(value)
-    saved=service.db.all('SELECT generation_id,song_id,publishing_status,external_reference,bucket,reviewer_id,review_id,EXISTS(SELECT 1 FROM bookmarks b WHERE b.generation_id=analytics_dataset.generation_id AND b.reviewer_id=?) AS own_bookmarked FROM analytics_dataset WHERE '+where,(rid,*args))
+    saved=service.db.all('SELECT generation_id,song_id,publishing_status,external_reference,bucket,reviewer_id,review_id,audio_duration,EXISTS(SELECT 1 FROM bookmarks b WHERE b.generation_id=analytics_dataset.generation_id AND b.reviewer_id=?) AS own_bookmarked FROM analytics_dataset WHERE '+where,(rid,*args))
     names=names or song_names(service);resolved={r['id']:r for r in names.annotate(names.records)};present=available_audio(service.db)
     return [{**resolved[r['generation_id']],**r} for r in saved
             if r['generation_id'] in resolved and resolved[r['generation_id']]['audio_id'] in present

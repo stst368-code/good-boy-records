@@ -56,11 +56,12 @@ class ReviewerQueues:
     def sweep(self, c):
         c.execute("DELETE FROM queue_reservations WHERE expires_at<=? OR EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=queue_reservations.audio_id)", (self.clock(),))
 
-    def candidates(self, c, session):
+    def candidates(self, c, session, randomize=True):
         names = song_names(self.service)
         filters = prepare(json.loads(session["filters_json"]), names)
-        rows = [dict(r) for r in c.execute(f"""SELECT g.id,g.audio_id,g.generation_timestamp,g.created_at,g.original_directory,{PROJECTION}
-            FROM generations g JOIN songs s ON s.id=g.song_id LEFT JOIN generation_metadata m ON m.generation_id=g.id
+        rows = [dict(r) for r in c.execute(f"""SELECT g.id,g.audio_id,g.generation_timestamp,g.created_at,g.original_directory,a.duration,{PROJECTION}
+            FROM generations g JOIN songs s ON s.id=g.song_id JOIN audio a ON a.id=g.audio_id
+            LEFT JOIN generation_metadata m ON m.generation_id=g.id
             WHERE NOT EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id)
             AND NOT EXISTS(SELECT 1 FROM publishing_selection p WHERE p.generation_id=g.id AND p.status='published')
             AND NOT EXISTS(SELECT 1 FROM queue_skips k WHERE k.audio_id=g.audio_id AND k.session_id=?)
@@ -70,7 +71,8 @@ class ReviewerQueues:
         opened = next((r for r in rows if r['id'] == session.get('opened_generation_id')), None)
         rows = [r for r in rows if matches(r, filters)]
         if session["order_by"] == "random":
-            random.shuffle(rows)
+            if randomize:
+                random.shuffle(rows)
         else:
             def date_key(r):
                 try:
@@ -118,6 +120,24 @@ class ReviewerQueues:
     def counts(self, rid, overrides=None):
         with self.db.transaction() as c:
             return self.count_scope(c, self.session(c, rid), overrides)
+
+    def browse(self, rid, offset, limit):
+        with closing(self.db.connect()) as c:
+            session = dict(c.execute("SELECT * FROM sessions WHERE reviewer_id=?", (rid,)).fetchone())
+            rows = self.candidates(c, session, randomize=False)
+            leases = c.execute("""SELECT audio_id,reviewer_id,ordinal FROM queue_reservations
+                                  WHERE expires_at>? ORDER BY ordinal""", (self.clock(),)).fetchall()
+        present = available_audio(self.db)
+        ranks = {row["audio_id"]: row["ordinal"] for row in leases if row["reviewer_id"] == rid}
+        unavailable = {row["audio_id"] for row in leases if row["reviewer_id"] != rid}
+        rows = [row for row in rows if row["audio_id"] in present and row["audio_id"] not in unavailable]
+        # Show the active reservation and reserved-ahead tracks first. The rest
+        # keep a stable browse order even when assignment is set to Random.
+        rows.sort(key=lambda row: (-1 if row["id"] == session["current_generation_id"]
+                                   else ranks.get(row["audio_id"], float("inf"))))
+        columns = ("id", "title", "genre", "duration")
+        return {"items": [{key: row[key] for key in columns} for row in rows[offset:offset + limit]],
+                "has_more": offset + limit < len(rows)}
 
     def open(self, rid, gid):
         with self.db.transaction() as c:
