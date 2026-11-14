@@ -3,6 +3,7 @@
 Uses synthetic media and a temporary database, never a real installation.
 """
 import argparse
+import asyncio
 import json
 from pathlib import Path
 import sys
@@ -42,6 +43,19 @@ def main():
         code = enable_http(Config(config))
         app = create_app(config, start_worker=True)
         service = app.state.service
+        blocked_paths = set()
+        release_media = threading.Event()
+        preview_requested = threading.Event()
+
+        @app.middleware('http')
+        async def delay_next_media(request, call_next):
+            path = request.url.path
+            if path in blocked_paths:
+                if path.endswith('/preview'):
+                    preview_requested.set()
+                await asyncio.to_thread(release_media.wait, 10)
+            return await call_next(request)
+
         server = uvicorn.Server(uvicorn.Config(app, host='0.0.0.0', port=18766, log_level='error', loop='_review.server_loop:create_loop'))
         thread = threading.Thread(target=server.run, daemon=True)
         thread.start()
@@ -86,8 +100,19 @@ def main():
                     page.wait_for_timeout(50)
                 assert service.prefetched_id is not None
                 assert service.db.one('SELECT COUNT(*) AS n FROM reviews')['n'] == 0
+                queued_next = service.prefetched_id
+                page.wait_for_function("(gid) => document.querySelector('[data-open-review=\"' + gid + '\"]')", arg=queued_next)
+                page.evaluate("(gid) => {window.nextQueueRow = document.querySelector('[data-open-review=\"' + gid + '\"]');}", queued_next)
+                blocked_paths.update([f'/api/tracks/{queued_next}/preview', f'/api/playback/{queued_next}'])
                 page.keyboard.type('5432', delay=80)
-                page.wait_for_function("()=>document.querySelectorAll('.rating-values [aria-pressed=true]').length===0")
+                page.wait_for_function("""(gid) => document.querySelector('#audio').src.includes(gid) &&
+                    !document.querySelector('.rating-values button:disabled') &&
+                    !document.querySelector('.rating-values [aria-pressed=true]')""", arg=queued_next)
+                assert page.evaluate("window.nextQueueRow.isConnected && window.nextQueueRow.textContent === 'In review'")
+                assert page.locator('#waveStatus').inner_text() == 'Loading waveform…'
+                assert page.locator('#reviewMessage').inner_text() == 'Review saved'
+                assert preview_requested.wait(2)
+                release_media.set()
                 page.wait_for_function("()=>!document.getElementById('audio').paused&&document.getElementById('audio').src.includes('mode=fast')")
                 assert service.db.one('SELECT COUNT(*) AS n FROM reviews')['n'] == 1
                 review = service.db.one('SELECT * FROM reviews')
@@ -170,6 +195,7 @@ def main():
                 phone.unroute_all(behavior='wait')
                 browser.close()
         finally:
+            release_media.set()
             server.should_exit = True
             thread.join(timeout=10)
 

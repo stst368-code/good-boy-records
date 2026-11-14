@@ -132,6 +132,37 @@ def test_prefetch_uses_only_the_selected_reviewers_reserved_next(clients):
     assert current(a)['track']['id'] == ra['track_id']
 
 
+def test_review_navigation_can_load_without_counts_or_waveform(clients, monkeypatch):
+    s, a, _, ar, _ = clients
+    ids = seed(s, 6)
+    first = s.public_track(ids[0])
+    s.analyzer.run(first['audio_id'])
+    analysis = s.db.one('SELECT id,preview_path FROM analyses WHERE audio_id=?', (first['audio_id'],))
+    s.queue_settings('alphabetical', 'asc', {}, reviewer_id=ar)
+    read_text = Path.read_text
+
+    def ignore_waveform(path, *args, **kwargs):
+        assert path != Path(analysis['preview_path']), 'Navigation read the waveform'
+        return read_text(path, *args, **kwargs)
+
+    def no_count(*args, **kwargs):
+        pytest.fail('Navigation counted the whole queue')
+
+    monkeypatch.setattr(Path, 'read_text', ignore_waveform)
+    monkeypatch.setattr(s.queues, 'count_scope', no_count)
+    start = a.get('/api/queue/next?include_counts=false').json()
+    assert start['track']['id'] == ids[0]
+    assert start['track']['sampling']['analysis_id'] == analysis['id']
+    assert start['track']['sampling']['segments']
+    assert 'counts' not in start and 'preview' not in start
+    assert a.post('/api/queue/prefetch', json={'current_id': ids[0], 'mode': 'full'}, headers=WRITE).json()['track_id'] == ids[1]
+    assert a.post('/api/reviewer/heartbeat?include_counts=false', json={'current_id': ids[0]}, headers=WRITE).json()['valid_current']
+    assert save(a, ids[0]).status_code == 200
+    assert a.get('/api/queue/next?include_counts=false').json()['track']['id'] == ids[1]
+    assert a.post('/api/queue/open?include_counts=false', json={'generation_id': ids[-1]}, headers=WRITE).json()['track']['id'] == ids[-1]
+    assert a.get('/api/queue/back').json()['track']['id'] == ids[0]
+
+
 def test_skip_back_and_corrections_do_not_change_other_reviewer(clients):
     s, a, b, ar, br = clients
     seed(s)

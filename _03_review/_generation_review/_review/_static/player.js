@@ -42,9 +42,16 @@ export function initPlayer({toast, onChange}) {
   }
 
   function canStep(direction) {
-    if (!current) return false;
-    const {queue, index} = current;
-    return Boolean(queue && (direction < 0 ? index > 0 : index + 1 < queue.items.length || queue.loadMore));
+    const queue = current?.queue;
+    if (!queue) return false;
+    return Boolean(queue.items[stepIndex(current, direction)] || (direction > 0 && queue.loadMore));
+  }
+
+  function stepIndex(entry, direction) {
+    const {queue, index} = entry;
+    let next = index + direction;
+    while (queue.items[next] && queue.retired?.has(queue.items[next].id)) next += direction;
+    return next;
   }
 
   function refresh() {
@@ -127,10 +134,11 @@ export function initPlayer({toast, onChange}) {
     stepping = entry;
     refresh();
     try {
-      const {queue, index} = entry;
-      const nextIndex = index + direction;
-      while (nextIndex === queue.items.length && queue.loadMore && stepping === entry) {
+      const {queue} = entry;
+      let nextIndex = stepIndex(entry, direction);
+      while (nextIndex >= queue.items.length && queue.loadMore && stepping === entry) {
         await queue.loadMore();
+        nextIndex = stepIndex(entry, direction);
       }
       if (stepping === entry && queue.items[nextIndex]) await playQueue(queue, nextIndex);
     } finally {

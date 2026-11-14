@@ -3,6 +3,7 @@ import json
 import re
 import threading
 import time
+from concurrent.futures import Future
 from pathlib import Path
 import numpy as np
 import soundfile as sf
@@ -35,6 +36,7 @@ class Playback:
         self.config, self.db, self.archiver = config, db, archiver
         self.lock = threading.RLock()
         self.pins = {}
+        self.rendering = {}
 
     @property
     def cache_root(self):
@@ -50,7 +52,7 @@ class Playback:
 
     def cache_report(self):
         with self.lock:
-            files = [p for p in self.cache_root.iterdir() if p.is_file() and not p.is_symlink()] if self.cache_root.exists() else []
+            files = [p for p in self.cache_root.iterdir() if p.suffix != '.part' and p.is_file() and not p.is_symlink()] if self.cache_root.exists() else []
             known = {r['filename'] for r in self.db.all('SELECT filename FROM playback_cache')}
             return {'files': len(files), 'bytes': sum(p.stat().st_size for p in files),
                     'wav_files': sum(p.suffix == '.wav' for p in files), 'wav_bytes': sum(p.stat().st_size for p in files if p.suffix == '.wav'),
@@ -113,11 +115,12 @@ class Playback:
             raise FileNotFoundError("Recording unavailable")
         if mode == "full" and format == "flac" and match_lufs is None:
             return source
-        analysis = self.db.one("SELECT * FROM analyses WHERE audio_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (g["audio_id"],))
         if analysis_id:
             analysis = self.db.one("SELECT * FROM analyses WHERE id=? AND audio_id=?", (analysis_id, g["audio_id"]))
             if not analysis:
                 raise ValueError("Analysis does not belong to this recording")
+        else:
+            analysis = self.db.one("SELECT * FROM analyses WHERE audio_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (g["audio_id"],))
         if segment_id:
             s = self.db.one("SELECT * FROM segments WHERE id=? AND audio_id=?", (segment_id, g["audio_id"]))
             if not s:
@@ -140,8 +143,10 @@ class Playback:
             raise ValueError("Unknown playback mode")
         # Full lossless WAV does not depend on an analysis revision or snippet fade.
         independent = mode == 'full' and match_lufs is None
-        key = hashlib.sha256(dumps([g["audio_id"], None if independent else analysis["id"] if analysis else None, ranges, format, match_lufs, 0 if independent else self.config.values["fade_ms"]]).encode()).hexdigest()
-        target = self.config.data / "cache" / "playback" / (key + "." + format)
+        cache_fade = 0 if independent else self.config.values["fade_ms"]
+        fade_ms = 0 if mode == 'full' else cache_fade
+        key = hashlib.sha256(dumps([g["audio_id"], None if independent else analysis["id"] if analysis else None, ranges, format, match_lufs, cache_fade]).encode()).hexdigest()
+        target = self.cache_root / (key + "." + format)
         with self.lock:
             if target.exists():
                 self.remember(target, g['audio_id'])
@@ -157,30 +162,55 @@ class Playback:
                         if legacy.is_file() and not legacy.is_symlink():
                             self.remember(legacy, g['audio_id'])
                             return legacy
+            future = self.rendering.get(target)
+            render = future is None
+            if render:
+                future = self.rendering[target] = Future()
+        if not render:
+            return future.result()
+
+        temporary = target.with_suffix(".part")
+        try:
             target.parent.mkdir(parents=True, exist_ok=True)
-            temporary = target.with_suffix(".part")
             gain = 1.
             if match_lufs is not None:
                 metrics = json.loads(analysis["metrics_json"]) if analysis else {}
                 if metrics.get("integrated_lufs") is None:
                     raise ValueError("Loudness matching needs completed analysis with measurable audio")
                 gain = 10 ** ((match_lufs - metrics["integrated_lufs"]) / 20)
-            with sf.SoundFile(source) as src, sf.SoundFile(temporary, "w", samplerate=src.samplerate, channels=src.channels,
-                                                        subtype=src.subtype, format="FLAC" if format == "flac" else "WAV") as dst:
-                fade = round(src.samplerate * self.config.values["fade_ms"] / 1000) if mode != "full" else 0
-                for beginning, ending in ranges:
-                    src.seek(round(beginning * src.samplerate))
-                    remaining = min(src.frames - src.tell(), round((ending - beginning) * src.samplerate))
-                    total, offset = remaining, 0
-                    while remaining > 0:
-                        block = src.read(min(65536, remaining), dtype="float64", always_2d=True)
-                        if not len(block):
-                            break
+            self.encode(source, temporary, ranges, format, fade_ms, gain)
+            with self.lock:
+                temporary.replace(target)
+                self.remember(target, g['audio_id'])
+            future.set_result(target)
+            return target
+        except BaseException as exc:
+            future.set_exception(exc)
+            raise
+        finally:
+            try:
+                temporary.unlink(missing_ok=True)
+            finally:
+                with self.lock:
+                    del self.rendering[target]
+
+    @staticmethod
+    def encode(source, destination, ranges, format, fade_ms, gain):
+        with sf.SoundFile(source) as src, sf.SoundFile(destination, "w", samplerate=src.samplerate, channels=src.channels,
+                                                     subtype=src.subtype, format="FLAC" if format == "flac" else "WAV") as dst:
+            fade = round(src.samplerate * fade_ms / 1000)
+            for beginning, ending in ranges:
+                src.seek(round(beginning * src.samplerate))
+                remaining = min(src.frames - src.tell(), round((ending - beginning) * src.samplerate))
+                total, offset = remaining, 0
+                while remaining > 0:
+                    block = src.read(min(65536, remaining), dtype="float64", always_2d=True)
+                    if not len(block):
+                        break
+                    if fade:
                         positions = np.arange(len(block)) + offset
-                        envelope = np.minimum(1., np.minimum(positions / max(fade, 1), (total - 1 - positions) / max(fade, 1))) if fade else np.ones(len(block))
-                        dst.write(block * envelope[:, None] * gain)
-                        remaining -= len(block)
-                        offset += len(block)
-            temporary.replace(target)
-            self.remember(target, g['audio_id'])
-        return target
+                        envelope = np.minimum(1., np.minimum(positions / fade, (total - 1 - positions) / fade))
+                        block *= envelope[:, None]
+                    dst.write(block * gain)
+                    remaining -= len(block)
+                    offset += len(block)

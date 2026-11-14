@@ -11,35 +11,42 @@
 </head>
 <body>
 <header class="topbar"><a class="wordmark" href="#listenView" aria-label="Good Boy Records Listen"><span class="logo">GBR</span><span>GOOD BOY RECORDS<small>STUDIO</small></span></a>
-  <nav aria-label="Main"><button id="writingTab" class="tab">Writing</button><button id="yamlTab" class="tab">YAML editor</button><button id="generationTab" class="tab">Generation</button><button id="listenTab" class="tab active" aria-current="page">Listen</button><button id="preparationTab" class="tab">Preparation</button><button id="publishingTab" class="tab">Publish</button><button id="settingsButton" class="icon-button" aria-label="Settings" title="Settings">⚙</button></nav>
+  <nav aria-label="Main"><button id="listenTab" class="tab active" aria-current="page">Listen</button><button id="writingTab" class="tab">Writing</button><button id="yamlTab" class="tab">YAML editor</button><button id="generationTab" class="tab">Generation</button><button id="preparationTab" class="tab">Preparation</button><button id="publishingTab" class="tab">Publish</button></nav>
+  <button id="settingsButton" class="icon-button" aria-label="Settings" title="Settings">⚙</button>
 </header>
 <main>
   <section id="preparationView" hidden aria-label="Preparation"></section>
   <section id="publishingView" hidden aria-label="Publishing"></section>
-  <section id="listenView" aria-labelledby="listenHeading">
+  <section id="listenView" aria-label="Listen">
     <header class="listen-heading">
-      <h1 id="listenHeading">Listen</h1>
       <nav class="listen-sources" aria-label="Listening collections">
-        <button id="reviewTab" type="button" aria-controls="reviewView queueView" aria-current="true">Review queue</button>
+        <button id="reviewTab" type="button" aria-controls="reviewView queueView" aria-current="true">Review</button>
         <button id="selectionTab" type="button" aria-controls="selectionView">Selection</button>
         <button id="libraryTab" type="button" aria-controls="libraryView" hidden>Library</button>
       </nav>
-      <button id="jumpQueue" class="quiet-button" type="button">Browse queue ↓</button>
+      <button id="jumpQueue" class="quiet-button" type="button" aria-controls="queueView" aria-expanded="false">Queue</button>
       <div id="reviewerBar" class="reviewer-bar" hidden><span>Reviewing as <strong id="reviewerName"></strong></span><button id="changeUser" class="quiet-button">Change user</button></div>
     </header>
     <div class="listen-content" data-source="review">
   <aside id="queueView" class="listen-queue" aria-labelledby="reviewQueueHeading">
     <div class="listen-queue-heading">
       <div><h2 id="reviewQueueHeading">Review queue</h2><span id="queueCount" class="queue-count" role="status" aria-live="polite"></span></div>
-      <button id="queueButton" class="quiet-button">Queue options</button>
+      <button id="queueButton" class="quiet-button" aria-label="Queue options">Filters</button>
     </div>
     <div id="queueList" class="listen-list"></div>
     <button id="moreQueue" class="quiet-button more-tracks" type="button" hidden>Load more</button>
   </aside>
   <section id="reviewView" aria-label="Music review">
+    <header class="review-header">
+      <div id="trackHeading" class="track-heading" hidden><div><p id="trackGenre" class="genre"></p><h1 id="trackTitle"></h1></div><span id="correctionBadge" class="badge" hidden>Editing previous review</span></div>
+      <div class="review-navigation">
+        <button id="back" type="button" class="quiet-button" disabled>Edit last review</button>
+        <button id="resumeQueue" type="button" class="secondary" hidden>Resume queue</button>
+        <button id="skip" type="button" class="secondary" hidden>Skip</button>
+      </div>
+    </header>
     <div id="empty" class="empty" hidden><div class="empty-icon" aria-hidden="true">♫</div><h1>Ready when you are.</h1><p id="emptyText">Choose your input folders in Settings. Tracks will appear here automatically.</p><div class="actions"><button id="rescanEmpty">Rescan</button><button id="returnSkipped" hidden>Return skipped tracks</button></div></div>
     <div id="reviewCard" hidden>
-      <div class="track-heading"><div><p id="trackGenre" class="genre"></p><h1 id="trackTitle"></h1></div><span id="correctionBadge" class="badge" hidden>Editing previous review</span></div>
       <section class="player" aria-label="Review waveform">
         <div class="player-top"><div class="mode-tabs" role="group" aria-label="Listening mode"><button data-mode="fast">Fast</button><button data-mode="quick" class="active">Quick</button><button data-mode="standard">Standard</button><button data-mode="full">Full</button></div><span id="modeDescription" class="subtle">20-second overview</span></div>
         <div class="wave-wrap"><canvas id="waveform" aria-label="Recording waveform. Tap to seek, or select a listening range." tabindex="0"></canvas><span id="waveStatus">Preparing waveform…</span></div>
@@ -48,12 +55,8 @@
         <div id="snippets" class="snippets" aria-label="Listening sections"></div>
         <div class="review-listen-controls">
           <button id="reviewPlay" type="button">Play review audio</button>
-          <label class="autoplay-label"><input id="autoplayNext" type="checkbox"> Autoplay after review or skip</label>
+          <label class="autoplay-label"><input id="autoplayNext" type="checkbox" aria-description="Start playback after saving or skipping"> Autoplay next</label>
         </div>
-      </section>
-      <section id="technicalChecks" class="technical-checks" aria-label="Automatic technical checks">
-        <div class="technical-heading"><strong>Technical checks</strong><span id="technicalStatus" role="status">Waiting for analysis</span></div>
-        <div id="technicalFlags" class="technical-flags"></div><details class="technical-details"><summary>Measurements</summary><p id="technicalMetrics" class="subtle small"></p><p class="subtle small">Signal checks can flag intentional effects or rests. Listen and choose your own ratings.</p></details>
       </section>
       <section id="reviewTools" class="review-tools" aria-label="Review context">
         <div class="track-flag-controls"><div class="flag-buttons" role="group" aria-label="Track flags"><button id="distributionFlag" type="button" aria-pressed="false">Flag for publish</button><button id="bookmarkFlag" type="button" aria-pressed="false">Bookmark</button><button id="rejectFlag" type="button" aria-pressed="false">Reject</button></div><span id="flagSummary" class="subtle small"></span><p id="flagMessage" class="small" role="status"></p><button id="retryFlags" type="button" class="quiet-button" hidden>Retry flags</button><button id="refreshFlags" type="button" class="quiet-button" hidden>Refresh flags</button></div>
@@ -61,15 +64,19 @@
         <button id="viewReviews" class="quiet-button" hidden>View saved reviews and reasons</button>
       </section>
       <section id="ratings" class="ratings" aria-label="Quality ratings">
-        <p class="tag-timing-hint subtle small">Fourth rating saves · choose any tags first</p><p id="ratingReminder" class="rating-reminder">A 5 rating is truly exceptional, reserve for tracks which literally could not be improved</p>
+        <p id="ratingReminder" class="rating-reminder">A 5 rating is truly exceptional, reserve for tracks which literally could not be improved</p>
         <div class="rating" data-dimension="audio_quality"><div class="rating-label"><span>Audio Quality</span></div><p class="rating-guidance">Clarity, artifacts and glitching</p><div class="rating-values" role="group" aria-label="Audio Quality"></div><div class="rating-anchors"><div class="rating-anchor single" data-score-min="0" data-score-max="0"><span class="anchor-label">Pure noise</span></div><div class="rating-anchor range" data-score-min="1" data-score-max="2"><span class="rating-bracket" aria-hidden="true"></span><span class="anchor-label">Rough</span></div><div class="rating-anchor range" data-score-min="3" data-score-max="4"><span class="rating-bracket" aria-hidden="true"></span><span class="anchor-label">Clear</span></div><div class="rating-anchor single" data-score-min="5" data-score-max="5"><span class="anchor-label">Perfect</span></div></div></div>
         <div class="rating" data-dimension="composition"><div class="rating-label"><span>Composition</span></div><p class="rating-guidance">How closely does it match the intended cluster/genre? <span id="compositionGenre" class="intended-genre"></span></p><div class="rating-values" role="group" aria-label="Composition"></div><div class="rating-anchors"><div class="rating-anchor single" data-score-min="0" data-score-max="0"><span class="anchor-label">Unrelated</span></div><div class="rating-anchor range" data-score-min="1" data-score-max="2"><span class="rating-bracket" aria-hidden="true"></span><span class="anchor-label">Spin-off</span></div><div class="rating-anchor range" data-score-min="3" data-score-max="4"><span class="rating-bracket" aria-hidden="true"></span><span class="anchor-label">Clearly inspired</span></div><div class="rating-anchor single" data-score-min="5" data-score-max="5"><span class="anchor-label">Exact</span></div></div></div>
         <div class="rating" data-dimension="consistency"><div class="rating-label"><span>Consistency</span></div><p class="rating-guidance">Is it one unified song from start to finish?</p><div class="rating-values" role="group" aria-label="Consistency"></div><div class="rating-anchors"><div class="rating-anchor single" data-score-min="0" data-score-max="0"><span class="anchor-label">China shop bull</span></div><div class="rating-anchor range" data-score-min="1" data-score-max="2"><span class="rating-bracket" aria-hidden="true"></span><span class="anchor-label">Inconsistent</span></div><div class="rating-anchor range" data-score-min="3" data-score-max="4"><span class="rating-bracket" aria-hidden="true"></span><span class="anchor-label">Consistent</span></div><div class="rating-anchor single" data-score-min="5" data-score-max="5"><span class="anchor-label">Unified Song</span></div></div></div>
         <div class="rating" data-dimension="realism"><div class="rating-label"><span>Realism</span></div><p class="rating-guidance">Would the average person believe it was made by a human?</p><div class="rating-values" role="group" aria-label="Realism"></div><div class="rating-anchors"><div class="rating-anchor single" data-score-min="0" data-score-max="0"><span class="anchor-label">Slop</span></div><div class="rating-anchor range" data-score-min="1" data-score-max="2"><span class="rating-bracket" aria-hidden="true"></span><span class="anchor-label">Could fool mum</span></div><div class="rating-anchor range" data-score-min="3" data-score-max="4"><span class="rating-bracket" aria-hidden="true"></span><span class="anchor-label">Realistic</span></div><div class="rating-anchor single" data-score-min="5" data-score-max="5"><span class="anchor-label">Hyper-realistic</span></div></div></div>
       <p class="realism-note">Human production includes electronic, synthetic and chiptune music.</p></section>
-      <section id="reviewTags" class="review-tags" aria-label="Review observations"><div class="tags-heading"><strong>Observations <span class="subtle small">Optional · choose before your final rating</span></strong><button id="clearTags" type="button" class="quiet-button">Clear Tags</button></div><div id="tagGroups" class="tag-groups"></div></section>
     </div>
-    <footer class="review-footer"><label id="autoSubmitLabel" class="auto-submit-label"><input id="autoSubmit" type="checkbox" checked> Auto-submit</label><button id="submitReview" class="primary" hidden disabled>Submit review</button><button id="retryReview" class="secondary" hidden>Retry save</button><button id="back" class="secondary">← Back</button><button id="resumeQueue" class="secondary" hidden>Resume queue</button><span id="reviewMessage" role="status" aria-live="polite"></span><button id="skip" class="secondary">Skip →</button></footer>
+    <footer class="review-footer"><label id="autoSubmitLabel" class="auto-submit-label"><input id="autoSubmit" type="checkbox" checked> Save on fourth rating</label><button id="submitReview" class="primary" hidden disabled>Save review</button><button id="retryReview" class="secondary" hidden>Retry save</button><span id="reviewMessage" role="status" aria-live="polite"></span></footer>
+    <details id="reviewTags" class="review-tags" aria-label="Review observations" open hidden><summary>Observations <span class="subtle small">Choose before your final rating</span></summary><div class="tags-heading"><button id="clearTags" type="button" class="quiet-button">Clear Tags</button></div><div id="tagGroups" class="tag-groups"></div></details>
+    <section id="technicalChecks" class="technical-checks" aria-label="Automatic technical checks" hidden>
+      <div class="technical-heading"><strong>Technical checks</strong><span id="technicalStatus" role="status">Waiting for analysis</span></div>
+      <div id="technicalFlags" class="technical-flags"></div><details class="technical-details"><summary>Measurements</summary><p id="technicalMetrics" class="subtle small"></p><p class="subtle small">Signal checks can flag intentional effects or rests. Listen and choose your own ratings.</p></details>
+    </section>
   </section>
       <section id="selectionView" hidden aria-label="Publishing selection">
         <div class="selection-filters">

@@ -23,7 +23,7 @@ async function api(path,body){
   if(!response.ok){let data;try{data=await response.json();}catch{data={detail:response.statusText};}if(response.status===401&&path!=='/login'&&!$('loginDialog').open)$('loginDialog').showModal();const error=new Error(typeof data.detail==='string'?data.detail:JSON.stringify(data.detail));error.code=data.code;error.status=response.status;throw error;}
   return response.json();
 }
-function guarded(fn){return (...args)=>Promise.resolve(fn(...args)).catch(error=>toast(error.message));}
+function guarded(fn){return async (...args)=>{try{return await fn(...args);}catch(error){toast(error.message);}};}
 function recordingURL(id, mode, format, extra = {}) {
   return `/api/playback/${encodeURIComponent(id)}?` + new URLSearchParams({mode, format, ...extra});
 }
@@ -49,8 +49,8 @@ function paintPlayback(entry, playing) {
   const reviewPlay = $('reviewPlay');
   reviewPlay.disabled = !reviewAudio;
   reviewPlay.textContent = inReview && playing ? 'Pause review audio' : 'Play review audio';
-  const selector = entry?.key ? `[data-play-key="${CSS.escape(entry.key)}"]` : '';
-  for (const row of document.querySelectorAll(`.listen-row[data-current]${selector ? ', ' + selector : ''}`)) {
+  const selector = entry?.key ? `, [data-play-key="${CSS.escape(entry.key)}"]` : '';
+  for (const row of document.querySelectorAll('.listen-row[data-current]' + selector)) {
     const active = row.dataset.playKey === entry?.key;
     if (active) row.dataset.current = 'true';
     else delete row.dataset.current;
@@ -106,11 +106,19 @@ async function submitReview(){
     const modes=[...state.listened];const mode=modes.length>1?'mixed':modes[0]||state.track.previous_mode||state.mode;
     await state.flagWrite.catch(()=>{});
     await api(`/tracks/${gid}/review`,{...state.scores,mode,tags:reviewTags.value(),reason:$('reason').value,distribution:state.draftFlags.distribution,bookmarked:state.draftFlags.bookmarked,rejected:Boolean(state.draftFlags.rejected),expected_publishing_status:state.flags?.publishing_status||'not_selected',submission_id:state.submissionId,expected_review_id:state.track.review_id||null,reassessment:Boolean(state.track.reassessment),listening:{modes_played:modes,played_seconds:Math.round(state.heard*10)/10,complete_full_playback:state.fullCompleted,analysis_id:reviewAudio?.analysis_id||state.preview?.analysis_id||null,analyses_played:[...state.analysisIds],selected_range:state.selection,playback_speed:audio.playbackRate}});
-    saved=true;selectionDirty=true;if(player.current===reviewAudio)player.pause();$('reviewMessage').textContent='Saved';await nextTrack($('autoplayNext').checked);state.submitting=false;paintRatings();
+    saved = true;
+    selectionDirty = true;
+    if (!state.track.correction) finishQueueTrack(gid, true);
+    if (player.current === reviewAudio) player.pause();
+    $('reviewMessage').textContent = 'Review saved';
+    await nextTrack($('autoplayNext').checked);
+    $('reviewMessage').textContent = 'Review saved';
+    state.submitting = false;
+    paintRatings();
   }catch(error){state.submitting=false;state.advancePending=saved;state.saveError=!saved;if(error.code==='flags_changed')$('refreshFlags').hidden=false;if(error.code==='submission_saved'){state.canBack=true;$('back').disabled=false;state.saveError=false;}if(['reservation_lost','already_reviewed','other_reviewer'].includes(error.code))loseReservation(error.message);paintRatings();$('reviewMessage').textContent=saved?'Review saved. Retrying the next track…':state.reservationLost?error.message:`Not saved: ${error.message} Your entries are retained. ${error.code==='flags_changed'?'Refresh flags, then retry.':error.code==='submission_saved'?'Use Back to open the saved review.':'Retry save or choose a rating again.'}`;if(saved)throw new Error('Review saved; retrying the next track.');throw error;}
 }
 function preferredMode(){const mode=localStorage.getItem('gbr-review-mode')||'quick';return ['fast','quick','standard','full'].includes(mode)?mode:'quick';}
-function modeAvailable(mode){return mode==='full'||Boolean(state.preview?.ready&&state.preview.segments.some(s=>s.mode===mode));}
+function modeAvailable(mode){return mode==='full'||Boolean(state.sampling?.segments.some(s=>s.mode===mode));}
 function prepareNext(){
   clearTimeout(prefetchTimer);const gid=state.track?.id;if(!gid||state.track.correction||state.reservationLost)return;
   const mode=preferredMode();
@@ -118,25 +126,32 @@ function prepareNext(){
 }
 async function nextTrack(autoplay = false) {
   const reviewerId = state.reviewerId;
-  const result = await api('/queue/next?include_preview=true');
+  const result = await api('/queue/next?include_counts=false');
   if (reviewerId !== state.reviewerId) return;
   state.emptyReason = result.reason;
   state.canBack = result.can_back;
-  paintCounts(result.counts);
   $('returnSkipped').hidden = !result.has_skips;
   const previous = state.track;
-  await loadTrack(result.track, result.preview, {autoplay, replace: true});
-  if (previous || result.track || !reviewList) reviewListDirty = true;
-  if (reviewVisible() && reviewListDirty) refreshReviewList().catch(error => toast(error.message));
+  loadTrack(result.track, {autoplay, replace: true});
+  if (!previous && result.track && !reviewList?.items.length) reviewListDirty = true;
+  updateQueueReview();
+  refreshVisibleQueue();
+  refreshReviewCount();
 }
 async function previousReview() {
   const result = await api('/queue/back');
-  if (result.track) await loadTrack(result.track, null, {replace: true});
+  if (result.track) {
+    loadTrack(result.track, {replace: true});
+    updateQueueReview();
+  }
 }
 async function advanceReview(autoplay) {
   const track = state.track;
   if (!track || state.reservationLost) return;
-  if (!track.correction) await api(`/tracks/${track.id}/skip`, {});
+  if (!track.correction) {
+    await api(`/tracks/${track.id}/skip`, {});
+    finishQueueTrack(track.id, false);
+  }
   try {
     await nextTrack(autoplay);
   } catch (error) {
@@ -147,7 +162,7 @@ async function advanceReview(autoplay) {
     throw error;
   }
 }
-async function loadTrack(track, initialPreview = null, {autoplay = false, replace = false} = {}) {
+function loadTrack(track, {autoplay = false, replace = false, playSelected = false} = {}) {
   const sequence = ++loadSequence;
   clearTimeout(prefetchTimer);
   const previousAudio = reviewAudio;
@@ -155,6 +170,7 @@ async function loadTrack(track, initialPreview = null, {autoplay = false, replac
   reviewAudio = null;
   state.track = track;
   state.preview = null;
+  state.sampling = track?.sampling || null;
   state.mode = preferredMode();
   state.scores = {...track?.scores};
   state.ratingIndex = 0;
@@ -189,9 +205,11 @@ async function loadTrack(track, initialPreview = null, {autoplay = false, replac
   $('spectralWrap').hidden = true;
   $('spectralToggle').setAttribute('aria-expanded', 'false');
   $('reviewCard').hidden = !track;
+  $('trackHeading').hidden = $('skip').hidden = $('autoSubmitLabel').hidden = !track;
+  $('reviewTags').hidden = $('technicalChecks').hidden = !track;
   $('empty').hidden = Boolean(track);
   $('correctionBadge').hidden = !track?.correction;
-  $('skip').textContent = track?.correction ? 'Return to queue' : 'Skip →';
+  $('skip').textContent = track?.correction ? 'Return to queue' : 'Skip';
   $('reviewMessage').textContent = track?.correction ? 'Adjust tags or Reason first, then choose a rating to save.' : '';
   paintRatings();
   if (!track) {
@@ -214,15 +232,8 @@ async function loadTrack(track, initialPreview = null, {autoplay = false, replac
   $('compositionGenre').textContent = track.cluster && track.cluster !== track.genre ? `${track.cluster} / ${track.genre}` : track.genre;
   $('snippets').replaceChildren();
   $('waveStatus').hidden = false;
-  $('waveStatus').textContent = 'Preparing waveform…';
+  $('waveStatus').textContent = 'Loading waveform…';
   $('nextPoint').disabled = $('spectralToggle').disabled = true;
-  for (const button of document.querySelectorAll('[data-mode]')) button.disabled = true;
-  try {
-    await refreshPreview(sequence, initialPreview);
-  } catch (error) {
-    if (sequence === loadSequence) toast(error.message);
-  }
-  if (sequence !== loadSequence) return;
   const playing = player.current;
   if (playing?.source === 'queue' && playing.id === track.id) {
     setMode('full', {}, {remember: false, activate: false, reuse: playing});
@@ -231,21 +242,48 @@ async function loadTrack(track, initialPreview = null, {autoplay = false, replac
       state.listened.add('full');
       if (reviewAudio.analysis_id) state.analysisIds.add(reviewAudio.analysis_id);
     }
-    return;
+    if (playSelected && audio.paused) player.toggle().catch(error => toast(error.message));
+  } else {
+    const mode = modeAvailable(state.mode) ? state.mode : modeAvailable('quick') ? 'quick' : 'full';
+    const activate = playSelected || !playing || canReplace();
+    const playback = setMode(mode, {}, {remember: false, activate, autoplay: activate && autoplay && !track.correction});
+    playback?.catch(error => {if (sequence === loadSequence) toast(error.message);});
   }
-  const mode = modeAvailable(state.mode) ? state.mode : modeAvailable('quick') ? 'quick' : 'full';
-  const activate = !playing || canReplace();
-  await setMode(mode, {}, {remember: false, activate, autoplay: activate && autoplay && !track.correction});
-
+  prepareNext();
+  refreshPreview(sequence).catch(() => {
+    if (sequence === loadSequence) $('waveStatus').textContent = 'Waveform unavailable';
+  });
 }
-async function refreshPreview(sequence=loadSequence,initialPreview=null){
-  if(!state.track)return;const gid=state.track.id;const preview=initialPreview||await api(`/tracks/${gid}/preview`);
-  if(sequence!==loadSequence||state.track?.id!==gid)return;
-  const wasReady=state.preview?.ready;state.preview=preview;renderTechnicalChecks(preview.technical_checks);
-  $('waveStatus').hidden=preview.ready;$('waveStatus').textContent=state.track.analysis_state==='failed'?'Waveform unavailable · full playback available':'Preparing waveform…';
-  for(const button of document.querySelectorAll('[data-mode]'))button.disabled=!modeAvailable(button.dataset.mode);
-  $('spectralToggle').disabled=!preview.ready;$('nextPoint').disabled=!preview.ready||!preview.markers.length;
-  if(preview.ready){document.querySelector('.freq-top').textContent=`${Math.round(preview.frequency_axis.max_hz/1000)} kHz`;drawSnippets();drawWave();if(!wasReady&&state.heard===0&&reviewAudio&&(player.current!==reviewAudio||audio.paused)){const wanted=preferredMode();if(modeAvailable(wanted)&&state.mode!==wanted)setMode(wanted,{}, {remember:false, activate:player.current===reviewAudio});}prepareNext();}
+let previewRequestSequence;
+async function refreshPreview(sequence=loadSequence){
+  if (!state.track || previewRequestSequence === sequence) return;
+  const gid = state.track.id;
+  previewRequestSequence = sequence;
+  try {
+    const preview = await api(`/tracks/${gid}/preview`);
+    if (sequence !== loadSequence) return;
+    const hadSampling = Boolean(state.sampling?.segments.length);
+    state.preview = preview;
+    if (preview.ready) state.sampling = {analysis_id: preview.analysis_id, segments: preview.segments};
+    renderTechnicalChecks(preview.technical_checks);
+    $('waveStatus').hidden = preview.ready;
+    $('waveStatus').textContent = state.track.analysis_state === 'failed' ? 'Waveform unavailable' : 'Preparing waveform…';
+    for (const button of document.querySelectorAll('[data-mode]')) button.disabled = !modeAvailable(button.dataset.mode);
+    $('spectralToggle').disabled = !preview.ready;
+    $('nextPoint').disabled = !preview.ready || !preview.markers.length;
+    if (preview.ready) {
+      document.querySelector('.freq-top').textContent = `${Math.round(preview.frequency_axis.max_hz/1000)} kHz`;
+      if (!hadSampling && state.mode === 'full' && state.listened.size === 0 &&
+          reviewAudio && (player.current !== reviewAudio || audio.paused)) {
+        const wanted = preferredMode();
+        if (modeAvailable(wanted) && wanted !== 'full') setMode(wanted, {}, {remember: false, activate: player.current === reviewAudio});
+      }
+      drawSnippets();
+      drawWave();
+    }
+  } finally {
+    if (previewRequestSequence === sequence) previewRequestSequence = null;
+  }
 }
 function renderTechnicalChecks(checks){
   const status=$('technicalStatus'), flags=$('technicalFlags');flags.replaceChildren();$('technicalMetrics').textContent='';
@@ -273,14 +311,17 @@ function setMode(mode, extra = {}, {remember = true, activate = true, autoplay =
     toast('Sampling is being prepared. Full playback is available.');
     return;
   }
-  if (mode !== 'range' && remember) localStorage.setItem('gbr-review-mode', mode);
+  if (mode !== 'range' && remember) {
+    localStorage.setItem('gbr-review-mode', mode);
+    prepareNext();
+  }
   if (['fast','quick','standard'].includes(mode)) state.lastSampleMode = mode;
   state.mode = mode;
   const description = mode === 'full' ? 'Complete recording' : mode === 'range' ? 'Selected passage' : `${state.durations[mode]}-second overview`;
-  const analysisId = state.preview?.analysis_id;
-  const params = analysisId ? {analysis_id: analysisId, ...extra} : extra;
+  const analysisId = state.sampling?.analysis_id;
+  const params = analysisId && mode !== 'full' ? {analysis_id: analysisId, ...extra} : extra;
   const portions = ranges || (mode === 'range' ? [{start: Number(extra.start), end: Number(extra.end)}] :
-    mode === 'full' ? [{start: 0, end: track.duration}] : state.preview.segments.filter(segment => segment.mode === mode));
+    mode === 'full' ? [{start: 0, end: track.duration}] : state.sampling.segments.filter(segment => segment.mode === mode));
   const entry = {
     id: track.id, key: `queue:${track.id}`, source: 'review', title: track.title,
     subtitle: `Review queue · ${description}`, kind: mode, ranges: portions,
@@ -311,9 +352,8 @@ async function playReview() {
   else await player.load(reviewAudio, {autoplay: true});
 }
 function drawSnippets(){
-  $('snippets').replaceChildren();if(!state.preview?.ready)return;
-  const sections=state.preview.segments.filter(s=>s.mode===(['fast','quick','standard'].includes(state.mode)?state.mode:state.lastSampleMode));
-  if(state.mode==='full')return;
+  $('snippets').replaceChildren();if(!state.sampling||state.mode==='full')return;
+  const sections=state.sampling.segments.filter(s=>s.mode===(['fast','quick','standard'].includes(state.mode)?state.mode:state.lastSampleMode));
   for(const [i,section] of sections.entries()){
     const button=document.createElement('button');button.className='snippet';button.textContent=`${i+1} · ${fmt(section.start)}`;button.setAttribute('aria-label',`Replay section ${i+1} starting at ${fmt(section.start)}`);
     button.onclick=guarded(()=>setMode('range',{segment_id:section.id},{ranges:[section],autoplay:true}));$('snippets').append(button);
@@ -447,8 +487,9 @@ async function showListen(source) {
   if (source === 'review') {
     if (!state.track && !state.advancePending) await changeReview(() => nextTrack());
     else {
-      const list = reviewListDirty || !reviewList ? refreshReviewList() : null;
-      await Promise.all([list, !state.flagError && !state.saveError ? refreshFlags(true) : null]);
+      refreshVisibleQueue();
+      refreshReviewCount();
+      if (canChangeReview() && !state.flagError && !state.saveError) await refreshFlags(true);
     }
   } else if (source === 'selection') {
     if (!selectionList || selectionDirty) await loadCandidates();
@@ -541,12 +582,12 @@ $('queueButton').onclick=guarded(async()=>{
   $('queueDialog').showModal();await previewQueueCounts();
 });
 async function refreshQueueFilters(){if(await queueOptions())await previewQueueCounts();}
-async function applyQueue(returnSkipped=false){const settings=queueFields();await api('/queue',{...settings,return_skipped:returnSkipped});state.queue=settings;reviewListDirty=true;$('queueDialog').close();await nextTrack();}
+async function applyQueue(returnSkipped=false){const settings=queueFields();await api('/queue',{...settings,return_skipped:returnSkipped});state.queue=settings;resetQueueDisplay();$('queueDialog').close();await nextTrack();}
 $('queueForm').onsubmit = guarded(event => {event.preventDefault(); return changeReview(() => applyQueue());});
 $('resetSkipped').onclick = guarded(() => changeReview(() => applyQueue(true)));
 $('returnSkipped').onclick = guarded(() => changeReview(async () => {
   await api('/queue', {...state.queue, return_skipped: true});
-  reviewListDirty = true;
+  resetQueueDisplay();
   await nextTrack();
 }));
 async function status(){const result=await api('/status');$('systemStatus').textContent=`Background: ${result.worker}. Analysis waiting: ${result.analysis_pending}. File issues: ${result.scan_errors}. Archive retries needed: ${result.archive_failures}.`;if(result.archive_failures&&!state.saveError&&!state.submitting)$('reviewMessage').textContent='Review saved. An archive move needs attention in Settings.';}
@@ -562,11 +603,75 @@ $('backup').onclick=guarded(async()=>{const r=await fetch('/api/backup',{method:
 $('signOut').onclick=guarded(async()=>{await api('/logout',{});player.pause();location.reload();});
 const listenPageSize = 50;
 let reviewList, selectionList, reviewListDirty = true, selectionDirty = true;
+let reviewCounts = null, countsRevision = 0, countsDue = 0, countsRequest;
+
+function refreshReviewCount() {
+  if (!state.reviewer || !reviewVisible() || countsRequest || Date.now() < countsDue) return;
+  const revision = countsRevision;
+  countsDue = Date.now() + 15000;
+  countsRequest = api('/queue/counts').then(counts => {
+    if (revision !== countsRevision) return;
+    reviewCounts = counts;
+    paintCounts(counts);
+  }).catch(() => {}).finally(() => {
+    countsRequest = null;
+  });
+}
+
+function resetQueueDisplay() {
+  reviewListDirty = true;
+  reviewList = null;
+  $('queueList').replaceChildren();
+  $('moreQueue').hidden = true;
+  reviewCounts = null;
+  countsRevision++;
+  countsDue = 0;
+  $('queueCount').textContent = '';
+}
+
+function finishQueueTrack(id, reviewed) {
+  reviewList?.retire(id);
+  const row = $('queueList').querySelector(`[data-play-key="queue:${CSS.escape(id)}"]`);
+  row?.remove();
+  countsRevision++;
+  if (reviewCounts) {
+    if (reviewed) {
+      reviewCounts.remaining = Math.max(0, reviewCounts.remaining - 1);
+      reviewCounts.reviewed = Math.min(reviewCounts.total, reviewCounts.reviewed + 1);
+    } else {
+      reviewCounts.skipped++;
+    }
+    paintCounts(reviewCounts);
+  } else {
+    countsDue = 0;
+  }
+}
+
+function updateQueueReview() {
+  const activeId = state.track?.correction ? null : state.track?.id;
+  for (const button of $('queueList').querySelectorAll('[data-open-review]')) {
+    const active = button.dataset.openReview === activeId;
+    button.textContent = active ? 'In review' : 'Review';
+    button.closest('.listen-row').toggleAttribute('data-in-review', active);
+  }
+}
+
+function refreshVisibleQueue() {
+  if (!reviewVisible()) return;
+  if (reviewListDirty || !reviewList) refreshReviewList().catch(error => toast(error.message));
+}
 
 function makeList({path, query, entryFor, container, moreButton, render, isVisible, emptyText}) {
-  const list = {items: [], loadMore: append};
+  const list = {items: [], loadMore: append, recalculateOffset, retire, retired: new Set()};
   const ids = new Set();
-  let offset = 0, request;
+  let offset = 0, request, restart = false;
+  function recalculateOffset() {
+    restart = true;
+  }
+  function retire(id) {
+    list.retired.add(id);
+    recalculateOffset();
+  }
   async function append() {
     if (!list.loadMore) return;
     if (!request) request = fetchPage().finally(() => {request = null;});
@@ -575,19 +680,26 @@ function makeList({path, query, entryFor, container, moreButton, render, isVisib
   async function fetchPage() {
     if (isVisible()) moreButton.disabled = true;
     try {
-      const params = new URLSearchParams(query);
-      params.set('limit', listenPageSize);
-      params.set('offset', offset);
-      const result = await api(path + '?' + params);
-      offset += result.items.length;
-      if (!result.has_more || !result.items.length) list.loadMore = null;
-      for (const item of result.items) {
-        const entry = entryFor(item);
-        if (ids.has(entry.id)) continue;
-        ids.add(entry.id);
-        list.items.push(entry);
-        if (isVisible()) container.append(render(item, list, list.items.length - 1));
-      }
+      const originalLength = list.items.length;
+      const rows = document.createDocumentFragment();
+      do {
+        if (restart) {offset = 0; restart = false;}
+        const params = new URLSearchParams(query);
+        params.set('limit', listenPageSize);
+        params.set('offset', offset);
+        const result = await api(path + '?' + params);
+        if (restart) continue;
+        offset += result.items.length;
+        if (!result.has_more || !result.items.length) list.loadMore = null;
+        for (const item of result.items) {
+          const entry = entryFor(item);
+          if (ids.has(entry.id) || list.retired.has(entry.id)) continue;
+          ids.add(entry.id);
+          list.items.push(entry);
+          if (isVisible()) rows.append(render(item, list, list.items.length - 1));
+        }
+      } while (list.loadMore && list.items.length === originalLength);
+      if (isVisible()) container.append(rows);
       if (isVisible() && !list.items.length) {
         const empty = document.createElement('p');
         empty.className = 'subtle';
@@ -648,14 +760,14 @@ async function openReview(gid, reassess = false) {
       (reassess ? state.track.reassessment : !state.track.correction);
     if (!alreadyOpen) {
       if (reassess) {
-        await loadTrack(await api(`/tracks/${gid}?reassess=true`));
+        loadTrack(await api(`/tracks/${gid}?reassess=true`));
       } else {
-        const result = await api('/queue/open', {generation_id: gid});
+        const result = await api('/queue/open?include_counts=false', {generation_id: gid});
         state.canBack = result.can_back;
-        paintCounts(result.counts);
-        await loadTrack(result.track);
+        loadTrack(result.track, {playSelected: true, autoplay: true});
+        reviewList?.recalculateOffset();
       }
-      reviewListDirty = true;
+      updateQueueReview();
     }
     await showListen('review');
     $('trackTitle').scrollIntoView({block: 'nearest'});
@@ -664,11 +776,8 @@ async function openReview(gid, reassess = false) {
 
 function attachReviewQueue(entry, list) {
   if (!list) return;
-  const index = list.items.findIndex(item => item.id === entry.id);
-  if (index >= 0 || state.track?.correction) {
-    entry.queue = list;
-    entry.index = index;
-  }
+  entry.queue = list;
+  entry.index = list.items.findIndex(item => item.id === entry.id);
 }
 
 async function refreshReviewList() {
@@ -689,15 +798,18 @@ async function refreshReviewList() {
       const title = document.createElement('h3');
       title.className = 'listen-track-title';
       title.textContent = item.title;
+      title.title = item.title;
       const context = document.createElement('p');
       context.textContent = `${item.genre} · ${fmt(item.duration)} · ${item.id.slice(0, 6)}`;
       info.append(title, context);
       const open = document.createElement('button');
       open.type = 'button';
       open.className = 'listen-open';
-      open.dataset.openReview = '';
+      open.dataset.openReview = item.id;
       open.disabled = !canChangeReview();
-      open.textContent = state.track?.id === item.id && !state.track.correction ? 'In review' : 'Review';
+      const active = state.track?.id === item.id && !state.track.correction;
+      open.textContent = active ? 'In review' : 'Review';
+      row.toggleAttribute('data-in-review', active);
       open.setAttribute('aria-label', `Review ${item.title}`);
       open.onclick = guarded(() => openReview(item.id));
       row.append(playButton(queue, index), info, open);
@@ -720,10 +832,16 @@ async function refreshReviewList() {
     throw error;
   }
 }
-$('moreQueue').onclick = guarded(() => reviewList?.loadMore?.());
+$('moreQueue').onclick = guarded(async () => {
+  await reviewList?.loadMore?.();
+  if (reviewAudio) attachReviewQueue(reviewAudio, reviewList);
+  player.refresh();
+});
 $('jumpQueue').onclick = () => {
-  $('queueView').scrollIntoView({block: 'start'});
-  $('queueButton').focus({preventScroll: true});
+  const open = $('jumpQueue').getAttribute('aria-expanded') !== 'true';
+  $('jumpQueue').setAttribute('aria-expanded', String(open));
+  $('listenView').classList.toggle('queue-expanded', open);
+  if (open) refreshVisibleQueue();
 };
 
 async function loadCandidates() {
@@ -736,7 +854,6 @@ async function loadCandidates() {
   $('compare').disabled = true;
   moreButton.hidden = true;
   container.textContent = 'Loading recordings…';
-  if (!await selectionOptions(sequence) || sequence !== candidateSequence) return;
   const query = new URLSearchParams({
     status: $('selectionStatus').value,
     bucket: $('selectionBucket').value,
@@ -754,8 +871,11 @@ async function loadCandidates() {
   });
   selectionList = list;
   container.replaceChildren();
-  await list.loadMore();
-  if (selectionList === list) selectionDirty = false;
+  const [recordings, facets] = await Promise.allSettled([list.loadMore(), selectionOptions(sequence)]);
+  if (selectionList !== list) return;
+  if (recordings.status === 'rejected') throw recordings.reason;
+  selectionDirty = false;
+  if (facets.status === 'rejected') throw facets.reason;
 }
 
 function candidateRow(item, list, index) {
@@ -946,15 +1066,15 @@ async function heartbeat(){
   if(!state.reviewer||$('reviewerDialog').open||$('loginDialog').open||state.submitting||state.loadingReview||reviewerChanging)return;
   const sequence = loadSequence, reviewerId = state.reviewerId;
   const current = state.track && !state.track.correction ? state.track.id : null;
-  const result = await api('/reviewer/heartbeat', {current_id: current});
+  const result = await api('/reviewer/heartbeat?include_counts=false', {current_id: current});
   if (sequence !== loadSequence || reviewerId !== state.reviewerId || !canChangeReview()) return;
-  paintCounts(result.counts);
+  refreshReviewCount();
   if (current && !result.valid_current) loseReservation();
 }
 async function chooseReviewer(name){
   if(!canChangeReview())return;
   reviewerChanging=true;const buttons=[...$('reviewerForm').querySelectorAll('button')];buttons.forEach(button=>button.disabled=true);
-  try{const result=await api('/reviewer/select',{name});state.canBack=false;player.load(null);reviewList=selectionList=null;++candidateSequence;await loadTrack(null);state.reviewer=result.reviewer;state.reviewerId=result.reviewer.id;localStorage.setItem('gbr-reviewer-id',state.reviewerId);$('reviewerDialog').close();showView('listen','review');await boot();}
+  try{const result=await api('/reviewer/select',{name});state.canBack=false;player.load(null);resetQueueDisplay();selectionList=null;++candidateSequence;loadTrack(null);state.reviewer=result.reviewer;state.reviewerId=result.reviewer.id;localStorage.setItem('gbr-reviewer-id',state.reviewerId);$('reviewerDialog').close();showView('listen','review');await boot();}
   finally{reviewerChanging=false;buttons.forEach(button=>button.disabled=false);paintRatings();}
 }
 async function showReviewerDialog(names=null){

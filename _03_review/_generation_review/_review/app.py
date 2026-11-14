@@ -224,6 +224,8 @@ def create_app(config_path, start_worker=True, database_path=None):
         response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'"
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
+        elif request.url.path == "/" or request.url.path.startswith(("/static/", "/tools/")):
+            response.headers["Cache-Control"] = "no-cache"
         return response
 
     @app.exception_handler(Conflict)
@@ -277,8 +279,8 @@ def create_app(config_path, start_worker=True, database_path=None):
         return {"reviewer": service.queues.select(body.name, request.headers.get("x-gbr-reviewer"))}
 
     @app.post("/api/reviewer/heartbeat")
-    def heartbeat(body: HeartbeatBody, request: Request):
-        return service.queues.heartbeat(reviewer_id(request), body.current_id)
+    def heartbeat(body: HeartbeatBody, request: Request, include_counts: bool = True):
+        return service.queues.heartbeat(reviewer_id(request), body.current_id, include_counts)
 
     @app.post("/api/login")
     def login(body: LoginBody, request: Request):
@@ -304,8 +306,9 @@ def create_app(config_path, start_worker=True, database_path=None):
         return response
 
     @app.get("/api/queue/next")
-    def next_track(request: Request, include_preview: bool = False):
-        result = service.next(reviewer_id=reviewer_id(request))
+    def next_track(request: Request, include_preview: bool = False, include_counts: bool = True):
+        result = service.next(reviewer_id=reviewer_id(request), include_counts=include_counts)
+        with_sampling(result["track"])
         if include_preview:
             result["preview"] = track_preview(result["track"]["id"]) if result["track"] else None
         return result
@@ -316,10 +319,12 @@ def create_app(config_path, start_worker=True, database_path=None):
 
     @app.post("/api/queue/prefetch")
     def prefetch(body: PrefetchBody, request: Request):
-        result = service.next(peek=True, reviewer_id=reviewer_id(request), expected_current=body.current_id)
-        if not result["track"]:
+        rid = reviewer_id(request)
+        gid = service.queues.prefetch_target(rid, body.current_id)
+        if rid == service.default_reviewer_id:
+            service.prefetched_id = gid
+        if not gid:
             return {"prepared": False}
-        gid = result["track"]["id"]
         try:
             service.playback.render(gid, body.mode, body.format)
         except (ValueError, FileNotFoundError, KeyError):
@@ -365,7 +370,8 @@ def create_app(config_path, start_worker=True, database_path=None):
     def previous_track(request: Request):
         rid = reviewer_id(request)
         session = service.db.one("SELECT previous_generation_id FROM sessions WHERE reviewer_id=?", (rid,))
-        return {"track": service.public_track(session["previous_generation_id"], correction=True, reviewer_id=rid) if session and session["previous_generation_id"] else None}
+        track = service.public_track(session["previous_generation_id"], correction=True, reviewer_id=rid) if session and session["previous_generation_id"] else None
+        return {"track": with_sampling(track)}
 
     @app.get("/api/tracks/{gid}")
     def track(gid: str, request: Request, reassess: bool = False):
@@ -374,7 +380,7 @@ def create_app(config_path, start_worker=True, database_path=None):
             raise HTTPException(404, "Recording not found")
         if reassess:
             result["reassessment"] = True
-        return result
+        return with_sampling(result)
 
     @app.post("/api/tracks/{gid}/review")
     def review(gid: str, body: ReviewBody, request: Request):
@@ -389,8 +395,10 @@ def create_app(config_path, start_worker=True, database_path=None):
         return service.set_flags(gid, reviewer_id(request), body.distribution, body.bookmarked, body.expected_publishing_status, rejected=body.rejected)
 
     @app.post('/api/queue/open')
-    def open_track(body: OpenBody, request: Request):
-        return service.queues.open(reviewer_id(request), body.generation_id)
+    def open_track(body: OpenBody, request: Request, include_counts: bool = True):
+        result = service.queues.open(reviewer_id(request), body.generation_id, include_counts)
+        with_sampling(result["track"])
+        return result
 
     @app.get('/api/tracks/{gid}/reviews')
     def review_details(gid: str, request: Request):
@@ -410,7 +418,16 @@ def create_app(config_path, start_worker=True, database_path=None):
         service.skip(gid, reviewer_id=reviewer_id(request))
         return {"skipped": True}
 
-    def technical_checks(analysis):
+    def segments_for(analysis_id):
+        return service.db.all("SELECT id,mode,ordinal,start,end FROM segments WHERE analysis_id=? ORDER BY mode,ordinal", (analysis_id,))
+
+    def with_sampling(track):
+        if track:
+            analysis = service.db.one("SELECT id FROM analyses WHERE audio_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (track["audio_id"],))
+            track["sampling"] = {"analysis_id": analysis["id"], "segments": segments_for(analysis["id"])} if analysis else None
+        return track
+
+    def technical_checks(analysis, events):
         from .triage import technical_triage, number
         if not analysis:
             return {"analysis_id": None, "measurements": {}, **technical_triage({})}
@@ -420,7 +437,6 @@ def create_app(config_path, start_worker=True, database_path=None):
             metrics = {}
         if not isinstance(metrics, dict):
             metrics = {}
-        events = service.db.all("SELECT type,start,end FROM audio_events WHERE analysis_id=? ORDER BY start", (analysis["id"],))
         measured = {key: number(metrics.get(key)) for key in ("integrated_lufs", "true_peak_dbtp_4x", "rms_dbfs", "clipped_fraction", "stereo_correlation", "channel_balance_db")}
         return {"analysis_id": analysis["id"], "measurements": measured, **technical_triage(metrics, events)}
 
@@ -429,18 +445,18 @@ def create_app(config_path, start_worker=True, database_path=None):
         if not g:
             raise KeyError("Recording not found")
         analysis = service.db.one("SELECT * FROM analyses WHERE audio_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (g["audio_id"],))
-        checks = technical_checks(analysis)
+        events = service.db.all("SELECT id,type,start,end FROM audio_events WHERE analysis_id=? ORDER BY start", (analysis["id"],)) if analysis else []
+        checks = technical_checks(analysis, events)
         if not analysis:
             return {"ready": False, "technical_checks": checks}
         if not Path(analysis["preview_path"]).is_file() or not Path(analysis["spectrogram_path"]).is_file():
             service.db.execute("UPDATE audio SET analysis_state='pending' WHERE id=?", (g["audio_id"],))
             return {"ready": False, "technical_checks": checks}
         data = json.loads(Path(analysis["preview_path"]).read_text(encoding="utf-8"))
-        markers = service.db.all("SELECT id,start,end FROM audio_events WHERE analysis_id=? ORDER BY start", (analysis["id"],))
-        segments = service.db.all("SELECT id,mode,ordinal,start,end FROM segments WHERE analysis_id=? ORDER BY mode,ordinal", (analysis["id"],))
-        points = service.db.all("SELECT id,start,end FROM audio_events WHERE analysis_id=? AND type='structural_transition' ORDER BY start", (analysis["id"],))
+        markers = [{key: event[key] for key in ("id", "start", "end")} for event in events]
+        points = [marker for marker, event in zip(markers, events) if event["type"] == "structural_transition"]
         return {"ready": True, "duration": data["duration"], "waveform": data["waveform"], "channels": data["channels"],
-                "markers": markers, "points": points, "segments": segments, "analysis_id": analysis["id"], "frequency_axis": data["frequency_axis"], "technical_checks": checks}
+                "markers": markers, "points": points, "segments": segments_for(analysis["id"]), "analysis_id": analysis["id"], "frequency_axis": data["frequency_axis"], "technical_checks": checks}
 
     @app.get("/api/tracks/{gid}/preview")
     def preview(gid: str):
@@ -474,17 +490,18 @@ def create_app(config_path, start_worker=True, database_path=None):
         limit, offset = max(1, min(limit, 300)), max(offset, 0)
         names = filtering.song_names(service)
         filters = filtering.prepare({'song':song,'titles':titles or [],'clusters':clusters or [],'genres':genres or []}, names)
-        rows = [row for row in filtering.publishing_rows(service,rid,bucket,status,bookmarked,names) if filtering.matches(row,filters)]
+        rows = [row for row in filtering.publishing_rows(service,rid,bucket,status,bookmarked,names,verify_media=False) if filtering.matches(row,filters)]
         rows.sort(key=lambda row:(row['title'].casefold(),row['generation_id']))
+        page, has_more = filtering.available_page(service.db, rows, offset, limit)
         columns = ('generation_id','title','genre','song_id','publishing_status','external_reference','bucket','reviewer_id','review_id','audio_duration')
-        items = [{key:row[key] for key in columns} for row in rows[offset:offset+limit]]
+        items = [{key:row[key] for key in columns} for row in page]
         for item in items:
             own = service.db.one('SELECT r.id FROM latest_reviewer_reviews r JOIN generations g ON g.audio_id=r.audio_id WHERE g.id=? AND r.reviewer_id=?', (item['generation_id'], rid))
             item["can_reassess"] = bool(own)
             item.pop('reviewer_id')
             item['can_review'] = not item['review_id']
             item['flags'] = service.track_flags(item['generation_id'], rid)
-        return {"items": items, "offset": offset, "has_more": offset+limit < len(rows)}
+        return {"items": items, "offset": offset, "has_more": has_more}
 
     @app.post("/api/publishing/{gid}")
     def publish_status(gid: str, body: PublishingBody, request: Request):
