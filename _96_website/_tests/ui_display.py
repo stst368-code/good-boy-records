@@ -54,11 +54,16 @@ def main():
                 if args.width and width not in args.width:
                     continue
                 page = browser.new_page(viewport={'width':width,'height':height}, device_scale_factor=density)
+                original_covers = set()
+                page.on('request', lambda request: original_covers.add(request.url)
+                        if '/showcase/' in request.url and request.resource_type == 'image' else None)
                 page.add_init_script('const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>setTimeout(()=>raf(cb),100)')
                 page.on('pageerror', lambda error: errors.append(str(error)))
                 page.route('https://pub-*.r2.dev/**', media)
                 page.goto(f'http://127.0.0.1:{server.server_port}/good-boy-records/')
                 page.wait_for_function('typeof tracks!=="undefined" && nodes.length>0 && document.querySelector("#playingCoverScreen").dataset.renderSize')
+                page.wait_for_function('tracks.some(t=>GBRGallery.previewFor(artOf(t),SHOWCASE_ROOT))')
+                assert len(original_covers) <= 2, original_covers
                 sleeve = page.locator('#playingCoverScreen').bounding_box()
                 rack = page.locator('.hardware').bounding_box()
                 assert sleeve['width'] == sleeve['height']
@@ -73,10 +78,34 @@ def main():
                 if width < 900:
                     assert sleeve['width'] == 252 and rack['height'] == 164
 
+                if width == 1440:
+                    # A late response from the previous track must never change the active lyrics.
+                    assert page.evaluate("""async () => {
+                      const originalFetch=window.fetch, current=tracks[index];
+                      let finishOld;
+                      const response=text=>new Response(JSON.stringify({lines:[{text,start:0,end:20}]}));
+                      window.fetch=(url,options)=>{
+                        if(url==='test-old-lyrics.json')return new Promise(resolve=>finishOld=resolve);
+                        if(url==='test-current-lyrics.json')return Promise.resolve(response('Current lyrics'));
+                        return originalFetch(url,options);
+                      };
+                      try{
+                        const pending=loadLyrics({...current,lyrics_url:'test-old-lyrics.json'});
+                        await loadLyrics({...current,lyrics_url:'test-current-lyrics.json'});
+                        finishOld(response('Previous lyrics'));
+                        await pending;
+                        return lyricLines[0]?.text === 'Current lyrics';
+                      }finally{
+                        window.fetch=originalFetch;
+                        loadLyrics(current);
+                      }
+                    }""")
+
                 page.locator('#tracksButton').click()
                 page.wait_for_function('''()=>{const r=document.querySelector('#sidePanel').getBoundingClientRect();return r.x>=0&&r.right<=innerWidth&&r.bottom<=innerHeight+1}''')
                 johnny = page.locator('.track-song-group summary', has_text='Johnny Three Fridges')
                 assert johnny.count() == 1 and '8 VERSIONS' in johnny.inner_text()
+                assert page.locator('.track-song-group summary .track-art-thumbnail').count() > 10
                 panel = page.locator('#sidePanel').bounding_box()
                 if width == 3840:
                     assert panel['width'] >= 1600

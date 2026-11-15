@@ -87,5 +87,33 @@
   const overlaps = (a, b, gap = 0) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x &&
     a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
 
-  window.GBRGallery = {titleKey, displayTitle, groupTracks, spaceCovers, coverSize, overlaps};
+  let previews;
+  async function loadPreviews() {
+    try {
+      const response = await fetch('gallery-previews.json', {cache:'no-cache'});
+      if (!response.ok) return false;
+      const {tile, columns, images, version} = await response.json();
+      if (!(tile > 0 && columns > 0 && images && /^[0-9a-f]{12}$/.test(version))) return false;
+      const image = new Image();
+      image.src = 'gallery-previews.webp?v=' + version;
+      await image.decode();
+      const rows = image.naturalHeight / tile;
+      if (image.naturalWidth !== columns * tile || !Number.isInteger(rows)) return false;
+      previews = {tile, columns, rows, images, image};
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function previewFor(src, showcaseRoot) {
+    if (!previews || !showcaseRoot || !src.startsWith(showcaseRoot + '/')) return null;
+    const {tile, columns, rows, images, image} = previews;
+    const name = 'showcase/' + src.slice(showcaseRoot.length + 1);
+    const slot = images[name];
+    if (!Number.isInteger(slot) || slot < 0 || slot >= columns * rows) return null;
+    return {image, tile, x:slot % columns, y:Math.floor(slot / columns), columns, rows};
+  }
+
+  window.GBRGallery = {titleKey, displayTitle, groupTracks, spaceCovers, coverSize, overlaps, loadPreviews, previewFor};
 })();

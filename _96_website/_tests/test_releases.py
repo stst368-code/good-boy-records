@@ -13,12 +13,17 @@ class ReleaseTests(unittest.TestCase):
 const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const base={tracks:[{id:'old',shareToken:'oldTOKEN'}],easter:{tracks:[{id:'hidden'}]}};
 const track={id:'gbr-13-2-aaa',displayTitle:'Song',release_id:'release',audio:{sources:{mp3:'https://media.test/audio.mp3',flac:null}}};
-let result={format:'gbr-public-releases-v1',tracks:[track]},failure=false;
+let result={format:'gbr-public-releases-v1',tracks:[track]},failure=false,requests=0;
 const context={window:{GBR_RELEASE_CATALOGUE:'https://media.test/catalogue.json'},AbortSignal,URL,
-console:{warn(){}},fetch:async()=>{if(failure)throw Error('offline');return{ok:true,json:async()=>result}}};
+console:{warn(){}},fetch:async()=>{requests++;if(failure)throw Error('offline');return{ok:true,json:async()=>result}}};
 vm.runInNewContext(fs.readFileSync(process.argv[1],'utf8'),context);
 (async()=>{
- let merged=await context.window.GBRloadReleases(base);
+ let ready;
+ const waiting=new Promise(resolve=>ready=resolve);
+ const loading=context.window.GBRloadReleases(waiting);
+ assert.equal(requests,1);
+ ready(base);
+ let merged=await loading;
  assert.equal(merged.tracks.length,2);assert.equal(merged.tracks[0].shareToken,'oldTOKEN');assert.equal(merged.easter,base.easter);
  assert.equal(base.tracks.length,1); // no mutation of saved fallback
  const legacy={...track,id:'old',legacy_id:'old',shareToken:'oldTOKEN'};
@@ -63,8 +68,9 @@ vm.runInNewContext(fs.readFileSync(process.argv[1],'utf8'),context);
             output=Path(directory)/'site';result=module.build(ROOT,output)
             original=json.loads((ROOT/'_data/catalogue.json').read_text())
             self.assertEqual(result['tracks'],len(original['tracks']));self.assertEqual(result['hidden_tracks'],len(original['easter']['tracks']))
-            self.assertIn('<script src="releases.js"></script>',(output/'index.html').read_text())
+            self.assertIn('<script src="releases.js?v=',(output/'index.html').read_text())
             self.assertTrue((output/'releases.js').is_file())
+            self.assertTrue((output/'gallery-previews.webp').is_file())
 
 
 if __name__=='__main__':unittest.main()

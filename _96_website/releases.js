@@ -10,7 +10,8 @@ window.GBRloadReleases=async function(base,{hidden=false,room=null}={}){
     if(data.format!==(selected==='public'?'gbr-public-releases-v1':selected==='hidden'?'gbr-hidden-releases-v1':'gbr-room-releases-v1')||!Array.isArray(data.tracks))throw Error('Invalid release catalogue');
     const safeUrl=value=>{if(value==null)return true;try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password;}catch{return false;}};
     const ids=new Set();
-    const original=Array.isArray(base)?{tracks:base}:base||{tracks:[]};
+    const saved=await base;
+    const original=Array.isArray(saved)?{tracks:saved}:saved||{tracks:[]};
     const validId=value=>typeof value==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,199}$/.test(value);
     for(const track of data.tracks){
       if(!track||!validId(track.id)||!(track.id.startsWith('gbr-')||track.legacy_id===track.id&&/^[a-zA-Z0-9]{8}$/.test(track.shareToken||''))||ids.has(track.id)||typeof track.displayTitle!=='string'||

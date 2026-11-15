@@ -69,6 +69,8 @@ def stage(root, target):
     shutil.copyfile(root / 'showcase-host.js', target / 'showcase-host.js')
     shutil.copyfile(root / 'releases.js', target / 'releases.js')
     shutil.copyfile(root / 'gallery.js', target / 'gallery.js')
+    for name in ('gallery-previews.json', 'gallery-previews.webp'):
+        shutil.copyfile(root / '_data' / name, target / name)
     shutil.copyfile(root / 'easter-egg.js', target / 'easter-egg.js')
     shutil.copyfile(root / 'rooms.js', target / 'rooms.js')
     for name in ('display.css', 'display.js'):

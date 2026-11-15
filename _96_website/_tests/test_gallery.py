@@ -1,4 +1,6 @@
 """The cover map keeps room between artwork and unifies published song aliases."""
+from hashlib import sha256
+import json
 import shutil
 import subprocess
 import unittest
@@ -9,6 +11,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class GalleryTest(unittest.TestCase):
+    def test_overview_preview_sheet_matches_its_index(self):
+        data = ROOT / '_data'
+        previews = json.loads((data / 'gallery-previews.json').read_text(encoding='utf-8'))
+        self.assertEqual(previews['version'], sha256((data / 'gallery-previews.webp').read_bytes()).hexdigest()[:12])
+        self.assertTrue(previews['images'])
+        self.assertTrue(all(path.startswith('showcase/') for path in previews['images']))
+        self.assertEqual(len(previews['images']), len(set(previews['images'].values())))
+
     @unittest.skipUnless(shutil.which('node'), 'Node.js required for the gallery checks')
     def test_published_title_aliases_and_cover_spacing(self):
         source = """
