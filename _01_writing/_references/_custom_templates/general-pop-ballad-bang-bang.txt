@@ -1,0 +1,32 @@
+Global Metadata
+Basic Attributes: Mid-1960s folk-pop torch ballad, around 72 BPM in E minor with a loose 4/4 pulse. One female voice and one fingerpicked steel-string acoustic guitar. A descending bass figure underpins a spare melody on the upper strings, with faint, slow tremolo on the notes that ring out.
+Global Emotional Progression: The singer starts with the composure of someone telling an old story. Her voice grows more urgent as she reaches the hardest lines, then retreats into long pauses. The ending feels unresolved.
+Application Scenarios & Imagery: An empty room after midnight. The singer sounds as though she’s telling the story to one person across the table.
+Sonics & Production Profile: A narrow mono studio recording with softened highs, gentle tape saturation and a short, dark chamber reverb. Faint tape hiss comes through in the pauses, with a trace of pitch drift on the longest guitar notes. Keep the breaths, fret squeaks and pick attack audible.
+Vocal Details
+Vocal Gender & Timbre: A low, warm female mezzo with a smoky edge and clear diction. She sings close to the mic, just behind the guitar pulse. The first words of a line can sound almost spoken, with a little vibrato arriving late on held vowels. Let her voice grow fuller and more exposed when she rises in register, with a slight catch where the emotion breaks through.
+Vocal Style: Sing the verses almost conversationally, letting the ends of lines fall away. In every [pre-chorus], climb into a fuller, urgent tone and hold the last stressed vowel until the voice begins to tremble. In every [bridge], follow the slower guitar pulse, sing just above a whisper and leave a breath between phrases.
+Harmony/Backing Vocals: Keep the female lead solo and undoubled in every sung section.
+Vocal FX: Keep the vocal close and centred in mono, with gentle tape compression. Let a short, dark chamber reverb catch the ends of held vowels. Keep breaths and consonants clear.
+Arrangement
+Instrument Lifecycle Description (Primary/Secondary Layering):
+Primary: One fingerpicked steel-string acoustic guitar carries the song. Open with the descending bass figure and let the upper strings answer the singer between lines. Pluck the bass notes more firmly in every [pre-chorus]. In every [bridge], slow down and reduce the pattern to soft, widely spaced single notes. Return to the opening figure in the outro.
+Secondary: Use an occasional softly brushed two-note chord on the same guitar to mark the end of a verse phrase or the entrance to a chorus. Keep the [bridge] to single notes and room tone.
+Groove & Foundation Progression: [intro]
+Open with the descending guitar figure on its own. Let the high note ring before the vocal enters.
+
+[verse]
+Pick lightly under the voice. Play the upper-string melody in the gaps between lines, like a brief answer to each phrase.
+
+[pre-chorus]
+Make every pre-chorus an emotional peak. Hold the tempo steady as the guitar bass notes get firmer and the upper notes come closer together. Let the vocal climb and press into the words, then hold the last vowel with an audible tremble.
+
+[chorus]
+Return to the opening guitar figure. Let the voice settle into a simple, sustained melody and ease back after the pre-chorus.
+
+[bridge]
+Slow every bridge to around 58 BPM with loose, unhurried timing. Reduce the guitar to isolated soft plucks with long gaps. Bring the voice down to a near-whisper and let each phrase trail into silence. Resume the original pulse as the next section begins.
+
+[outro]
+Play the opening figure once more. Let the last chord decay until only the room tone and faint tape hiss remain.
+Embellishments, Textures & Spatial FX: Give the sustained upper guitar notes a slow, shallow tremolo. Leave in a little fret squeak and finger noise. Let faint tape hiss emerge in the pauses, with a trace of pitch drift on the longest notes and a small mono room tail on the final chord.
