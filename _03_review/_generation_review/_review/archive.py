@@ -66,7 +66,7 @@ class Archiver:
 
     def plan(self, op):
         a = self.db.one("SELECT * FROM audio WHERE id=?", (op["audio_id"],))
-        gs = self.db.all("""SELECT g.*,m.yaml_sha256,m.raw_yaml_bytes,m.yaml_archive_path,m.parsed_json,s.title
+        gs = self.db.all("""SELECT g.*,m.yaml_sha256,m.raw_yaml_bytes,m.raw_yaml,m.yaml_archive_path,m.parsed_json,s.title
           FROM generations g JOIN generation_metadata m ON m.generation_id=g.id
           JOIN songs s ON s.id=g.song_id WHERE g.audio_id=? ORDER BY g.created_at,g.id""", (a["id"],))
         naming_title,placeholder=archive_naming(gs)
@@ -74,13 +74,15 @@ class Archiver:
         base = (None if stale_stem else a["archive_stem"]) or slug(naming_title) + "__" + a["pcm_sha256"][:8]
         folder = self.config.archive / str(op["bucket"])
         preparation = getattr(self, 'preparation_root', None)
-        if op.get('operation_type') == 'prepare':
+        roots = (preparation, getattr(self, 'showcase_root', None))
+        managed = bool(a['archive_path'] and any(root and inside(a['archive_path'], root) for root in roots))
+        if managed:
+            # Reassessing or discovering an alias must keep the working bundle.
+            folder = Path(a['archive_path']).parent
+        elif op.get('operation_type') == 'prepare':
             if preparation is None:
                 raise ValueError('Preparation storage has not been configured')
             folder = preparation / a['id'] / '_source'
-        elif a['archive_path'] and any(p and Path(a['archive_path']).resolve().is_relative_to(p.resolve()) for p in (preparation,getattr(self,'showcase_root',None))):
-            # A revised rating must not move an in-progress preparation back to Review.
-            folder = Path(a['archive_path']).parent
         source_audio = self.available(a["id"])
         if not source_audio:
             raise FileNotFoundError("Recording unavailable; review remains saved")
@@ -102,21 +104,30 @@ class Archiver:
             if yh is None:
                 generation_yamls[g["id"]] = None
                 continue
+            archived = Path(g['yaml_archive_path']) if g['yaml_archive_path'] else None
+            archived_hash = digest(archived) if archived and archived.is_file() and not archived.is_symlink() else None
+            working_yaml = None
+            if managed and archived_hash and archived_hash != yh and archived.parent.resolve() == folder.resolve():
+                # Keep the edited working sidecar bound to Preparation. Archive
+                # the checksum-verified original beside it as provenance.
+                working_yaml = str(archived)
             if yh in used:
-                generation_yamls[g["id"]] = used[yh]
+                generation_yamls[g["id"]] = working_yaml or used[yh]
                 continue
             yaml_target = folder / (stem + ("" if not used else "__p" + yh[:12]) + ".yaml")
             if yaml_target.exists() and digest(yaml_target) != yh:
                 yaml_target = folder / (stem + "__p" + yh + ".yaml")
             if yaml_target.exists() and digest(yaml_target) != yh:
                 raise FileExistsError(f"YAML collision: {yaml_target}")
-            yp = g["yaml_archive_path"]
-            if not yp or not Path(yp).is_file():
+            yp = str(archived) if archived_hash == yh else None
+            if not yp:
                 sources = self.db.all("SELECT yaml_path FROM generation_sources WHERE generation_id=?", (g["id"],))
                 yp = next((r["yaml_path"] for r in sources if r["yaml_path"] and Path(r["yaml_path"]).is_file() and digest(r["yaml_path"]) == yh), None)
             if not yp:
                 # Byte-identical YAML is retained in SQLite, including malformed YAML.
                 raw = g['raw_yaml_bytes']
+                if raw is None and isinstance(g['raw_yaml'], str):
+                    raw = g['raw_yaml'].encode('utf-8')
                 if not isinstance(raw, bytes) or hashlib.sha256(raw).hexdigest() != yh:
                     raise ValueError(f'No checksum-verified YAML snapshot for generation {g["id"]}; originals retained')
                 recovered = self.config.data / "recovery" / (g["id"] + ".yaml")
@@ -128,7 +139,7 @@ class Archiver:
                         os.fsync(f.fileno())
                 yp = str(recovered)
             items.append({"kind": "yaml", "source": yp, "destination": str(yaml_target), "sha256": yh})
-            used[yh], generation_yamls[g["id"]] = str(yaml_target), str(yaml_target)
+            used[yh], generation_yamls[g["id"]] = str(yaml_target), working_yaml or str(yaml_target)
         originals = []
         for m in self.db.all("SELECT * FROM media_files WHERE audio_id=? AND storage_state IN ('input','archived')", (a["id"],)):
             originals.append({"kind": "audio", "source": m["path"], "sha256": m["sha256"], "media_id": m["id"]})
@@ -140,7 +151,7 @@ class Archiver:
                 "generation_yamls": generation_yamls, "originals": originals}, gs, folder, stem)
 
     def process(self, op):
-        if self.db.one("SELECT 1 FROM sqlite_master WHERE type='table' AND name='processing_tasks'") and self.db.one("SELECT 1 FROM processing_tasks WHERE input_sha256=? AND kind='showcase_move' AND status NOT IN ('done','cancelled')",(op['audio_id'],)):
+        if self.db.one("SELECT 1 FROM sqlite_master WHERE type='table' AND name='processing_tasks'") and self.db.one("SELECT 1 FROM processing_tasks WHERE input_sha256=? AND kind='showcase_move' AND status='running'",(op['audio_id'],)):
             return  # Completion owns these paths; retry this review move later.
         latest = self.db.one("SELECT * FROM latest_reviews WHERE audio_id=?", (op["audio_id"],))
         # A superseded pending review must not undo a later correction.
@@ -172,6 +183,7 @@ class Archiver:
                 commit_paths(c, plan)
                 c.execute("UPDATE archive_operations SET verification_json=?,updated_at=? WHERE id=?", (dumps(verification), now(), op["id"]))
             destinations = {i["destination"] for i in plan["items"]}
+            destinations.update(path for path in plan["generation_yamls"].values() if path)
             # Only remove sources whose exact bytes still match the indexed version.
             for original in plan["originals"] + plan["items"]:
                 source = Path(original["source"])
@@ -214,11 +226,16 @@ class Archiver:
         except Exception as exc:
             self.db.execute("UPDATE archive_operations SET status='failed',error=?,updated_at=? WHERE id=?", (str(exc), now(), op["id"]))
 
-    def retry(self):
+    def unresolved(self, audio_id):
+        return self.db.one("""SELECT id,status,error FROM archive_operations
+            WHERE audio_id=? AND status IN ('failed','pending','running')
+            ORDER BY status='failed' DESC, created_at LIMIT 1""", (audio_id,))
+
+    def retry(self, audio_id=None):
         # Re-plan failed destinations to recover safely from external collisions.
         self.db.execute("""UPDATE archive_operations SET status='pending',
                         plan_json=CASE WHEN verification_json='{}' THEN '{}' ELSE plan_json END,
-                        error=NULL,updated_at=? WHERE status='failed'""", (now(),))
+                        error=NULL,updated_at=? WHERE status='failed' AND (? IS NULL OR audio_id=?)""", (now(), audio_id, audio_id))
 
     def reconcile(self):
         self.db.execute("UPDATE archive_operations SET status='pending' WHERE status='running'")

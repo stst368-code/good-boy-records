@@ -52,7 +52,9 @@ def main():
                 page = browser.new_page(viewport={'width': 1440, 'height': 900}, service_workers='block')
                 errors = []
                 requests = []
+                tool_requests = []
                 page.on('pageerror', lambda error: errors.append(str(error)))
+                page.on('request', lambda request: tool_requests.append(request.url) if '/tools/' in request.url else None)
 
                 def selection(route):
                     query = parse_qs(urlparse(route.request.url).query)
@@ -81,6 +83,8 @@ def main():
                 page.goto(origin)
                 page.locator('#knownReviewers').get_by_role('button', name='Simon').click()
                 expect(page.locator('#nowPlaying')).to_be_visible()
+                expect(page.locator('#empty')).to_be_visible()
+                assert not tool_requests
 
                 page.locator('#selectionTab').click()
                 expect(page.locator('.candidate')).to_have_count(50)
@@ -90,6 +94,12 @@ def main():
                 page.locator('#libraryTab').click()
                 expect(page.locator('#libraryRecordings .listen-row')).to_have_count(3)
                 assert page.evaluate("!document.querySelector('#audio').paused")
+                page.evaluate('history.back()')
+                expect(page.locator('#selectionView')).to_be_visible()
+                page.evaluate('history.forward()')
+                expect(page.locator('#libraryView')).to_be_visible()
+                assert page.evaluate("!document.querySelector('#audio').paused")
+                assert any(url.endswith('/library.js') for url in tool_requests)
                 page.locator('#playerNext').click()
                 expect(page.locator('#playerTitle')).to_have_text('Selection 51')
                 assert requests == [0, 50]

@@ -42,7 +42,7 @@ class Showcase:
         upload failure or Windows file lock resumes the same move, not a new copy.
         """
         from _review.archive import verified_copy
-        with self.prep.lock:
+        with self.prep.review.config_lock, self.prep.lock:
             row=self.db.one('SELECT g.audio_id,m.parsed_json FROM generations g JOIN generation_metadata m ON m.generation_id=g.id WHERE g.id=?',(gid,))
             previous=self.db.one("SELECT * FROM processing_tasks WHERE input_sha256=? AND kind='showcase_move' AND status<>'cancelled' ORDER BY rowid DESC LIMIT 1",(row['audio_id'],))
             if previous:
@@ -50,8 +50,7 @@ class Showcase:
             else:
                 active=self.db.one("SELECT 1 FROM processing_tasks t JOIN generations g ON g.id=t.generation_id WHERE g.audio_id=? AND t.status IN ('queued','running') AND t.kind NOT IN ('release_publish')",(row['audio_id'],))
                 if active:raise ValueError('Wait for processing and release preparation to finish before completing this recording')
-                if self.db.one("SELECT 1 FROM archive_operations WHERE audio_id=? AND status IN ('pending','running','failed')",(row['audio_id'],)):
-                    raise ValueError('Finish the pending archive operation before completing this recording')
+                self.require_archive_ready(row['audio_id'])
                 source=self.prep.tracks/row['audio_id']
                 destination=recording_folder(self.root,json.loads(self.prep.metadata_row(gid)['parsed_json']),row['audio_id'])
                 if not source.is_dir():raise ValueError('Preparation bundle is unavailable')
@@ -61,17 +60,24 @@ class Showcase:
                 plan={'source':str(source),'destination':str(destination),'items':items,'prepared_id':prepared_id}
                 self.db.execute("INSERT INTO processing_tasks(id,generation_id,kind,status,fingerprint,recipe_json,input_sha256,created_at) VALUES(?,?,'showcase_move','running',?,?,?,?)",(identifier,gid,'showcase:'+row['audio_id'],canonical(plan),row['audio_id'],now()))
             source,destination=Path(plan['source']),Path(plan['destination'])
-            if not self.allowed_source(plan) or not destination.resolve().is_relative_to(self.root.resolve()):
-                raise ValueError('Move journal points outside managed storage')
             try:
+                if not self.allowed_source(plan) or not destination.resolve().is_relative_to(self.root.resolve()):
+                    raise ValueError('Move journal points outside managed storage')
                 committed=json.loads(previous['telemetry_json']).get('committed',False) if previous else False
                 if not committed:
                     active=self.db.one("SELECT 1 FROM processing_tasks t JOIN generations g ON g.id=t.generation_id WHERE g.audio_id=? AND t.id<>? AND t.status IN ('queued','running') AND t.kind<>'release_publish'",(row['audio_id'],identifier))
                     if active:raise ValueError('Wait for active processing before moving this recording')
-                    if self.db.one("SELECT 1 FROM archive_operations WHERE audio_id=? AND status IN ('pending','running','failed')",(row['audio_id'],)):
-                        raise ValueError('Finish the pending archive operation before moving this recording')
+                    self.require_archive_ready(row['audio_id'])
                     self.db.execute("UPDATE processing_tasks SET status='running',started_at=?,error=NULL WHERE id=?",(now(),identifier))
-                    if self.inventory(source)!=plan['items']:raise ValueError('Preparation files changed since completion began; retained sources')
+                    inventory = self.inventory(source)
+                    if inventory != plan['items']:
+                        hashes = {item['relative']:item['sha256'] for item in inventory}
+                        if not previous or plan.get('legacy_root') or any(hashes.get(item['relative']) != item['sha256'] for item in plan['items']):
+                            raise ValueError('Preparation files changed since completion began; retained sources')
+                        # An archive retry can add verified provenance to an
+                        # uncommitted move. Its original inventory still matches.
+                        plan['items'] = inventory
+                        self.db.execute("UPDATE processing_tasks SET recipe_json=? WHERE id=?", (canonical(plan), identifier))
                     for item in plan['items']:
                         relative=Path(item['relative'])
                         if relative.is_absolute() or '..' in relative.parts or (destination/relative).is_symlink() or not (destination/relative).resolve().is_relative_to(destination.resolve()):
@@ -127,6 +133,13 @@ class Showcase:
             if path.is_file():files.append({'relative':path.relative_to(directory).as_posix(),'sha256':digest(path)})
         return files
 
+    def require_archive_ready(self, audio_id):
+        pending = self.prep.review.archiver.unresolved(audio_id)
+        if pending and pending['status'] == 'failed':
+            raise ValueError('This recording has a failed archive move. Use Retry archive move to recover it.')
+        if pending:
+            raise ValueError('An archive move is pending for this recording. Retry publication after the move finishes.')
+
     def allowed_source(self,plan):
         source=Path(plan['source'])
         if plan.get('legacy_root'):
@@ -137,7 +150,7 @@ class Showcase:
 
     def reset(self,gid):
         """Return an uncommitted failed move to editing; never touch the source."""
-        with self.prep.lock:
+        with self.prep.review.config_lock, self.prep.lock:
             row=self.db.one("SELECT * FROM processing_tasks WHERE kind='showcase_move' AND input_sha256=(SELECT audio_id FROM generations WHERE id=?) AND status='failed' ORDER BY rowid DESC LIMIT 1",(gid,))
             if not row or json.loads(row['telemetry_json']).get('committed'):
                 raise ValueError('Only an incomplete local move can be reset; completed showcase bundles are retained')

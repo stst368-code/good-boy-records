@@ -300,32 +300,37 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
       element.addEventListener("input", invalidate);
   return {
     reloadWorkers,
+    close() {
+      clearInterval(state.poll);
+      for (const audio of root.querySelectorAll('audio')) audio.pause();
+    },
     writingChanged(kind) {if(kind==='track')state.catalogueDirty=true;state.templatesDirty=true;invalidate();},
     async open() {
-      await ratingOptions();
+      const panels = Promise.all([ratingOptions(), jobs()]).catch(error => {
+        if (!root.hidden) toast(error.message);
+      });
       if (!state.loaded) {
-        const prefs = await api("/generation/preferences");
+        const [prefs, templates] = await Promise.all([api("/generation/preferences"), api("/generation/templates")]);
         $("genRoot").value = prefs.input_root;
         state.paths = prefs;
         purposeNotice();
-        await reloadWorkers(true);
-        if (state.workers.some(w => w.id === prefs.worker_id)) $('genWorker').value = prefs.worker_id;
-        restoreControls(prefs.controls);
-        $("genLayout").value = prefs.layout;
-        const templates = await api("/generation/templates");
-        captionPicker.load(templates.templates);
+        await Promise.all([scan(), reloadWorkers(true).then(() => {
+          if (state.workers.some(w => w.id === prefs.worker_id)) $('genWorker').value = prefs.worker_id;
+          restoreControls(prefs.controls);
+          $("genLayout").value = prefs.layout;
+          captionPicker.load(templates.templates);
+          return chooseWorker();
+        }), panels]);
         state.loaded = true;
-        await chooseWorker();
         if (!prefs.shared_database_ready)
           toast(
             "Generation needs the shared platform database. Open GBR through _97_app.",
           );
-        await scan();
         state.catalogueDirty=false;state.templatesDirty=false;
       }
       if(state.catalogueDirty){await scan();state.catalogueDirty=false;}
       if(state.templatesDirty){const result=await api('/generation/templates');captionPicker.load(result.templates);state.templatesDirty=false;}
-      await jobs();
+      await panels;
       clearInterval(state.poll);
       state.poll = setInterval(() => {
         if (!root.hidden) jobs().catch(() => {});

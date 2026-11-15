@@ -1,12 +1,15 @@
 import {initTimeline} from './timeline.js';
 export function initPreparation({api,toast}){
  const root=document.getElementById('preparationView');
- root.innerHTML=`<div class="prep-heading"><div><h1>Preparation</h1><p>Selected recordings, mastering trials and artwork briefs.</p></div><div><button id="prepBackLibrary" hidden>Back to Library</button><button id="prepRefresh">Refresh selected tracks</button></div></div><p id="prepNotice" role="status"></p><section id="prepQueue" class="prep-processing"><div class="prep-heading"><h2>Local processing queue</h2><button id="prepResumeQueue">Check / resume queue</button></div><p id="prepQueueStatus" role="status"></p><div id="prepQueueJobs"></div></section><label>Recording<select id="prepProject"></select></label><div id="prepWorkspace" hidden><details id="prepYamlDetails" class="prep-yaml" open><summary>Preparation YAML details</summary><p id="prepYamlSource" class="prep-note"></p><div id="prepIdentity" class="prep-actions"><label>Master song<select id="prepIdentitySong"></select></label><label>Variant<select id="prepIdentityVariant"></select></label><button id="prepSaveIdentity">Save song / variant IDs</button></div><dl id="prepYamlMetadata"></dl><details><summary>Caption</summary><pre id="prepYamlCaption"></pre></details><details><summary>Lyrics</summary><pre id="prepYamlLyrics"></pre></details><details><summary>Current YAML</summary><pre id="prepYamlRaw"></pre><details><summary>Original imported YAML</summary><pre id="prepYamlOriginal"></pre></details></details></details><div class="prep-grid"><section><h2>Mixing station</h2><p class="prep-note">Preview and full renders use the same effect chain. Originals stay intact.</p><label><input id="prepUseStems" type="checkbox"> Mix separated vocals + accompaniment</label><div id="prepControls" class="prep-controls"></div><label><input id="prepLimit" type="checkbox"> Enable sample-peak limiter at −1 dBFS</label><div class="prep-actions"><label>Start / seconds<input id="prepStart" type="number" min="0" value="0" step="1"></label><button id="prepPreview">Preview 30 seconds</button><button id="prepMaster">Render master candidate</button><button id="prepReset" class="secondary">Reset effects</button></div><audio id="prepRaw" controls preload="none"></audio><audio id="prepProcessed" controls preload="none"></audio><div class="prep-actions"><button id="prepAB">A/B original / processed</button><button id="prepClean" class="secondary">Clear previews</button></div></section><section><h2>Artwork brief</h2><label>Image family<select id="prepFamily"><option value="comfyui">ComfyUI · API workflow pending</option></select></label><label>Visual direction<textarea id="prepDirection" rows="3" placeholder="Mood, composition, palette or a specific visual concept"></textarea></label><div id="prepReferences"></div><button id="prepBrief">Build brief from YAML</button><textarea id="prepPrompt" rows="8" readonly aria-label="Artwork prompt"></textarea><p class="prep-note">Brief preparation is ready. Artwork diffusion will use your supplied ComfyUI API workflow.</p></section></div><div class="prep-actions"><button id="prepVisuals">Extract visual features</button></div><section class="prep-complete"><h2>Finish preparation</h2><label>Website destination<select id="prepReleaseVisibility"><option value="public">Main player</option><option value="hidden">Secret room · Cover unlock</option></select></label><label>Release artwork<select id="prepReleaseArtwork"><option value="">GBR sleeve</option></select></label><label>Attach finished artwork<input id="prepArtworkFile" type="file" accept="image/png,image/jpeg,image/webp"></label><button id="prepImportArtwork">Attach artwork</button><label><input id="prepIncludeFlac" type="checkbox" checked> Include lossless FLAC when available</label><label><input id="prepReleaseLyrics" type="checkbox" checked> Include saved, approved lyric timings when available</label><button id="prepComplete">Finish preparation → Publish queue</button><p class="prep-note">Uses the working audio selected above. Creates the MP3 and a ready-to-publish package. Publishing happens separately in the Publish tab. Save lyric and lighting edits first.</p></section><h2 id="prepHistoryHeading">Processing history</h2><a href="/api/export/json?kind=processing_tasks">Export processing history</a><div id="prepHistory"></div></div>`;
+ root.innerHTML=`<div class="prep-heading"><div><h1>Preparation</h1><p>Selected recordings, mastering trials and artwork briefs.</p></div><div><button id="prepBackLibrary" hidden>Back to Library</button><button id="prepRefresh">Refresh selected tracks</button></div></div><p id="prepNotice" role="status"></p><div class="prep-project-bar"><label>Recording<select id="prepProject"></select></label><label id="prepFlagFilter"><input id="prepFlaggedOnly" type="checkbox" checked> Flagged for publish only</label></div><section id="prepQueue" class="prep-processing"><div class="prep-heading"><h2>Local processing queue</h2><button id="prepResumeQueue">Check / resume queue</button></div><p id="prepQueueStatus" role="status"></p><div id="prepQueueJobs"></div></section><div id="prepWorkspace" hidden><details id="prepYamlDetails" class="prep-yaml" open><summary>Preparation YAML details</summary><p id="prepYamlSource" class="prep-note"></p><div id="prepIdentity" class="prep-actions"><label>Master song<select id="prepIdentitySong"></select></label><label>Variant<select id="prepIdentityVariant"></select></label><button id="prepSaveIdentity">Save song / variant IDs</button></div><dl id="prepYamlMetadata"></dl><details><summary>Caption</summary><pre id="prepYamlCaption"></pre></details><details><summary>Lyrics</summary><pre id="prepYamlLyrics"></pre></details><details><summary>Current YAML</summary><pre id="prepYamlRaw"></pre><details><summary>Original imported YAML</summary><pre id="prepYamlOriginal"></pre></details></details></details><div class="prep-grid"><section><h2>Mixing station</h2><p class="prep-note">Preview and full renders use the same effect chain. Originals stay intact.</p><label><input id="prepUseStems" type="checkbox"> Mix separated vocals + accompaniment</label><div id="prepControls" class="prep-controls"></div><label><input id="prepLimit" type="checkbox"> Enable sample-peak limiter at −1 dBFS</label><div class="prep-actions"><label>Start / seconds<input id="prepStart" type="number" min="0" value="0" step="1"></label><button id="prepPreview">Preview 30 seconds</button><button id="prepMaster">Render master candidate</button><button id="prepReset" class="secondary">Reset effects</button></div><audio id="prepRaw" controls preload="none"></audio><audio id="prepProcessed" controls preload="none"></audio><div class="prep-actions"><button id="prepAB">A/B original / processed</button><button id="prepClean" class="secondary">Clear previews</button></div></section><section><h2>Artwork brief</h2><label>Image family<select id="prepFamily"><option value="comfyui">ComfyUI · API workflow pending</option></select></label><label>Visual direction<textarea id="prepDirection" rows="3" placeholder="Mood, composition, palette or a specific visual concept"></textarea></label><div id="prepReferences"></div><button id="prepBrief">Build brief from YAML</button><textarea id="prepPrompt" rows="8" readonly aria-label="Artwork prompt"></textarea><p class="prep-note">Brief preparation is ready. Artwork diffusion will use your supplied ComfyUI API workflow.</p></section></div><div class="prep-actions"><button id="prepVisuals">Extract visual features</button></div><section class="prep-complete"><h2>Finish preparation</h2><label>Website destination<select id="prepReleaseVisibility"><option value="public">Main player</option><option value="hidden">Secret room · Cover unlock</option></select></label><label>Release artwork<select id="prepReleaseArtwork"><option value="">GBR sleeve</option></select></label><label>Attach finished artwork<input id="prepArtworkFile" type="file" accept="image/png,image/jpeg,image/webp"></label><button id="prepImportArtwork">Attach artwork</button><label><input id="prepIncludeFlac" type="checkbox" checked> Include lossless FLAC when available</label><label><input id="prepReleaseLyrics" type="checkbox" checked> Include saved, approved lyric timings when available</label><button id="prepComplete">Finish preparation → Publish queue</button><p class="prep-note">Uses the working audio selected above. Creates the MP3 and a ready-to-publish package. Publishing happens separately in the Publish tab. Save lyric and lighting edits first.</p></section><h2 id="prepHistoryHeading">Processing history</h2><a href="/api/export/json?kind=processing_tasks">Export processing history</a><div id="prepHistory"></div></div>`;
  const controls=[['vocal_db','Vocals / dB',-24,12,.5,0],['accompaniment_db','Accompaniment / dB',-24,12,.5,0],['gain_db','Gain / dB',-24,12,.5,0],['bass_db','Bass / dB',-12,12,.5,0],['mid_db','Mid / dB',-12,12,.5,0],['treble_db','Treble / dB',-12,12,.5,0],['reverb','Room reverb',0,1,.05,0],['room_seconds','Room decay / sec',.1,4,.1,1.2],['fade_in','Fade in / sec',0,30,.5,0],['fade_out','Fade out / sec',0,60,.5,0]];
  const q=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  q('prepControls').innerHTML=controls.map(([key,label,min,max,step,value])=>`<label>${label}<input type="range" data-mix="${key}" min="${min}" max="${max}" step="${step}" value="${value}"><output data-value="${key}">${value}</output></label>`).join('');
  for(const input of root.querySelectorAll('[data-mix]'))input.oninput=()=>root.querySelector(`[data-value="${input.dataset.mix}"]`).textContent=input.value;
  let projects=[],selected='',timer,lastPreview=null,lastBrief=null,previewStart=0,libraryMode=false,back=null,yamlFor='',yamlSequence=0,identity=null;
+ let openSequence=0,refreshSequence=0,polling=false,historySignature='',projectSignature='';
+ q('prepFlaggedOnly').checked=localStorage.getItem('gbr-preparation-flagged')!=='false';
+ const flaggedOnly=()=>!libraryMode&&q('prepFlaggedOnly').checked;
  const handle=fn=>async()=>{try{await fn()}catch(error){toast(error.message)}};
  const getTime=()=>!q('prepProcessed').paused?q('prepProcessed').currentTime+previewStart:q('prepRaw').currentTime;
  const isPlaying=()=>!q('prepRaw').paused||!q('prepProcessed').paused;
@@ -20,6 +23,9 @@ export function initPreparation({api,toast}){
  const mix=()=>Object.fromEntries([...root.querySelectorAll('[data-mix]')].map(input=>[input.dataset.mix,Number(input.value)]).concat([['limiter_db',q('prepLimit').checked?-1:null]]));
  function history(){const p=project();if(!p)return;
   q('prepWorkspace').hidden=!p.ready;q('prepNotice').textContent=p.ready?'':`Promotion: ${p.promotion?.status||'waiting for review'}${p.promotion?.error?' · '+p.promotion.error:''}`;
+  const signature=JSON.stringify([p.generation_id,timeline.artifact(),p.tasks]);
+  if(signature===historySignature)return;
+  historySignature=signature;
   q('prepHistory').innerHTML=p.tasks.map(t=>`<div class="prep-task"><strong>${esc(t.kind.replaceAll('_',' '))} · ${esc(t.status)}</strong><span>${esc(t.created_at)}${t.telemetry.wall_seconds?' · '+Number(t.telemetry.wall_seconds).toFixed(2)+' sec':''}</span>${t.telemetry.measurements?.device?`<span>${esc(t.telemetry.measurements.device)}${t.telemetry.measurements.resources?.peak_observed_device_bytes!=null?' · peak device memory '+(t.telemetry.measurements.resources.peak_observed_device_bytes/1024**3).toFixed(2)+' GiB (includes other processes)':''}</span>`:''}${t.telemetry.measurements?.sample_peak_dbfs!=null?`<span>Sample peak ${Number(t.telemetry.measurements.sample_peak_dbfs).toFixed(1)} dBFS · RMS ${Number(t.telemetry.measurements.rms_dbfs).toFixed(1)} dBFS</span>`:''}${t.telemetry.cleanup?.in_use||t.telemetry.cleanup?.error?'<p>Preview cleanup pending. Stop playback, then clear previews.</p>':''}${t.error?`<p>${esc(t.error)}</p>`:''}<div>${t.artifacts.filter(a=>a.available).map(a=>`<a href="/api/preparation/artifacts/${encodeURIComponent(a.id)}" target="_blank" rel="noopener">${esc(a.kind)}</a>`).join(' ')}${['failed','interrupted','queued','running'].includes(t.status)?` <button data-retry="${esc(t.id)}" class="secondary">${t.status==='running'||t.status==='queued'?'Recover stopped task':'Retry'}</button>`:''}${t.recipe.mix?` <button data-restore="${esc(t.id)}" class="secondary">Load settings</button>`:''}</div></div>`).join('')||'<p>No processing trials yet.</p>';
   for(const button of root.querySelectorAll('[data-retry]'))button.onclick=handle(async()=>{await api('/preparation/tasks/'+encodeURIComponent(button.dataset.retry)+'/retry',{});await refresh()});
   for(const button of root.querySelectorAll('[data-restore]'))button.onclick=()=>{const saved=p.tasks.find(t=>t.id===button.dataset.restore).recipe.mix;for(const input of root.querySelectorAll('[data-mix]')){input.value=saved[input.dataset.mix]??controls.find(c=>c[0]===input.dataset.mix)[5];input.oninput()}q('prepLimit').checked=saved.limiter_db!==null};
@@ -30,23 +36,37 @@ export function initPreparation({api,toast}){
   if(preview&&preview.id!==lastPreview){lastPreview=preview.id;previewStart=preview.recipe.start;q('prepProcessed').src='/api/preparation/artifacts/'+encodeURIComponent(preview.artifacts.find(a=>a.available).id);}
  }
  async function processingQueue(){
-  const status=await api('/preparation/processing');
+  const onlyFlagged=flaggedOnly();
+  const status=await api('/preparation/processing?'+new URLSearchParams({flagged_only:String(onlyFlagged)}));
+  if(onlyFlagged!==flaggedOnly())return;
   q('prepQueueStatus').textContent=`${status.running||0} running · ${status.pending||0} queued · ${status.failed||0} failed / interrupted`+(!status.environment_ready?' · Processing environment missing. Run py -3.12 _97_app/run_gbr.py setup-processing.':' · One local task runs at a time.');
   const opened=new Set([...q('prepQueueJobs').querySelectorAll('details[open]')].map(e=>e.dataset.log));
   q('prepQueueJobs').innerHTML=status.items.map(job=>{const p=job.progress||{},elapsed=p.wall_seconds==null?'':Math.floor(p.wall_seconds/60)+'m '+Math.floor(p.wall_seconds%60)+'s',stage=p.stage_started_at?Math.max(0,Math.floor(Date.now()/1000-p.stage_started_at)):null;return `<article class="prep-task"><strong>${esc(job.title)} · ${esc(job.kind.replaceAll('_',' '))} · ${esc(job.status)}${job.position?' · queue '+job.position:''}</strong><span>${esc(job.reason||p.message||job.error||(job.status==='running'?'Running local processing':'Waiting for worker'))}${elapsed?' · '+elapsed:''}${stage!=null&&job.status==='running'?' · current stage '+stage+'s':''}</span>${p.device?`<span>${esc(p.device.toUpperCase())}${p.gpu_name?' · '+esc(p.gpu_name):''}${p.vram_bytes?' · '+(p.vram_bytes/1024**3).toFixed(1)+' GiB VRAM':''}</span>`:''}${p.measurements?.matched_words!=null?`<span>${p.measurements.matched_words} / ${p.measurements.total_words} words aligned; remaining positions are estimates.</span>`:''}${job.error&&job.status!=='waiting'?`<p>${esc(job.error)}</p>`:''}${['failed','interrupted'].includes(job.status)?`<button data-process-retry="${esc(job.id)}">Retry task</button>`:''}${p.log_tail?`<details data-log="${esc(job.id)}" ${opened.has(job.id)?'open':''}><summary>Worker log · ${esc(p.last_update||'')}</summary><pre>${esc(p.log_tail)}</pre></details>`:''}</article>`;}).join('')||'<p>No local processing jobs.</p>';
   for(const button of q('prepQueueJobs').querySelectorAll('[data-process-retry]'))button.onclick=handle(async()=>{await api(`/preparation/tasks/${button.dataset.processRetry}/retry`,{});await processingQueue();});
  }
  q('prepResumeQueue').onclick=handle(async()=>{await api('/preparation/processing/resume',{});await processingQueue();});
- async function refresh(){const result=await api('/preparation/projects'+(libraryMode?'?published=true':''));projects=result.projects;await processingQueue();
+ async function refresh(){
+  const sequence=++refreshSequence;
+  const query=new URLSearchParams({focused:selected,published:String(libraryMode),flagged_only:String(flaggedOnly())});
+  const result=await api('/preparation/projects?'+query);
+  if(sequence!==refreshSequence)return;
+  projects=result.projects;
   q('prepNotice').textContent=result.enabled?(projects.length?'':'Flag a reviewed recording for distribution to begin.'):'The shared platform database is required for Preparation.';
-  q('prepProject').replaceChildren(...projects.map(p=>new Option(`${p.title} · ${p.style||p.cluster||''} · ${p.audio_id.slice(0,8)}${p.ready?'':' · promoting'}`,p.generation_id)));
+  const options=projects.map(p=>[p.generation_id,`${p.title} · ${p.style||p.cluster||''} · ${p.audio_id.slice(0,8)}${p.ready?'':' · promoting'}${!libraryMode&&p.status!=='selected'?' · flag cleared':''}`]);
+  const signature=JSON.stringify(options);
+  if(signature!==projectSignature){
+   q('prepProject').replaceChildren(...options.map(([id,label])=>new Option(label,id)));
+   projectSignature=signature;
+  }
   if(projects.some(p=>p.generation_id===selected))q('prepProject').value=selected;else selected=q('prepProject').value;
   if(project()?.ready&&!q('prepRaw').src.includes('/'+selected))q('prepRaw').src='/api/preparation/audio/'+encodeURIComponent(selected);
   history();
   const yamlKey=selected+':'+(project()?.yaml_sha256||'')+':'+(project()?.yaml_error||'')+':'+libraryMode;
   if(project()?.yaml_error){q('prepNotice').textContent=project().yaml_error;q('prepYamlSource').textContent=project().yaml_error;}
   if(selected&&!project()?.yaml_error&&yamlFor!==yamlKey){const request=++yamlSequence,id=selected;const value=await api(`/preparation/projects/${encodeURIComponent(id)}/yaml`);if(request===yamlSequence&&selected===id){yamlFor=yamlKey;q('prepYamlSource').textContent=(value.path||'Stored generation YAML')+(value.revision_id?' · saved Preparation revision':' · original metadata')+(value.editable?'. File edits are picked up automatically.':'. Published metadata is edited through Library.');q('prepYamlOriginal').textContent=value.original_yaml||'';q('prepYamlMetadata').innerHTML=Object.entries(value.metadata).filter(([key])=>!['lyrics','caption'].includes(key)).map(([key,value])=>`<div><dt>${esc(key)}</dt><dd>${esc(typeof value==='object'?JSON.stringify(value):value??'—')}</dd></div>`).join('');q('prepYamlCaption').textContent=value.metadata.caption||'No caption stored';q('prepYamlLyrics').textContent=value.metadata.lyrics||'No lyrics stored';q('prepYamlRaw').textContent=value.yaml||'No original YAML stored';q('prepIdentity').hidden=libraryMode;if(!libraryMode){identity=await api(`/preparation/projects/${encodeURIComponent(id)}/identity`);if(selected===id){q('prepIdentitySong').replaceChildren(new Option('Choose master song',''),...identity.songs.map(r=>new Option(r.title+' · '+r.id,r.id)));const sid=identity.song_id||identity.suggested_song_id;if(sid&&!identity.songs.some(r=>r.id===sid))q('prepIdentitySong').append(new Option('Unlisted song ID '+sid,sid));q('prepIdentitySong').value=sid||'';identityVariants();}}}}
+  if(sequence!==refreshSequence)return;
   if(project()?.ready)await timeline.update(project());
+  if(sequence!==refreshSequence)return;
   q('prepWorkspace').hidden=!project()?.ready;
   if(project()?.ready&&!result.ffmpeg)q('prepNotice').textContent='Install FFmpeg on the host to render previews and master candidates.';
  }
@@ -65,5 +85,50 @@ export function initPreparation({api,toast}){
  q('prepAB').onclick=handle(async()=>{const raw=q('prepRaw'),wet=q('prepProcessed');if(!wet.src)throw Error('Render a preview first');const start=previewStart;if(!wet.paused){const time=wet.currentTime;wet.pause();raw.currentTime=start+time;await raw.play()}else{const time=Math.max(0,raw.currentTime-start);raw.pause();wet.currentTime=Math.min(time,Math.max(0,(wet.duration||30)-.1));await wet.play()}});
  q('prepBrief').onclick=handle(async()=>{lastBrief=await api(`/preparation/projects/${encodeURIComponent(selected)}/artwork`,{family:q('prepFamily').value,direction:q('prepDirection').value,references:[...root.querySelectorAll('[data-reference]:checked')].map(e=>e.dataset.reference),seed:0});q('prepPrompt').value=lastBrief.prompt;await refresh()});
  q('prepBackLibrary').onclick=handle(async()=>{if(!timeline.canSwitch())throw Error('Save or reload the timeline draft before leaving');await back?.();});
- return {canLeave:()=>timeline.canSwitch(),open:async(options={})=>{libraryMode=!!options.published;back=options.onBack||null;if(options.published)selected=options.published;q('prepBackLibrary').hidden=!libraryMode;root.querySelector('h1').textContent=libraryMode?'Edit published recording':'Preparation';q('prepComplete').textContent=libraryMode?'Update published recording':'Finish preparation → Publish queue';const config=(await api('/releases/library/settings')).settings;q('prepReleaseVisibility').replaceChildren(...config.rooms.filter(r=>r.enabled).map(r=>new Option(r.name,r.id)));q('prepReleaseVisibility').value=options.room||config.default_room;q('prepIncludeFlac').checked=config.include_flac;q('prepReleaseLyrics').checked=config.timed_lyrics;await refresh();if(options.master_id)await timeline.chooseSource(options.master_id);if(projects.length)await references();clearInterval(timer);timer=setInterval(()=>{if(root.hidden){clearInterval(timer);return}refresh().catch(e=>toast(e.message))},2000)},close:()=>{timeline.close();clearInterval(timer);q('prepRaw').pause();q('prepProcessed').pause()}};
+ q('prepFlaggedOnly').onchange=handle(async()=>{
+  const input=q('prepFlaggedOnly');
+  if(!timeline.canSwitch()){
+   input.checked=!input.checked;
+   throw Error('Save or reload the timeline draft before changing the filter');
+  }
+  localStorage.setItem('gbr-preparation-flagged',String(input.checked));
+  await Promise.all([refresh(),processingQueue()]);
+ });
+ async function pollProcessing() {
+  if(polling||root.hidden||document.hidden)return;
+  polling=true;
+  try{await Promise.all([refresh(),processingQueue()]);}
+  catch(error){if(!root.hidden)toast(error.message);}
+  finally{polling=false;}
+ }
+ return {
+  canLeave:()=>timeline.canSwitch(),
+  async open(options={}){
+   const sequence=++openSequence;
+   libraryMode=Boolean(options.published);
+   back=options.onBack||null;
+   if(options.published)selected=options.published;
+   q('prepBackLibrary').hidden=!libraryMode;
+   q('prepFlagFilter').hidden=libraryMode;
+   root.querySelector('h1').textContent=libraryMode?'Edit published recording':'Preparation';
+   q('prepComplete').textContent=libraryMode?'Update published recording':'Finish preparation → Publish queue';
+   const config=(await api('/releases/library/settings')).settings;
+   if(sequence!==openSequence)return;
+   q('prepReleaseVisibility').replaceChildren(...config.rooms.filter(r=>r.enabled).map(r=>new Option(r.name,r.id)));
+   q('prepReleaseVisibility').value=options.room||config.default_room;
+   q('prepIncludeFlac').checked=config.include_flac;
+   q('prepReleaseLyrics').checked=config.timed_lyrics;
+   await Promise.all([refresh(),processingQueue()]);
+   if(sequence!==openSequence)return;
+   if(options.master_id)await timeline.chooseSource(options.master_id);
+   if(projects.length)await references();
+   if(sequence!==openSequence)return;
+   clearInterval(timer);
+   timer=setInterval(pollProcessing,2000);
+  },
+  close(){
+   ++openSequence;++refreshSequence;++yamlSequence;
+   timeline.close();clearInterval(timer);q('prepRaw').pause();q('prepProcessed').pause();
+  },
+ };
 }

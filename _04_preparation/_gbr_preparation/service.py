@@ -166,25 +166,38 @@ class Preparation:
             except (OSError,ValueError) as exc:
                 self.review.indexer.error('lyric-alignment:'+row['generation_id'],str(exc))
 
-    def projects(self,include_completed=False):
+    def projects(self,include_completed=False, *, focused=None, published_only=False, flagged_only=True):
         if not self.enabled:return {'enabled':False,'projects':[]}
         rows=self.db.all('''SELECT g.id AS generation_id,g.audio_id,s.title,m.parsed_json,a.duration,a.archive_path,p.status
             FROM publishing_selection p JOIN generations g ON g.id=p.generation_id JOIN songs s ON s.id=g.song_id
             JOIN generation_metadata m ON m.generation_id=g.id JOIN audio a ON a.id=g.audio_id
-            WHERE (p.status IN ('selected','published') AND (EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id)
+            WHERE ((p.status IN ('selected','published') AND (EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id)
                 OR EXISTS(SELECT 1 FROM processing_tasks t WHERE t.generation_id=g.id AND t.kind='library_import' AND t.status='done')))
-               OR a.archive_path LIKE ? ORDER BY p.selected_at,g.id''',(str(self.tracks)+'%',))
-        rows=[r for r in rows if include_completed or (r['status']=='selected' and not (r['archive_path'] and Path(r['archive_path']).resolve().is_relative_to(self.showcase.resolve())) and not self.db.one("SELECT 1 FROM processing_tasks WHERE generation_id=? AND kind='release_prepare' AND status='done'",(r['generation_id'],)))]
+                OR a.archive_path LIKE ?)
+            AND (?=0 OR p.status='published')
+            AND (?=1 OR (p.status<>'published' AND (?=0 OR p.status='selected') AND NOT EXISTS(SELECT 1 FROM processing_tasks t
+                WHERE t.generation_id=g.id AND t.kind='release_prepare' AND t.status='done')))
+            ORDER BY p.selected_at,g.id''',(str(self.tracks)+'%', published_only, include_completed, flagged_only))
+        tracks, showcase = self.tracks.resolve(), self.showcase.resolve()
         for row in rows:
-            try:row.update(self.metadata_row(row['generation_id']))
-            except (ValueError,OSError) as exc:row['yaml_error']=str(exc)
+            path = Path(row['archive_path']).resolve() if row['archive_path'] else None
+            row['completed'] = bool(path and path.is_relative_to(showcase))
+            row['ready'] = bool(path and (row['completed'] or path.is_relative_to(tracks)) and path.is_file())
+        rows = [row for row in rows if include_completed or not row['completed']]
+        if focused is not None and rows and not any(row['generation_id'] == focused for row in rows):
+            focused = rows[0]['generation_id']
+        for row in rows:
+            detailed = focused is None or focused == row['generation_id']
+            if detailed:
+                try:row.update(self.metadata_row(row['generation_id']))
+                except (ValueError,OSError) as exc:row['yaml_error']=str(exc)
             meta=json.loads(row.pop('parsed_json'))
             row['yaml_sha256']=row.get('yaml_sha256')
             row['title']=meta.get('title') or row['title']
             row.update(cluster=meta.get('cluster'),style=meta.get('style') or meta.get('style_primary'),
                        song_id=meta.get('song_id'),variant_id=meta.get('variant_id'))
-            row['completed']=bool(row['archive_path'] and Path(row['archive_path']).resolve().is_relative_to(self.showcase.resolve()))
-            row['ready']=bool(row['archive_path'] and Path(row['archive_path']).is_file() and any(Path(row['archive_path']).resolve().is_relative_to(p.resolve()) for p in (self.tracks,self.showcase)))
+            if not detailed:
+                continue
             row['tasks']=self.tasks(row['generation_id'])
             row['masters']=[{'id':item['id'],'created_at':item['created_at']} for item in self.db.all("SELECT a.id,a.uri,t.created_at FROM generation_artifacts a JOIN processing_tasks t ON t.id=json_extract(a.metadata_json,'$.processing_task_id') WHERE t.generation_id=? AND t.status='done' AND a.kind='master_candidate' ORDER BY t.rowid DESC",(row['generation_id'],)) if Path(item['uri']).is_file()]
             row['promotion']=self.db.one("SELECT id,status,error FROM archive_operations WHERE audio_id=? AND operation_type='prepare' ORDER BY rowid DESC LIMIT 1",(row['audio_id'],))
@@ -212,6 +225,8 @@ class Preparation:
         rows=self.db.all('SELECT * FROM processing_tasks WHERE generation_id=? ORDER BY created_at DESC,id DESC LIMIT 100',(gid,))
         for row in rows:
             row['recipe']=json.loads(row.pop('recipe_json'));row['telemetry']=json.loads(row.pop('telemetry_json'))
+            if row['kind']=='preparation_yaml':
+                row['recipe'].pop('yaml_bytes_b64', None)
             row['artifacts']=self.db.all("SELECT id,kind,size_bytes,metadata_json,uri FROM generation_artifacts WHERE json_extract(metadata_json,'$.processing_task_id')=?",(row['id'],))
             for artifact in row['artifacts']:
                 artifact['available']=Path(artifact.pop('uri')).is_file()
@@ -384,12 +399,15 @@ class Preparation:
                 environment.setdefault('TORCH_HOME',str(self.worker.parent/'_runtime/torch'))
                 process=self.processing.execute(identifier,command,request,environment,temporary,timeout) if task['kind']=='lyric_alignment' else subprocess.run(command,input=canonical(request).encode('utf-8'),capture_output=True,timeout=timeout,env=environment)
                 if process.returncode:
+                    tail = process.stderr.decode('utf-8', errors='replace')[-6000:]
+                    failure_telemetry = {'log_tail': tail} if tail else {}
                     resource_file=Path(temporary)/'resources.ndjson'
                     if resource_file.is_file():
                         observations=[json.loads(line) for line in resource_file.read_text(encoding="utf-8").splitlines()]
                         ended=[row for row in observations if row.get('event')=='stage_end']
-                        if ended:failure_telemetry={'resources':ended[-1]['resource']}
-                    raise RuntimeError(process.stderr.decode('utf-8',errors='replace')[-5000:] or 'Processing worker failed')
+                        if ended:failure_telemetry['resources']=ended[-1]['resource']
+                    from .processing import worker_error
+                    raise RuntimeError(worker_error(tail))
                 result=json.loads(process.stdout.decode('utf-8'));output=Path(result['output'])
                 if not output.resolve().is_relative_to(Path(temporary).resolve()) or not output.is_file():raise ValueError('Invalid worker output')
                 if digest(source)!=task['input_sha256']:raise ValueError('Source changed while processing; result was not published')

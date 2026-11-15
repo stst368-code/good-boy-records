@@ -60,6 +60,27 @@ def test_linux_does_not_import_or_change_optional_model_cache(alignment,monkeypa
     alignment.prepare_model_cache('ru')
 
 
+def test_incomplete_silero_cache_is_quarantined_before_torch_hub_loads_it(alignment, tmp_path):
+    incomplete = tmp_path / 'snakers4_silero-vad_master'
+    incomplete.mkdir()
+    (incomplete / 'part-download').write_bytes(b'preserve this')
+    healthy = tmp_path / 'snakers4_silero-vad_main'
+    healthy.mkdir()
+    (healthy / 'hubconf.py').write_text('# complete')
+    checkpoints = tmp_path / 'checkpoints'
+    checkpoints.mkdir()
+    (checkpoints / 'demucs.pth').write_bytes(b'cached')
+    torch = SimpleNamespace(hub=SimpleNamespace(get_dir=lambda: str(tmp_path)))
+
+    alignment.recover_silero_cache(torch)
+    alignment.recover_silero_cache(torch)
+    assert not incomplete.exists()
+    [retained] = list(tmp_path.glob('snakers4_silero-vad_master.incomplete-*'))
+    assert (retained / 'part-download').read_bytes() == b'preserve this'
+    assert (healthy / 'hubconf.py').read_text() == '# complete'
+    assert (checkpoints / 'demucs.pth').read_bytes() == b'cached'
+
+
 def test_cache_write_failures_are_not_hidden(alignment,whisper_models,tmp_path,monkeypatch):
     hub=ModuleType('huggingface_hub');hub.constants=SimpleNamespace(HF_HUB_CACHE=str(tmp_path))
     download=ModuleType('huggingface_hub.file_download')

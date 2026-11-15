@@ -150,6 +150,8 @@ def router(root,review,preparation,local):
     def publish(identifier:str,body:Publish|None=None):return service.start_publish(identifier,body.visibility if body else None)
     @routes.post('/{identifier}/discard')
     def discard(identifier:str):return service.discard(identifier)
+    @routes.post('/{identifier}/retry-archive')
+    def retry_archive(identifier:str):return service.retry_archive(identifier)
     @routes.post('/{identifier}/withdraw')
     def withdraw(identifier:str):
         try:return service.start_withdraw(identifier)

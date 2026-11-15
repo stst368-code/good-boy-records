@@ -245,27 +245,29 @@ def create_app(config_path, start_worker=True, database_path=None):
         return JSONResponse({"detail": str(exc)}, status_code=404)
 
     @app.get("/api/bootstrap")
-    def bootstrap(request: Request):
-        reviewer = service.queues.identity(request.headers.get("x-gbr-reviewer")) if authenticated(request) else None
+    def bootstrap(request: Request, include_directories: bool = True):
+        signed_in = authenticated(request)
+        reviewer = service.queues.identity(request.headers.get("x-gbr-reviewer")) if signed_in else None
         session = service.db.one("SELECT order_by,direction,filters_json FROM sessions WHERE reviewer_id=?", (reviewer["id"],)) if reviewer else None
-        directories = [str(p) for p in config.inputs]
-        queue_directories = set(directories) if authenticated(request) else set()
-        if authenticated(request):
+        inputs = config.inputs if signed_in and include_directories else []
+        directories = [str(p) for p in inputs]
+        queue_directories = set(directories)
+        if inputs:
             for row in service.db.all('SELECT DISTINCT original_directory FROM generations'):
                 folder = Path(row['original_directory']).resolve()
-                for root in config.inputs:
+                for root in inputs:
                     if folder.is_relative_to(root):
                         while folder != root:
                             queue_directories.add(str(folder))
                             folder = folder.parent
         queue_directories = sorted(queue_directories)
-        return {"authenticated": authenticated(request), "can_configure": local(request), "queue": session,
-                "reviewer": reviewer, "reviewers": service.queues.names() if authenticated(request) else [],
+        return {"authenticated": signed_in, "can_configure": local(request), "queue": session,
+                "reviewer": reviewer, "reviewers": service.queues.names() if signed_in else [],
                 "library_available": local(request) and app.state.preparation.enabled,
                 "heartbeat_seconds": min(10, config.values["reservation_seconds"] // 3),
-                "input_directories": [str(p) for p in config.inputs] if authenticated(request) else [],
+                "input_directories": directories,
                 "queue_directories": queue_directories,
-                "review_tags": review_tags.definitions(service.db) if authenticated(request) else [],
+                "review_tags": review_tags.definitions(service.db) if signed_in else [],
                 "durations": {m: config.values[m + "_seconds"] for m in ("fast", "quick", "standard")}}
 
     def reviewer_id(request):

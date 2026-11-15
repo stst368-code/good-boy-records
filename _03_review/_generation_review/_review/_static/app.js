@@ -1,10 +1,3 @@
-import {initLibrary} from '/tools/preparation/library.js';
-import {initPreparation} from "/tools/preparation/preparation.js";
-import {initPublishing} from "/tools/preparation/publishing.js";
-import {initYamlEditor} from "/tools/yaml-editor/editor.js";
-import {initGeneration} from "/tools/generation/generation.js";
-import {initWorkers} from "/tools/generation/workers.js";
-import {initWriting} from "/tools/writing/writing.js";
 import {toggleChoices,selectChoices} from "/static/choices.js";
 import {ReviewTags, savedTags} from "/static/tags.js";
 import {formatTime as fmt, initPlayer} from "/static/player.js";
@@ -50,7 +43,7 @@ function paintPlayback(entry, playing) {
   reviewPlay.disabled = !reviewAudio;
   reviewPlay.textContent = inReview && playing ? 'Pause review audio' : 'Play review audio';
   const selector = entry?.key ? `, [data-play-key="${CSS.escape(entry.key)}"]` : '';
-  for (const row of document.querySelectorAll('.listen-row[data-current]' + selector)) {
+  for (const row of document.querySelectorAll('[data-play-key][data-current]' + selector)) {
     const active = row.dataset.playKey === entry?.key;
     if (active) row.dataset.current = 'true';
     else delete row.dataset.current;
@@ -447,24 +440,140 @@ for (const button of document.querySelectorAll('[data-mode]')) {
   button.onclick = () => setMode(button.dataset.mode, {}, {activate: !player.current || player.current === reviewAudio});
 }
 
-function showView(view, source = state.source) {
-  const changed = view !== state.view || source !== state.source;
-  if (!changed) return;
-  if ($('preparationView').offsetParent !== null && !preparation.canLeave()) {
+const sources = new Set(['review', 'selection', 'library']);
+const stages = {listen:'Listen', writing:'Writing', yaml:'YAML editor', generation:'Generation', preparation:'Preparation', publishing:'Publish'};
+const tools = {};
+const imports = new Map();
+const styles = new Map();
+const openings = new Map();
+const prepCss = '/tools/preparation/preparation.css';
+const generationCss = '/tools/generation/generation.css';
+const definition = {
+  yaml: ['/tools/yaml-editor/editor.js', '/tools/yaml-editor/editor.css', m=>m.initYamlEditor({api,toast,browse:openDirectory})],
+  preparation: ['/tools/preparation/preparation.js', prepCss, m=>m.initPreparation({api,toast})],
+  publishing: ['/tools/preparation/publishing.js', prepCss, m=>m.initPublishing({
+    api, toast,
+    onPlay: (items, index) => playCollection({items}, index),
+    onListChange: () => player.refresh(),
+  })],
+  library: ['/tools/preparation/library.js', prepCss, m=>m.initLibrary({
+    api, toast, onEdit: openPublishedRecording,
+    onPlay: (items, index) => playCollection({items}, index),
+    onListChange: () => player.refresh(),
+  })],
+  writing: ['/tools/writing/writing.js', '/tools/writing/writing.css', m=>m.initWriting({
+    api, toast,
+    onPublished: kind=>{tools.generation?.writingChanged(kind);if(kind==='track')tools.yaml?.invalidateCatalogue();},
+  })],
+  workers: ['/tools/generation/workers.js', generationCss, m=>m.initWorkers({
+    api, toast, onChange: ()=>tools.generation?.reloadWorkers(),
+    configureWriting: async ()=>(await loadTool('writing')).openSettings(),
+  })],
+  generation: ['/tools/generation/generation.js', generationCss, m=>m.initGeneration({
+    api, toast, browse:openDirectory,
+    configureWorkers: async ()=>(await loadTool('workers')).open(),
+  })],
+};
+const preparationAnchor = document.createComment('Preparation home');
+$('preparationView').before(preparationAnchor);
+let navigationSequence = 0;
+
+function loadStylesheet(url) {
+  if (styles.has(url)) return styles.get(url);
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = url;
+  const loaded = new Promise((resolve, reject) => {
+    link.onload = resolve;
+    link.onerror = () => {
+      styles.delete(url);
+      link.remove();
+      reject(new Error('Stage styles could not load. Try opening the stage again.'));
+    };
+  });
+  styles.set(url, loaded);
+  $('workspaceStyles').before(link);
+  return loaded;
+}
+
+function loadTool(name) {
+  if (tools[name]) return Promise.resolve(tools[name]);
+  if (!imports.has(name)) {
+    const [url, css, initialize] = definition[name];
+    const loaded = Promise.all([import(url), loadStylesheet(css)])
+      .then(([module]) => tools[name] = initialize(module))
+      .finally(() => imports.delete(name));
+    imports.set(name, loaded);
+  }
+  return imports.get(name);
+}
+
+function activeTool() {
+  return state.view === 'listen' ? (state.source === 'library' ? 'library' : null) : state.view;
+}
+
+function openTool(name) {
+  if (!openings.has(name)) {
+    const opening = (async () => {
+      const tool = await loadTool(name);
+      if (activeTool() !== name) return;
+      try {
+        await tool.open();
+      } finally {
+        if (activeTool() !== name) tool.close?.();
+      }
+    })().finally(() => openings.delete(name));
+    openings.set(name, opening);
+  }
+  return openings.get(name);
+}
+
+function restorePreparation() {
+  if ($('preparationView').parentElement?.id === 'libraryEditorContainer') preparationAnchor.after($('preparationView'));
+}
+
+async function openPublishedRecording(item) {
+  const editor = $('libraryEditorContainer');
+  try {
+    const preparation = await loadTool('preparation');
+    if (activeTool() !== 'library') return;
+    editor.append($('preparationView'));
+    $('preparationView').hidden = false;
+    await preparation.open({
+      published: item.generation_id, master_id: item.master_id, room: item.room,
+      onBack: async () => {
+        preparation.close();
+        restorePreparation();
+        $('preparationView').hidden = true;
+        await tools.library.open();
+      },
+    });
+    if (activeTool() !== 'library' && state.view !== 'preparation') preparation.close();
+  } catch (error) {
+    if (activeTool() === 'library') {
+      restorePreparation();
+      $('preparationView').hidden = true;
+      await tools.library.open();
+    }
+    throw error;
+  }
+}
+
+function showView(view, source) {
+  if (view === state.view && source === state.source) return false;
+  if ($('preparationView').offsetParent !== null && tools.preparation?.canLeave() === false) {
     throw Error('Save or reload the lyric and lighting draft before leaving');
   }
-  const libraryVisible = view === 'listen' && source === 'library';
-  if (!libraryVisible) {
-    library.close();
+  const previous = activeTool();
+  if (previous === 'library') {
+    if ($('preparationView').parentElement?.id === 'libraryEditorContainer') tools.preparation?.close();
     restorePreparation();
   }
-  if (view !== 'preparation') preparation.close();
-  if (view !== 'publishing') publishing.close();
-  if (view !== 'writing') writing.close();
-  if (view !== 'generation') for (const preview of $('generationView').querySelectorAll('audio')) preview.pause();
+  tools[previous]?.close?.();
   state.view = view;
   state.source = source;
-  for (const name of ['writing','yaml','generation','listen','preparation','publishing']) {
+  $('workspaceTitle').textContent = stages[view];
+  for (const name of Object.keys(stages)) {
     const active = view === name;
     $(name+'View').hidden = !active;
     $(name+'Tab').classList.toggle('active', active);
@@ -472,7 +581,7 @@ function showView(view, source = state.source) {
     else $(name+'Tab').removeAttribute('aria-current');
   }
   document.querySelector('.listen-content').dataset.source = source;
-  for (const name of ['review','selection','library']) {
+  for (const name of sources) {
     $(name+'View').hidden = source !== name;
     if (source === name) $(name+'Tab').setAttribute('aria-current', 'true');
     else $(name+'Tab').removeAttribute('aria-current');
@@ -480,63 +589,102 @@ function showView(view, source = state.source) {
   $('queueView').hidden = source !== 'review';
   $('jumpQueue').hidden = source !== 'review';
   if (reviewVisible()) updateWavePosition();
+  return true;
 }
-async function showListen(source) {
-  const changed = state.view !== 'listen' || state.source !== source;
-  showView('listen', source);
-  if (source === 'review') {
-    if (!state.track && !state.advancePending) await changeReview(() => nextTrack());
-    else {
+
+function workspaceRoute() {
+  const [view, source] = location.hash.slice(1).split('/');
+  return view === 'listen' && sources.has(source) ? [view, source] :
+    Object.hasOwn(stages, view) && view !== 'listen' ? [view, state.source] : ['listen','review'];
+}
+
+function setStageMenu(open, focus = false) {
+  const button = $('workspaceMenu');
+  if (button.getAttribute('aria-expanded') !== String(open)) button.setAttribute('aria-expanded', String(open));
+  if (focus) {
+    if (open) $('workspaceNav').querySelector('[aria-current]')?.focus();
+    else button.focus();
+  }
+}
+$('workspaceMenu').onclick = event => {
+  setStageMenu($('workspaceMenu').getAttribute('aria-expanded') !== 'true', event.detail === 0);
+};
+document.addEventListener('click', event => {
+  if (!$('workspaceHeader').contains(event.target)) setStageMenu(false);
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && $('workspaceMenu').getAttribute('aria-expanded') === 'true') setStageMenu(false, true);
+});
+
+function routeHash(view, source) {
+  return view === 'listen' ? `#listen/${source}` : `#${view}`;
+}
+
+async function navigate(view, source = state.source, {replace = false} = {}) {
+  if (!state.reviewer) return;
+  if (view !== 'listen' && !state.canConfigure) view = 'listen';
+  if (source === 'library' && $('libraryTab').hidden) source = 'review';
+  const changed = showView(view, source);
+  if (!replace) setStageMenu(false);
+  const hash = routeHash(view, source);
+  if (hash !== location.hash) history[replace ? 'replaceState' : 'pushState'](null, '', hash);
+  if (changed) window.scrollTo(0, 0);
+  const sequence = ++navigationSequence;
+  const loading = $('workspaceLoading');
+  loading.hidden = true;
+  const name = activeTool();
+  if (name) {
+    const timer = setTimeout(() => {
+      if (sequence !== navigationSequence) return;
+      loading.textContent = `Opening ${name === 'library' ? 'Library' : stages[view]}…`;
+      loading.hidden = false;
+    }, 150);
+    try {
+      if (changed || !tools[name] || openings.has(name) || $('workspaceMain').dataset.failedStage === name) {
+        await openTool(name);
+        delete $('workspaceMain').dataset.failedStage;
+      }
+    } catch (error) {
+      if (sequence === navigationSequence) {
+        $('workspaceMain').dataset.failedStage = name;
+        throw error;
+      }
+    } finally {
+      clearTimeout(timer);
+      if (sequence === navigationSequence) loading.hidden = true;
+    }
+  } else if (source === 'review') {
+    if (!state.track && !state.advancePending) {
+      if (reviewerChanging) await nextTrack();
+      else await changeReview(() => nextTrack());
+    } else {
       refreshVisibleQueue();
       refreshReviewCount();
       if (canChangeReview() && !state.flagError && !state.saveError) await refreshFlags(true);
     }
-  } else if (source === 'selection') {
-    if (!selectionList || selectionDirty) await loadCandidates();
-  } else if (changed) {
-    await library.open();
+  } else if (!selectionList || selectionDirty) {
+    await loadCandidates();
   }
 }
-$('listenTab').onclick = guarded(() => showListen(state.source));
-$('reviewTab').onclick = guarded(() => showListen('review'));
-$('selectionTab').onclick = guarded(() => showListen('selection'));
-$('libraryTab').onclick = guarded(() => showListen('library'));
+
+const showListen = source => navigate('listen', source);
+for (const name of Object.keys(stages)) $(name+'Tab').onclick = guarded(() => navigate(name));
+for (const source of sources) $(source+'Tab').onclick = guarded(() => showListen(source));
 document.querySelector('.wordmark').onclick = guarded(event => {
   event.preventDefault();
-  return showListen(state.source);
+  return showListen('review');
 });
-const yamlEditor=initYamlEditor({api,toast,browse:async callback=>{await openDirectory(callback);}});
-const preparation=initPreparation({api,toast});
-const publishing=initPublishing({api,toast});
-const preparationAnchor=document.createComment('Preparation home');$('preparationView').before(preparationAnchor);
-function restorePreparation(){if($('preparationView').parentElement?.id==='libraryEditorContainer')preparationAnchor.after($('preparationView'));}
-const library = initLibrary({
-  api, toast,
-  onPlay: (items, index) => playCollection({items}, index),
-  onListChange: () => player.refresh(),
-  onEdit: async item => {
-    $('libraryEditorContainer').append($('preparationView'));
-    $('preparationView').hidden = false;
-    await preparation.open({published: item.generation_id, master_id: item.master_id, room: item.room,
-      onBack: async () => {
-        preparation.close();
-        restorePreparation();
-        $('preparationView').hidden = true;
-        await library.open();
-      },
-    });
-  },
-});
-$('publishingTab').onclick=guarded(async()=>{showView('publishing');await publishing.open();});
-$('preparationTab').onclick=guarded(async()=>{showView('preparation');await preparation.open();});
-const writing=initWriting({api,toast,onPublished:kind=>{generation.writingChanged(kind);if(kind==='track')yamlEditor.invalidateCatalogue();}});
-$('writingTab').onclick=guarded(async()=>{showView('writing');await writing.open();});
-$('openWritingSettings').onclick=guarded(async()=>{$('settingsDialog').close();await writing.openSettings();});
-const workers=initWorkers({api,toast,onChange:async()=>{await generation.reloadWorkers();},configureWriting:()=>writing.openSettings()});
-const generation=initGeneration({api,toast,browse:async callback=>{await openDirectory(callback);},configureWorkers:()=>workers.open()});
-$('openWorkerSettings').onclick=guarded(async()=>{$('settingsDialog').close();await workers.open();});
-$('generationTab').onclick=guarded(async()=>{showView('generation');await generation.open();});
-$('yamlTab').onclick=guarded(async()=>{showView('yaml');await yamlEditor.open();});
+window.addEventListener('popstate', guarded(async () => {
+  const [view, source] = workspaceRoute();
+  try {
+    await navigate(view, source, {replace: true});
+  } catch (error) {
+    history.replaceState(null, '', routeHash(state.view, state.source));
+    throw error;
+  }
+}));
+$('openWritingSettings').onclick=guarded(async()=>{const writing=await loadTool('writing');$('settingsDialog').close();await writing.openSettings();});
+$('openWorkerSettings').onclick=guarded(async()=>{const workers=await loadTool('workers');$('settingsDialog').close();await workers.open();});
 $('back').onclick=guarded(()=>changeReview(()=>previousReview()));
 $('autoplayNext').checked=localStorage.getItem('gbr-autoplay-next')==='true';
 $('autoplayNext').onchange=()=>localStorage.setItem('gbr-autoplay-next',String($('autoplayNext').checked));
@@ -592,11 +740,28 @@ $('returnSkipped').onclick = guarded(() => changeReview(async () => {
 }));
 async function status(){const result=await api('/status');$('systemStatus').textContent=`Background: ${result.worker}. Analysis waiting: ${result.analysis_pending}. File issues: ${result.scan_errors}. Archive retries needed: ${result.archive_failures}.`;if(result.archive_failures&&!state.saveError&&!state.submitting)$('reviewMessage').textContent='Review saved. An archive move needs attention in Settings.';}
 $('settingsButton').onclick=guarded(async()=>{
+  setStageMenu(false);
   $('hostSettings').hidden=!state.canConfigure;$('remoteSettings').hidden=state.canConfigure;$('reconcile').hidden=!state.canConfigure;$('retune').hidden=!state.canConfigure;$('diagnostics').hidden=!state.canConfigure;$('cacheManagement').hidden=!state.canConfigure;$('settingsError').textContent='';$('saveSettings').disabled=true;$('settingsDialog').showModal();
+  if (state.canConfigure) {
+    loadTool('publishing').catch(error=>toast(error.message));
+    refreshDiagnostics();
+    refreshCacheSummary();
+  }
   if(state.canConfigure){try{const setting=await api('/settings');$('inputFolders').value=setting.input_directories.join('\n');$('archiveFolder').value=setting.archive_directory;$('archiveFolder').readOnly=setting.archive_locked;$('browseArchive').disabled=setting.archive_locked;$('archiveLockNote').hidden=!setting.archive_locked;for(const [id,key] of [['quickSeconds','quick_seconds'],['standardSeconds','standard_seconds'],['scanInterval','scan_interval_seconds'],['fadeMs','fade_ms'],['fastSeconds','fast_seconds'],['transitionSensitivity','transition_sensitivity'],['queueAhead','reservation_queue_ahead'],['reservationSeconds','reservation_seconds']])$(id).value=setting[key];$('saveSettings').disabled=false;}catch(error){$('settingsError').textContent=error.message;}}
   status().catch(error=>{$('systemStatus').textContent=error.message;});
-  if(state.canConfigure){api('/mobile').then(m=>{$('mobileAccess').hidden=false;$('phoneLinks').replaceChildren();$('phoneInstructions').textContent=m.enabled?'Open a link below on the same network.':'Use Start-Mobile-Windows.bat on the host. No certificate is required.';for(const url of m.urls){const link=document.createElement('a');link.href=url;link.textContent=url;link.target='_blank';link.rel='noopener';$('phoneLinks').append(link,document.createElement('br'));}$('phoneCode').textContent=m.access_code?`Access code: ${m.access_code}`:m.enabled?'Use your existing password.':'';}).catch(()=>{});api('/diagnostics').then(d=>{$('diagnosticText').textContent=JSON.stringify(d,null,2);}).catch(error=>{$('diagnosticText').textContent=error.message;});cacheReport().catch(error=>{$('cacheSummary').textContent=error.message;});}
+  if(state.canConfigure)api('/mobile').then(m=>{$('mobileAccess').hidden=false;$('phoneLinks').replaceChildren();$('phoneInstructions').textContent=m.enabled?'Open a link below on the same network.':'Use Start-Mobile-Windows.bat on the host. No certificate is required.';for(const url of m.urls){const link=document.createElement('a');link.href=url;link.textContent=url;link.target='_blank';link.rel='noopener';$('phoneLinks').append(link,document.createElement('br'));}$('phoneCode').textContent=m.access_code?`Access code: ${m.access_code}`:m.enabled?'Use your existing password.':'';}).catch(()=>{});
 });
+function refreshDiagnostics() {
+  if (!$('diagnostics').open) return;
+  api('/diagnostics').then(d=>$('diagnosticText').textContent=JSON.stringify(d,null,2))
+    .catch(error=>$('diagnosticText').textContent=error.message);
+}
+function refreshCacheSummary() {
+  if (!$('cacheManagement').open) return;
+  cacheReport().catch(error=>$('cacheSummary').textContent=error.message);
+}
+$('diagnostics').addEventListener('toggle',refreshDiagnostics);
+$('cacheManagement').addEventListener('toggle',refreshCacheSummary);
 $('settingsForm').onsubmit=async event=>{event.preventDefault();$('settingsError').textContent='';$('saveSettings').disabled=true;try{await api('/settings',{input_directories:$('inputFolders').value.split('\n').map(value=>value.trim().replace(/^"|"$/g,'')).filter(Boolean),archive_directory:$('archiveFolder').value,quick_seconds:Number($('quickSeconds').value),standard_seconds:Number($('standardSeconds').value),scan_interval_seconds:Number($('scanInterval').value),fade_ms:Number($('fadeMs').value),fast_seconds:Number($('fastSeconds').value),transition_sensitivity:$('transitionSensitivity').value,reservation_queue_ahead:Number($('queueAhead').value),reservation_seconds:Number($('reservationSeconds').value)});state.durations={fast:Number($('fastSeconds').value),quick:Number($('quickSeconds').value),standard:Number($('standardSeconds').value)};state.waitForRetune=true;toast('Settings saved. Input folders will be rescanned.');$('settingsDialog').close();}catch(error){$('settingsError').textContent=error.message+' Your edits are retained.';}finally{$('saveSettings').disabled=false;}};
 for(const [id,path] of [['rescan','/scan'],['rescanEmpty','/scan'],['retryArchive','/archive/retry'],['reconcile','/reconcile'],['reanalyse','/reanalyse'],['retune','/retune']])$(id).onclick=guarded(async()=>{await api(path,{});if(['retune','reanalyse'].includes(id))state.waitForRetune=true;toast(id==='retune'?'Cached zones queued for retuning.':'Background task scheduled.');});
 $('backup').onclick=guarded(async()=>{const r=await fetch('/api/backup',{method:'POST',headers:{'X-GBR-Request':'1'}});if(!r.ok)throw new Error('Database backup failed');const url=URL.createObjectURL(await r.blob()),link=document.createElement('a');link.href=url;link.download='gbr-review-backup.sqlite';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Database backup downloaded. Back up the archive separately.');});
@@ -1073,13 +1238,17 @@ async function heartbeat(){
 }
 async function chooseReviewer(name){
   if(!canChangeReview())return;
+  if ($('preparationView').offsetParent !== null && tools.preparation?.canLeave() === false) {
+    throw Error('Save or reload the lyric and lighting draft before changing reviewers');
+  }
+  const changingReviewer = Boolean(state.reviewer);
   reviewerChanging=true;const buttons=[...$('reviewerForm').querySelectorAll('button')];buttons.forEach(button=>button.disabled=true);
-  try{const result=await api('/reviewer/select',{name});state.canBack=false;player.load(null);resetQueueDisplay();selectionList=null;++candidateSequence;loadTrack(null);state.reviewer=result.reviewer;state.reviewerId=result.reviewer.id;localStorage.setItem('gbr-reviewer-id',state.reviewerId);$('reviewerDialog').close();showView('listen','review');await boot();}
+  try{const result=await api('/reviewer/select',{name});state.canBack=false;player.load(null);resetQueueDisplay();selectionList=null;++candidateSequence;loadTrack(null);state.reviewer=result.reviewer;state.reviewerId=result.reviewer.id;localStorage.setItem('gbr-reviewer-id',state.reviewerId);$('reviewerDialog').close();if(changingReviewer)history.replaceState(null,'','#listen/review');await boot();}
   finally{reviewerChanging=false;buttons.forEach(button=>button.disabled=false);paintRatings();}
 }
 async function showReviewerDialog(names=null){
   if(!canChangeReview())return;
-  const reviewers=names||(await api('/bootstrap')).reviewers;$('knownReviewers').replaceChildren();$('reviewerError').textContent='';$('newReviewerName').value='';$('cancelReviewer').hidden=!state.reviewer;
+  const reviewers=names||(await api('/bootstrap?include_directories=false')).reviewers;$('knownReviewers').replaceChildren();$('reviewerError').textContent='';$('newReviewerName').value='';$('cancelReviewer').hidden=!state.reviewer;
   for(const reviewer of reviewers){const button=document.createElement('button');button.type='button';button.textContent=reviewer.display_name;button.onclick=guarded(()=>chooseReviewer(reviewer.display_name));$('knownReviewers').append(button);}
   if(!$('reviewerDialog').open)$('reviewerDialog').showModal();
 }
@@ -1089,11 +1258,24 @@ $('changeUser').onclick=guarded(()=>showReviewerDialog());
 $('resumeQueue').onclick=guarded(()=>changeReview(()=>nextTrack()));
 window.addEventListener('focus',()=>heartbeat().catch(()=>{}));
 async function boot(){
-  const b=await api('/bootstrap');if(!b.authenticated){if(!$('loginDialog').open)$('loginDialog').showModal();return;}
-  reviewTags.configure(b.review_tags||[]);state.canConfigure=b.can_configure;$('libraryTab').hidden=!b.library_available;$("reviewImportLabel").hidden=!state.canConfigure;$('generationTab').hidden=!state.canConfigure;$('writingTab').hidden=!state.canConfigure;state.reviewer=b.reviewer;if(!b.reviewer){state.reviewerId='';localStorage.removeItem('gbr-reviewer-id');await showReviewerDialog(b.reviewers);return;}$('reviewerBar').hidden=false;$('reviewerName').textContent=b.reviewer.display_name;clearInterval(heartbeatTimer);heartbeatTimer=setInterval(()=>heartbeat().catch(()=>{}),b.heartbeat_seconds*1000);state.durations=b.durations;if(b.queue){state.queue={song:'',genre:'',directory:'',order:b.queue.order_by,direction:b.queue.direction,...JSON.parse(b.queue.filters_json)};}
+  const b=await api('/bootstrap?include_directories=false');if(!b.authenticated){if(!$('loginDialog').open)$('loginDialog').showModal();return;}
+  reviewTags.configure(b.review_tags||[]);
+  state.canConfigure=b.can_configure;
+  $('workspaceMenu').hidden=!state.canConfigure;
+  $('libraryTab').hidden=!b.library_available;
+  $('reviewImportLabel').hidden=!state.canConfigure;
+  for(const name of Object.keys(stages)) $(name+'Tab').hidden=name!=='listen'&&!state.canConfigure;
+  state.reviewer=b.reviewer;
+  if(!b.reviewer){state.reviewerId='';localStorage.removeItem('gbr-reviewer-id');await showReviewerDialog(b.reviewers);return;}
+  $('reviewerBar').hidden=false;
+  $('reviewerName').textContent=b.reviewer.display_name;
+  clearInterval(heartbeatTimer);
+  heartbeatTimer=setInterval(()=>heartbeat().catch(()=>{}),b.heartbeat_seconds*1000);
+  state.durations=b.durations;
+  if(b.queue){state.queue={song:'',genre:'',directory:'',order:b.queue.order_by,direction:b.queue.direction,...JSON.parse(b.queue.filters_json)};}
   $('nowPlaying').hidden=false;
-  if (reviewerChanging) await nextTrack();
-  else await changeReview(() => nextTrack());
+  const [view,source] = workspaceRoute();
+  await navigate(view,source,{replace:true});
   if('serviceWorker' in navigator&&isSecureContext)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 }
 function newSubmissionId(){return globalThis.crypto?.randomUUID?.()||Array.from(globalThis.crypto.getRandomValues(new Uint32Array(4)),value=>value.toString(16)).join('-');}

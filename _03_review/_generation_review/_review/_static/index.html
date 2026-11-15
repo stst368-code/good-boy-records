@@ -4,17 +4,27 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#11161b"><meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/static/manifest.webmanifest"><link rel="icon" href="/static/icon.svg" type="image/svg+xml">
-  <title>GBR</title><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/tools/yaml-editor/editor.css"><link rel="stylesheet" href="/tools/generation/generation.css">
-  <link rel="stylesheet" href="/tools/preparation/preparation.css">
-<link rel="stylesheet" href="/tools/writing/writing.css">
+  <title>GBR Studio</title><link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/listening.css">
+  <link id="workspaceStyles" rel="stylesheet" href="/static/workspace.css">
 </head>
 <body>
-<header class="topbar"><a class="wordmark" href="#listenView" aria-label="Good Boy Records Listen"><span class="logo">GBR</span><span>GOOD BOY RECORDS<small>STUDIO</small></span></a>
-  <nav aria-label="Main"><button id="listenTab" class="tab active" aria-current="page">Listen</button><button id="writingTab" class="tab">Writing</button><button id="yamlTab" class="tab">YAML editor</button><button id="generationTab" class="tab">Generation</button><button id="preparationTab" class="tab">Preparation</button><button id="publishingTab" class="tab">Publish</button></nav>
-  <button id="settingsButton" class="icon-button" aria-label="Settings" title="Settings">⚙</button>
+<header class="topbar" id="workspaceHeader">
+  <a class="wordmark" href="#listen/review" aria-label="Good Boy Records Listen"><span class="logo">GBR</span><span>Good Boy Records<small>Studio</small></span></a>
+  <span id="workspaceTitle">Listen</span>
+  <button id="workspaceMenu" type="button" class="quiet-button" aria-controls="workspaceNav" aria-expanded="false">Stages</button>
+  <nav id="workspaceNav" aria-label="Studio stages">
+    <button id="listenTab" class="tab active" aria-current="page">Listen</button>
+    <button id="writingTab" class="tab" hidden>Writing</button>
+    <button id="yamlTab" class="tab" hidden>YAML editor</button>
+    <button id="generationTab" class="tab" hidden>Generation</button>
+    <button id="preparationTab" class="tab" hidden>Preparation</button>
+    <button id="publishingTab" class="tab" hidden>Publish</button>
+  </nav>
+  <button id="settingsButton" class="quiet-button" type="button" aria-label="Settings" title="Settings"><span aria-hidden="true">⚙</span> <span class="settings-label">Settings</span></button>
 </header>
-<main>
+<main id="workspaceMain">
+  <p id="workspaceLoading" role="status" hidden></p>
   <section id="preparationView" hidden aria-label="Preparation"></section>
   <section id="publishingView" hidden aria-label="Publishing"></section>
   <section id="listenView" aria-label="Listen">
@@ -25,7 +35,7 @@
         <button id="libraryTab" type="button" aria-controls="libraryView" hidden>Library</button>
       </nav>
       <button id="jumpQueue" class="quiet-button" type="button" aria-controls="queueView" aria-expanded="false">Queue</button>
-      <div id="reviewerBar" class="reviewer-bar" hidden><span>Reviewing as <strong id="reviewerName"></strong></span><button id="changeUser" class="quiet-button">Change user</button></div>
+      <div id="reviewerBar" class="reviewer-bar" hidden><button id="changeUser" class="quiet-button" title="Change reviewer" aria-label="Change reviewer"><strong id="reviewerName"></strong><span aria-hidden="true">⌄</span></button></div>
     </header>
     <div class="listen-content" data-source="review">
   <aside id="queueView" class="listen-queue" aria-labelledby="reviewQueueHeading">

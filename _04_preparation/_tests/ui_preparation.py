@@ -47,6 +47,7 @@ def main():
                     page.on('response',lambda response:failures.append((response.status,response.url)) if response.status>=500 else None)
                     page.goto(f'http://127.0.0.1:{port}')
                     page.wait_for_selector('#reviewerDialog[open]');page.locator('#knownReviewers button',has_text='Simon').click()
+                    if width<1080:page.locator('#workspaceMenu').click()
                     page.locator('#preparationTab').click()
                     page.wait_for_selector('#prepWorkspace:not([hidden])')
                     assert 'Browser song' in page.locator('#prepProject').inner_text()
@@ -70,7 +71,9 @@ def main():
                     page.wait_for_function("()=>document.getElementById('prepPrompt').value.includes('Ink engraving')")
                     assert 'test the room' in page.locator('#prepPrompt').input_value()
                     assert 'Sample peak' in page.locator('#prepHistory').inner_text()
-                    page.reload();page.wait_for_selector('#preparationTab');page.locator('#preparationTab').click()
+                    page.reload()
+                    if width<1080:page.locator('#workspaceMenu').click()
+                    page.locator('#preparationTab').click()
                     page.wait_for_function("()=>document.getElementById('prepPrompt').value.includes('Ink engraving')")
                     assert page.locator('#prepDirection').input_value()=='Ink engraving, emerald and copper'
                     page.locator('[data-mix=gain_db]').fill('-6')
@@ -161,6 +164,7 @@ def main():
                     page.wait_for_function("()=>!document.getElementById('prepProcessed').getAttribute('src')")
                     assert page.locator('#prepHistory a',has_text='master_candidate').count()
                     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+2')
+                    if width<1080:page.locator('#workspaceMenu').click()
                     page.locator('#listenTab').click()
                     assert page.locator('#preparationView').is_hidden()
                     assert next(prep.source(gid)[1].parent.glob('*.yaml')).read_bytes()==raw

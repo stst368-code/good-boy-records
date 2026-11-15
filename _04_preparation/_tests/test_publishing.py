@@ -349,6 +349,52 @@ def test_same_song_variant_and_genre_have_distinct_recording_folders(publication
     assert not review.db.all('PRAGMA foreign_key_check')
 
 
+def test_publication_deduplicates_source_audio_across_generation_ids(publication):
+    review, prep, publisher, store, gid, source, yaml = publication
+    duplicate = review.config.inputs[0] / 'same-audio-new-metadata.flac'
+    shutil.copyfile(source, duplicate)
+    duplicate.with_suffix('.yaml').write_bytes(yaml.replace(b'variant_id: 2', b'variant_id: 3'))
+    audio_id = review.indexer.index(duplicate)
+    sibling = review.db.one('SELECT id,audio_id FROM generations WHERE id<>?', (gid,))
+    assert audio_id == sibling['audio_id'] == review.db.one('SELECT audio_id FROM generations WHERE id=?', (gid,))['audio_id']
+    review.publishing(sibling['id'], 'selected')
+    for operation in review.db.all("SELECT * FROM archive_operations WHERE status='pending'"):
+        review.archiver.process(operation)
+    first, original = prepare(publication)
+    second = publisher.finish_preparation(sibling['id'], {'include_flac': True})['id']
+    alternate = wait(review.db, second)
+    assert alternate['status'] == 'done', alternate['error']
+    assert json.loads(alternate['recipe_json'])['track']['id'] != original['track']['id']
+    pending = publisher.projects()['projects']
+    assert {p['prepared_id'] for p in pending} == {first, second}
+    assert {p['audio_id'] for p in pending} == {audio_id}
+    assert len(review.db.all('SELECT id FROM generations')) == 2
+
+    alignment = review.db.one("SELECT id FROM processing_tasks WHERE generation_id=? AND kind='lyric_alignment'", (gid,))
+    review.db.execute("UPDATE processing_tasks SET status='running' WHERE id=?", (alignment['id'],))
+    store.unknown = True
+    job = publisher.start_publish(first)['id']
+    try:
+        with pytest.raises(ValueError, match='Another preparation of this recording is publishing'):
+            publisher.start_publish(second)
+    finally:
+        review.db.execute("UPDATE processing_tasks SET status='done' WHERE id=?", (alignment['id'],))
+    assert wait(review.db, job)['status'] == 'failed'
+    assert len(json.loads(store.objects[POINTER])['tracks']) == 1
+    assert review.db.one("SELECT status FROM publishing_selection WHERE generation_id=?", (gid,))['status'] == 'selected'
+
+    changed_alias = wait(review.db, publisher.start_publish(second, 'hidden')['id'])
+    assert changed_alias['status'] == 'failed'
+    assert 'already has a release' in changed_alias['error']
+    assert wait(review.db, publisher.start_publish(first)['id'])['status'] == 'done'
+    with pytest.raises(ValueError, match='already has a release'):
+        publisher.start_publish(second)
+    assert publisher.projects()['projects'] == []
+    assert publisher.projects()['already_published'] == 1
+    assert len(publisher.library.projects()['items']) == 1
+    assert review.db.one("SELECT status FROM processing_tasks WHERE id=?", (second,))['status'] == 'done'
+
+
 def test_interrupted_local_commit_resumes_verified_copies(publication,monkeypatch):
     import _gbr_preparation.showcase as module
     review,prep,publisher,store,gid,source,_=publication

@@ -25,6 +25,7 @@ PUBLIC_BASE = 'https://pub-a5c11159f6144ae885f7795a5bf7086a.r2.dev'
 DEFAULTS = {'endpoint': '', 'bucket': '', 'public_base': PUBLIC_BASE,
             'website_url': 'https://stst368-code.github.io/good-boy-records/',
             'profile': '', 'rclone_remote':'', 'access_key_env': 'GBR_R2_ACCESS_KEY_ID', 'secret_key_env': 'GBR_R2_SECRET_ACCESS_KEY'}
+DUPLICATE_RELEASE = 'This recording already has a release under another generation. Open it in Library or retry its publication.'
 
 
 def encoded(value):return (canonical(value)+'\n').encode('utf-8')
@@ -52,7 +53,11 @@ def public_flac(source, destination):
 def error_text(exc):
     # SDK exceptions can include endpoint/request details; never return credentials.
     if hasattr(exc, 'response'):
-        return 'R2 request failed: '+str(exc.response.get('Error', {}).get('Code', 'unknown'))
+        operation = getattr(exc, 'operation_name', 'request')
+        code = str(exc.response.get('Error', {}).get('Code', 'unknown'))
+        if code in {'AccessDenied','403'}:
+            return f'R2 {operation} denied access to the configured bucket. Check its Object Read & Write credentials in Publishing settings.'
+        return f'R2 {operation} failed ({code})'
     return str(exc)[:1500]
 
 
@@ -152,7 +157,7 @@ class Publisher:
         # reconcile the remote pointer before changing local release state.
         if preparation.enabled:
             self.db.execute("UPDATE processing_tasks SET status='interrupted',error='Application restarted; retry explicitly to reconcile publication' WHERE kind IN ('release_prepare','release_publish') AND status IN ('queued','running')")
-            self.db.execute("UPDATE processing_tasks SET status='interrupted',error='Application restarted; retry the legacy migration explicitly' WHERE kind='showcase_move' AND json_extract(recipe_json,'$.legacy_root') IS NOT NULL AND status IN ('queued','running')")
+            self.db.execute("UPDATE processing_tasks SET status='interrupted',error='Application restarted. Retry the move through Publish or Library.' WHERE kind='showcase_move' AND status IN ('queued','running')")
             self.wait_thread=threading.Thread(target=self._resume_waiting,name='gbr-publication-wait',daemon=True)
             self.wait_thread.start()
 
@@ -231,6 +236,8 @@ class Publisher:
 
     def check(self):
         store=self.store();s=self.settings()
+        for room in self.library.room_ids():
+            store.read(destination(room)[0])
         # A tiny public probe checks real write/read, URL mapping and browser CORS.
         raw=b'GBR public release connection check\n';sha=hashlib.sha256(raw).hexdigest()
         item={'key':'gbr/v2/check/'+sha+'.txt','sha256':sha,'size':len(raw),'content_type':'text/plain'}
@@ -268,18 +275,53 @@ class Publisher:
         return row
 
     def projects(self):
-        rows=[p for p in self.prep.projects(include_completed=True).get('projects',[]) if p['ready'] and p['status'] in {'selected','published'}]
+        if not self.prep.enabled:
+            return {'projects': [], 'releases': [], 'already_published': 0}
+        rows = self.db.all("""SELECT g.id AS generation_id,g.audio_id,a.archive_path,p.status,
+                prepared.id AS prepared_id,prepared.recipe_json
+            FROM publishing_selection p JOIN generations g ON g.id=p.generation_id
+            JOIN audio a ON a.id=g.audio_id
+            JOIN processing_tasks prepared ON prepared.id=(
+                SELECT id FROM processing_tasks
+                WHERE generation_id=g.id AND kind='release_prepare' AND status='done' ORDER BY rowid DESC LIMIT 1)
+            WHERE p.status='selected' AND a.archive_path IS NOT NULL
+            AND (EXISTS(SELECT 1 FROM reviews r WHERE r.audio_id=g.audio_id)
+                OR EXISTS(SELECT 1 FROM processing_tasks t WHERE t.generation_id=g.id AND t.kind='library_import' AND t.status='done'))
+            ORDER BY p.selected_at,g.id""")
+        published = {row['audio_id'] for row in self.db.all("""SELECT g.audio_id FROM generations g
+            JOIN publishing_selection p ON p.generation_id=g.id WHERE p.status='published'""")}
+        roots = (self.prep.tracks.resolve(), self.prep.showcase.resolve())
+        queue, already_published = [], set()
         for row in rows:
-            row['artworks']=self.db.all("SELECT id,kind FROM generation_artifacts WHERE kind IN ('album_artwork','cover_artwork') AND json_extract(metadata_json,'$.source_generation_id')=?",(row['generation_id'],))
-        queue=[]
-        for row in rows:
-            if row['status']=='published':continue
-            prepared=self.db.one("SELECT id,recipe_json FROM processing_tasks WHERE generation_id=? AND kind='release_prepare' AND status='done' ORDER BY rowid DESC LIMIT 1",(row['generation_id'],))
-            if prepared:
-                recipe=json.loads(prepared['recipe_json']);queue.append({**row,'prepared_id':prepared['id'],'track':recipe['track'],'files':recipe['files'],'options':recipe['options'],
-                    'can_return':not self.retained_preview(prepared['id'],row['generation_id'],recipe),
-                    'publication':self.publication_state(row['generation_id'])})
-        return {'projects':queue,'releases':[r for r in self.releases() if not self.db.one("SELECT 1 FROM publishing_selection WHERE generation_id=? AND status='published'",(r['generation_id'],))]}
+            if row['audio_id'] in published:
+                already_published.add(row['audio_id'])
+                continue
+            source = Path(row.pop('archive_path')).resolve()
+            if not any(source.is_relative_to(root) for root in roots) or not source.is_file():
+                continue
+            pid, gid = row['prepared_id'], row['generation_id']
+            recipe = json.loads(row.pop('recipe_json'))
+            queue.append({**row, 'track': recipe['track'], 'files': recipe['files'], 'options': recipe['options'],
+                          'can_return': not self.retained_preview(pid, gid, recipe),
+                          'publication': self.publication_state(gid),
+                          'archive': self.review.archiver.unresolved(row['audio_id'])})
+        releases = [row for row in self.releases() if row['audio_id'] not in published]
+        return {'projects': queue, 'releases': releases, 'already_published': len(already_published)}
+
+    def retry_archive(self, prepared_id):
+        self.prep.require()
+        row = self.db.one("""SELECT g.audio_id FROM processing_tasks t JOIN generations g ON t.generation_id=g.id
+            WHERE t.id=? AND t.kind='release_prepare' AND t.status='done'""", (prepared_id,))
+        if not row:
+            raise KeyError('Prepared recording unavailable')
+        self.review.archiver.retry(audio_id=row['audio_id'])
+        return {'scheduled': True}
+
+    @staticmethod
+    def published_alias(connection, gid):
+        return connection.execute("""SELECT 1 FROM generations g JOIN publishing_selection p ON p.generation_id=g.id
+            WHERE g.audio_id=(SELECT audio_id FROM generations WHERE id=?) AND g.id<>? AND p.status='published' LIMIT 1""",
+                                  (gid, gid)).fetchone()
 
     def publication_state(self,gid):
         # Query each pending recording directly: the global recent-job limit must
@@ -329,7 +371,9 @@ class Publisher:
 
     def releases(self):
         if not self.prep.enabled:return []
-        rows=self.db.all("SELECT id,generation_id,kind,status,error,recipe_json,telemetry_json,created_at FROM processing_tasks WHERE kind IN ('release_prepare','release_publish','showcase_move') ORDER BY rowid DESC LIMIT 100")
+        rows=self.db.all("""SELECT t.id,t.generation_id,g.audio_id,t.kind,t.status,t.error,t.recipe_json,t.telemetry_json,t.created_at
+            FROM processing_tasks t JOIN generations g ON g.id=t.generation_id
+            WHERE t.kind IN ('release_prepare','release_publish','showcase_move') ORDER BY t.rowid DESC LIMIT 100""")
         for row in rows:
             recipe=json.loads(row.pop('recipe_json'));row['progress']=json.loads(row.pop('telemetry_json'))
             row['title']=recipe.get('track',{}).get('displayTitle') or (recipe.get('legacy_track') or {}).get('displayTitle') or recipe.get('title','Release')
@@ -547,7 +591,9 @@ class Publisher:
         self.prep.require()
         task=self.db.one("SELECT * FROM processing_tasks WHERE id=? AND kind='release_prepare' AND status='done'",(identifier,))
         if not task:raise ValueError('Prepare and review a release first')
-        self.eligible(task['generation_id']);recipe=json.loads(task['recipe_json'])
+        gid = task['generation_id']
+        selection = self.eligible(gid)
+        recipe=json.loads(task['recipe_json'])
         visibility=visibility or recipe.get('options',{}).get('visibility','public')
         destination(visibility)
         self.library.room(visibility)
@@ -559,10 +605,20 @@ class Publisher:
                 raise ValueError('Historical preview files are unavailable; prepare a fresh release to create its local MP3')
         publish_id=uuid.uuid4().hex
         with self.db.transaction() as c:
-            active=c.execute("SELECT id FROM processing_tasks WHERE kind='release_publish' AND generation_id=? AND status IN ('queued','running')",(task['generation_id'],)).fetchone()
-            if active:return {'id':active[0]}
+            status = c.execute('SELECT status FROM publishing_selection WHERE generation_id=?', (gid,)).fetchone()
+            if not status or status[0] not in {'selected', 'published'}:
+                raise ValueError('Distribution selection changed')
+            if status[0] != 'published' and self.published_alias(c, gid):
+                raise ValueError(DUPLICATE_RELEASE)
+            active = c.execute("""SELECT t.id,t.generation_id FROM processing_tasks t
+                JOIN generations g ON g.id=t.generation_id WHERE g.audio_id=?
+                AND t.kind='release_publish' AND t.status IN ('queued','running') LIMIT 1""", (selection['audio_id'],)).fetchone()
+            if active:
+                if active['generation_id'] != gid:
+                    raise ValueError('Another preparation of this recording is publishing')
+                return {'id': active['id']}
             c.execute("INSERT INTO processing_tasks(id,generation_id,kind,status,fingerprint,recipe_json,input_sha256,created_at,telemetry_json) VALUES(?,?,'release_publish','queued',?,?,?,?,?)",
-                      (publish_id,task['generation_id'],'publish:'+identifier,canonical({'prepared_id':identifier,'title':recipe['track']['displayTitle'],'visibility':visibility}),task['input_sha256'],now(),canonical({'phase':'queued','message':'Queued for publication'})))
+                      (publish_id,gid,'publish:'+identifier,canonical({'prepared_id':identifier,'title':recipe['track']['displayTitle'],'visibility':visibility}),task['input_sha256'],now(),canonical({'phase':'queued','message':'Queued for publication'})))
         self.pool.submit(self._publish,publish_id);return {'id':publish_id}
 
     def validate_preview(self,gid,recipe):
@@ -579,7 +635,8 @@ class Publisher:
         try:
             task=self.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,));request=json.loads(task['recipe_json']);pid=request['prepared_id']
             prepared=self.db.one('SELECT * FROM processing_tasks WHERE id=?',(pid,));recipe=json.loads(prepared['recipe_json']);gid=task['generation_id']
-            self.eligible(gid);settings=self.settings()
+            selection = self.eligible(gid)
+            settings=self.settings()
             if recipe['destination']!={k:settings[k] for k in recipe['destination']}:raise ValueError('Publishing destination changed; prepare a new preview')
             # Processing uses temporary paths inside this bundle. Let active
             # alignment/renders finish before its verified move, then use the
@@ -610,7 +667,17 @@ class Publisher:
             pointer,_=destination(visibility)
             recipe['options']['visibility']=visibility;recipe['track']['visibility']=visibility
             self.db.execute('UPDATE processing_tasks SET recipe_json=? WHERE id=?',(canonical(recipe),pid))
+            self.progress(identifier, phase='reading_catalogue', message=f'Reading the {visibility} release catalogue')
             store=self.store();catalogue,etag=read_catalogue(store,visibility)
+            # A pointer write can succeed before its local receipt is saved.
+            # Recognize that release across rooms before uploading an alias.
+            alias_previews = set()
+            if selection['status'] != 'published':
+                alias_previews = {row['id'] for row in self.db.all("""SELECT t.id FROM processing_tasks t
+                    JOIN generations g ON g.id=t.generation_id
+                    WHERE g.audio_id=? AND g.id<>? AND t.kind='release_prepare'""", (selection['audio_id'], gid))}
+            if any(t.get('release_id') in alias_previews for t in catalogue['tracks']):
+                raise ValueError(DUPLICATE_RELEASE)
             present=next((t for t in catalogue['tracks'] if t.get('id')==recipe['track']['id']),None)
             # A new preview can replace its predecessor; an older receipt cannot
             # resurrect itself over a newer preview on either destination.
@@ -618,6 +685,8 @@ class Publisher:
             for room in self.library.room_ids():
                 if room==visibility:continue
                 other,_=read_catalogue(store,room)
+                if any(t.get('release_id') in alias_previews for t in other['tracks']):
+                    raise ValueError(DUPLICATE_RELEASE)
                 other_tracks.extend(t for t in other['tracks'] if t.get('id')==recipe['track']['id'])
             other_track=other_tracks[0] if other_tracks else None
             for current in (present,*other_tracks):
@@ -658,6 +727,8 @@ class Publisher:
         with self.db.transaction() as c:
             old=c.execute('SELECT status FROM publishing_selection WHERE generation_id=?',(gid,)).fetchone()
             if not old or old[0] not in {'selected','published'}:raise ValueError('Distribution selection changed; publication was not approved')
+            if old[0] != 'published' and self.published_alias(c, gid):
+                raise ValueError(DUPLICATE_RELEASE)
             if publish_pointer:publish_pointer()
             from .release_catalogue import share_token
             url=progress['url']

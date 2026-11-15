@@ -101,6 +101,36 @@ def test_yamls_changed_after_package_creation_require_rebuilding_before_move(pub
     assert prep.projects()['projects'][0]['generation_id']==gid
 
 
+def test_publish_recovers_existing_yaml_snapshot_and_retries_archive_without_reverting_edits(publication):
+    review, prep, publisher, store, gid, source, original = publication
+    current = source.with_suffix('.yaml')
+    edited = original.replace(b'variant_id: 2', b'variant_id: 1')
+    current.write_bytes(edited)
+    pid, recipe = prepare(publication)
+    revision = prep.metadata.read(gid)['revision_id']
+    artifact = review.db.one('SELECT uri FROM generation_artifacts WHERE id=?', (revision+'-yaml',))
+    snapshot = Path(artifact['uri'])
+    snapshot.unlink()
+    review.db.execute("UPDATE processing_tasks SET recipe_json=json_remove(recipe_json,'$.yaml_bytes_b64') WHERE id=?", (revision,))
+    assert prep.metadata.read(gid)['_raw_bytes'] == edited
+    assert snapshot.read_bytes() == edited
+
+    past = review.db.one('SELECT id FROM latest_reviews WHERE generation_id=?', (gid,))
+    review.review(gid, dict(audio_quality=5,composition=4,consistency=4,realism=4), 'full',
+                  expected_review_id=past['id'], reassessment=True, distribution=True)
+    review.db.execute("UPDATE archive_operations SET status='failed',error='Previous retry failed' WHERE status='pending'")
+    assert publisher.projects()['projects'][0]['archive']['status'] == 'failed'
+    assert publisher.retry_archive(pid)['scheduled']
+    [pending] = review.db.all("SELECT * FROM archive_operations WHERE status='pending'")
+    review.archiver.process(pending)
+    assert not review.archiver.unresolved(pending['audio_id'])
+    assert prep.metadata.read(gid)['path'] == str(current)
+    assert current.read_bytes() == edited
+    task = wait(review.db, publisher.start_publish(pid)['id'])
+    assert task['status'] == 'done', task['error']
+    assert json.loads(store.objects[POINTER])['tracks'][0]['variant_id'] == recipe['track']['variant_id'] == 1
+    assert review.db.one('SELECT raw_yaml_bytes FROM generation_metadata WHERE generation_id=?', (gid,))['raw_yaml_bytes'] == original
+
 def test_edited_metadata_revisions_survive_publishing_and_later_library_changes(publication):
     review,prep,publisher,_,gid,source,_=publication;legacy(publication)
     current=prep.metadata.catalogue(gid);prep.metadata.set_identity(gid,13,1,current['sha256'])

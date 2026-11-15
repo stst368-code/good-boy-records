@@ -45,10 +45,8 @@ def router(root,review,local):
     routes=APIRouter(prefix='/api/preparation',dependencies=[Depends(host)])
 
     @routes.get('/projects')
-    def projects(published:bool=False):
-        result=service.projects(include_completed=published)
-        if published:result['projects']=[p for p in result['projects'] if p['status']=='published']
-        return result
+    def projects(published:bool=False, focused:str|None=None, flagged_only:bool=True):
+        return service.projects(include_completed=published, focused=focused, published_only=published, flagged_only=flagged_only)
 
     @routes.post('/sync')
     def sync():
@@ -59,7 +57,7 @@ def router(root,review,local):
     def references():return {'references':service.reference_list()}
 
     @routes.get('/processing')
-    def processing():return service.processing.status()
+    def processing(flagged_only:bool=False):return service.processing.status(flagged_only=flagged_only)
 
     @routes.post('/processing/resume')
     def resume_processing():return service.processing.resume()

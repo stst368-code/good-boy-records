@@ -1,10 +1,12 @@
 """Preparation metadata revisions, separate from immutable generation provenance."""
+from base64 import b64decode, b64encode
 import csv
 from datetime import date,datetime
 import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import uuid
 import sys
 
@@ -50,6 +52,62 @@ class PreparationMetadata:
         if path.is_symlink() or not path.resolve().is_relative_to(bundle.resolve()):raise ValueError('Recording YAML must stay inside its managed bundle')
         return path
 
+    @staticmethod
+    def snapshot(path, checksum, raw):
+        bundle = path.parent.parent if path.parent.name == '_source' else path.parent
+        destination = bundle / '_derived'
+        if destination.is_symlink() or not destination.resolve().is_relative_to(bundle.resolve()):
+            raise ValueError('Preparation YAML snapshots must stay inside the recording bundle')
+        destination.mkdir(parents=True, exist_ok=True)
+        target = destination / f'preparation-{checksum}.yaml'
+        if target.is_symlink() or (target.exists() and (not target.is_file() or digest(target) != checksum)):
+            target = destination / f'preparation-{checksum}-recovered-{uuid.uuid4().hex[:8]}.yaml'
+        if not target.exists():
+            from _review.archive import verified_copy
+            temporary = destination / f'.gbr-yaml-{uuid.uuid4().hex}.part'
+            try:
+                with temporary.open('xb') as stream:
+                    stream.write(raw)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                verified_copy(temporary, target, checksum, uuid.uuid4().hex)
+            finally:
+                temporary.unlink(missing_ok=True)
+        return target
+
+    def revision_bytes(self, gid, identifier, revision, path, current):
+        checksum = revision.get('sha256')
+        if not isinstance(checksum, str) or not re.fullmatch(r'[a-f0-9]{64}', checksum):
+            raise ValueError('Saved Preparation YAML revision has an invalid checksum')
+        artifact_id = identifier + '-yaml'
+        artifact = self.db.one('SELECT uri,sha256 FROM generation_artifacts WHERE id=?', (artifact_id,))
+        if artifact and artifact['sha256'] != checksum:
+            raise ValueError('Saved Preparation YAML revision has conflicting checksums')
+        if artifact:
+            saved = Path(artifact['uri'])
+            roots = (self.prep.tracks.resolve(), self.prep.showcase.resolve())
+            if not saved.is_symlink() and any(saved.resolve().is_relative_to(root) for root in roots) and saved.is_file():
+                raw = saved.read_bytes()
+                if hashlib.sha256(raw).hexdigest() == checksum:
+                    return raw
+        try:
+            stored = b64decode(revision.get('yaml_bytes_b64') or '', validate=True)
+        except (ValueError, TypeError):
+            stored = None
+        if current is None and path and path.is_file():
+            current = path.read_bytes()
+        raw = next((value for value in (stored, current)
+                    if value is not None and hashlib.sha256(value).hexdigest() == checksum), None)
+        if raw is None:
+            raise ValueError('Saved Preparation YAML snapshot is missing or changed. Restore the matching YAML copy and retry.')
+        if path:
+            snapshot = self.snapshot(path, checksum, raw)
+            self.db.execute("""INSERT INTO generation_artifacts VALUES(?,NULL,?,?,?,?,NULL,?)
+                ON CONFLICT(id) DO UPDATE SET uri=excluded.uri,size_bytes=excluded.size_bytes""",
+                            (artifact_id, 'preparation_yaml', checksum, str(snapshot), len(raw),
+                             canonical({'processing_task_id':identifier,'source_generation_id':gid})))
+        return raw
+
     def read(self,gid):
         """Refresh editable Preparation copies; published bundles use saved revisions."""
         self.prep.require()
@@ -62,16 +120,17 @@ class PreparationMetadata:
             if original and row['yaml_sha256'] and hashlib.sha256(original).hexdigest()!=row['yaml_sha256']:
                 raise ValueError('Original generation YAML checksum is inconsistent; restore its database backup before publishing')
             raw=original;metadata=json.loads(row['parsed_json']);checksum=row['yaml_sha256'];identifier=None
-            if revision:
-                metadata=revision['metadata'];checksum=revision['sha256'];identifier=previous['id']
-                artifact=self.db.one('SELECT uri,sha256 FROM generation_artifacts WHERE id=?',(identifier+'-yaml',))
-                if not artifact or not Path(artifact['uri']).is_file() or digest(artifact['uri'])!=artifact['sha256']:raise ValueError('Saved Preparation YAML revision is unavailable or changed')
-                raw=Path(artifact['uri']).read_bytes()
             # Only the editable stage may change the effective recording data.
             editable=path and path.resolve().is_relative_to(self.prep.tracks.resolve())
+            current, current_sha = None, None
             if editable:
                 if not path.is_file():raise ValueError('Preparation YAML is missing: '+str(path))
                 current=path.read_bytes();current_sha=hashlib.sha256(current).hexdigest()
+            if revision:
+                metadata=revision['metadata'];checksum=revision['sha256'];identifier=previous['id']
+                if not editable or current_sha == checksum:
+                    raw = self.revision_bytes(gid, identifier, revision, path, current)
+            if editable:
                 if current_sha!=checksum:
                     try:
                         # Source rejects duplicate/ambiguous keys, aliases and
@@ -88,13 +147,9 @@ class PreparationMetadata:
                     except (ValueError,UnicodeError,yaml.YAMLError,TypeError,RecursionError) as exc:
                         raise ValueError('Preparation YAML is invalid; saved metadata was retained: '+str(exc)) from exc
                     identifier=uuid.uuid4().hex
-                    destination=path.parent.parent/'_derived' if path.parent.name=='_source' else path.parent/'_derived'
-                    destination.mkdir(parents=True,exist_ok=True)
-                    snapshot=destination/('preparation-'+current_sha+'.yaml')
-                    if snapshot.exists() and digest(snapshot)!=current_sha:raise ValueError('Preparation YAML snapshot changed; retained the current file')
-                    if not snapshot.exists():
-                        with snapshot.open('xb') as stream:stream.write(current);stream.flush();os.fsync(stream.fileno())
-                    body={'parent_id':previous['id'] if previous else None,'source_path':str(path),'sha256':current_sha,'metadata':parsed}
+                    snapshot=self.snapshot(path,current_sha,current)
+                    body={'parent_id':previous['id'] if previous else None,'source_path':str(path),'sha256':current_sha,
+                          'metadata':parsed,'yaml_bytes_b64':b64encode(current).decode('ascii')}
                     with self.db.transaction() as c:
                         c.execute("INSERT INTO processing_tasks(id,generation_id,kind,status,fingerprint,recipe_json,input_sha256,created_at,completed_at) VALUES(?,?,'preparation_yaml','done',?,?,?,?,?)",(identifier,gid,identifier,canonical(body),row['yaml_sha256'] or current_sha,now(),now()))
                         c.execute('INSERT INTO generation_artifacts VALUES(?,NULL,?,?,?,?,NULL,?)',(identifier+'-yaml','preparation_yaml',current_sha,str(snapshot),len(current),canonical({'processing_task_id':identifier,'source_generation_id':gid})))

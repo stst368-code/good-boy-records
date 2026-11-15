@@ -49,6 +49,16 @@ def test_finish_preparation_is_offline_and_only_publish_places_it_in_library(pub
         assert client.get('/api/releases/library').json()['items'][0]['playback_url'] is None
 
 
+def test_preparation_filter_applies_to_projects_and_processing_jobs(publication):
+    review, prep, publisher, _, gid, _, _ = publication
+    assert [project['generation_id'] for project in prep.projects()['projects']] == [gid]
+    assert any(job['generation_id'] == gid for job in prep.processing.status(flagged_only=True)['items'])
+    review.publishing(gid, 'not_selected')
+    assert prep.projects()['projects'] == []
+    assert prep.processing.status(flagged_only=True)['items'] == []
+    assert [project['generation_id'] for project in prep.projects(flagged_only=False)['projects']] == [gid]
+    assert any(job['generation_id'] == gid for job in prep.processing.status()['items'])
+
 def test_metadata_revision_reuses_audio_and_preserves_source_reviews_and_identity(publication):
     review,prep,publisher,store,gid,_,yaml=publication
     pid,original=published(publication)
