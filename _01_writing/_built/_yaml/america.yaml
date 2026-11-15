@@ -1,0 +1,78 @@
+song_id: 101
+variant_id: 1
+title: america
+cluster:
+version:
+explicit:
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |-
+  [intro]
+  puerto rico
+  my heart's devotion
+  let it sink back in the ocean
+  always the hurricanes blowing
+  always the population growing
+  and the money owing
+  and the sunlight streaming
+  and the natives steaming
+  i like the island manhattan
+  smoke on your pipe
+  and put that in!
+  [chorus]
+  i like to be in america
+  okay by me in america
+  everything free in america
+  (for a small fee in america)
+  [post-chorus]
+  buying on credit is so nice
+  (one look at us and they charge twice)
+  i have my own washing machine
+  (what will you have though to keep clean?)
+  [verse]
+  skyscrapers bloom in america
+  (cadillacs zoom in america)
+  industry boom in america
+  (twelve in a room in america)
+  lots of new housing with more space
+  (lots of doors slamming in our face)
+  i'll get a terrace apartment
+  (better get rid of your accent)
+  [chorus]
+  life can be bright in america
+  (if you can fight in america)
+  life is all right in america
+  (if you're all white in america)
+  [instrumental]
+  [verse]
+  here you are free and you have pride
+  (long as you stay on your own side)
+  free to be anything you choose
+  (free to wait tables and shine shoes)
+  [bridge]
+  everywhere grime in america
+  organized crime in america
+  terrible time in america
+  [pre-chorus]
+  you forget i'm in america
+  [instrumental]
+  [verse]
+  i think i go back to san juan
+  (i know a boat you can get on)
+  bye bye!
+  (everyone there will give big cheer!)
+  yeah!
+  (everyone there will have moved here)
+  [outro]

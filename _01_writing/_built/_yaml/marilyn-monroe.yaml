@@ -1,0 +1,74 @@
+song_id: 100
+variant_id: 1
+title: marilyn-monroe
+cluster:
+version:
+explicit:
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |-
+  [intro]
+  once, i 'ad an 'usband
+  you know the sorta chap
+  i met 'im at a dance
+  and how he came on with the chat
+  (are ya dancin'? i think you're a bleedin' cracker!)
+  [verse]
+  he said me eyes were deep blue pools
+  me skin as soft as snow
+  (lovely!)
+  [verse]
+  he told me i was sexier than marilyn monroe
+  and we went dancin'
+  we went dancin'
+  then, of course, i found that i was six weeks overdue
+  (yer what?!)
+  [verse]
+  we got married at the registry
+  and then we had a do
+  we all 'ad curly salmon sandwiches
+  and 'ow the ale did flow
+  (cheers!)
+  the bride they said was lovelier than marilyn monroe
+  (and we went dancin')
+  (we went dancin')
+  [verse]
+  then the baby came along
+  we called him
+  (darren wayne)
+  (aww!)
+  then three months on i found that i was in the club again
+  (i've married a bleedin' rabbit!)
+  and though i still fancied dancin'
+  me husband wouldn't go
+  [verse]
+  (get lost, will ya?)
+  with a wife he said
+  was twice the size of marilyn monroe
+  no more dancin'
+  no more dancin'
+  by the time that i was twenty-five
+  i looked like forty-two
+  with seven hungry mouths to feed
+  and one more nearly due
+  me husband, he walked out on me
+  a month or two ago
+  [verse]
+  (ta-ra!)
+  for a girl they say looks a bit like marilyn monroe
+  and they go dancin'
+  they go dancin'
+  yes. they go dancin'
+  they go dancin'
