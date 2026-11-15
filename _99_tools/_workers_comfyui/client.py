@@ -8,6 +8,7 @@ from urllib.error import HTTPError,URLError
 from urllib.parse import urlencode
 from urllib.request import Request,urlopen
 from workflow import discover,compile_workflow,canonical
+from live_progress import PromptProgress, comfy_timestamp
 
 ROOT=Path(__file__).parent
 HEADERS={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36',
@@ -105,6 +106,7 @@ class Client:
             raise RuntimeError('ComfyUI output cleanup is pending: install _99_tools/_workers_comfyui/gbr_bridge.py in ComfyUI/custom_nodes, restart ComfyUI, then retry Clean temporary files. The verified local result is already saved.')
         self.request('/gbr/ack',{'attempt_id':job['attempt_id'],'file':ref['file'],'sha256':ref['download_sha256']})
     def run(self,job,directory,resume=False):
+        from datetime import datetime,timezone
         from _gbr_worker.runpod import RemotePending
         from _gbr_worker.control import Cancelled,check_cancel
         cancelled=getattr(self,'cancelled',None);progress=getattr(self,'progress',lambda *a,**k:None)
@@ -112,8 +114,17 @@ class Client:
         def save(data):
             temporary=journal.with_suffix('.tmp');temporary.write_text(canonical(data),encoding='utf-8');temporary.replace(journal)
         def event(**data):
-            from datetime import datetime,timezone
             with (directory/'events.ndjson').open('a',encoding='utf-8') as f:f.write(canonical({'at':datetime.now(timezone.utc).isoformat(),**data})+'\n')
+        def execution_stamps(history):
+            return {kind:comfy_timestamp(payload.get('timestamp'))
+                    for kind,payload in (history or {}).get('status',{}).get('messages',[])
+                    if kind in ('execution_start','execution_success') and isinstance(payload,dict)}
+        def subscribe(reference):
+            self._prefix(45)
+            subscription = PromptProgress(self.address, self.prefix, reference['client_id'], reference['prompt'], HEADERS['User-Agent'])
+            subscription.open()
+            return subscription
+        live = None
         try:
             if journal.is_file():ref=json.loads(journal.read_text(encoding="utf-8"))
             else:
@@ -122,6 +133,7 @@ class Client:
                 ref={'state':'submitting','attempt_id':job['attempt_id'],'prompt':compiled['prompt'],'workflow_sha256':compiled['workflow_sha256'],'models':identity,'hardware':hardware,'versions':system,'client_id':uuid.uuid4().hex}
                 save(ref)
                 event(event='worker',hardware=hardware,versions=system);event(event='model_resolved',models=identity)
+                live = subscribe(ref)
                 submitted=self.request('/prompt',{'prompt':ref['prompt'],'client_id':ref['client_id'],'extra_data':{'gbr_attempt_id':job['attempt_id']}})
                 if submitted.get('node_errors') or not submitted.get('prompt_id'):raise ValueError('Comfy rejected workflow: '+canonical(submitted))
                 ref.update(state='queued',prompt_id=submitted['prompt_id']);save(ref)
@@ -138,10 +150,32 @@ class Client:
                     if len(prompt)>3 and prompt[3].get('gbr_attempt_id')==job['attempt_id']:candidates.append(identifier)
                 if len(set(candidates))!=1:raise RemotePending('Submission acknowledgement missing; inspect Comfy queue/history. This attempt was not submitted again.')
                 ref['prompt_id']=candidates[0];save(ref)
+            if live is None:
+                live = subscribe(ref)
+            prompt_id = ref['prompt_id']
+            recorded_start = False
+
+            def record_start(started_at):
+                nonlocal recorded_start
+                if started_at and not recorded_start:
+                    event(event='stage_start', id=job['attempt_id']+'-comfy', stage='comfy_execution', started_at=started_at)
+                    recorded_start = True
+
+            def report():
+                record_start(live.started_at)
+                if cancel_requested:
+                    return
+                if running and not live.finished:
+                    progress('comfy_generating', prompt_id=prompt_id, heartbeat=True, **live.snapshot())
+                else:
+                    stage = 'comfy_queued' if queued else 'comfy_waiting'
+                    progress(stage, prompt_id=prompt_id, heartbeat=True, execution_started_at=live.started_at)
+
             deadline=time.monotonic()+7200
             cancel_sent=False;targeted_available=True
             while time.monotonic()<deadline:
-                if cancelled and cancelled() and not cancel_sent:
+                cancel_requested = bool(cancelled and cancelled())
+                if cancel_requested and not cancel_sent:
                     queue=self.request('/queue')
                     owned=[row for row in [*queue.get('queue_running',[]),*queue.get('queue_pending',[])] if row[1]==ref['prompt_id'] and row[3].get('gbr_attempt_id')==job['attempt_id']]
                     if not owned:
@@ -175,9 +209,11 @@ class Client:
                         # owned FLAC so normal verified discard/ack removes it.
                         files=[f for output in (history or {}).get('outputs',{}).values() for f in output.get('audio',[]) if f.get('filename','').endswith('.flac')]
                         if len(files)==1:ref['file']=files[0];break
+                        record_start(execution_stamps(history).get('execution_start'))
                         raise Cancelled('ComfyUI confirmed this prompt is no longer running or queued')
                 if history:
                     if history.get('status',{}).get('status_str')=='error':
+                        record_start(execution_stamps(history).get('execution_start'))
                         check_cancel(cancelled)
                         raise RuntimeError('Comfy execution failed: '+canonical(history.get('status')))
                     if history.get('status',{}).get('completed'):
@@ -185,12 +221,27 @@ class Client:
                         if len(files)!=1:raise ValueError('Expected one generated FLAC in Comfy history')
                         ref['file']=files[0];break
                 queue=self.request('/queue')
-                running=any(row[1]==ref['prompt_id'] for row in queue.get('queue_running',[]))
-                if not (cancelled and cancelled()):progress('comfy_generating' if running else 'comfy_queued')
-                time.sleep(1)
+                running=any(row[1]==prompt_id for row in queue.get('queue_running',[]))
+                queued=any(row[1]==prompt_id for row in queue.get('queue_pending',[]))
+                report()
+                live.wait(prompt_id, 1, report)
             else:raise RemotePending('Comfy prompt is still pending; reconnect to the saved prompt ID')
+            live.close()
+            messages=(history or {}).get('status',{}).get('messages',[])
+            stamps=execution_stamps(history)
+            started_at = stamps.get('execution_start') or live.started_at
+            finished_at = stamps.get('execution_success')
+            if started_at and finished_at:
+                seconds = (datetime.fromisoformat(finished_at) - datetime.fromisoformat(started_at)).total_seconds()
+                if seconds >= 0:
+                    event(event='stage_end',id=job['attempt_id']+'-comfy',stage='comfy_execution',started_at=started_at,
+                          completed_at=finished_at,duration_seconds=seconds,resource={'device_id':ref['hardware']['gpu_uuid'] or self.address,
+                          'sampling_interval_ms':None,'coverage':'unavailable','offload':{},
+                          'details':{'timing_source':'comfy_server_timestamps','queue_time_excluded':True}})
+            else:
+                record_start(started_at)
             file=ref['file']
-            progress('downloading')
+            progress('downloading', execution_started_at=started_at)
             if file.get('type','output')!='output' or Path(file['filename']).name!=file['filename'] or '..' in Path(file.get('subfolder','')).parts or '\\' in file.get('subfolder','') or not file.get('subfolder','').startswith('gbr') or not file['filename'].startswith(job['attempt_id']):raise ValueError('Comfy returned a file outside this attempt namespace')
             output=directory/'audio.flac';temporary=directory/'download.part'
             self._prefix(45)
@@ -204,12 +255,7 @@ class Client:
             info=sf.info(temporary)
             if info.format!='FLAC' or not info.frames:raise ValueError('Comfy output is not valid FLAC')
             temporary.replace(output);ref['download_sha256']=hashlib.sha256(output.read_bytes()).hexdigest();ref['state']='downloaded';save(ref)
-            from datetime import datetime,timezone
-            messages=history.get('status',{}).get('messages',[])
-            stamps={kind:payload.get('timestamp') for kind,payload in messages if kind in ('execution_start','execution_success') and isinstance(payload,dict)}
             cached=[node for kind,payload in messages if kind=='execution_cached' and isinstance(payload,dict) for node in payload.get('nodes',[])]
-            if all(isinstance(stamps.get(kind),(int,float)) for kind in ('execution_start','execution_success')) and stamps['execution_success']>=stamps['execution_start']:
-                event(event='stage_end',id=job['attempt_id']+'-comfy',stage='comfy_execution',started_at=datetime.fromtimestamp(stamps['execution_start']/1000,timezone.utc).isoformat(),completed_at=datetime.fromtimestamp(stamps['execution_success']/1000,timezone.utc).isoformat(),duration_seconds=(stamps['execution_success']-stamps['execution_start'])/1000,resource={'device_id':ref['hardware']['gpu_uuid'] or self.address,'sampling_interval_ms':None,'coverage':'unavailable','offload':{},'details':{'timing_source':'comfy_server_timestamps','queue_time_excluded':True}})
             result={'protocol':1,'run_id':job['run_id'],'attempt_id':job['attempt_id'],'status':'succeeded','completed_at':datetime.now(timezone.utc).isoformat(),
                 'actual_parameters':job['parameters'],'models':ref['models'],'hardware':ref['hardware'],'workflow_sha256':ref['workflow_sha256'],
                 'remote':{'prompt_id':ref['prompt_id'],'file':ref['file'],'download_sha256':ref['download_sha256']},'encoding':{'mode':'comfy_graph','cache_hit':('2' in cached) if any(kind=='execution_cached' for kind,_ in messages) else None,'key':None},'telemetry_limitations':['Per-prompt peak VRAM is unavailable from stock ComfyUI; checkpoint hashes require the GBR bridge.']}
@@ -221,4 +267,6 @@ class Client:
         except ComfyConnectionError as error:raise RemotePending('Comfy connection failed; the saved attempt was not resubmitted: '+str(error)) from error
         except (OSError,URLError,TimeoutError) as error:raise RemotePending('Comfy connection lost; reconnect to this attempt without resubmitting: '+str(error)) from error
         finally:
+            if live is not None:
+                live.close()
             (directory/'download.part').unlink(missing_ok=True)

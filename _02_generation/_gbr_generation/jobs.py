@@ -13,9 +13,46 @@ from .yaml_document import YamlDocument
 
 LIVE={'running','publishing','cancel_requested'}
 TERMINAL={'succeeded','failed','cancelled'}
+REMOTE={'comfyui','runpod_dedicated','runpod_serverless'}
+COMFY_STATUS_MAX_AGE=8
 
 
 def identity(target):return target['backend']+'|'+(target.get('address') or '')
+
+
+def run_activity(status, backend, controller, *, now):
+    """Translate a ledger state and its matching live attempt into a display phase."""
+    if status not in LIVE:
+        return {'phase':status}
+    if not controller:
+        return {'phase':'reconnect' if backend in REMOTE else 'interrupted'}
+
+    stage = controller.get('stage')
+    if status == 'cancel_requested':
+        return {'phase':'cancelling','stage':stage,'message':controller.get('message')}
+    if status == 'publishing' or stage in {'downloading','publishing'}:
+        return {'phase':'finalising','stage':stage if stage == 'downloading' else 'publishing'}
+    if stage == 'starting_worker':
+        return {'phase':'preparing','stage':stage}
+
+    if backend == 'comfyui':
+        try:
+            age = (now - datetime.fromisoformat(controller.get('updated_at') or '')).total_seconds()
+        except (ValueError, TypeError):
+            age = float('inf')
+        if age > COMFY_STATUS_MAX_AGE or not controller.get('prompt_id'):
+            return {'phase':'awaiting_status','stage':'comfy_waiting'}
+        if stage == 'comfy_queued':
+            return {'phase':'worker_queue','stage':stage}
+        if stage != 'comfy_generating':
+            return {'phase':'awaiting_status','stage':'comfy_waiting'}
+    elif stage == 'serverless_queued':
+        return {'phase':'worker_queue','stage':stage}
+    elif not stage or stage == 'running':
+        return {'phase':'awaiting_status'}
+
+    return {'phase':'running', **{key:controller.get(key) for key in
+            ('stage','node_label','step','steps','progress_unit','message')}}
 
 
 class Jobs:
@@ -35,22 +72,52 @@ class Jobs:
         with closing(open_database(self.g.review.config.database)) as conn:
             from .planner import ensure_queue_order
             ensure_queue_order(conn)
-            scope = """FROM generation_runs r JOIN generation_batches b ON b.id=r.batch_id
-                LEFT JOIN generation_queue_order q ON q.run_id=r.id
-                WHERE COALESCE(json_extract(b.policy_json,'$.purpose'),'production')='production'"""
-            counts = dict(conn.execute('SELECT r.status,COUNT(*) '+scope+' GROUP BY r.status'))
+            scope = "COALESCE(json_extract(b.policy_json,'$.purpose'),'production')='production'"
+            batches = 'FROM generation_runs r JOIN generation_batches b ON b.id=r.batch_id'
+            counts = dict(conn.execute('SELECT r.status,COUNT(*) '+batches+' WHERE '+scope+' GROUP BY r.status'))
             states = tabs[status]
-            order = ("r.status='prepared',b.created_at,COALESCE(q.position,r.rowid),r.rowid"
-                     if status == 'queued' else 'r.completed_at DESC,r.rowid DESC')
-            rows = [dict(row) for row in conn.execute("""SELECT r.id,r.batch_id,r.title,r.style,r.status,
-                (SELECT error FROM generation_attempts WHERE run_id=r.id ORDER BY started_at DESC,rowid DESC LIMIT 1) AS error """
-                +scope+' AND r.status IN ('+','.join('?' for _ in states)+') ORDER BY '+order+' LIMIT 50 OFFSET ?',
-                (*states,offset))]
-        if status == 'queued':
-            live = {task['run_id']:task for task in self.g.tasks(include_logs=False,live_only=True) if task.get('run_id')}
-            for row in rows:
-                row.update({key:live.get(row['id'],{}).get(key) for key in ('worker_id','stage','step','steps')})
-        return {'runs':rows,'counts':{key:sum(counts.get(state,0) for state in states) for key,states in tabs.items()}}
+            order = ('waiting, batch_created, queue_position, sequence'
+                     if status == 'queued' else 'completed_at DESC, sequence DESC')
+            page_order = ('p.waiting, p.batch_created, p.queue_position, p.sequence'
+                          if status == 'queued' else 'p.completed_at DESC, p.sequence DESC')
+            placeholders = ','.join('?' for _ in states)
+            rows = [dict(row) for row in conn.execute(f"""
+                WITH page AS (
+                    SELECT r.id,r.batch_id,r.title,r.style,r.variant_id,r.status,r.created_at AS queued_at,
+                        r.started_at AS dispatched_at,r.completed_at,r.rowid AS sequence,b.created_at AS batch_created,
+                        (r.status='prepared') AS waiting,COALESCE(q.position,r.rowid) AS queue_position
+                    {batches} LEFT JOIN generation_queue_order q ON q.run_id=r.id
+                    WHERE {scope} AND r.status IN ({placeholders})
+                    ORDER BY {order} LIMIT 50 OFFSET ?
+                )
+                SELECT p.id,p.batch_id,p.title,p.style,p.variant_id,p.status,p.queued_at,p.dispatched_at,p.completed_at,
+                       a.id AS attempt_id,a.error,a.execution_mode AS backend,s.started_at AS execution_started_at
+                FROM page p
+                LEFT JOIN generation_attempts a ON a.id=(
+                    SELECT id FROM generation_attempts WHERE run_id=p.id ORDER BY rowid DESC LIMIT 1
+                )
+                LEFT JOIN generation_timing_spans s ON s.id=a.id||'-comfy'
+                ORDER BY {page_order}
+                """, (*states,offset))]
+        live = {}
+        if any(row['status'] in LIVE for row in rows):
+            live = {task['attempt_id']:task for task in self.g.tasks(include_logs=False,live_only=True)
+                    if task.get('attempt_id')}
+        now = datetime.now(timezone.utc)
+        for row in rows:
+            controller = live.get(row.pop('attempt_id'))
+            if controller and controller.get('run_id') != row['id']:
+                controller = None
+            row.update(run_activity(row['status'], row['backend'], controller, now=now))
+            recorded_start = row.pop('execution_started_at')
+            row['started_at'] = ((controller or {}).get('execution_started_at') or recorded_start
+                                 if row['backend'] == 'comfyui' else row['dispatched_at'])
+            row['worker_id'] = ((controller.get('worker_id') or identity(controller['connection']))
+                                if controller else None)
+            if row['status'] in LIVE:
+                row['completed_at'] = None  # A retry may still carry the previous attempt's completion.
+        return {'runs':rows,'counts':{key:sum(counts.get(state,0) for state in states) for key,states in tabs.items()},
+                'can_shuffle':bool(counts.get('prepared'))}
 
     def reorder(self, action, run_ids):
         selected = set(run_ids)
@@ -83,6 +150,7 @@ class Jobs:
         scope="(?='all' OR COALESCE(json_extract(policy_json,'$.purpose'),'production')=?)"
         batches=self.g.review.db.all("SELECT id,created_at,status,selection_json,policy_json FROM generation_batches WHERE "+scope+" AND (status NOT IN ('succeeded','failed','cancelled') OR id IN (SELECT id FROM generation_batches WHERE "+scope+" ORDER BY created_at DESC LIMIT 100)) ORDER BY created_at DESC",(purpose,purpose,purpose,purpose))
         result=[]
+        now = datetime.now(timezone.utc)
         for batch in batches:
             policy=json.loads(batch.pop('policy_json'));selection=json.loads(batch.pop('selection_json'))
             counts=Counter(r['status'] for r in self.g.review.db.all('SELECT status FROM generation_runs WHERE batch_id=?',(batch['id'],)))
@@ -99,7 +167,9 @@ class Jobs:
             result.append({**batch,'purpose':policy.get('purpose','production'),'experiment_label':policy.get('experiment_label',''),
                 'status':status,'section':section,'counts':dict(counts),'total':sum(counts.values()),'available_workers':available,'automatic_workers':automatic,
                 'worker_notices':[{'worker_id':wid,'message':message} for (bid,wid),message in list(self.g.dispatcher.notices.items()) if bid==batch['id']],
-                'workers':[{**{k:t.get(k) for k in ('id','worker_id','connection','status','active','run_id','stage','step','steps','message','updated_at','error','report','cleanup_pending')},'current_title':next((r['title'] for r in t.get('runs',[]) if r['id']==t.get('run_id')),None)} for t in workers]})
+                'workers':[{**{k:t.get(k) for k in ('id','worker_id','connection','status','active','run_id','stage','step','steps','message','updated_at','error','report','cleanup_pending')},
+                    'activity':run_activity('running',t['connection']['backend'],t,now=now) if t['active'] and t.get('attempt_id') else None,
+                    'current_title':next((r['title'] for r in t.get('runs',[]) if r['id']==t.get('run_id')),None)} for t in workers]})
             if policy.get('purpose')=='experiment' and getattr(self.g,'experiment_publisher',None):
                 result[-1]['publications']=self.g.experiment_publisher.listing(batch['id'])
         return {'jobs':result,'history_limit':100}
@@ -120,27 +190,29 @@ class Jobs:
         if sort not in ordering:raise ValueError('Unknown configuration order')
         path,manifest=self.batch(batch_id);frozen={r['id']:r for r in manifest['runs']}
         controllers=[t for t in self.controllers() if t.get('batch_id')==batch_id]
+        live={t.get('attempt_id'):t for t in controllers if t['active'] and t.get('attempt_id')}
         rows=self.g.review.db.all('SELECT id,title,song_id,variant_id,status,effective_json,started_at,completed_at FROM generation_runs WHERE batch_id=? ORDER BY '+ordering[sort]+' LIMIT ? OFFSET ?',(batch_id,limit,offset))
         result=[]
+        now = datetime.now(timezone.utc)
         for row in rows:
             parameters=json.loads(row.pop('effective_json'));parameters.pop('caption',None)
-            attempts=self.g.review.db.all('SELECT id,status,error,started_at FROM generation_attempts WHERE run_id=? ORDER BY rowid DESC LIMIT 1',(row['id'],))
-            attempt=attempts[0] if attempts else None;worker=None;stage=row['status'];extra={}
+            attempts=self.g.review.db.all('SELECT id,status,error,started_at,execution_mode FROM generation_attempts WHERE run_id=? ORDER BY rowid DESC LIMIT 1',(row['id'],))
+            attempt=attempts[0] if attempts else None;worker=None;current=None
             if attempt:
                 request=path.parent/'attempts'/attempt['id']/'request.json'
                 try:worker=identity(json.loads(request.read_text(encoding="utf-8"))['execution']['diffusion'])
                 except (OSError,ValueError,KeyError):pass
-                current=next((t for t in controllers if (t.get('worker_id') or identity(t['connection']))==worker),None)
-                if current and row['status'] in LIVE:
-                    stage=current.get('stage') if current.get('run_id')==row['id'] else 'publishing' if row['status']=='publishing' else 'reconnect' if not current['active'] else 'generating'
-                    extra={k:current.get(k) for k in ('step','steps','message') if current.get('run_id')==row['id']}
-            elif row['status']=='prepared' and controllers and all(t['status']=='waiting_worker' for t in controllers):stage='waiting_worker'
+                current=live.get(attempt['id'])
+                if current and current.get('run_id')!=row['id']:current=None
+            activity=run_activity(row['status'],attempt['execution_mode'] if attempt else None,current,now=now)
+            if row['status']=='prepared' and controllers and all(t['status']=='waiting_worker' for t in controllers):
+                activity['stage']='waiting_worker'
             options=frozen.get(row['id'],{}).get('worker_options') or []
             eligible=set(o['worker_id'] for o in options)
             eligible.update(c.get('worker_id') or identity(c['connection']) for c in controllers if any(r['id']==row['id'] for r in c.get('runs',[])))
             if not worker and not attempt:
                 if len(eligible)==1:worker=next(iter(eligible))
-            result.append({**row,'parameters':parameters,'attempt':attempt,'worker':worker,'stage':stage or row['status'],**extra,
+            result.append({**row,'parameters':parameters,'attempt':attempt,'worker':worker,**activity,
                 'eligible_workers':sorted(eligible), 'can_cancel':row['status'] in {'prepared','running','failed'},
                 'error':attempt.get('error') if attempt and row['status']=='failed' else None})
             if manifest.get('purpose')=='experiment':

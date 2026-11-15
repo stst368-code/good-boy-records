@@ -30,7 +30,10 @@ from test_comfy_execution import server as comfy_server
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--browser')
+    parser.add_argument('--screenshots', type=Path)
     args = parser.parse_args()
+    if args.screenshots:
+        args.screenshots.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
         built = root / '_01_writing/_built'
@@ -101,7 +104,7 @@ def main():
                 page.wait_for_selector('.ye-file')
                 page.get_by_label('Select _yaml/gbr-local-smoke.yaml', exact=True).check()
                 page.locator('[data-role=kind]').select_option('add_template')
-                page.locator('[data-role=template_fields]').fill('explicit')
+                page.locator('[data-role=template_fields]').select_option('explicit')
                 page.locator('[data-role=use_default]').check()
                 page.locator('[data-role=default_text]').fill('no')
                 page.locator('#ye-preview').click()
@@ -139,6 +142,7 @@ def main():
                 page.locator('#genScan').click();page.wait_for_selector('.generation-file')
                 assert page.locator('#genRoot').input_value() == str(built)
                 page.locator('#genSelectVisible').click()
+                page.locator('.generation-advanced > summary').click()
                 page.locator('#genDurationMode').select_option('fixed')
                 assert page.locator('#genDuration').input_value() == '360'
                 page.locator('#genRepetitions').fill('2')
@@ -155,6 +159,7 @@ def main():
                 assert page.locator('#genStepsMode').input_value()=='list'
                 assert page.locator('#genStepsList').input_value()=='20,30'
                 page.locator('#genSelectVisible').click()
+                page.locator('.generation-advanced > summary').click()
                 assert not boundary.calls
                 page.locator('#genRepetitions').fill('1')
                 page.locator('#genCaptionCount').fill('1')
@@ -165,6 +170,9 @@ def main():
                 assert '1 ready' in page.locator('#genPlanSummary').inner_text()
                 assert not boundary.calls
                 page.locator('#genStart').click()
+                page.get_by_role('tab',name='Completed',exact=False).click()
+                page.locator('.queue-row[data-phase=succeeded]').wait_for()
+                page.locator('.job-controls > summary').click()
                 page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('1 / 1 complete')")
                 assert len(boundary.calls) == 1
                 assert boundary.calls[0]['parameters']['duration'] == 360
@@ -215,7 +223,7 @@ def main():
                     with page.expect_response('**/api/generation/workers'):
                         page.locator('#workerSave').click()
                     page.wait_for_function("()=>!document.getElementById('workerSave').disabled")
-                    page.screenshot(path='/workspace/scratch/286b0af2d5d4/app_stage/workers-desktop.png',full_page=True)
+                    if args.screenshots:page.screenshot(path=str(args.screenshots/'workers-desktop.png'),full_page=True)
                     page.locator('#workersClose').click()
                     with page.expect_response('**/api/generation/workers/query'):
                         page.locator('#genWorker').select_option('comfyui|'+url)
@@ -242,14 +250,14 @@ def main():
                     page.wait_for_selector('#workerSettingsDialog[open]')
                     page.set_viewport_size({'width':390,'height':844})
                     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-                    page.screenshot(path='/workspace/scratch/286b0af2d5d4/app_stage/workers-mobile.png',full_page=True)
+                    if args.screenshots:page.screenshot(path=str(args.screenshots/'workers-mobile.png'),full_page=True)
                     page.locator('#workersClose').click()
                 page.set_viewport_size({'width': 390, 'height': 844})
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-                page.screenshot(path='/workspace/scratch/286b0af2d5d4/app_stage/generation-mobile.png',full_page=True)
+                if args.screenshots:page.screenshot(path=str(args.screenshots/'generation-mobile.png'),full_page=True)
                 page.set_viewport_size({'width':1920,'height':1080})
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-                page.screenshot(path='/workspace/scratch/286b0af2d5d4/app_stage/generation-desktop.png',full_page=True)
+                if args.screenshots:page.screenshot(path=str(args.screenshots/'generation-desktop.png'),full_page=True)
                 assert not errors, errors
                 browser.close()
                 print(json.dumps({'selection_preview_dispatch_review_archive': 'passed', 'native_inference': 'not run', 'worker_settings_and_discovery':'passed', 'js_errors': errors}))

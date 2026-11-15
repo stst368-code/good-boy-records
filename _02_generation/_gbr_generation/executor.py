@@ -483,11 +483,17 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             def cancelled():
                 with closing(open_database(manifest['database'])) as reader:
                     return reader.execute('SELECT status FROM generation_runs WHERE id=?',(run['id'],)).fetchone()[0] in {'cancel_requested','cancelled'}
-            def notify(stage,**data):
+            execution_started_at = None
+            def notify(stage,heartbeat=False,**data):
+                nonlocal execution_started_at
+                execution_started_at = data.get('execution_started_at') or execution_started_at
+                if execution_started_at:
+                    data['execution_started_at'] = execution_started_at
                 update={'run_id':run['id'],'attempt_id':attempt_id,'stage':stage,**data}
                 previous=getattr(notify,'last',{})
-                if progress and update!=previous:
-                    if stage==previous.get('stage') and time.monotonic()-getattr(notify,'at',0)<.5:return
+                elapsed=time.monotonic()-getattr(notify,'at',0)
+                if progress and (update!=previous or heartbeat and elapsed>=2):
+                    if stage==previous.get('stage') and elapsed<.5:return
                     progress(**update);notify.last=update;notify.at=time.monotonic()
             def remote_client(client):
                 client.cancelled=cancelled;client.progress=notify

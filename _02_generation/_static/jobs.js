@@ -1,5 +1,6 @@
+import {initQueue, phaseLabel, stepText} from './queue.js';
 import {experimentPublishing} from "/tools/generation/experiment-publishing.js";
-const LABELS={completed:'Complete',prepared:'Queued',running:'Generating',publishing:'Finalising',cancel_requested:'Cancelling',cancelled:'Cancelled',succeeded:'Complete',failed:'Failed',waiting_worker:'Worker busy · waiting',paused:'Paused',queue_complete:'Queue finished',starting_worker:'Starting worker',comfy_queued:'Queued in ComfyUI',comfy_generating:'Generating in ComfyUI',conditioning:'Text conditioning',diffusion:'Diffusion',decode:'Decoding audio',write_flac:'Writing FLAC',downloading:'Downloading audio',cancel_after_generation:'Finishes current generation, then discards output',dedicated_generating:'Generating on pod',serverless_generating:'Generating serverless',reconnect:'Reconnect needed'};
+const LABELS={completed:'Complete',prepared:'Queued',running:'Active',publishing:'Finalising',cancel_requested:'Cancelling',cancelled:'Cancelled',succeeded:'Complete',failed:'Failed',waiting_worker:'Worker busy · waiting',paused:'Paused',queue_complete:'Queue finished',starting_worker:'Starting worker',comfy_queued:'Queued in ComfyUI',comfy_generating:'Generating in ComfyUI',conditioning:'Text conditioning',diffusion:'Diffusion',decode:'Decoding audio',write_flac:'Writing FLAC',downloading:'Downloading audio',cancel_after_generation:'Finishes current generation, then discards output',dedicated_generating:'Generating on pod',serverless_generating:'Generating serverless',reconnect:'Reconnect needed'};
 const label=value=>LABELS[value]||String(value||'Waiting').replaceAll('_',' ');
 const workerName=value=>value?.startsWith('local|')?'This PC':value?.replace(/^comfyui\|/,'ComfyUI · ').replace(/^runpod_dedicated\|/,'Pod · ').replace(/^runpod_serverless\|/,'Serverless · ')||'Next available worker';
 const node=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
@@ -11,126 +12,16 @@ export function initJobs({root:container,api,toast,onQueued}){
   const guard=fn=>async(...args)=>{try{await fn(...args);}catch(e){toast(e.message);}};
   const publication=experimentPublishing({api,toast,refresh});
   const button=(text,fn,cls='')=>{const b=node('button',cls,text);b.type='button';b.onclick=guard(fn);return b;};
-  const queue=node('section','generation-run-queue');
-  const controls=node('details','job-controls');
-  const root=node('div','generation-jobs');
-  controls.append(node('summary','','Job controls and diagnostics'),root);
-  container.append(queue,controls);
-  const selected=new Map();
-  let tab='queued',offset=0,queueSequence=0,queueSignature='',acting=false;
-  const tabs=node('div','generation-inline');
-  const tabButtons=new Map();
-  for(const name of ['queued','completed','cancelled','failed']){
-    const title=name[0].toUpperCase()+name.slice(1);
-    const control=button(title,async()=>{
-      tab=name;offset=0;selected.clear();await refreshQueue();
-    });
-    control.setAttribute('aria-pressed',String(tab===name));
-    tabButtons.set(name,{title,control});tabs.append(control);
-  }
-  const actions=node('div','generation-inline');
-  const cancel=button('Cancel selected',async()=>{
-    if(acting||!selected.size)return;
-    if(!window.confirm(`Cancel ${selected.size} selected runs?`))return;
-    acting=true;updateActions();
-    const failed=[];
-    try{
-      for(const run of selected.values()){
-        try{await api(`/generation/jobs/${run.batch_id}/runs/${run.id}/cancel`,{});}
-        catch(error){failed.push(error.message);}
-      }
-      if(failed.length)toast(`${failed.length} runs could not be cancelled. ${failed[0]}`);
-      selected.clear();
-    }finally{acting=false;await refreshQueue();}
-  });
-  async function reorder(action){
-    if(acting)return;
-    acting=true;updateActions();
-    try{await api('/generation/queue/order',{action,run_ids:[...selected.keys()]});}
-    finally{acting=false;await refreshQueue();}
-  }
-  const promote=button('Promote within job',()=>reorder('promote'));
-  const shuffle=button('Shuffle within jobs',()=>reorder('shuffle'));
-  const previous=button('Previous',async()=>{offset=Math.max(0,offset-50);selected.clear();await refreshQueue();});
-  const next=button('Next',async()=>{offset+=50;selected.clear();await refreshQueue();});
-  const range=node('span','subtle small');
-  const pager=node('div','generation-inline');
-  const table=node('div','generation-queue-table');
-  const pickAll=node('input');pickAll.type='checkbox';pickAll.setAttribute('aria-label','Select all cancellable runs on this page');
-  let displayed=[];
-  pickAll.onchange=()=>{
-    for(const run of displayed.filter(isCancellable)){
-      if(pickAll.checked)selected.set(run.id,run);else selected.delete(run.id);
-    }
-    syncSelection();
+  const queue = initQueue({api, toast});
+  const controls = node('details', 'job-controls');
+  const controlsTitle = node('summary', '', 'Job controls and diagnostics');
+  const root = node('div', 'generation-jobs');
+  let lastBatchRefresh = 0;
+  controls.append(controlsTitle, root);
+  container.append(queue.element, controls);
+  controls.ontoggle = () => {
+    if (controls.open && state.purpose === 'production') guard(refresh)();
   };
-  function isCancellable(run){return ['prepared','running'].includes(run.status);}
-  function updateActions(){
-    actions.hidden=tab!=='queued';
-    cancel.disabled=acting||!selected.size;
-    promote.disabled=acting||![...selected.values()].some(run=>run.status==='prepared');
-    shuffle.disabled=acting;
-  }
-  function syncSelection(){
-    const selectable=displayed.filter(isCancellable);
-    const checked=selectable.filter(run=>selected.has(run.id)).length;
-    pickAll.hidden=tab!=='queued';
-    pickAll.disabled=!selectable.length;
-    pickAll.checked=!!checked&&checked===selectable.length;
-    pickAll.indeterminate=checked>0&&!pickAll.checked;
-    for(const box of table.querySelectorAll('tbody input'))box.checked=selected.has(box.value);
-    updateActions();
-  }
-  actions.append(cancel,promote,shuffle);pager.append(previous,range,next);
-  queue.append(tabs,actions,table,pager);
-  async function refreshQueue(){
-    const sequence=++queueSequence;
-    const data=await api(`/generation/queue?status=${tab}&offset=${offset}`);
-    if(sequence!==queueSequence||state.purpose!=='production')return;
-    const count=data.counts[tab];
-    if(offset&&!data.runs.length){offset=Math.max(0,Math.floor((count-1)/50)*50);return refreshQueue();}
-    displayed=data.runs;
-    for(const id of selected.keys()){
-      const row=displayed.find(run=>run.id===id&&isCancellable(run));
-      if(row)selected.set(id,row);else selected.delete(id);
-    }
-    for(const [name,{title,control}] of tabButtons){
-      control.textContent=`${title} · ${data.counts[name]}`;
-      control.setAttribute('aria-pressed',String(name===tab));
-    }
-    range.textContent=count?`${offset+1}–${offset+displayed.length} of ${count}`:'';
-    previous.disabled=offset===0;next.disabled=offset+displayed.length>=count;pager.hidden=count<=50;
-    const signature=JSON.stringify([tab,displayed]);
-    if(signature!==queueSignature){
-      queueSignature=signature;
-      const grid=node('table'),header=node('tr'),select=node('th'),body=node('tbody');
-      select.append(pickAll);header.append(select);
-      for(const column of ['Track','Job ID','Progress'])header.append(node('th','',column));
-      const head=node('thead');head.append(header);grid.append(head,body);
-      for(const run of displayed){
-        const row=node('tr'),cell=node('td'),track=node('td');
-        if(tab==='queued'&&isCancellable(run)){
-          const checkbox=node('input');checkbox.type='checkbox';checkbox.value=run.id;
-          checkbox.setAttribute('aria-label','Select '+run.title);
-          checkbox.onchange=()=>{if(checkbox.checked)selected.set(run.id,run);else selected.delete(run.id);syncSelection();};
-          cell.append(checkbox);
-        }
-        track.append(node('strong','',run.title),node('div','subtle small',run.style));
-        const job=node('td'),id=node('code','',run.batch_id.slice(0,8));id.title=run.batch_id;job.append(id);
-        const progress=node('td','',label(run.stage||run.status));
-        if(['running','publishing','cancel_requested'].includes(run.status)){
-          const bar=node('progress','job-step-progress');bar.setAttribute('aria-label',run.title+' generation progress');
-          if(run.steps>0&&run.step!=null){bar.max=run.steps;bar.value=run.step;progress.append(node('div','small',`${run.step} / ${run.steps}`));}
-          progress.append(bar);
-        }
-        if(run.error&&run.status==='failed')progress.append(node('div','error small',run.error));
-        row.append(cell,track,job,progress);body.append(row);
-      }
-      table.replaceChildren(displayed.length?grid:node('p','subtle','No '+tab+' runs.'));
-    }
-    syncSelection();
-  }
-  controls.ontoggle=()=>{if(controls.open)guard(refresh)();};
   function drawer(key,title){const e=node('details','job-drawer');e.dataset.key=key;e.open=state.open.has(key);e.append(node('summary','',title));e.addEventListener('toggle',()=>{if(!e.isConnected)return;if(e.open)state.open.add(key);else state.open.delete(key);});return e;}
   function metadata(run){const p=run.parameters;return [['Encoder',model(p.text_encoder)],['DiT',model(p.dit)],['Sampling',p.sampler+' / '+p.scheduler],['Encoder CFG',p.encoder_cfg],['Diffusion CFG',p.sampler_cfg],['Top-k',p.top_k],['Steps',p.sampler_steps],['Seconds',p.duration]].map(([k,v])=>k+': '+v).join(' · ');}
   async function loadRuns(id,more=false,sequence=null){
@@ -163,18 +54,18 @@ export function initJobs({root:container,api,toast,onQueued}){
   function runRow(batch,run){
     const e=node('article','job-run '+run.status);e.dataset.run=run.id;e.parameterSignature=JSON.stringify(run.parameters);
     const head=node('div','job-run-head'),title=node('div');title.append(node('strong','',run.title),node('span','job-run-id',`Song ${run.song_id} · variant ${run.variant_id} · ${run.id.slice(0,8)}`));
-    head.append(title,node('span','job-status '+run.status,label(run.status)));
+    head.append(title,node('span','job-status '+run.phase,phaseLabel(run)));
     if(run.can_cancel)head.append(cancelButton(batch,run));
     e.append(head,node('p','job-configuration',metadata(run)));
-    const activity=node('div','job-run-activity');activity.append(node('span','job-worker-name',(run.worker?workerName(run.worker):run.status==='prepared'?'Next available worker':run.status==='cancelled'?'Not dispatched':'Worker not recorded')),node('span','job-stage',label(run.stage)));
-    if(run.step!=null&&run.steps){activity.append(node('span','job-step',`${run.step} / ${run.steps} steps`));const p=node('progress','job-step-progress');p.max=run.steps;p.value=run.step;p.setAttribute('aria-label','Sampling steps');activity.append(p);}
+    const activity=node('div','job-run-activity');activity.append(node('span','job-worker-name',(run.worker?workerName(run.worker):run.status==='prepared'?'Next available worker':run.status==='cancelled'?'Not dispatched':'Worker not recorded')),node('span','job-stage',run.node_label || (run.stage ? label(run.stage) : '')));
+    if(stepText(run)){activity.append(node('span','job-step',stepText(run)));const p=node('progress','job-step-progress');p.max=run.steps;p.value=run.step;p.setAttribute('aria-label','Sampling steps');activity.append(p);}
     e.append(activity);if(run.message)e.append(node('p','job-run-note subtle small',run.message));if(run.error)e.append(node('p','error small',run.error));
     const details=node('div','job-run-drawers');details.append(textDrawer(batch,run,'caption'),textDrawer(batch,run,'lyrics'));
     const config=drawer(batch.id+'/'+run.id+'/config','All parameters');config.append(parameterList(run.parameters));details.append(config);e.append(details);if(batch.purpose==='experiment')e.append(experimentResult(batch,run));return e;
   }
   function workerControls(batch){
     const area=node('div','job-workers');
-    for(const w of batch.workers){const chip=node('div','job-worker '+(w.active?'online':''));chip.append(node('span','job-worker-dot'),node('span','job-worker-title',workerName(w.worker_id||w.connection.backend+'|'+(w.connection.address||''))),node('span','job-worker-state',label(w.status==='waiting_worker'?'waiting_worker':w.stage||w.status)));
+    for(const w of batch.workers){const chip=node('div','job-worker '+(w.active?'online':''));chip.append(node('span','job-worker-dot'),node('span','job-worker-title',workerName(w.worker_id||w.connection.backend+'|'+(w.connection.address||''))),node('span','job-worker-state',w.activity ? phaseLabel(w.activity) : label(w.status)));
       const actions=node('span','job-worker-actions');
       const action=(value,title)=>button(title,async()=>{await api('/generation/tasks/'+w.id,{action:value});await refresh();});
       if(w.active)actions.append(action('pause','Pause'));
@@ -220,7 +111,7 @@ export function initJobs({root:container,api,toast,onQueued}){
     const e=node('article','job-batch '+batch.section);e.dataset.batch=batch.id;
     const c=batch.counts,header=node('div','job-batch-heading'),title=node('div');title.append(node('h3','',`${batch.purpose==='experiment'?'Experiment':'Batch'} ${batch.experiment_label||batch.id.slice(0,8)}`),node('span','subtle small',time(batch.created_at)));header.append(title,node('span','job-status '+batch.status,label(batch.status)));e.append(header);
     const completed=c.succeeded||0,ended=completed+(c.cancelled||0)+(c.failed||0),bar=node('progress','job-batch-progress');bar.max=batch.total||1;bar.value=ended;bar.setAttribute('aria-label','Configurations resolved');e.append(bar);
-    const counts=node('div','job-counts');counts.append(node('span','complete',`${completed} / ${batch.total} complete`));for(const [name,n]of [['generating',(c.running||0)+(c.publishing||0)],['queued',c.prepared||0],['cancelled',(c.cancelled||0)+(c.cancel_requested||0)],['failed',c.failed||0]])if(n)counts.append(node('span',name,`${n} ${name}`));e.append(counts,workerControls(batch),assignmentControls(batch));
+    const counts=node('div','job-counts');counts.append(node('span','complete',`${completed} / ${batch.total} complete`));for(const [name,n]of [['assigned',(c.running||0)+(c.publishing||0)],['queued',c.prepared||0],['cancelled',(c.cancelled||0)+(c.cancel_requested||0)],['failed',c.failed||0]])if(n)counts.append(node('span',name,`${n} ${name}`));e.append(counts,workerControls(batch),assignmentControls(batch));
     const tools=node('div','experiment-batch-tools');
     if(batch.purpose==='experiment'){const caption=node('label','','Order results'),sort=node('select');sort.setAttribute('aria-label','Order experiment results');for(const [name,value] of [['Generation order','created'],['Steps · low to high','steps'],['Total time · fastest first','time']])sort.append(new Option(name,value));sort.value=state.sorts.get(batch.id)||'created';sort.onchange=guard(async()=>{state.sorts.set(batch.id,sort.value);state.pages.delete(batch.id);await loadRuns(batch.id);render();});caption.append(sort);tools.append(caption);}
     const download=node('a','experiment-export','Export performance CSV');download.href=`/api/generation/jobs/${batch.id}/performance.csv`;tools.append(download);e.append(tools);if(batch.purpose==='experiment')e.append(publication.controls(batch));
@@ -233,16 +124,16 @@ export function initJobs({root:container,api,toast,onQueued}){
     if(batch.purpose==='experiment')publication.update(existing.querySelector('.comparison-publishing'),batch);
     const badge=existing.querySelector('.job-batch-heading .job-status');badge.className='job-status '+batch.status;badge.textContent=label(batch.status);
     const bar=existing.querySelector('.job-batch-progress'),c=batch.counts;bar.max=batch.total||1;bar.value=(c.succeeded||0)+(c.cancelled||0)+(c.failed||0);
-    const counts=existing.querySelector('.job-counts');counts.replaceChildren(node('span','complete',`${c.succeeded||0} / ${batch.total} complete`));for(const [name,n]of [['generating',(c.running||0)+(c.publishing||0)],['queued',c.prepared||0],['cancelled',(c.cancelled||0)+(c.cancel_requested||0)],['failed',c.failed||0]])if(n)counts.append(node('span',name,`${n} ${name}`));
+    const counts=existing.querySelector('.job-counts');counts.replaceChildren(node('span','complete',`${c.succeeded||0} / ${batch.total} complete`));for(const [name,n]of [['assigned',(c.running||0)+(c.publishing||0)],['queued',c.prepared||0],['cancelled',(c.cancelled||0)+(c.cancel_requested||0)],['failed',c.failed||0]])if(n)counts.append(node('span',name,`${n} ${name}`));
     const fingerprint=JSON.stringify(batch.workers,(key,value)=>key==='updated_at'?undefined:value);
     if(existing.dataset.workers!==fingerprint){existing.querySelector('.job-workers').replaceWith(workerControls(batch));existing.dataset.workers=fingerprint;}
     const assignment=JSON.stringify([!!batch.counts.prepared,batch.automatic_workers,batch.available_workers,batch.worker_notices]);if(existing.assignmentSignature!==assignment){existing.querySelector('.job-assignment').replaceWith(assignmentControls(batch));existing.assignmentSignature=assignment;}
     const list=existing.querySelector('.job-track-list'),page=state.pages.get(batch.id);
-    if(page){list.querySelector(':scope>p')?.remove();const old=new Map([...list.querySelectorAll(':scope>.job-run')].map(e=>[e.dataset.run,e]));let cursor=list.querySelector(':scope>.job-run')||list.querySelector(':scope>.job-more');for(const run of page.runs){const row=old.get(run.id);if(!row){list.insertBefore(runRow(batch,run),cursor);continue;}if(row!==cursor)list.insertBefore(row,cursor);else cursor=row.nextElementSibling;old.delete(run.id);row.className='job-run '+run.status;const status=row.querySelector('.job-status');status.className='job-status '+run.status;status.textContent=label(run.status);row.querySelector('.job-configuration').textContent=metadata(run);row.querySelector('.job-worker-name').textContent=(run.worker?workerName(run.worker):run.status==='prepared'?'Next available worker':run.status==='cancelled'?'Not dispatched':'Worker not recorded');row.querySelector('.job-stage').textContent=label(run.stage);
+    if(page){list.querySelector(':scope>p')?.remove();const old=new Map([...list.querySelectorAll(':scope>.job-run')].map(e=>[e.dataset.run,e]));let cursor=list.querySelector(':scope>.job-run')||list.querySelector(':scope>.job-more');for(const run of page.runs){const row=old.get(run.id);if(!row){list.insertBefore(runRow(batch,run),cursor);continue;}if(row!==cursor)list.insertBefore(row,cursor);else cursor=row.nextElementSibling;old.delete(run.id);row.className='job-run '+run.status;const status=row.querySelector('.job-status');status.className='job-status '+run.phase;status.textContent=phaseLabel(run);row.querySelector('.job-configuration').textContent=metadata(run);row.querySelector('.job-worker-name').textContent=(run.worker?workerName(run.worker):run.status==='prepared'?'Next available worker':run.status==='cancelled'?'Not dispatched':'Worker not recorded');row.querySelector('.job-stage').textContent=run.node_label || (run.stage ? label(run.stage) : '');
       const signature=JSON.stringify(run.parameters);if(row.parameterSignature!==signature){row.querySelector('.job-parameters').replaceWith(parameterList(run.parameters));row.parameterSignature=signature;}
       if(batch.purpose==='experiment'){const panel=row.querySelector('.experiment-result'),signature=JSON.stringify([run.observations,run.output]);if(!panel)row.append(experimentResult(batch,run));else if(panel.signature!==signature)panel.replaceWith(experimentResult(batch,run));}
       for(const drawer of row.querySelectorAll('[data-kind]')){const attempt=run.attempt?.id||'queued';if(drawer.dataset.attempt!==attempt){drawer.dataset.attempt=attempt;drawer.loadContent();}}
-      const activity=row.querySelector('.job-run-activity');activity.querySelectorAll('.job-step,.job-step-progress').forEach(e=>e.remove());if(run.step!=null&&run.steps){activity.append(node('span','job-step',`${run.step} / ${run.steps} steps`));const p=node('progress','job-step-progress');p.max=run.steps;p.value=run.step;p.setAttribute('aria-label','Sampling steps');activity.append(p);}
+      const activity=row.querySelector('.job-run-activity');activity.querySelectorAll('.job-step,.job-step-progress').forEach(e=>e.remove());if(stepText(run)){activity.append(node('span','job-step',stepText(run)));const p=node('progress','job-step-progress');p.max=run.steps;p.value=run.step;p.setAttribute('aria-label','Sampling steps');activity.append(p);}
       if(!run.can_cancel)row.querySelector('.job-cancel')?.remove();else if(!row.querySelector('.job-cancel'))row.querySelector('.job-run-head').append(cancelButton(batch,run));
       let note=row.querySelector('.job-run-note');if(run.message){if(!note){note=node('p','job-run-note subtle small');activity.after(note);}note.textContent=run.message;}else note?.remove();
       let error=row.querySelector('.error');if(run.error){if(!error){error=node('p','error small');activity.after(error);}error.textContent=run.error;}else error?.remove();
@@ -257,12 +148,28 @@ export function initJobs({root:container,api,toast,onQueued}){
       for(const [index,job] of jobs.entries()){let existing=root.querySelector(`[data-batch="${job.id}"]`);if(existing)updateCard(existing,job);else existing=card(job);if(list.children[index]!==existing)list.insertBefore(existing,list.children[index]||null);}
     }
   }
-  async function refresh(){
+  async function refresh({background=false}={}){
     if(state.purpose==='production'){
-      const load=refreshQueue();
+      const load=queue.refresh();
       if(!controls.open)return load;
       await load;
     }
+    if (background && Date.now() - lastBatchRefresh < 3800) return;
+    lastBatchRefresh = Date.now();
     const sequence=++state.sequence,data=await api('/generation/jobs?purpose='+state.purpose);if(sequence!==state.sequence)return;state.jobs=data.jobs;for(const job of data.jobs)if(state.open.has(job.id+'/runs'))await loadRuns(job.id,false,sequence);if(sequence!==state.sequence)return;render();await Promise.all([...root.querySelectorAll('details[open]')].filter(e=>e.refreshLog).map(e=>e.refreshLog()));onQueued?.(data);return data;}
-  return {refresh,setPurpose(purpose){if(state.purpose===purpose)return;state.purpose=purpose;state.sequence++;state.jobs=[];root.replaceChildren();queue.hidden=purpose==='experiment';controls.open=purpose==='experiment';},hasActive:()=>state.jobs.some(j=>j.section==='active')};
+  return {
+    refresh,
+    setPurpose(purpose) {
+      if (state.purpose === purpose) return;
+      state.purpose = purpose;
+      state.sequence++;
+      state.jobs = [];
+      lastBatchRefresh = 0;
+      root.replaceChildren();
+      const experiment = purpose === 'experiment';
+      queue.setVisible(!experiment);
+      controlsTitle.hidden = experiment;
+      controls.open = experiment;
+    },
+  };
 }

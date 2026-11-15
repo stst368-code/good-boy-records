@@ -1,5 +1,7 @@
 """Real shared DB/HTTP run controls, including Windows rename contention."""
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import subprocess
@@ -13,7 +15,7 @@ import test_app_generation
 import test_execution
 from _gbr_generation.jobs import Jobs
 from _gbr_generation.executor import execute
-from _gbr_generation.planner import verify_plan
+from _gbr_generation.planner import open_database, verify_plan
 from _gbr_generation.job_state import atomic_state,read_state
 from _gbr_generation import app_jobs
 from test_comfy_execution import server
@@ -171,3 +173,47 @@ def test_flat_queue_promotes_next_worker_claim_and_separates_cancelled_runs(setu
     assert [call['run_id'] for call in worker.calls] == [last]
     assert jobs.queue('completed', 0)['runs'][0]['id'] == last
     assert jobs.queue('cancelled', 0)['runs'][0]['id'] == middle
+
+
+def test_flat_queue_reports_only_fresh_owned_comfy_activity_and_real_times(setup):
+    f,jobs=setup
+    _,manifest=batch(f,7)
+    running,pending,stale,wrong_attempt,finished,waiting,unknown=[run['id'] for run in manifest['runs']]
+    batch_id=manifest['batch_id']
+    now=datetime.now(timezone.utc)
+    dispatched=(now-timedelta(minutes=3)).isoformat()
+    started=(now-timedelta(minutes=1)).isoformat()
+    attempt_ids={}
+    with closing(open_database(f.database)) as db, db:
+        for index,run_id in enumerate((running,pending,stale,wrong_attempt,finished,unknown),1):
+            attempt_id=f'{index:032x}'
+            attempt_ids[run_id]=attempt_id
+            db.execute("UPDATE generation_runs SET status='running',started_at=? WHERE id=?",(dispatched,run_id))
+            db.execute('INSERT INTO generation_attempts VALUES(?,?,?,?,?,?,?,?,?,?)',
+                       (attempt_id,run_id,None,'full_generation','running','comfyui','{}',dispatched,None,None))
+        db.execute("UPDATE generation_runs SET status='succeeded',completed_at=? WHERE id=?",(now.isoformat(),finished))
+        db.execute('INSERT INTO generation_timing_spans VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+                   (attempt_ids[finished]+'-comfy',attempt_ids[finished],None,'comfy_execution',started,
+                    now.isoformat(),60,None,None,None,0))
+    def state(run_id, stage, **extra):
+        return {'run_id':run_id,'attempt_id':attempt_ids[run_id],'stage':stage,'active':True,'batch_id':batch_id,
+                'prompt_id':run_id,'updated_at':now.isoformat(),'connection':{'backend':'comfyui','address':'http://127.0.0.1:8190'},**extra}
+    snapshots=[
+        state(running,'comfy_generating',step=12,steps=30,progress_unit='steps',execution_started_at=started),
+        state(pending,'comfy_queued'),
+        {**state(stale,'comfy_generating',step=11,steps=30),'updated_at':(now-timedelta(minutes=1)).isoformat()},
+        {**state(wrong_attempt,'comfy_generating',step=11,steps=30),'attempt_id':'e'*32},
+        state(unknown,'comfy_waiting'),
+    ]
+    with patch.object(f.generation,'tasks',return_value=snapshots):
+        payload=f.client.get('/api/generation/queue',headers=f.headers).json()
+        data={row['id']:row for row in payload['runs']}
+        assert {run_id:row['phase'] for run_id,row in data.items()}=={
+            running:'running',pending:'worker_queue',stale:'awaiting_status',wrong_attempt:'reconnect',
+            waiting:'prepared',unknown:'awaiting_status',
+        }
+        assert data[running]['step']==12 and data[running]['started_at']==started
+        assert data[pending]['started_at'] is None and data[pending]['dispatched_at']==dispatched
+        assert all(row.get('step') is None for run_id,row in data.items() if run_id!=running)
+        completed=jobs.queue('completed',0)['runs'][0]
+        assert completed['started_at']==started and completed['completed_at']==now.isoformat()

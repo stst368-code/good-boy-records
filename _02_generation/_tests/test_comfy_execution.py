@@ -7,7 +7,8 @@ import json
 from pathlib import Path
 import sys
 import threading
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
+from unittest.mock import patch
 import numpy as np
 import pytest
 import soundfile as sf
@@ -16,6 +17,7 @@ import test_execution
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'_99_tools/_workers_comfyui'))
 from client import Client
+from live_progress import comfy_timestamp
 from _gbr_generation.executor import execute
 from _gbr_generation.connections import normalize
 from _gbr_worker.contract import MODEL
@@ -37,7 +39,7 @@ def inventory():
 
 @contextmanager
 def server(drop_ack=False,extensions=True,unknown_code=404,prompt_code=None,busy=False,nodes_override=None,api_prefix='',browser_headers=False,holding=None,targeted_cancel=False,pending=False,cancel_output=False,audio_subtype="PCM_24",sample_rate=44100,channels=2):
-    output=io.BytesIO();wave=np.sin(np.arange(4410)*.05)*.1;sf.write(output,np.stack([wave]*channels,axis=1),sample_rate,format='FLAC',subtype=audio_subtype);audio=output.getvalue();state={'submissions':0,'acked':False,'requests':[],'audio':audio}
+    output=io.BytesIO();wave=np.sin(np.arange(4410)*.05)*.1;sf.write(output,np.stack([wave]*channels,axis=1),sample_rate,format='FLAC',subtype=audio_subtype);audio=output.getvalue();state={'submissions':0,'acked':False,'requests':[],'audio':audio,'pending':pending}
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def route(self):
@@ -53,7 +55,7 @@ def server(drop_ack=False,extensions=True,unknown_code=404,prompt_code=None,busy
             value=json.loads(self.rfile.read(int(self.headers.get('Content-Length',0))))
             if self.path=='/prompt':
                 if prompt_code:self.send_response(prompt_code);self.end_headers();return
-                state['submissions']+=1;state['prompt']=value['prompt'];state['attempt']=value['extra_data']['gbr_attempt_id']
+                state['submissions']+=1;state['prompt']=value['prompt'];state['attempt']=value['extra_data']['gbr_attempt_id'];state['client_id']=value['client_id']
                 if drop_ack:self.send_response(503);self.end_headers();return
                 self.respond({'prompt_id':'owned-prompt'})
             elif self.path=='/gbr/ack' and extensions:
@@ -73,7 +75,7 @@ def server(drop_ack=False,extensions=True,unknown_code=404,prompt_code=None,busy
             elif self.path=='/system_stats':self.respond({'system':{'comfyui_version':'test-boundary'},'devices':[{'name':'test GPU','vram_total':123456789,'vram_free':100000000}]})
             elif self.path=='/queue':
                 own=[[1,'owned-prompt',{}, {'gbr_attempt_id':state['attempt']}]] if state.get('attempt') and holding and not holding.is_set() and not state.get('cancelled') else []
-                self.respond({'queue_running':([[0,'another-job',{},{}]] if busy else [])+([] if pending else own),'queue_pending':own if pending else []})
+                self.respond({'queue_running':([[0,'another-job',{},{}]] if busy else [])+([] if state['pending'] else own),'queue_pending':own if state['pending'] else []})
             elif self.path.startswith('/history'):
                 if holding and not holding.is_set() and not state.get('cancelled'):self.respond({});return
                 history={'prompt':[0,'owned-prompt',{}, {'gbr_attempt_id':state['attempt']}],'status':{'status_str':'success','completed':True,'messages':[['execution_start',{'timestamp':1792400000000}],['execution_cached',{'nodes':['1','2']}],['execution_success',{'timestamp':1792400001500}]]},'outputs':{'9':{'audio':[{'filename':state['attempt']+'_00001_.flac','subfolder':'gbr','type':'output'}]}}}
@@ -112,6 +114,84 @@ def test_comfy_full_publication_and_reconnect_without_duplicate_submission(drop_
             assert fixture.rows("SELECT duration_seconds FROM generation_timing_spans WHERE stage='comfy_execution'")[0][0]==1.5
             models=json.loads(fixture.rows('SELECT actual_models_json FROM generation_attempts')[0][0]);assert models['checkpoint_sha256'] is None
     finally:fixture.doCleanups()
+
+
+def test_comfy_live_steps_are_scoped_to_the_executing_prompt():
+    from websockets.sync.client import connect
+    from websockets.sync.server import serve
+
+    fixture=test_execution.ExecutionTests('runTest');fixture.setUp()
+    hold=threading.Event()
+    queued=threading.Event()
+    sampling=threading.Event()
+    decoding=threading.Event()
+    updates=[]
+    client_ids=[]
+    start=1792400000000
+
+    def progress(**state):
+        updates.append(state)
+        if state['stage']=='comfy_queued':
+            queued.set()
+        elif state.get('step')==11:
+            sampling.set()
+        elif state.get('node_label')=='Decoding audio':
+            decoding.set()
+
+    def websocket(socket):
+        client_ids.append(parse_qs(urlsplit(socket.request.path).query)['clientId'][0])
+        assert queued.wait(5)
+        state['pending']=False
+        def emit(type, prompt_id='owned-prompt', **data):
+            socket.send(json.dumps({'type':type,'data':{'prompt_id':prompt_id,**data}}))
+        socket.send(b'preview frame')
+        emit('progress','another-job',node='6',value=29,max=30)
+        emit('execution_start',timestamp=start)
+        emit('executing',node='6')
+        emit('progress',node='6',value=11,max=30)
+        assert sampling.wait(5)
+        emit('executing',node='8')
+        assert decoding.wait(5)
+        hold.set()
+        emit('execution_success',timestamp=start+1500)
+
+    try:
+        with server(holding=hold, pending=True, busy=True) as (address,state), serve(websocket,'127.0.0.1',0) as stream:
+            socket_port=stream.socket.getsockname()[1]
+            thread=threading.Thread(target=stream.serve_forever,daemon=True)
+            thread.start()
+            watchdog=threading.Timer(12,hold.set)
+            watchdog.start()
+
+            def socket_connect(uri, **options):
+                # The HTTP fixture and websocket server have separate sockets.
+                url=urlsplit(uri)
+                assert url.netloc==urlsplit(address).netloc and url.path=='/ws'
+                return connect(url._replace(netloc=f'127.0.0.1:{socket_port}').geturl(),**options)
+
+            try:
+                fixture.spec.setdefault('batch',{}).update(sampler='euler',scheduler='simple',text_encoder='bf16',dit='fp32')
+                fixture.spec['execution']={'conditioning':{'backend':'comfyui','address':address},'diffusion':{'backend':'comfyui','address':address},'encoding_cache':'prefer'}
+                fixture.spec.pop('model_revision',None)
+                with patch('live_progress.connect',side_effect=socket_connect):
+                    result=execute(fixture.prepare(),progress=progress)
+                assert result['status']=='succeeded',result
+                assert client_ids==[state['client_id']]
+                feedback=[event for event in updates if event.get('step') is not None]
+                assert feedback and all(event['step']==11 and event['steps']==30 and event['node_label']=='Sampling'
+                                        and event['stage']=='comfy_generating' and event['prompt_id']=='owned-prompt'
+                                        for event in feedback)
+                assert feedback[0]['execution_started_at']==comfy_timestamp(start)
+                assert next(item for item in updates if item.get('node_label')=='Decoding audio')['step'] is None
+                assert updates.index(feedback[0]) > next(i for i,event in enumerate(updates) if event['stage']=='comfy_queued')
+                assert state['submissions']==1
+            finally:
+                watchdog.cancel()
+                hold.set()
+                stream.shutdown()
+                thread.join(3)
+    finally:
+        fixture.doCleanups()
 
 
 def test_comfy_url_rejects_credentials_and_unsupported_cache_does_not_reach_server():

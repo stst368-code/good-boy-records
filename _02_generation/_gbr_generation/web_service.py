@@ -31,6 +31,7 @@ class GenerationService:
     def __init__(self, root, review_service):
         self.root, self.review = Path(root), review_service
         self.previews, self.processes, self.secrets = {}, {}, {}
+        self._recovered_controllers = None
         self.lock = threading.RLock()
         from .workers import Workers
         self.workers = Workers(self)
@@ -490,15 +491,21 @@ class GenerationService:
         root = self.runtime / 'app_jobs'
         if not root.is_dir():
             return items
-        folders = [root / identifier for identifier in list(self.processes)] if live_only else sorted(root.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+        if live_only:
+            if self._recovered_controllers is None:
+                self._recovered_controllers = {folder.name for folder in root.iterdir()
+                                               if folder.name not in self.processes and self.active(folder.name)}
+            identifiers = self._recovered_controllers | self.processes.keys()
+            folders = [root / identifier for identifier in identifiers]
+        else:
+            folders = sorted(root.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
         for index,folder in enumerate(folders):
-            if live_only and not self.active(folder.name):continue
-            if index>=50 and not self.active(folder.name):continue
+            active = self.active(folder.name)
+            if (live_only or index>=50) and not active:continue
             if not folder.is_dir() or not (folder / 'task.json').is_file():
                 continue
             task = task_paths(json.loads((folder / 'task.json').read_text(encoding="utf-8")))
             state = read_state(folder/'state.json',{'status':'starting'})
-            active = self.active(folder.name)
             item = {'id': folder.name, 'connection': task['connection'], 'batch_id': task.get('batch_id'), **state,
                     'active': active, 'manifest': task.get('manifest'),'worker_id':task.get('worker_id'),
                     'runpod_pod_id':task.get('runpod_pod_id') or (str(task['worker_id']).split('|',1)[1] if str(task.get('worker_id','')).startswith('runpod|') else None),

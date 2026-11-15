@@ -58,8 +58,8 @@ def main():
             page.wait_for_selector('.generation-file')
             assert page.locator('#genPurpose').input_value() == 'production'
             page.locator('#genQueueTab').click()
-            page.wait_for_selector('.job-batch')
-            assert page.locator('.job-batch').count() == 1
+            page.wait_for_selector('.queue-row')
+            assert page.locator('.queue-row').count() == 1
             assert 'Encoding shortlist' not in page.locator('#genJobs').inner_text()
             page.locator('#genExperimentsTab').click()
             card = page.locator(f'[data-batch="{manifest["batch_id"]}"]')
@@ -98,6 +98,7 @@ def main():
             page.set_viewport_size({'width': 1920, 'height': 1080})
             page.locator('#genSetupTab').click()
             page.locator('#genPurpose').select_option('experiment')
+            page.locator('.generation-advanced > summary').click()
             assert page.locator('#genSeedPolicy').input_value() == 'shared'
             page.locator('#genExperimentLabel').fill('Steps 1–100')
             page.locator('#genCaptionMode').select_option('yaml')
@@ -109,7 +110,7 @@ def main():
             page.wait_for_function('()=>document.getElementById("genPlanSummary").textContent.includes("100 generations")')
             page.locator('#genStart').click()
             page.wait_for_function('()=>document.getElementById("genJobs").textContent.includes("Steps 1–100")')
-            assert page.locator('#genExperimentsTab').get_attribute('class') == 'active'
+            assert page.locator('#genExperimentsTab').get_attribute('aria-selected') == 'true'
             assert f.source.read_bytes() == f.original
             assert not errors, errors
             browser.close()
