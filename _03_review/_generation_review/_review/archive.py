@@ -10,6 +10,8 @@ from .util import digest, now, dumps, slug, inside
 from .native_archive import extend_plan, commit_paths, remove_empty_bundles
 from .metadata_identity import worker_intermediate,archive_naming
 
+OPTIONAL_PROVENANCE = {"generation_report", "source_yaml"}
+
 
 def verified_copy(source, destination, expected, operation_id):
     source, destination = Path(source) if source else None, Path(destination)
@@ -167,26 +169,26 @@ class Archiver:
             if not plan:
                 plan = self.plan(op)
                 self.db.execute("UPDATE archive_operations SET plan_json=?,updated_at=? WHERE id=?", (dumps(plan), now(), op["id"]))
-            missing_reports = set()
+            missing_provenance = set()
             copied = []
             for item in plan["items"]:
                 try:
                     verified_copy(item["source"], item["destination"], item["sha256"], op["id"])
                 except FileNotFoundError:
-                    if (item["kind"] != "generation_report" or Path(item["source"]).exists()
+                    if (item["kind"] not in OPTIONAL_PROVENANCE or Path(item["source"]).exists()
                             or Path(item["destination"]).exists()):
                         raise
-                    missing_reports.add((item["source"], item["sha256"]))
+                    missing_provenance.add((item["source"], item["sha256"]))
                     continue
                 copied.append(item)
-            if missing_reports:
-                # A missing provenance report must not block verified audio and YAML.
+            if missing_provenance:
+                # Optional native provenance can be missing while audio and completed YAML are intact.
                 plan["items"] = copied
                 plan["originals"] = [item for item in plan["originals"]
-                                     if item["kind"] != "generation_report"
-                                     or (item["source"], item["sha256"]) not in missing_reports]
+                                     if item["kind"] not in OPTIONAL_PROVENANCE
+                                     or (item["source"], item["sha256"]) not in missing_provenance]
                 plan["native_artifacts"] = [item for item in plan.get("native_artifacts", [])
-                                            if (item["source"], item["sha256"]) not in missing_reports]
+                                            if (item["source"], item["sha256"]) not in missing_provenance]
             verification = {i["destination"]: {"sha256": i["sha256"], "verified": True} for i in plan["items"]}
             # Validate shared recording even for different FLAC-container encodings.
             if audio_identity(plan["audio_destination"])[0] != op["audio_id"]:
