@@ -167,8 +167,26 @@ class Archiver:
             if not plan:
                 plan = self.plan(op)
                 self.db.execute("UPDATE archive_operations SET plan_json=?,updated_at=? WHERE id=?", (dumps(plan), now(), op["id"]))
+            missing_reports = set()
+            copied = []
             for item in plan["items"]:
-                verified_copy(item["source"], item["destination"], item["sha256"], op["id"])
+                try:
+                    verified_copy(item["source"], item["destination"], item["sha256"], op["id"])
+                except FileNotFoundError:
+                    if (item["kind"] != "generation_report" or Path(item["source"]).exists()
+                            or Path(item["destination"]).exists()):
+                        raise
+                    missing_reports.add((item["source"], item["sha256"]))
+                    continue
+                copied.append(item)
+            if missing_reports:
+                # A missing provenance report must not block verified audio and YAML.
+                plan["items"] = copied
+                plan["originals"] = [item for item in plan["originals"]
+                                     if item["kind"] != "generation_report"
+                                     or (item["source"], item["sha256"]) not in missing_reports]
+                plan["native_artifacts"] = [item for item in plan.get("native_artifacts", [])
+                                            if (item["source"], item["sha256"]) not in missing_reports]
             verification = {i["destination"]: {"sha256": i["sha256"], "verified": True} for i in plan["items"]}
             # Validate shared recording even for different FLAC-container encodings.
             if audio_identity(plan["audio_destination"])[0] != op["audio_id"]:

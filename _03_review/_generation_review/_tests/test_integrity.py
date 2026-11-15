@@ -196,3 +196,16 @@ def test_backup_consistent_and_password_hash(service,tmp_path):
     hashed=password_hash('ten-char-password')
     assert password_ok('ten-char-password',hashed) and not password_ok('wrong',hashed)
     assert 'ten-char-password' not in hashed
+def test_archive_retries_with_missing_generation_report(service):
+    path, _, gid = track(service)
+    complete(service, gid)
+    op = service.db.one('SELECT * FROM archive_operations')
+    plan = service.archiver.plan(op)
+    report = {'kind': 'generation_report', 'source': str(path.with_suffix('.generation.json')),
+              'destination': plan['audio_destination'] + '.generation.json', 'sha256': 'a' * 64}
+    plan['items'].append(report)
+    service.db.execute("UPDATE archive_operations SET status='pending',plan_json=? WHERE id=?",
+                       (dumps(plan), op['id']))
+    archive_all(service)
+    assert service.db.one('SELECT status FROM archive_operations')['status'] == 'done'
+    assert not path.exists()
