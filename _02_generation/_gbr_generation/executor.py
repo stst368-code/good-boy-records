@@ -14,7 +14,7 @@ import uuid
 
 from .planner import json_text, open_database, sha, verify_plan, write_completed_yaml, write_new
 from .yaml_document import YamlDocument
-from .cancellation import discard as discard_cancelled,verify as verify_cancelled
+from .cancellation import discard as discard_cancelled,verify as verify_cancelled,update_batch_status
 from _gbr_layout import request_paths
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -580,7 +580,7 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
                 else:
                     write_new(receipt, json_text(evidence).encode('utf-8'))
                 conn.execute('BEGIN IMMEDIATE')
-                if conn.execute('SELECT status FROM generation_runs WHERE id=?',(run['id'],)).fetchone()[0]=='cancel_requested':
+                if conn.execute('SELECT status FROM generation_runs WHERE id=?',(run['id'],)).fetchone()[0] in {'cancel_requested','cancelled'}:
                     conn.rollback();raise Cancelled('Cancelled before publication')
                 conn.execute("UPDATE generation_runs SET status='publishing' WHERE id=?",(run['id'],));conn.commit()
                 notify('publishing')
@@ -636,8 +636,6 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
             if error and not was_cancelled:
                 break
         with conn:
-            statuses = [r[0] for r in conn.execute("SELECT status FROM generation_runs WHERE batch_id=?", (manifest["batch_id"],))]
-            batch_status = "succeeded" if all(s == "succeeded" for s in statuses) else "running" if any(s in {'running','publishing','cancel_requested'} for s in statuses) else "failed" if 'failed' in statuses else "prepared" if 'prepared' in statuses else 'cancelled'
-            conn.execute("UPDATE generation_batches SET status=? WHERE id=?", (batch_status, manifest["batch_id"]))
+            batch_status = update_batch_status(conn,manifest["batch_id"])
     return {"batch_id": manifest["batch_id"], "status": batch_status, "attempts": results}
 

@@ -131,6 +131,8 @@ def main():
             assert not any(url.endswith('/generation/jobs?purpose=production') for url in requests)
             page.set_viewport_size({'width':390,'height':844})
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            attention=statuses.get_by_role('tab',name='Needs attention')
+            assert attention.evaluate('el=>el.getBoundingClientRect().right<=innerWidth')
             if args.screenshots:
                 page.screenshot(path=str(args.screenshots/'generation-queue-mobile.png'),full_page=True)
             page.set_viewport_size({'width':1920,'height':1080})

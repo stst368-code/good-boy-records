@@ -1,6 +1,6 @@
 import {initQueue, phaseLabel, stepText} from './queue.js';
 import {experimentPublishing} from "/tools/generation/experiment-publishing.js";
-const LABELS={completed:'Complete',prepared:'Queued',running:'Active',publishing:'Finalising',cancel_requested:'Cancelling',cancelled:'Cancelled',succeeded:'Complete',failed:'Failed',waiting_worker:'Worker busy · waiting',paused:'Paused',queue_complete:'Queue finished',starting_worker:'Starting worker',comfy_queued:'Queued in ComfyUI',comfy_generating:'Generating in ComfyUI',conditioning:'Text conditioning',diffusion:'Diffusion',decode:'Decoding audio',write_flac:'Writing FLAC',downloading:'Downloading audio',cancel_after_generation:'Finishes current generation, then discards output',dedicated_generating:'Generating on pod',serverless_generating:'Generating serverless',reconnect:'Reconnect needed'};
+const LABELS={completed:'Complete',prepared:'Queued',running:'Active',publishing:'Finalising',cancel_requested:'Cancel requested',cancelled:'Cancelled',succeeded:'Complete',failed:'Failed',waiting_worker:'Worker busy · waiting',paused:'Paused',queue_complete:'Queue finished',starting_worker:'Starting worker',comfy_queued:'Queued in ComfyUI',comfy_generating:'Generating in ComfyUI',conditioning:'Text conditioning',diffusion:'Diffusion',decode:'Decoding audio',write_flac:'Writing FLAC',downloading:'Downloading audio',cancel_after_generation:'Finishes current generation, then discards output',dedicated_generating:'Generating on pod',serverless_generating:'Generating serverless',reconnect:'Reconnect needed'};
 const label=value=>LABELS[value]||String(value||'Waiting').replaceAll('_',' ');
 const workerName=value=>value?.startsWith('local|')?'This PC':value?.replace(/^comfyui\|/,'ComfyUI · ').replace(/^runpod_dedicated\|/,'Pod · ').replace(/^runpod_serverless\|/,'Serverless · ')||'Next available worker';
 const node=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
@@ -107,11 +107,22 @@ export function initJobs({root:container,api,toast,onQueued}){
     });
     e.refreshLog=load;e.addEventListener('toggle',load);if(e.open)load();return e;
   }
+  function updateCounts(element, batch) {
+    const counts = batch.counts;
+    element.replaceChildren(node('span', 'complete', `${counts.succeeded || 0} / ${batch.total} complete`));
+    for (const [status, label, count] of [
+      ['assigned', 'assigned', (counts.running || 0) + (counts.publishing || 0)],
+      ['queued', 'queued', counts.prepared],
+      ['cancel_requested', 'with cancellation requested', counts.cancel_requested],
+      ['cancelled', 'cancelled', counts.cancelled],
+      ['failed', 'failed', counts.failed],
+    ]) if (count) element.append(node('span', status, `${count} ${label}`));
+  }
   function card(batch){
     const e=node('article','job-batch '+batch.section);e.dataset.batch=batch.id;
     const c=batch.counts,header=node('div','job-batch-heading'),title=node('div');title.append(node('h3','',`${batch.purpose==='experiment'?'Experiment':'Batch'} ${batch.experiment_label||batch.id.slice(0,8)}`),node('span','subtle small',time(batch.created_at)));header.append(title,node('span','job-status '+batch.status,label(batch.status)));e.append(header);
     const completed=c.succeeded||0,ended=completed+(c.cancelled||0)+(c.failed||0),bar=node('progress','job-batch-progress');bar.max=batch.total||1;bar.value=ended;bar.setAttribute('aria-label','Configurations resolved');e.append(bar);
-    const counts=node('div','job-counts');counts.append(node('span','complete',`${completed} / ${batch.total} complete`));for(const [name,n]of [['assigned',(c.running||0)+(c.publishing||0)],['queued',c.prepared||0],['cancelled',(c.cancelled||0)+(c.cancel_requested||0)],['failed',c.failed||0]])if(n)counts.append(node('span',name,`${n} ${name}`));e.append(counts,workerControls(batch),assignmentControls(batch));
+    const counts=node('div','job-counts');updateCounts(counts,batch);e.append(counts,workerControls(batch),assignmentControls(batch));
     const tools=node('div','experiment-batch-tools');
     if(batch.purpose==='experiment'){const caption=node('label','','Order results'),sort=node('select');sort.setAttribute('aria-label','Order experiment results');for(const [name,value] of [['Generation order','created'],['Steps · low to high','steps'],['Total time · fastest first','time']])sort.append(new Option(name,value));sort.value=state.sorts.get(batch.id)||'created';sort.onchange=guard(async()=>{state.sorts.set(batch.id,sort.value);state.pages.delete(batch.id);await loadRuns(batch.id);render();});caption.append(sort);tools.append(caption);}
     const download=node('a','experiment-export','Export performance CSV');download.href=`/api/generation/jobs/${batch.id}/performance.csv`;tools.append(download);e.append(tools);if(batch.purpose==='experiment')e.append(publication.controls(batch));
@@ -124,7 +135,7 @@ export function initJobs({root:container,api,toast,onQueued}){
     if(batch.purpose==='experiment')publication.update(existing.querySelector('.comparison-publishing'),batch);
     const badge=existing.querySelector('.job-batch-heading .job-status');badge.className='job-status '+batch.status;badge.textContent=label(batch.status);
     const bar=existing.querySelector('.job-batch-progress'),c=batch.counts;bar.max=batch.total||1;bar.value=(c.succeeded||0)+(c.cancelled||0)+(c.failed||0);
-    const counts=existing.querySelector('.job-counts');counts.replaceChildren(node('span','complete',`${c.succeeded||0} / ${batch.total} complete`));for(const [name,n]of [['assigned',(c.running||0)+(c.publishing||0)],['queued',c.prepared||0],['cancelled',(c.cancelled||0)+(c.cancel_requested||0)],['failed',c.failed||0]])if(n)counts.append(node('span',name,`${n} ${name}`));
+    updateCounts(existing.querySelector('.job-counts'),batch);
     const fingerprint=JSON.stringify(batch.workers,(key,value)=>key==='updated_at'?undefined:value);
     if(existing.dataset.workers!==fingerprint){existing.querySelector('.job-workers').replaceWith(workerControls(batch));existing.dataset.workers=fingerprint;}
     const assignment=JSON.stringify([!!batch.counts.prepared,batch.automatic_workers,batch.available_workers,batch.worker_notices]);if(existing.assignmentSignature!==assignment){existing.querySelector('.job-assignment').replaceWith(assignmentControls(batch));existing.assignmentSignature=assignment;}
@@ -159,6 +170,7 @@ export function initJobs({root:container,api,toast,onQueued}){
     const sequence=++state.sequence,data=await api('/generation/jobs?purpose='+state.purpose);if(sequence!==state.sequence)return;state.jobs=data.jobs;for(const job of data.jobs)if(state.open.has(job.id+'/runs'))await loadRuns(job.id,false,sequence);if(sequence!==state.sequence)return;render();await Promise.all([...root.querySelectorAll('details[open]')].filter(e=>e.refreshLog).map(e=>e.refreshLog()));onQueued?.(data);return data;}
   return {
     refresh,
+    focusBatch: queue.focusBatch,
     setPurpose(purpose) {
       if (state.purpose === purpose) return;
       state.purpose = purpose;

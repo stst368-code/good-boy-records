@@ -2,6 +2,7 @@
 import hashlib
 import json
 from pathlib import Path
+import re
 import time
 import uuid
 from urllib.error import HTTPError,URLError
@@ -61,6 +62,32 @@ class Client:
     def request(self,path,data=None,timeout=45):
         self._prefix(timeout)
         with self._open(self.prefix+path,data,timeout) as response:return json.load(response)
+    def prompt_queue(self, timeout=45):
+        queue = self.request('/queue',timeout=timeout)
+        if not isinstance(queue,dict) or any(
+            not isinstance(queue.get(key),list) or any(
+                not isinstance(row,list) or len(row)<2 or not isinstance(row[1],str) for row in queue[key]
+            ) for key in ('queue_running','queue_pending')
+        ):
+            raise ValueError('ComfyUI did not return a valid prompt queue')
+        return queue
+    def cancel_prompt(self, prompt_id, *, timeout=15):
+        if not re.fullmatch('[A-Za-z0-9_-]+',prompt_id):
+            raise ValueError('Invalid ComfyUI prompt ID')
+        try:
+            self._prefix(timeout)
+            with self._open('/api/jobs/'+prompt_id+'/cancel',{},timeout=timeout) as response:
+                reply=json.load(response)
+            return bool(isinstance(reply,dict) and reply.get('cancelled')), True
+        except HTTPError as error:
+            if error.code not in (404,405,501):raise
+        except (ValueError,UnicodeDecodeError):
+            pass
+        return False, False
+    def delete_pending_prompts(self, prompt_ids, *, timeout=15):
+        self._prefix(timeout)
+        with self._open(self.prefix+'/queue',{'delete':prompt_ids},timeout=timeout) as response:
+            response.read()
     def capabilities(self,timeout=5):
         # Stock ComfyUI may route absent extension URLs to a static handler.
         try:
@@ -126,7 +153,10 @@ class Client:
             return subscription
         live = None
         try:
-            if journal.is_file():ref=json.loads(journal.read_text(encoding="utf-8"))
+            if journal.is_file():
+                ref=json.loads(journal.read_text(encoding="utf-8"))
+                if ref.get('attempt_id')!=job['attempt_id']:
+                    raise RemotePending('The saved ComfyUI prompt belongs to a different attempt')
             else:
                 check_cancel(cancelled)
                 prepared=self.prepare(job);compiled=prepared['compiled'];identity=prepared['identity'];hardware=prepared['hardware'];system=prepared['system']
@@ -173,41 +203,35 @@ class Client:
 
             deadline=time.monotonic()+7200
             cancel_sent=False;targeted_available=True
+            def owns(item):
+                return len(item)>3 and isinstance(item[3],dict) and item[3].get('gbr_attempt_id')==job['attempt_id']
             while time.monotonic()<deadline:
                 cancel_requested = bool(cancelled and cancelled())
                 if cancel_requested and not cancel_sent:
-                    queue=self.request('/queue')
-                    owned=[row for row in [*queue.get('queue_running',[]),*queue.get('queue_pending',[])] if row[1]==ref['prompt_id'] and row[3].get('gbr_attempt_id')==job['attempt_id']]
+                    queue=self.prompt_queue()
+                    visible=[*queue['queue_running'],*queue['queue_pending']]
+                    owned=[row for row in visible if row[1]==prompt_id and owns(row)]
                     if not owned:
-                        prior=self.request('/history/'+ref['prompt_id']).get(ref['prompt_id'],{}).get('prompt',[])
-                        if len(prior)<4 or prior[3].get('gbr_attempt_id')!=job['attempt_id']:raise RemotePending('Cannot verify cancellation ownership; reconnect to the saved attempt')
-                    # The modern ID-scoped API is atomic. Never fall back to
-                    # the old global /interrupt endpoint on an older server.
-                    if targeted_available:
-                        try:
-                            self._prefix(45)
-                            with self._open('/api/jobs/'+ref['prompt_id']+'/cancel',{},timeout=15) as response:reply=json.load(response)
-                            cancel_sent=bool(reply.get('cancelled'))
-                        except HTTPError as error:
-                            if error.code not in (404,405,501):raise
-                            targeted_available=False
-                        except (ValueError,UnicodeDecodeError):targeted_available=False
-                    if not targeted_available:
-                        queue=self.request('/queue')
-                        own=[row for row in queue.get('queue_pending',[]) if row[1]==ref['prompt_id'] and row[3].get('gbr_attempt_id')==job['attempt_id']]
-                        if own:
-                            self._prefix(45)
-                            with self._open(self.prefix+'/queue',{'delete':[ref['prompt_id']]}) as response:response.read()
+                        if any(row[1]==prompt_id or owns(row) for row in visible):
+                            raise RemotePending('Cannot verify cancellation ownership; reconnect to the saved attempt')
+                        cancel_sent=True  # A saved prompt ID can already have left the queue.
+                    else:
+                        if targeted_available:
+                            cancel_sent,targeted_available=self.cancel_prompt(prompt_id)
+                        if not targeted_available and any(row[1]==prompt_id and owns(row) for row in queue['queue_pending']):
+                            self.delete_pending_prompts([prompt_id])
                             cancel_sent=True
-                        else:progress('cancel_after_generation',message='This server cannot safely interrupt one prompt; its output will be discarded when it finishes.')
+                        elif not targeted_available:
+                            progress('cancel_after_generation',message='This server cannot safely interrupt one prompt; its output will be discarded when it finishes.')
                     if cancel_sent:progress('cancelling')
                 history=self.request('/history/'+ref['prompt_id']).get(ref['prompt_id'])
                 if cancel_sent:
-                    queue=self.request('/queue')
-                    if not any(row[1]==ref['prompt_id'] for row in [*queue.get('queue_running',[]),*queue.get('queue_pending',[])]):
+                    queue=self.prompt_queue()
+                    if not any(row[1]==prompt_id for row in [*queue['queue_running'],*queue['queue_pending']]):
                         # Completion can win the cancellation race. Fetch the
                         # owned FLAC so normal verified discard/ack removes it.
-                        files=[f for output in (history or {}).get('outputs',{}).values() for f in output.get('audio',[]) if f.get('filename','').endswith('.flac')]
+                        outputs=(history or {}).get('outputs',{}) if owns((history or {}).get('prompt',[])) else {}
+                        files=[f for output in outputs.values() for f in output.get('audio',[]) if f.get('filename','').endswith('.flac')]
                         if len(files)==1:ref['file']=files[0];break
                         record_start(execution_stamps(history).get('execution_start'))
                         raise Cancelled('ComfyUI confirmed this prompt is no longer running or queued')

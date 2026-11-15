@@ -157,6 +157,36 @@
   flex-wrap: wrap;
   min-height: 59px;
 }
+.queue-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px 1px;
+}
+.queue-filters input,
+.queue-filters select {
+  width: auto;
+  min-height: 38px;
+  font-size: 13px;
+}
+.queue-filters input {
+  flex: 1 1 180px;
+  max-width: 340px;
+  min-width: 0;
+}
+.queue-job-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.queue-job-filter button {
+  min-height: 36px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
 .queue-actions,
 .queue-pagination {
   display: flex;
@@ -275,6 +305,7 @@
 .queue-row[data-phase=succeeded] .queue-state { color: #a9d6bd; }
 .queue-row[data-phase=failed] .queue-state,
 .queue-row[data-phase=interrupted] .queue-state,
+.queue-row[data-phase=cancel_unconfirmed] .queue-state,
 .queue-row[data-phase=reconnect] .queue-state { color: #efa99c; }
 .queue-progress {
   display: block;
@@ -347,8 +378,10 @@
   }
   .generation-queue-tabs {
     padding-inline: 4px;
+    flex-wrap: wrap;
   }
   .queue-toolbar-actions,
+  .queue-filters,
   .queue-footer {
     padding-inline: 12px;
   }

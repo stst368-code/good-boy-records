@@ -183,6 +183,7 @@ def ensure_queue_order(conn):
         run_id TEXT PRIMARY KEY REFERENCES generation_runs(id) ON DELETE CASCADE,
         position INTEGER NOT NULL
     )""")
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_runs_batch_status ON generation_runs(batch_id,status)')
 
 
 def open_database(path):

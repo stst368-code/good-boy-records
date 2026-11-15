@@ -169,9 +169,18 @@ def main():
                 page.wait_for_selector('#genPlan:not([hidden])')
                 assert '1 ready' in page.locator('#genPlanSummary').inner_text()
                 assert not boundary.calls
-                page.locator('#genStart').click()
+                page.locator('#genQueueTab').click()
+                page.get_by_role('tab',name='Completed',exact=False).click()
+                page.get_by_role('searchbox',name='Find generation runs').fill('a previous search')
+                page.locator('#genSetupTab').click()
+                with page.expect_response('**/api/generation/start') as submitted:
+                    page.locator('#genStart').click()
+                batch_id = submitted.value.json()['batch_id']
+                page.locator('.queue-job-filter',has_text=f'Job {batch_id[:8]}').wait_for()
+                assert page.get_by_role('searchbox',name='Find generation runs').input_value()==''
                 page.get_by_role('tab',name='Completed',exact=False).click()
                 page.locator('.queue-row[data-phase=succeeded]').wait_for()
+                assert page.locator('.queue-row .queue-job code').get_attribute('title')==batch_id
                 page.locator('.job-controls > summary').click()
                 page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('1 / 1 complete')")
                 assert len(boundary.calls) == 1
@@ -192,7 +201,7 @@ def main():
                 page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('CPU boundary fixture')")
                 page.locator('#listenTab').click()
                 page.wait_for_selector('#reviewCard:not([hidden])')
-                assert '1 left' in page.locator('#queueCount').inner_text()
+                page.wait_for_function("()=>document.getElementById('queueCount').textContent.includes('1 left')")
                 for dimension in ('audio_quality', 'composition', 'consistency', 'realism'):
                     page.locator(f'[data-dimension={dimension}] .rating-values [data-score="5"]').click()
                 page.wait_for_function("()=>document.getElementById('queueCount').textContent.includes('0 left')")

@@ -7,6 +7,7 @@ import threading
 import uuid
 
 from .assignments import admission,policy
+from .cancellation import CancellationRecovery
 from .connections import execution,connection_key
 from .planner import open_database,sha,json_text,write_new
 from _gbr_worker.contract import SMOKE_MODEL_REVISION
@@ -18,6 +19,7 @@ LOG=logging.getLogger('gbr_dispatch')
 class Dispatcher:
     def __init__(self,generation):
         self.g=generation;self.stop=threading.Event();self.wake=threading.Event();self.thread=None;self.notices={};self.incompatible={}
+        self.cancellations = CancellationRecovery(generation)
 
     def start(self):
         if self.thread and self.thread.is_alive():return
@@ -124,6 +126,10 @@ class Dispatcher:
     def tick(self):
         from .jobs import Jobs
         if not self.g.shared_ready():return
+        try:
+            self.cancellations.reconcile()
+        except (OSError,ValueError,RuntimeError):
+            LOG.exception('Could not reconcile generation cancellations')
         tasks=self.g.tasks(False);active={t.get('batch_id') for t in tasks if t['active'] and t.get('batch_id')}
         if not active:return
         entries=[e for e in self.g.workers.entries() if self.g.workers.automatic(e)]

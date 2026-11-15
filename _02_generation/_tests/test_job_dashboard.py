@@ -175,6 +175,112 @@ def test_flat_queue_promotes_next_worker_claim_and_separates_cancelled_runs(setu
     assert jobs.queue('cancelled', 0)['runs'][0]['id'] == middle
 
 
+def test_new_batch_is_visible_with_a_thousand_old_runs_and_abandoned_cancellations(setup):
+    f,jobs=setup
+    _,old=batch(f,1)
+    _,recent=batch(f,2)
+    recent_ids=[run['id'] for run in recent['runs']]
+    with closing(open_database(f.database)) as db, db:
+        db.execute("UPDATE generation_batches SET created_at='2000-01-01T00:00:00Z' WHERE id=?",(old['batch_id'],))
+        db.execute("UPDATE generation_runs SET title='CofetĂrie Nouă' WHERE id=?",(recent_ids[0],))
+        db.execute("""
+            WITH RECURSIVE backlog(i) AS (VALUES (1) UNION ALL SELECT i+1 FROM backlog WHERE i<999)
+            INSERT INTO generation_runs(id,batch_id,source_sha256,title,status,requested_json,effective_json,created_at)
+            SELECT printf('%032x',i),batch_id,source_sha256,'Older track',
+                CASE WHEN i<=500 THEN 'cancel_requested' ELSE 'prepared' END, '{}','{}',created_at
+            FROM backlog CROSS JOIN generation_runs WHERE id=?
+            """,(old['runs'][0]['id'],))
+    url='/api/generation/queue'
+    queue=f.client.get(url,headers=f.headers).json()
+    assert [r['id'] for r in queue['runs'][:2]]==recent_ids
+    assert queue['waiting']==queue['counts']['queued']==502 and queue['counts']['attention']==500
+    oldest=f.client.get(url,params={'order':'dispatch'},headers=f.headers).json()
+    assert oldest['runs'][0]['batch_id']==old['batch_id']
+    scoped=f.client.get(url,params={'batch':recent['batch_id']},headers=f.headers).json()
+    assert scoped['counts']['attention']==0 and [r['id'] for r in scoped['runs']]==recent_ids
+    matched=f.client.get(url,params={'q':'COFETĂRIE'},headers=f.headers).json()
+    assert [r['id'] for r in matched['runs']]==recent_ids[:1]
+    f.generation.dispatcher.tick()
+    queue=jobs.queue('queued',0)
+    assert queue['counts']['attention']==0 and queue['counts']['cancelled']==500 and queue['waiting']==502
+    cancelled=jobs.queue('cancelled',0)['runs']
+    assert len(cancelled)==50 and all(r['completed_at'] for r in cancelled)
+    assert not list(f.generation.generated.rglob('*.flac'))
+
+
+def test_bulk_cancel_is_idempotent_and_preserves_publishing_and_finished_runs(setup):
+    f,jobs=setup
+    _,manifest=batch(f,5)
+    prepared,running,publishing,completed,failed=[run['id'] for run in manifest['runs']]
+    with closing(open_database(f.database)) as db, db:
+        db.executemany('UPDATE generation_runs SET status=? WHERE id=?',
+                       [('running',running),('publishing',publishing),('succeeded',completed),('failed',failed)])
+    url='/api/generation/queue/cancel'
+    selection={'run_ids':[prepared,prepared,running,publishing,completed,failed,'f'*32]}
+    result=f.client.post(url,headers=f.headers,json=selection)
+    assert result.status_code==200 and result.json()=={'cancelled':1,'requested':1,'unavailable':4}
+    cancelled=jobs.queue('cancelled',0)['runs'][0]
+    assert cancelled['id']==prepared and cancelled['completed_at']
+    assert f.client.post(url,headers=f.headers,json=selection).json()==result.json()
+    assert jobs.queue('cancelled',0)['runs'][0]['completed_at']==cancelled['completed_at']
+    with closing(open_database(f.database)) as db:
+        assert dict(db.execute('SELECT id,status FROM generation_runs'))=={
+            prepared:'cancelled',running:'cancel_requested',publishing:'publishing',completed:'succeeded',failed:'failed',
+        }
+
+
+def test_detached_comfy_cancellations_are_confirmed_only_for_owned_or_ended_prompts(setup):
+    f,jobs=setup
+    path,manifest=batch(f,5)
+    gone,pending,foreign,terminated,preserved=[run['id'] for run in manifest['runs']]
+    recovery=f.generation.dispatcher.cancellations
+    now=datetime.now(timezone.utc)
+    started=(now-timedelta(minutes=10)).isoformat()
+    hold=threading.Event()
+    with server(holding=hold,pending=True,busy=True) as (address,state):
+        stopped='https://stopped-pod-8188.proxy.runpod.net'
+        with closing(open_database(f.database)) as db, db:
+            for number,(run_id,prompt,worker) in enumerate([
+                (gone,'already-gone',address),(pending,'owned-prompt',address),(foreign,'another-job',address),
+                (terminated,None,stopped),(preserved,'owned-output',address),
+            ],1):
+                attempt=f'{number:032x}'
+                db.execute("UPDATE generation_runs SET status='cancel_requested',started_at=? WHERE id=?",(started,run_id))
+                db.execute('INSERT INTO generation_attempts VALUES(?,?,?,?,?,?,?,?,?,?)',
+                           (attempt,run_id,None,'full_generation','running','comfyui','{}',started,None,None))
+                directory=path.parent/'attempts'/attempt
+                directory.mkdir(parents=True)
+                target={'backend':'comfyui','address':worker}
+                (directory/'request.json').write_text(json.dumps({'run_id':run_id,'attempt_id':attempt,
+                    'execution':{'conditioning':target,'diffusion':target}}),encoding='utf-8')
+                if prompt:
+                    (directory/'comfy.json').write_text(json.dumps({'attempt_id':attempt,'prompt_id':prompt}),encoding='utf-8')
+                if run_id==pending:
+                    state['attempt']=attempt
+                if run_id==preserved:
+                    output=f.root/'already-saved'
+                    output.mkdir()
+                    audio=output/'audio.flac'
+                    audio.write_bytes(b'existing recording')
+                    db.execute('INSERT INTO generation_execution_state VALUES(?,?,?,?)',(run_id,None,'saved',str(output)))
+        worker={'runpod':{'pod_id':'stopped-pod','state':'TERMINATED','last_discovery':now.timestamp()}}
+        with patch.object(f.generation.workers,'entries',return_value=[worker]):
+            recovery.reconcile([])
+        assert {r['id'] for r in jobs.queue('cancelled',0)['runs']}=={gone,terminated}
+        assert [request for request in state['requests'] if request[0]=='POST']==[('POST','/queue')]
+        assert 'ownership' in recovery.notices[foreign]
+        assert 'saved output' in recovery.notices[preserved]
+        recovery.reconcile([])
+        assert {r['id'] for r in jobs.queue('cancelled',0)['runs']}=={gone,terminated,pending}
+        assert audio.read_bytes()==b'existing recording'
+        assert {r['id'] for r in jobs.queue('attention',0)['runs']}=={foreign,preserved}
+        from _gbr_generation.executor import ComfyClient
+        with patch.object(ComfyClient,'prompt_queue',side_effect=OSError('worker offline')):
+            recovery.reconcile([])
+        assert 'Could not confirm' in recovery.notices[foreign]
+        assert {r['id'] for r in jobs.queue('attention',0)['runs']}=={foreign,preserved}
+
+
 def test_flat_queue_reports_only_fresh_owned_comfy_activity_and_real_times(setup):
     f,jobs=setup
     _,manifest=batch(f,7)
@@ -209,9 +315,12 @@ def test_flat_queue_reports_only_fresh_owned_comfy_activity_and_real_times(setup
         payload=f.client.get('/api/generation/queue',headers=f.headers).json()
         data={row['id']:row for row in payload['runs']}
         assert {run_id:row['phase'] for run_id,row in data.items()}=={
-            running:'running',pending:'worker_queue',stale:'awaiting_status',wrong_attempt:'reconnect',
+            running:'running',pending:'worker_queue',stale:'awaiting_status',
             waiting:'prepared',unknown:'awaiting_status',
         }
+        assert payload['counts']['attention']==1
+        attention=jobs.queue('attention',0)['runs']
+        assert [(row['id'],row['phase']) for row in attention]==[(wrong_attempt,'reconnect')]
         assert data[running]['step']==12 and data[running]['started_at']==started
         assert data[pending]['started_at'] is None and data[pending]['dispatched_at']==dispatched
         assert all(row.get('step') is None for run_id,row in data.items() if run_id!=running)

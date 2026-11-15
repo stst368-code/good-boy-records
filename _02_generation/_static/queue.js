@@ -5,6 +5,7 @@ const tabs = [
   ['completed', 'Completed', 'No completed runs.'],
   ['cancelled', 'Cancelled', 'No cancelled runs.'],
   ['failed', 'Failed', 'No failed runs.'],
+  ['attention', 'Needs attention', 'No interrupted runs or unconfirmed cancellations.'],
 ];
 const pageSize = 50;
 const phases = {
@@ -13,7 +14,10 @@ const phases = {
   worker_queue: 'Queued on worker',
   running: 'Running',
   finalising: 'Finalising',
+  cancel_requested: 'Cancel requested',
   cancelling: 'Cancelling',
+  finishing_to_cancel: 'Finishing before cancellation',
+  cancel_unconfirmed: 'Cancellation unconfirmed',
   reconnect: 'Reconnect needed',
   interrupted: 'Interrupted',
   awaiting_status: 'Awaiting status',
@@ -104,6 +108,17 @@ export function initQueue({api, toast}) {
   element.append(list, ...entries.map(entry => entry.panel));
 
   const content = node('div');
+  const filters = node('div', 'queue-filters');
+  const search = node('input');
+  search.type = 'search';
+  search.maxLength = 200;
+  search.placeholder = 'Track title or job ID';
+  search.setAttribute('aria-label', 'Find generation runs');
+  const order = node('select');
+  order.setAttribute('aria-label', 'Order queued runs');
+  order.append(new Option('Newest jobs first', 'newest'), new Option('Oldest jobs first', 'dispatch'));
+  const scope = node('div', 'queue-job-filter');
+  const scopeText = node('span');
   const toolbar = node('div', 'queue-toolbar-actions');
   const actions = node('div', 'queue-actions');
   const pickAll = node('input');
@@ -127,6 +142,10 @@ export function initQueue({api, toast}) {
   table.append(grid);
 
   let tab = 'queued';
+  let searchText = '';
+  let searchTimer;
+  let batchId = null;
+  let revealBatch = false;
   let offset = 0;
   let sequence = 0;
   let pending = null;
@@ -158,28 +177,30 @@ export function initQueue({api, toast}) {
   }
 
   const cancel = button('Cancel selected', async () => {
-    const runs = [...selected.values()];
-    if (!runs.length || !window.confirm(`Cancel ${runs.length} selected runs?`)) return;
+    const runIds = [...selected.keys()];
+    if (!runIds.length || !window.confirm(`Cancel ${runIds.length} selected runs?`)) return;
     await changeQueue(async () => {
-      const failures = [];
-      for (const run of runs) {
-        try {
-          await api(`/generation/jobs/${run.batch_id}/runs/${run.id}/cancel`, {});
-          selected.delete(run.id);
-        } catch (error) {
-          failures.push(error.message);
-        }
-      }
-      if (failures.length) toast(`${failures.length} could not be cancelled. ${failures[0]}`);
+      const result = await api('/generation/queue/cancel', {run_ids:runIds});
+      selected.clear();
+      toast([
+        result.cancelled && `${result.cancelled} cancelled`,
+        result.requested && `${result.requested} cancellation requests sent`,
+        result.unavailable && `${result.unavailable} already finished or unavailable`,
+      ].filter(Boolean).join(' · '));
     });
   }, 'queue-cancel');
   const reorder = action => changeQueue(() => api('/generation/queue/order', {
-    action, run_ids: [...selected.keys()],
+    action, run_ids: [...selected.keys()], batch_id:batchId,
   }));
   const promote = button('Move to front', () => reorder('promote'));
   promote.title = 'Move selected queued runs to the front of their jobs';
   const shuffle = button('Shuffle within jobs', () => reorder('shuffle'));
   const range = node('span', 'queue-range');
+  const clearJob = button('All jobs', () => {
+    batchId = null;
+    revealBatch = false;
+    return changePage(0);
+  });
   const previous = button('Previous', () => changePage(offset - pageSize));
   const next = button('Next', () => changePage(offset + pageSize));
   const pager = node('div', 'queue-pagination');
@@ -187,12 +208,14 @@ export function initQueue({api, toast}) {
   const footer = node('div', 'queue-footer');
   footer.append(range, pager);
   actions.append(pickLabel, promote, shuffle, cancel);
+  scope.append(scopeText, clearJob);
+  filters.append(search, order, scope);
   toolbar.append(actions, health);
-  content.append(toolbar, notice, table, footer);
+  content.append(filters, toolbar, notice, table, footer);
   entries[0].panel.append(content);
   table.hidden = footer.hidden = true;
 
-  function changePage(newOffset) {
+  function resetPage(newOffset = 0) {
     offset = Math.max(0, newOffset);
     displayed = [];
     selected.clear();
@@ -200,25 +223,31 @@ export function initQueue({api, toast}) {
     notice.hidden = false;
     notice.textContent = 'Loading runs…';
     syncSelection();
+  }
+
+  function changePage(newOffset) {
+    resetPage(newOffset);
     return refresh();
   }
 
-  bindTabs({
+  const selectTab = bindTabs({
     list, entries, label: 'Run status', initial: tab,
     onSelect(name) {
       if (name === tab) return;
       tab = name;
-      offset = 0;
-      displayed = [];
-      selected.clear();
       entries.find(entry => entry.name === tab).panel.append(content);
-      table.hidden = footer.hidden = true;
-      notice.hidden = false;
-      notice.textContent = 'Loading runs…';
-      syncSelection();
-      refresh().catch(() => {});
+      return changePage(0)?.catch(error => toast(error.message));
     },
   });
+
+  search.oninput = () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      searchText = search.value.trim();
+      changePage(0)?.catch(error => toast(error.message));
+    }, 180);
+  };
+  order.onchange = () => changePage(0)?.catch(error => toast(error.message));
 
   function syncSelection() {
     const selectable = displayed.filter(cancellable);
@@ -226,7 +255,10 @@ export function initQueue({api, toast}) {
     pickAll.disabled = acting || !selectable.length;
     pickAll.checked = checked > 0 && checked === selectable.length;
     pickAll.indeterminate = checked > 0 && !pickAll.checked;
-    actions.hidden = tab !== 'queued';
+    actions.hidden = tab !== 'queued' && tab !== 'attention';
+    promote.hidden = shuffle.hidden = order.hidden = tab !== 'queued';
+    scope.hidden = !batchId;
+    scopeText.textContent = batchId ? 'Job ' + batchId.slice(0,8) : '';
     cancel.textContent = selected.size ? `Cancel selected (${selected.size})` : 'Cancel selected';
     cancel.disabled = acting || !selected.size;
     promote.disabled = acting || ![...selected.values()].some(run => run.status === 'prepared');
@@ -290,7 +322,7 @@ export function initQueue({api, toast}) {
     record.pick.hidden = !cancellable(run);
     record.badge.textContent = phaseLabel(run);
     const steps = stepText(run);
-    const stage = run.node_label || stages[run.stage];
+    const stage = run.message || run.node_label || stages[run.stage];
     record.details.textContent = [stage || (run.phase === 'running' && run.backend === 'comfyui' ? 'Waiting for node updates' : ''), steps]
       .filter(Boolean).join(' · ');
     record.details.hidden = !record.details.textContent;
@@ -345,13 +377,18 @@ export function initQueue({api, toast}) {
     notice.hidden = !!displayed.length;
     notice.textContent = displayed.length ? '' : entries.find(entry => entry.name === tab).empty;
     lastUpdate = new Date();
-    health.textContent = 'Updated ' + clockFormat.format(lastUpdate);
+    health.textContent = tab==='queued'
+      ? `${data.waiting.toLocaleString()} waiting · ${(count - data.waiting).toLocaleString()} with workers`
+      : 'Updated ' + clockFormat.format(lastUpdate);
     syncSelection();
   }
 
   function refresh(force = false) {
     if (element.hidden) return;
-    const key = `status=${tab}&offset=${offset}`;
+    const parameters = new URLSearchParams({status:tab,offset,order:order.value});
+    if (searchText) parameters.set('q',searchText);
+    if (batchId) parameters.set('batch',batchId);
+    const key = parameters.toString();
     if (!force && pending?.key === key) return pending.promise;
     const request = ++sequence;
     if (table.hidden && notice.hidden) {
@@ -361,6 +398,13 @@ export function initQueue({api, toast}) {
     const promise = api('/generation/queue?' + key).then(data => {
       if (request !== sequence) return;
       const count = data.counts[tab];
+      if (revealBatch) {
+        revealBatch = false;
+        if (tab==='queued' && !count) {
+          const actual = ['attention','failed','completed','cancelled'].find(name => data.counts[name]);
+          if (actual) return selectTab(actual);
+        }
+      }
       if (offset && !data.runs.length) {
         offset = Math.max(0, Math.floor((count - 1) / pageSize) * pageSize);
         return refresh();
@@ -385,6 +429,15 @@ export function initQueue({api, toast}) {
   return {
     element,
     refresh,
+    focusBatch(id) {
+      if (!id) return;
+      batchId = id;
+      revealBatch = true;
+      clearTimeout(searchTimer);
+      search.value = searchText = '';
+      if (tab !== 'queued') selectTab('queued')?.catch(error => toast(error.message));
+      else resetPage();
+    },
     setVisible(visible) {
       element.hidden = !visible;
       if (!visible) {

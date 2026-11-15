@@ -7,7 +7,8 @@ from pathlib import Path
 import re
 from random import shuffle
 
-from .planner import open_database,verify_plan
+from .cancellation import update_batch_status
+from .planner import json_text,open_database,verify_plan
 from .workers import LIVE_POD_STATES
 from .yaml_document import YamlDocument
 
@@ -25,11 +26,17 @@ def run_activity(status, backend, controller, *, now):
     if status not in LIVE:
         return {'phase':status}
     if not controller:
+        if status == 'cancel_requested':
+            return {'phase':'cancel_unconfirmed'}
         return {'phase':'reconnect' if backend in REMOTE else 'interrupted'}
 
     stage = controller.get('stage')
     if status == 'cancel_requested':
-        return {'phase':'cancelling','stage':stage,'message':controller.get('message')}
+        if stage == 'cancel_after_generation':
+            phase = 'finishing_to_cancel'
+        else:
+            phase = 'cancelling' if stage == 'cancelling' else 'cancel_requested'
+        return {'phase':phase,'stage':stage,'message':controller.get('message')}
     if status == 'publishing' or stage in {'downloading','publishing'}:
         return {'phase':'finalising','stage':stage if stage == 'downloading' else 'publishing'}
     if stage == 'starting_worker':
@@ -66,60 +73,100 @@ class Jobs:
             if key not in latest or task['active'] and not latest[key]['active']:latest[key]=task
         return list(latest.values())
 
-    def queue(self, status, offset):
-        tabs = {'queued': ('prepared', 'running', 'publishing', 'cancel_requested'),
-                'completed': ('succeeded',), 'cancelled': ('cancelled',), 'failed': ('failed',)}
+    def queue(self, status, offset, *, batch_id=None, search='', order='newest'):
+        snapshots = {task['run_id']:task for task in self.g.tasks(include_logs=False,live_only=True)
+                     if task.get('attempt_id') and task.get('run_id')}
+        search = search.strip().casefold()
+        filters = ["COALESCE(json_extract(b.policy_json,'$.purpose'),'production')='production'"]
+        if batch_id:
+            filters.append('r.batch_id=:batch')
+        if search:
+            filters.append('(instr(casefold(r.title),:search)>0 OR instr(r.batch_id,:search)=1)')
+        source = 'FROM generation_runs r JOIN generation_batches b ON b.id=r.batch_id WHERE ' + ' AND '.join(filters)
+        scope = f"""
+            SELECT r.id,r.batch_id,r.title,r.style,r.variant_id,r.status,r.created_at AS queued_at,
+                   r.started_at AS dispatched_at,r.completed_at,r.rowid AS sequence,b.created_at AS batch_created,
+                   CASE
+                       WHEN r.status='prepared' THEN 'queued'
+                       WHEN r.status IN ('running','publishing','cancel_requested') THEN
+                           CASE WHEN r.id IN (SELECT value FROM json_each(:live)) THEN 'queued' ELSE 'attention' END
+                       WHEN r.status='succeeded' THEN 'completed'
+                       ELSE r.status
+                   END AS tab
+            {source}
+        """
+        params = {'batch':batch_id,'search':search,'tab':status,'offset':offset}
         with closing(open_database(self.g.review.config.database)) as conn:
             from .planner import ensure_queue_order
             ensure_queue_order(conn)
-            scope = "COALESCE(json_extract(b.policy_json,'$.purpose'),'production')='production'"
-            batches = 'FROM generation_runs r JOIN generation_batches b ON b.id=r.batch_id'
-            counts = dict(conn.execute('SELECT r.status,COUNT(*) '+batches+' WHERE '+scope+' GROUP BY r.status'))
-            states = tabs[status]
-            order = ('waiting, batch_created, queue_position, sequence'
-                     if status == 'queued' else 'completed_at DESC, sequence DESC')
-            page_order = ('p.waiting, p.batch_created, p.queue_position, p.sequence'
-                          if status == 'queued' else 'p.completed_at DESC, p.sequence DESC')
-            placeholders = ','.join('?' for _ in states)
+            if search:
+                conn.create_function('casefold',1,str.casefold,deterministic=True)
+            conn.execute('BEGIN')
+            # An old snapshot must not keep an abandoned attempt in the live queue.
+            live = {}
+            if snapshots:
+                for row in conn.execute("""
+                    SELECT a.run_id,a.id FROM generation_attempts a WHERE a.id IN (SELECT value FROM json_each(?))
+                      AND a.id=(SELECT id FROM generation_attempts WHERE run_id=a.run_id ORDER BY rowid DESC LIMIT 1)
+                    """, (json_text([t['attempt_id'] for t in snapshots.values()]),)):
+                    task = snapshots.get(row['run_id'])
+                    if task and task['attempt_id']==row['id']:
+                        live[row['run_id']]=task
+            params['live']=json_text(list(live))
+            totals = dict(conn.execute(f'SELECT r.status,COUNT(*) {source} GROUP BY r.status',params))
+            waiting = totals.get('prepared',0)
+            active = sum(totals.get(state,0) for state in LIVE)
+            with_workers = conn.execute(f"""
+                SELECT COUNT(*) {source} AND r.status IN ('running','publishing','cancel_requested')
+                AND r.id IN (SELECT value FROM json_each(:live))
+                """,params).fetchone()[0] if live else 0
+            counts = {'queued':waiting+with_workers,'attention':active-with_workers,'completed':totals.get('succeeded',0),
+                      'cancelled':totals.get('cancelled',0),'failed':totals.get('failed',0)}
+            if status == 'queued':
+                direction = 'ASC' if order=='dispatch' else 'DESC'
+                ordering = f"(p.status='prepared'),p.batch_created {direction},p.queue_position,p.sequence"
+            else:
+                ordering = 'COALESCE(p.completed_at,p.dispatched_at,p.queued_at) DESC,p.sequence DESC'
+            statuses = {
+                'queued': "'prepared','running','publishing','cancel_requested'",
+                'attention': "'running','publishing','cancel_requested'",
+                'completed': "'succeeded'",
+                'cancelled': "'cancelled'",
+                'failed': "'failed'",
+            }[status]
             rows = [dict(row) for row in conn.execute(f"""
-                WITH page AS (
-                    SELECT r.id,r.batch_id,r.title,r.style,r.variant_id,r.status,r.created_at AS queued_at,
-                        r.started_at AS dispatched_at,r.completed_at,r.rowid AS sequence,b.created_at AS batch_created,
-                        (r.status='prepared') AS waiting,COALESCE(q.position,r.rowid) AS queue_position
-                    {batches} LEFT JOIN generation_queue_order q ON q.run_id=r.id
-                    WHERE {scope} AND r.status IN ({placeholders})
-                    ORDER BY {order} LIMIT 50 OFFSET ?
+                WITH scoped AS ({scope} AND r.status IN ({statuses})), sorted AS (
+                    SELECT s.*,COALESCE(q.position,s.sequence) AS queue_position
+                    FROM scoped s LEFT JOIN generation_queue_order q ON q.run_id=s.id
+                    WHERE s.tab=:tab
+                ), page AS (
+                    SELECT * FROM sorted p ORDER BY {ordering} LIMIT 50 OFFSET :offset
                 )
                 SELECT p.id,p.batch_id,p.title,p.style,p.variant_id,p.status,p.queued_at,p.dispatched_at,p.completed_at,
-                       a.id AS attempt_id,a.error,a.execution_mode AS backend,s.started_at AS execution_started_at
+                       a.error,a.execution_mode AS backend,s.started_at AS execution_started_at
                 FROM page p
                 LEFT JOIN generation_attempts a ON a.id=(
                     SELECT id FROM generation_attempts WHERE run_id=p.id ORDER BY rowid DESC LIMIT 1
                 )
                 LEFT JOIN generation_timing_spans s ON s.id=a.id||'-comfy'
-                ORDER BY {page_order}
-                """, (*states,offset))]
-        live = {}
-        if any(row['status'] in LIVE for row in rows):
-            live = {task['attempt_id']:task for task in self.g.tasks(include_logs=False,live_only=True)
-                    if task.get('attempt_id')}
+                ORDER BY {ordering}
+                """,params)]
         now = datetime.now(timezone.utc)
         for row in rows:
-            controller = live.get(row.pop('attempt_id'))
-            if controller and controller.get('run_id') != row['id']:
-                controller = None
+            controller = live.get(row['id'])
             row.update(run_activity(row['status'], row['backend'], controller, now=now))
+            if row['phase']=='cancel_unconfirmed':
+                row['message']=self.g.dispatcher.cancellations.notices.get(row['id']) or 'Waiting for confirmation from the worker.'
             recorded_start = row.pop('execution_started_at')
             row['started_at'] = ((controller or {}).get('execution_started_at') or recorded_start
                                  if row['backend'] == 'comfyui' else row['dispatched_at'])
             row['worker_id'] = ((controller.get('worker_id') or identity(controller['connection']))
                                 if controller else None)
             if row['status'] in LIVE:
-                row['completed_at'] = None  # A retry may still carry the previous attempt's completion.
-        return {'runs':rows,'counts':{key:sum(counts.get(state,0) for state in states) for key,states in tabs.items()},
-                'can_shuffle':bool(counts.get('prepared'))}
+                row['completed_at'] = None
+        return {'runs':rows,'counts':counts,'waiting':waiting,'can_shuffle':bool(waiting)}
 
-    def reorder(self, action, run_ids):
+    def reorder(self, action, run_ids, batch_id=None):
         selected = set(run_ids)
         with closing(open_database(self.g.review.config.database)) as conn, conn:
             from .planner import ensure_queue_order
@@ -129,7 +176,8 @@ class Jobs:
             for row in conn.execute("""SELECT r.batch_id,r.id FROM generation_runs r
                     JOIN generation_batches b ON b.id=r.batch_id LEFT JOIN generation_queue_order q ON q.run_id=r.id
                     WHERE r.status='prepared' AND COALESCE(json_extract(b.policy_json,'$.purpose'),'production')='production'
-                    ORDER BY r.batch_id,COALESCE(q.position,r.rowid),r.rowid"""):
+                      AND (? IS NULL OR r.batch_id=?)
+                    ORDER BY r.batch_id,COALESCE(q.position,r.rowid),r.rowid""", (batch_id,batch_id)):
                 groups.setdefault(row['batch_id'],[]).append(row['id'])
             for queue in groups.values():
                 if action == 'shuffle':
@@ -242,23 +290,61 @@ class Jobs:
         source=self.g.review.db.one('SELECT raw_bytes FROM source_documents WHERE sha256=?',(row['source_sha256'],))
         return {'caption':json.loads(row['effective_json']).get('caption',''),'lyrics':YamlDocument(source['raw_bytes']).values.get('lyrics','')}
 
+    def cancel_selected(self, run_ids):
+        selected = set(run_ids)
+        result = {'cancelled':0,'requested':0,'unavailable':len(selected)}
+        with closing(open_database(self.g.review.config.database)) as conn, conn:
+            conn.execute('BEGIN IMMEDIATE')
+            rows = conn.execute("""
+                SELECT r.id,r.batch_id,r.status FROM generation_runs r
+                JOIN generation_batches b ON b.id=r.batch_id
+                WHERE r.id IN (SELECT value FROM json_each(?))
+                  AND r.status IN ('prepared','running','cancel_requested','cancelled')
+                  AND COALESCE(json_extract(b.policy_json,'$.purpose'),'production')='production'
+                """, (json_text(list(selected)),)).fetchall()
+            finished = datetime.now(timezone.utc).isoformat(timespec='milliseconds')
+            batches = set()
+            for row in rows:
+                result['unavailable']-=1
+                if row['status'] in {'prepared','cancelled'}:
+                    result['cancelled']+=1
+                    status,completed_at='cancelled',finished
+                else:
+                    result['requested']+=1
+                    status,completed_at='cancel_requested',None
+                if status!=row['status']:
+                    conn.execute('UPDATE generation_runs SET status=?,completed_at=? WHERE id=?',
+                                 (status,completed_at,row['id']))
+                    batches.add(row['batch_id'])
+            for batch_id in batches:
+                update_batch_status(conn,batch_id)
+        if result['requested']:
+            self.g.dispatcher.wake.set()
+        return result
+
     def cancel(self,batch_id,run_id):
-        path,manifest=self.batch(batch_id)
-        if run_id not in {r['id'] for r in manifest['runs']}:raise ValueError('Run is not in this batch')
+        failed_path=None
         with closing(open_database(self.g.review.config.database)) as conn,conn:
             conn.execute('BEGIN IMMEDIATE')
-            row=conn.execute('SELECT status FROM generation_runs WHERE id=?',(run_id,)).fetchone()
+            row=conn.execute('SELECT status FROM generation_runs WHERE batch_id=? AND id=?',(batch_id,run_id)).fetchone()
+            if not row:raise ValueError('Run is not in this batch')
             if row['status'] in {'succeeded','publishing'}:raise ValueError('This recording is already saved or finalising; it cannot be cancelled')
             status='cancel_requested' if row['status'] in {'running','cancel_requested'} else 'cancelled'
-            now=datetime.now(timezone.utc).isoformat(timespec='milliseconds')
-            conn.execute('UPDATE generation_runs SET status=?,completed_at=? WHERE id=?',(status,None if status=='cancel_requested' else now,run_id))
-            remaining=conn.execute("SELECT 1 FROM generation_runs WHERE batch_id=? AND status NOT IN ('succeeded','failed','cancelled')",(batch_id,)).fetchone()
-            if not remaining:conn.execute("UPDATE generation_batches SET status='cancelled' WHERE id=?",(batch_id,))
-        if row['status']=='failed':
+            if status!=row['status']:
+                if row['status']=='failed':
+                    failed_path,manifest=self.batch(batch_id)
+                    if not any(run['id']==run_id for run in manifest['runs']):
+                        raise ValueError('Run is not in this batch')
+                now=datetime.now(timezone.utc).isoformat(timespec='milliseconds')
+                conn.execute('UPDATE generation_runs SET status=?,completed_at=? WHERE id=?',(status,None if status=='cancel_requested' else now,run_id))
+                update_batch_status(conn,batch_id)
+        if status=='cancel_requested':
+            self.g.dispatcher.wake.set()
+        if failed_path:
             from .cancellation import discard
             attempt=self.g.review.db.one('SELECT id FROM generation_attempts WHERE run_id=? ORDER BY rowid DESC LIMIT 1',(run_id,))
             if attempt:
-                directory=path.parent/'attempts'/attempt['id']
+                directory=failed_path.parent/'attempts'/attempt['id']
                 if (directory/'request.json').is_file() and discard(directory,json.loads((directory/'request.json').read_text(encoding="utf-8"))):
                     (directory/'cleanup-pending.json').write_text(json.dumps({'cancelled':True,'error':'Remote cancellation output cleanup may be retried'}), encoding="utf-8")
         return {'run_id':run_id,'status':status}

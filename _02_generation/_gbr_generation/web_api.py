@@ -2,10 +2,10 @@
 import csv
 import io
 import json
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.error import HTTPError, URLError
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
@@ -34,6 +34,11 @@ class Connection(Body):
 class QueueOrder(BaseModel):
     action: Literal['promote','shuffle']
     run_ids: list[str] = Field(default_factory=list,max_length=1000)
+    batch_id: str | None = Field(default=None,pattern=r'^[0-9a-f]{32}$')
+
+
+class QueueCancel(Body):
+    run_ids: list[Annotated[str, Field(pattern=r'^[0-9a-f]{32}$')]] = Field(min_length=1,max_length=1000)
 
 
 class Preferences(Body):
@@ -280,11 +285,16 @@ def router(root, review_service, local):
         return {'tasks': service.tasks()}
 
     @routes.get('/queue')
-    def queue(status:Literal['queued','completed','cancelled','failed']='queued',offset:int=0):
-        return jobs_service.queue(status,max(0,offset))
+    def queue(status:Literal['queued','attention','completed','cancelled','failed']='queued',offset:int=0,
+              batch:str|None=Query(default=None,pattern=r'^[0-9a-f]{32}$'),q:str=Query(default='',max_length=200),
+              order:Literal['newest','dispatch']='newest'):
+        return jobs_service.queue(status,max(0,offset),batch_id=batch,search=q,order=order)
+
+    @routes.post('/queue/cancel')
+    def cancel_selected(body:QueueCancel):return jobs_service.cancel_selected(body.run_ids)
 
     @routes.post('/queue/order')
-    def reorder(body:QueueOrder):return jobs_service.reorder(body.action,body.run_ids)
+    def reorder(body:QueueOrder):return jobs_service.reorder(body.action,body.run_ids,body.batch_id)
 
     @routes.get('/jobs')
     def jobs(purpose:Literal['production','experiment','all']='production'):return jobs_service.listing(purpose)
