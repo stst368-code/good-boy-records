@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt,StrictBool
 from typing import Literal
 from .service import Preparation
+from .mastering import preset_catalogue
 
 
 class Job(BaseModel):
@@ -55,6 +56,9 @@ def router(root,review,local):
 
     @routes.get('/references')
     def references():return {'references':service.reference_list()}
+
+    @routes.get('/effects')
+    def effects():return preset_catalogue()
 
     @routes.get('/processing')
     def processing(flagged_only:bool=False):return service.processing.status(flagged_only=flagged_only)

@@ -1,4 +1,5 @@
 """Stage 4 orchestration on the existing database, move journal and artifact registry."""
+from base64 import b64decode, b64encode
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
@@ -16,8 +17,10 @@ import tempfile
 import threading
 import time
 import uuid
+import zlib
 from .artwork import brief
 from .editorial import lyric_words,position_lyrics,validate_lyrics,lighting
+from .mastering import validate_effects
 
 DEFAULT_MIX = {'gain_db':0., 'bass_db':0., 'mid_db':0., 'treble_db':0.,
                'vocal_db':0., 'accompaniment_db':0., 'reverb':0., 'room_seconds':1.2, 'fade_in':0., 'fade_out':0., 'limiter_db':None}
@@ -40,9 +43,10 @@ def now():
 
 
 def mix_recipe(value):
-    if not isinstance(value,dict) or set(value)-set(DEFAULT_MIX):
+    if not isinstance(value,dict) or set(value)-set(DEFAULT_MIX)-{'effects'}:
         raise ValueError('Unknown mixing control')
-    result={**DEFAULT_MIX,**value}
+    effects = validate_effects(value.get('effects', []))
+    result = {key: value.get(key, default) for key, default in DEFAULT_MIX.items()}
     limits={'gain_db':(-24,12),'bass_db':(-12,12),'mid_db':(-12,12),'treble_db':(-12,12),
             'vocal_db':(-24,12),'accompaniment_db':(-24,12),'reverb':(0,1),'room_seconds':(.1,4),'fade_in':(0,30),'fade_out':(0,60),'limiter_db':(-12,0)}
     for key,(low,high) in limits.items():
@@ -50,7 +54,9 @@ def mix_recipe(value):
         if key=='limiter_db' and v is None:continue
         if isinstance(v,bool) or not isinstance(v,(float,int)) or not math.isfinite(v) or not low<=v<=high:
             raise ValueError('Invalid '+key)
-    return {'version':1,**result}
+    if effects:
+        return {'version': 2, **result, 'effects': effects}
+    return {'version': 1, **result}
 
 
 class Preparation:
@@ -200,6 +206,16 @@ class Preparation:
                 continue
             row['tasks']=self.tasks(row['generation_id'])
             row['masters']=[{'id':item['id'],'created_at':item['created_at']} for item in self.db.all("SELECT a.id,a.uri,t.created_at FROM generation_artifacts a JOIN processing_tasks t ON t.id=json_extract(a.metadata_json,'$.processing_task_id') WHERE t.generation_id=? AND t.status='done' AND a.kind='master_candidate' ORDER BY t.rowid DESC",(row['generation_id'],)) if Path(item['uri']).is_file()]
+            row['artworks'] = [
+                {'id': item['id'], 'created_at': item['created_at']}
+                for item in self.db.all(
+                    """SELECT a.id, a.uri, t.created_at FROM generation_artifacts a
+                       LEFT JOIN processing_tasks t ON t.id=json_extract(a.metadata_json, '$.processing_task_id')
+                       WHERE a.kind IN ('album_artwork','cover_artwork')
+                         AND json_extract(a.metadata_json, '$.source_generation_id')=?
+                       ORDER BY a.rowid DESC""", (row['generation_id'],))
+                if Path(item['uri']).is_file()
+            ]
             row['promotion']=self.db.one("SELECT id,status,error FROM archive_operations WHERE audio_id=? AND operation_type='prepare' ORDER BY rowid DESC LIMIT 1",(row['audio_id'],))
         return {'enabled':True,'projects':rows,'ffmpeg':bool(shutil.which('ffmpeg')),
                 'reference_root':str(self.references),'worker_root':str(self.worker.parent)}
@@ -227,10 +243,9 @@ class Preparation:
             row['recipe']=json.loads(row.pop('recipe_json'));row['telemetry']=json.loads(row.pop('telemetry_json'))
             if row['kind']=='preparation_yaml':
                 row['recipe'].pop('yaml_bytes_b64', None)
-            row['artifacts']=self.db.all("SELECT id,kind,size_bytes,metadata_json,uri FROM generation_artifacts WHERE json_extract(metadata_json,'$.processing_task_id')=?",(row['id'],))
+            row['artifacts']=self.db.all("SELECT id,kind,size_bytes,uri FROM generation_artifacts WHERE json_extract(metadata_json,'$.processing_task_id')=?",(row['id'],))
             for artifact in row['artifacts']:
                 artifact['available']=Path(artifact.pop('uri')).is_file()
-                artifact.pop('metadata_json')
         return rows
 
     def artifact(self,identifier):
@@ -505,6 +520,58 @@ class Preparation:
     def alignment_python(self):
         return self.worker.parent/'.venv'/('Scripts/python.exe' if os.name=='nt' else 'bin/python')
 
+    def _editorial_sidecar(self, gid, artifact, source_sha):
+        checksum = artifact['sha256']
+        if not isinstance(checksum, str) or not re.fullmatch(r'[a-f0-9]{64}', checksum):
+            return None
+
+        def verified_json(raw):
+            if hashlib.sha256(raw).hexdigest() != checksum:
+                return None
+            try:
+                data = json.loads(raw)
+            except (UnicodeError, ValueError):
+                return None
+            return data if isinstance(data, dict) and data.get('source_sha256') == source_sha else None
+
+        roots = (self.tracks.resolve(), self.showcase.resolve())
+
+        def read(path):
+            try:
+                resolved = path.resolve()
+                if any(resolved.is_relative_to(root) for root in roots):
+                    return verified_json(resolved.read_bytes())
+            except OSError:
+                pass
+            return None
+
+        stored = Path(artifact['uri'])
+        data = read(stored)
+        if data is not None:
+            return data
+        bundle = self.bundle(gid) / '_derived'
+        for filename in dict.fromkeys((checksum + '.json', stored.name)):
+            candidate = bundle / filename
+            if candidate == stored:
+                continue
+            data = read(candidate)
+            if data is not None:
+                self.db.execute('UPDATE generation_artifacts SET uri=? WHERE id=? AND uri=?',
+                                (str(candidate), artifact['id'], artifact['uri']))
+                return data
+        backup = json.loads(artifact['metadata_json']).get('lyrics_backup_zlib')
+        size = artifact['size_bytes']
+        if not backup or not isinstance(size, int) or size <= 0:
+            return None
+        try:
+            unpack = zlib.decompressobj()
+            raw = unpack.decompress(b64decode(backup, validate=True), size + 1)
+        except (TypeError, ValueError, zlib.error):
+            return None
+        if unpack.eof and len(raw) == size:
+            return verified_json(raw)
+        return None
+
     def editorial(self,gid,artifact_id=None):
         self.require();row,source=self.source(gid,artifact_id=artifact_id);sha=digest(source)
         metadata=self.metadata.read(gid)
@@ -516,17 +583,34 @@ class Preparation:
             placeholders=','.join('?' for _ in kinds)
             extra=" AND COALESCE(json_extract(recipe_json,'$.lyrics_sha256'),?)=?" if key=='lyric' else ''
             args=(gid,sha,*kinds,*((metadata['original_lyrics_sha256'],metadata['lyrics_sha256']) if key=='lyric' else ()))
-            task=self.db.one(f"SELECT * FROM processing_tasks WHERE generation_id=? AND input_sha256=? AND kind IN ({placeholders}) AND status='done'{extra} ORDER BY rowid DESC LIMIT 1",args)
-            if not task:continue
-            artifact=self.db.one("SELECT id,sha256 FROM generation_artifacts WHERE json_extract(metadata_json,'$.processing_task_id')=? AND kind IN ('lyric_alignment','lyric_edit','visual_features','visual_edit')",(task['id'],))
-            if not artifact:continue
-            path=self.artifact(artifact['id'])
-            if digest(path)!=artifact['sha256']:raise ValueError('Editorial sidecar bytes changed; restore the registered version')
-            data=json.loads(path.read_text(encoding="utf-8"))
-            if data.get('source_sha256')!=sha:raise ValueError('Sidecar refers to different audio')
-            if key=='lyric':result.update(language=data.get('language',result['language']),words=data['words'],approved=data.get('approved',False),lyric_task_id=task['id'],unmatched_recognition=data.get('unmatched_recognition',[]),timing_source='WhisperX alignment' if task['kind']=='lyric_alignment' else 'Saved lyric corrections')
-            elif key=='visual':result.update(features=data,feature_artifact_id=artifact['id'])
-            else:result.update(sensitivity=data['sensitivity'],sections=data['sections'],lighting_task_id=task['id'])
+            tasks = self.db.all(f"""SELECT id,kind FROM processing_tasks WHERE generation_id=? AND input_sha256=?
+                AND kind IN ({placeholders}) AND status='done'{extra} ORDER BY rowid DESC LIMIT 25""", args)
+            for index, task in enumerate(tasks):
+                artifact = self.db.one("""SELECT id,uri,sha256,size_bytes,metadata_json FROM generation_artifacts
+                    WHERE json_extract(metadata_json,'$.processing_task_id')=? AND kind=?""",
+                    (task['id'], 'visual_features' if key == 'visual' else task['kind']))
+                data = self._editorial_sidecar(gid, artifact, sha) if artifact else None
+                if data is None:
+                    continue
+                if key == 'lyric':
+                    if not isinstance(data.get('words'), list):
+                        continue
+                    timing = 'WhisperX alignment' if task['kind'] == 'lyric_alignment' else 'Saved lyric corrections'
+                    if index:
+                        timing = 'Latest lyric revision unavailable · showing earlier saved lyrics'
+                        result['lyric_revision_missing'] = True
+                    result.update(language=data.get('language', result['language']), words=data['words'],
+                                  approved=index == 0 and data.get('approved', False), lyric_task_id=task['id'],
+                                  unmatched_recognition=data.get('unmatched_recognition', []), timing_source=timing)
+                elif key == 'visual':
+                    result.update(features=data, feature_artifact_id=artifact['id'])
+                else:
+                    result.update(sensitivity=data['sensitivity'], sections=data['sections'], lighting_task_id=task['id'])
+                break
+            else:
+                if key == 'lyric' and tasks:
+                    result['timing_source'] = 'Saved lyric timings unavailable · showing estimated words from the YAML'
+                    result['lyric_revision_missing'] = True
         result['words']=position_lyrics(result['words'],result['duration'])
         result['timing_source']=result.get('timing_source','Estimated positions only; audio alignment has not completed')
         result['timed_words']=sum(w.get('start') is not None and w.get('end') is not None and not w.get('estimated') for w in result['words'])
@@ -557,7 +641,8 @@ class Preparation:
             recipe={'parent_task_id':current[key],'input_artifact_id':data.get('input_artifact_id'),'feature_artifact_id':current['feature_artifact_id'] if kind=='visual_edit' else None}
             if kind=='lyric_edit':recipe['lyrics_sha256']=current['lyrics_sha256']
             raw=canonical(payload).encode('utf-8');sha=hashlib.sha256(raw).hexdigest();recipe['output_sha256']=sha
-            _,source=self.source(gid,artifact_id=data.get('input_artifact_id'));destination=source.parent.parent/'_derived';destination.mkdir(parents=True,exist_ok=True)
+            destination = self.bundle(gid) / '_derived'
+            destination.mkdir(parents=True, exist_ok=True)
             path=destination/(sha+'.json')
             if path.exists():
                 if digest(path)!=sha:raise ValueError('Editorial artifact collision')
@@ -565,11 +650,14 @@ class Preparation:
                 with path.open('xb') as stream:stream.write(raw);stream.flush();os.fsync(stream.fileno())
             identifier=uuid.uuid4().hex
             fingerprint=hashlib.sha256(canonical([gid,kind,recipe,current['source_sha256']]).encode()).hexdigest()
+            artifact_metadata = {'processing_task_id': identifier, 'source_generation_id': gid}
+            if kind == 'lyric_edit':
+                artifact_metadata['lyrics_backup_zlib'] = b64encode(zlib.compress(raw)).decode('ascii')
             with self.db.transaction() as c:
                 c.execute('INSERT INTO processing_tasks(id,generation_id,kind,status,fingerprint,recipe_json,input_sha256,created_at,completed_at) VALUES(?,?,?,?,?,?,?,?,?)',
                     (identifier,gid,kind,'done',fingerprint,canonical(recipe),current['source_sha256'],now(),now()))
                 c.execute('INSERT INTO generation_artifacts VALUES(?,NULL,?,?,?,?,NULL,?)',
-                    (identifier+'-output',kind,sha,str(path),len(raw),canonical({'processing_task_id':identifier,'source_generation_id':gid})))
+                    (identifier+'-output',kind,sha,str(path),len(raw),canonical(artifact_metadata)))
             return {'id':identifier,**self.editorial(gid,data.get('input_artifact_id'))}
 
 

@@ -4991,6 +4991,7 @@ body[data-view="knowledge"] #easterStoryOverlay{display:none!important}
 <audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
 <script src="showcase-host.js?v=20261025-eggs"></script>
 <script src="releases.js"></script>
+<script src="gallery.js"></script>
 <script src="rooms.js"></script>
 <script src="easter-egg.js"></script>
 <script>
@@ -5020,13 +5021,14 @@ let viewMode='tracks',knowledgeReady=false,knowledgeLoading=false,knowledgeManif
 let knowledgeDensity='overview',knowledgeExpanded=new Set(),knowledgeReaderPinned=false,knowledgeReaderMode='peek';
 let activeKnowledgeTab='how-its-made';
 const trackGroupOpen=new Set();
+let songGroups={groups:[],byIndex:[]}, mapGenres=[], coverFrame=[];
 let knowledgeExpansionOrder=[],knowledgeRenderNodeId=null;
 function rgb(hex){const m=/^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex||'');return m?{r:parseInt(m[1],16),g:parseInt(m[2],16),b:parseInt(m[3],16)}:{r:208,g:128,b:47}}
 function srgbLinear(v){v/=255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)}
 function oklch(hex){const c=rgb(hex),r=srgbLinear(c.r),g=srgbLinear(c.g),b=srgbLinear(c.b),l=.4122214708*r+.5363325363*g+.0514459929*b,m=.2119034982*r+.6806995451*g+.1073969566*b,s=.0883024619*r+.2817188376*g+.6299787005*b,L_=Math.cbrt(l),M_=Math.cbrt(m),S_=Math.cbrt(s),L=.2104542553*L_+.793617785*M_-.0040720468*S_,A=1.9779984951*L_-2.428592205*M_+.4505937099*S_,B=.0259040371*L_+.7827717662*M_-.808675766*S_,C=Math.hypot(A,B),H=(Math.atan2(B,A)*180/Math.PI+360)%360;return{l:L,c:C,h:H}}
 function colourCompare(a,b){const ca=oklch(a||'#808080'),cb=oklch(b||'#808080');return ca.h-cb.h||ca.l-cb.l||ca.c-cb.c}
 function accent(track){const c=track?.genre?.child_colour||'#d0802f',v=rgb(c);document.documentElement.style.setProperty('--accent',c);document.documentElement.style.setProperty('--accent-rgb',`${v.r},${v.g},${v.b}`);return v}
-function titleOf(t){return t?.displayTitle||t?.composition||t?.title||t?.id||'Untitled'}
+function titleOf(t){return GBRGallery.displayTitle(t?.displayTitle||t?.title||t?.composition||t?.id||'Untitled')}
 function variantOf(t){return t?.variant||t?.version||(typeof t?.style==='string'?t.style:'')||t?.style_primary||t?.genre?.child_genre||'—'}
 
 /* Share links are deliberately opaque and short. The track id itself never appears
@@ -5777,7 +5779,7 @@ function setLyricTypography(t){
   else if(/pop|disco|dance|club|city.?pop|hyper.?pop/.test(raw)) family='pop';
   document.body.dataset.lyricFont=family;
 }
-function select(i,autoplay=true){window.GBRcoverEgg?.reset();if(!tracks.length)return;index=(i%tracks.length+tracks.length)%tracks.length;const t=tracks[index],candidates=audioCandidates(t),src=candidates[0]||'';audioCandidateIndex=0;loadPlaybackVisuals(t);accent(t);setLyricTypography(t);updateFormatButtons(t);ui.title.textContent=titleOf(t);ui.variant.textContent=variantOf(t);ui.mobileSongTitle.textContent=String(titleOf(t)||'').toLowerCase();ui.genreParent.textContent=t.genre?.parent_genre||'Unclassified';ui.genreChild.textContent=t.genre?.child_genre||variantOf(t);ui.metaTitle.textContent=titleOf(t);ui.metaSub.textContent=[variantOf(t),t.genre?.cluster].filter(Boolean).join(' · ');updateEasterStory(t);syncMediaSession(t);loadLyrics(t);ui.cover.onload=paintFixedCover;ui.cover.onerror=()=>{if(ui.cover.src!==FALLBACK_ART)ui.cover.src=FALLBACK_ART};ui.fixedCover.onerror=()=>{if(ui.fixedCover.src!==FALLBACK_ART)ui.fixedCover.src=FALLBACK_ART};if(ui.playingCoverScreen)ui.playingCoverScreen.onerror=()=>{if(ui.playingCoverScreen.src!==FALLBACK_ART)ui.playingCoverScreen.src=FALLBACK_ART};const artwork=artOf(t);ui.cover.src=artwork;ui.fixedCover.src=artwork;if(ui.playingCoverScreen)ui.playingCoverScreen.src=artwork;ui.cover.alt=`Album artwork for ${titleOf(t)}`;ui.fixedCover.alt=`Now playing artwork for ${titleOf(t)}`;if(ui.playingCoverScreen)ui.playingCoverScreen.alt=`Now playing artwork for ${titleOf(t)}`;if(src&&audio.src!==new URL(src,location.href).href){audio.src=src;audio.load()}if(autoplay&&src&&power)startPlaybackNow();if(openTab==='tracks')renderTrackRows();if(openTab==='story')renderStoryPanel()}
+function select(i,autoplay=true){window.GBRcoverEgg?.reset();if(!tracks.length)return;index=(i%tracks.length+tracks.length)%tracks.length;const t=tracks[index],candidates=audioCandidates(t),src=candidates[0]||'';audioCandidateIndex=0;loadPlaybackVisuals(t);accent(t);setLyricTypography(t);updateFormatButtons(t);ui.title.textContent=titleOf(t);ui.variant.textContent=variantOf(t);ui.mobileSongTitle.textContent=titleOf(t);const parentGenre=t.genre?.parent_genre||'',childGenre=t.genre?.child_genre||'';ui.genreParent.textContent=parentGenre;ui.genreChild.textContent=GBRGallery.titleKey(parentGenre)===GBRGallery.titleKey(childGenre)?'':childGenre;ui.metaTitle.textContent=titleOf(t);ui.metaSub.textContent=[variantOf(t),t.genre?.cluster].filter(Boolean).join(' · ');updateEasterStory(t);syncMediaSession(t);loadLyrics(t);ui.cover.onload=paintFixedCover;ui.cover.onerror=()=>{if(ui.cover.src!==FALLBACK_ART)ui.cover.src=FALLBACK_ART};ui.fixedCover.onerror=()=>{if(ui.fixedCover.src!==FALLBACK_ART)ui.fixedCover.src=FALLBACK_ART};if(ui.playingCoverScreen)ui.playingCoverScreen.onerror=()=>{if(ui.playingCoverScreen.src!==FALLBACK_ART)ui.playingCoverScreen.src=FALLBACK_ART};const artwork=artOf(t);ui.cover.src=artwork;ui.fixedCover.src=artwork;if(ui.playingCoverScreen)ui.playingCoverScreen.src=artwork;ui.cover.alt=`Album artwork for ${titleOf(t)}`;ui.fixedCover.alt=`Now playing artwork for ${titleOf(t)}`;if(ui.playingCoverScreen)ui.playingCoverScreen.alt=`Now playing artwork for ${titleOf(t)}`;if(src&&audio.src!==new URL(src,location.href).href){audio.src=src;audio.load()}if(autoplay&&src&&power)startPlaybackNow();if(openTab==='tracks')renderTrackRows();if(openTab==='story')renderStoryPanel()}
 function seededUnit(text){let h=2166136261;for(const ch of String(text)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return((h>>>0)%10000)/10000}
 
 const KNOWLEDGE_MANIFEST_URL='knowledge-manifest.json';
@@ -6489,18 +6491,12 @@ function renderTrackBrowser(){
 }
 function renderTrackRows(){
   const list=$('trackList');if(!list)return;
-  const q=trackFilter.trim().toLowerCase(),all=tracks.map((t,i)=>({t,i}));
-  const groups=new Map();
-  for(const item of all){
-    const t=item.t,key=String(t.composition||t.title||titleOf(t)).trim().toLowerCase()||String(item.i);
-    if(!groups.has(key))groups.set(key,{key,title:titleOf(t),items:[],allItems:[]});
-    groups.get(key).allItems.push(item)
-  }
-  for(const g of groups.values()){
-    const titleMatch=!q||g.title.toLowerCase().includes(q);
-    g.items=titleMatch?g.allItems:g.allItems.filter(({t})=>[variantOf(t),t.genre?.parent_genre,t.genre?.child_genre].some(v=>String(v||'').toLowerCase().includes(q)))
-  }
-  const shown=[...groups.values()].filter(g=>g.items.length);
+  const q=GBRGallery.titleKey(trackFilter);
+  const shown=songGroups.groups.map(group=>{
+    const items=!q||GBRGallery.titleKey(group.title).includes(q)?group.allItems:group.allItems.filter(({t})=>
+      [titleOf(t),variantOf(t),t.genre?.parent_genre,t.genre?.child_genre].some(value=>GBRGallery.titleKey(value).includes(q)));
+    return {...group,items}
+  }).filter(group=>group.items.length);
   shown.sort((a,b)=>a.title.localeCompare(b.title,undefined,{numeric:true,sensitivity:'base'}));
   list.replaceChildren();
 
@@ -6538,6 +6534,7 @@ function renderTrackRows(){
   }
 }
 function buildNodes(refit=true){
+  songGroups=GBRGallery.groupTracks(tracks);mapGenres=[];coverFrame=[];
   if(!tracks.length)return;
   playingAnchor=easter?{x:1500,y:1500}:{x:3500,y:3500};world=easter?{w:3000,h:3000}:{w:7000,h:7000};
   const starTiming=(key,field=false)=>{
@@ -6566,16 +6563,21 @@ function buildNodes(refit=true){
     /* v10.12.5 — build the map from the TOP taxonomy level first. Previous
        builds laid parents around the ring and only labelled clusters afterwards,
        which let related genres bunch together and gave the map no real territories. */
-    const clusterOrder=[...new Set(tracks.map(t=>String(t.genre?.cluster||'unclassified').trim().toLowerCase()))];
-    const norm=v=>String(v||'unclassified').trim().toLowerCase();
+    const norm=value=>GBRGallery.titleKey(value||'unclassified');
+    const knownParents=new Map();
+    for(const track of tracks){
+      const genre=track.genre;
+      if(genre?.parent_genre&&genre.cluster)knownParents.set(norm(genre.parent_genre),genre.cluster);
+    }
     const clusterInfo=new Map();
     for(const t of tracks){
-      const clusterRaw=t.genre?.cluster||'unclassified',clusterKey=norm(clusterRaw),parent=t.genre?.parent_genre||'Unclassified',child=t.genre?.child_genre||t.genre?.matched_genre||t.genre?.requested||'Unknown';
+      const parent=t.genre?.parent_genre||'Unclassified',child=t.genre?.child_genre||t.genre?.matched_genre||'Unknown';
+      const clusterRaw=t.genre?.cluster||knownParents.get(norm(parent))||parent,clusterKey=norm(clusterRaw);
       let c=clusterInfo.get(clusterKey);if(!c){c={key:clusterKey,name:clusterRaw,colour:t.genre?.parent_colour||t.genre?.child_colour||'#808080',parents:new Map(),tracks:[]};clusterInfo.set(clusterKey,c)}c.tracks.push(t);
       let p=c.parents.get(parent);if(!p){p={name:parent,colour:t.genre?.parent_colour||'#808080',children:new Map(),tracks:[]};c.parents.set(parent,p)}p.tracks.push(t);
       let ch=p.children.get(child);if(!ch){ch={name:child,colour:t.genre?.child_colour||'#9a9a9a',tracks:[]};p.children.set(child,ch)}ch.tracks.push(t)
     }
-    const clusters=[...clusterInfo.values()].sort((a,b)=>{const ai=clusterOrder.indexOf(a.key),bi=clusterOrder.indexOf(b.key);if(ai>=0||bi>=0)return(ai<0?999:ai)-(bi<0?999:bi);return colourCompare(a.colour,b.colour)||a.name.localeCompare(b.name)});
+    const clusters=[...clusterInfo.values()];
     parentLanes=[];for(const c of clusters)for(const p of [...c.parents.values()].sort((a,b)=>colourCompare(a.colour,b.colour)||a.name.localeCompare(b.name)))parentLanes.push({name:p.name,colour:p.colour});buildGenreStrip();
 
     /* v10.12.6 — organic, deterministic galaxy placement. The top-level
@@ -6624,48 +6626,66 @@ function buildNodes(refit=true){
       })
     });
     nodes=made.sort((a,b)=>a.i-b.i);
-    /* Collision settle protects readability while preserving the seeded cloud
-       character. Springs are intentionally weak so nodes do not snap back into
-       regimented-looking formations. */
-    const exclusion=760;
-    for(let pass=0;pass<92;pass++){for(let i=0;i<nodes.length;i++){const a=nodes[i],adx=a.x-playingAnchor.x,ady=a.y-playingAnchor.y,ad=Math.hypot(adx,ady)||1;let fx=(a.baseX-a.x)*.032,fy=(a.baseY-a.y)*.032;if(ad<exclusion){const q=(exclusion-ad)*.16;fx+=adx/ad*q;fy+=ady/ad*q}for(let j=i+1;j<nodes.length;j++){const b=nodes[j],dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy)||.01,minD=138;if(d<minD){const push=(minD-d)*.070,ux=dx/d,uy=dy/d;fx+=ux*push;fy+=uy*push;b.vx-=ux*push;b.vy-=uy*push}}a.vx=(a.vx+fx)*.58;a.vy=(a.vy+fy)*.58;a.x+=a.vx;a.y+=a.vy}for(const n of nodes){n.x=Math.max(120,Math.min(world.w-120,n.x));n.y=Math.max(120,Math.min(world.h-120,n.y));n.vx*=.30;n.vy*=.30}}
+    GBRGallery.spaceCovers(nodes,playingAnchor,820);
+    for(const cluster of clusters){
+      const members=nodes.filter(node=>node.cluster===cluster.key);
+      if(!members.length||['unknown','unclassified','unspecified'].includes(cluster.key))continue;
+      const x=members.reduce((sum,node)=>sum+node.x,0)/members.length;
+      const y=members.reduce((sum,node)=>sum+node.y,0)/members.length;
+      const dx=x-playingAnchor.x,dy=y-playingAnchor.y,d=Math.hypot(dx,dy)||1;
+      const ux=dx/d,uy=dy/d;
+      const edge=Math.max(...members.map(node=>(node.x-x)*ux+(node.y-y)*uy));
+      mapGenres.push({name:GBRGallery.displayTitle(cluster.name),colour:cluster.colour,
+        size:members.length,x:x+ux*(edge+84),y:y+uy*(edge+84)});
+    }
+    mapGenres.sort((a,b)=>b.size-a.size);
   }
   if(refit)setExplorationStart();
 }
 function resize(){dpr=Math.min(2,devicePixelRatio||1);const r=ui.stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(r.width*dpr));canvas.height=Math.max(1,Math.round(r.height*dpr));canvas.style.width=`${r.width}px`;canvas.style.height=`${r.height}px`;ctx.setTransform(dpr,0,0,dpr,0,0);if(ui.starCanvas){ui.starCanvas.width=canvas.width;ui.starCanvas.height=canvas.height;ui.starCanvas.style.width=`${r.width}px`;ui.starCanvas.style.height=`${r.height}px`;starCtx=ui.starCanvas.getContext('2d');starCtx.setTransform(dpr,0,0,dpr,0,0)}if(!nodes.length)buildNodes(true);updateZoomLabel()}
 
-function nodeDisplaySize(n,hovered=false,sameComp=false,sameChild=false){if(easter){const z=Math.max(.24,camera.zoom),base=96*Math.pow(z,1.12)*GBRDisplay.scale,limit=Math.max(230,Math.min(ui.stage.clientWidth,ui.stage.clientHeight)*.94);return Math.max(28*GBRDisplay.scale,Math.min(limit,hovered?base*1.86:sameComp?base*1.34:sameChild?base*1.22:base*1.12))}const z=Math.max(.10,camera.zoom),base=82*Math.pow(z,.56)*GBRDisplay.scale,minSize=(z<.22?28:z<.38?34:z<.55?39:42)*GBRDisplay.scale,limit=Math.max(230,Math.min(ui.stage.clientWidth,ui.stage.clientHeight)*.94),normal=Math.max(minSize,base);return Math.min(limit,hovered?normal*1.72:sameComp?normal*1.30:sameChild?normal*1.18:normal)}
-function convexHull(points){
-  const pts=[...points].sort((a,b)=>a.x===b.x?a.y-b.y:a.x-b.x);
-  if(pts.length<=1)return pts;
-  const cross=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
-  const lower=[];
-  for(const pt of pts){while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],pt)<=0)lower.pop();lower.push(pt)}
-  const upper=[];
-  for(let i=pts.length-1;i>=0;i--){const pt=pts[i];while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],pt)<=0)upper.pop();upper.push(pt)}
-  upper.pop();lower.pop();
-  return lower.concat(upper);
-}
-function drawClusterBoundaries(anchorScreen){
-  if(!nodes.length)return;
-  const groups=new Map();
-  for(const n of nodes){const key=n.cluster||`${n.parent}|${n.child}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(n)}
-  for(const group of groups.values()){
-    const pts=[];
-    for(const n of group){
-      const sp=viewToScreen(n.x,n.y),size=nodeDisplaySize(n,false,false,false),half=size/2+Math.max(10,14*camera.zoom);
-      pts.push({x:sp.x-half,y:sp.y-half},{x:sp.x+half,y:sp.y-half},{x:sp.x+half,y:sp.y+half},{x:sp.x-half,y:sp.y+half});
-    }
-    if(!pts.length)continue;
-    const sample=group[0]?.t,cc=rgb(sample?.genre?.child_colour||sample?.genre?.parent_colour||'#8a7559');
-    const hull=convexHull(pts);
-    if(hull.length<3)continue;
-    const cx=hull.reduce((a,p)=>a+p.x,0)/hull.length,cy=hull.reduce((a,p)=>a+p.y,0)/hull.length,pad=Math.max(4,8*camera.zoom);
-    const expanded=hull.map(p=>{const dx=p.x-cx,dy=p.y-cy,d=Math.hypot(dx,dy)||1;return{x:p.x+dx/d*pad,y:p.y+dy/d*pad}});
-    const lineDrive=testMode?1:(genreZonesEnabled?lineLamp:0);if(lineDrive<=.002)continue;ctx.save();ctx.strokeStyle=`rgba(${cc.r},${cc.g},${cc.b},${(camera.zoom>.62?.205:.145)*lineDrive*1.75})`;ctx.lineWidth=Math.max(1.15,1.55*camera.zoom);ctx.setLineDash([]);ctx.beginPath();
-    for(let i=0;i<expanded.length;i++){const a=expanded[i],b=expanded[(i+1)%expanded.length],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;if(i===0)ctx.moveTo(mx,my);else ctx.quadraticCurveTo(a.x,a.y,mx,my)}
-    const first=expanded[0],last=expanded[expanded.length-1],fx=(first.x+last.x)/2,fy=(first.y+last.y)/2;ctx.quadraticCurveTo(last.x,last.y,fx,fy);ctx.closePath();ctx.stroke();ctx.restore();
+function coverBoxes(w,h,anchor,coreSize,lyricHeight){
+  const zoom=camera.zoom;
+  const size=GBRGallery.coverSize(zoom,w,h);
+  const core={x:anchor.x-coreSize/2,y:anchor.y-coreSize/2,width:coreSize,height:coreSize+lyricHeight};
+  const screen={x:0,y:0,width:w,height:h};
+  const visible=[];
+  for(const n of nodes){
+    if(n.i===index)continue;
+    const shimmerX=(Math.sin(phase*(.72+n.seed1*.65)+n.seed2*6.283)+Math.cos(phase*(.37+n.seed3*.44)+n.seed4*6.283)*.35)*n.drift;
+    const shimmerY=(Math.cos(phase*(.69+n.seed2*.72)+n.seed1*6.283)*.82+Math.sin(phase*(.41+n.seed4*.38)+n.seed3*6.283)*.28)*n.drift;
+    const sp={x:(n.x+shimmerX-camera.x)*zoom+w/2,y:(n.y+shimmerY-camera.y)*zoom+h/2};
+    const rect={x:sp.x-size/2,y:sp.y-size/2,width:size,height:size};
+    if(!GBRGallery.overlaps(rect,screen)||GBRGallery.overlaps(rect,core,10))continue;
+    visible.push({n,sp,rect});
   }
+  return {core,visible};
+}
+function drawOverviewLabels(w,h,core){
+  if(easter||!genreZonesEnabled||camera.zoom>.55||w<290)return;
+  const reserved=[core,...coverFrame.map(cover=>cover.rect)];
+  const scale=GBRDisplay.scale,limit=w<700?4:9;
+  let painted=0;
+  ctx.save();
+  ctx.textBaseline='middle';
+  ctx.font=`600 ${Math.min(17,Math.max(11,13*scale))}px system-ui`;
+  for(const genre of mapGenres){
+    if(painted>=limit)break;
+    const point=viewToScreen(genre.x,genre.y),width=ctx.measureText(genre.name).width+18,height=23;
+    if(width>w-24||point.x<-30||point.x>w+30||point.y<58||point.y>h+8)continue;
+    const x=Math.min(w-width-10,Math.max(10,point.x-width/2));
+    const rect=[0,-24,24,-48,48].map(offset=>({x,y:point.y-height/2+offset,width,height})).find(box=>
+      box.y>=62&&box.y+height<h-10&&!reserved.some(taken=>GBRGallery.overlaps(box,taken,6)));
+    if(!rect)continue;
+    const colour=rgb(genre.colour);
+    ctx.fillStyle='rgba(12,13,13,.82)';
+    ctx.beginPath();ctx.roundRect(rect.x,rect.y,width,height,5);ctx.fill();
+    ctx.fillStyle=`rgba(${colour.r},${colour.g},${colour.b},.8)`;ctx.fillRect(rect.x+2,rect.y+5,2,height-10);
+    ctx.fillStyle='#ded1bc';ctx.fillText(genre.name,rect.x+10,rect.y+height/2);
+    reserved.push(rect);
+    painted++;
+  }
+  ctx.restore();
 }
 /* v10.12.5 — genre territories replace the old peak-event "firework" rays.
    These are low-opacity local motifs: they explain ownership of space and react
@@ -6803,7 +6823,7 @@ function drawKnowledge(w,h,music){
 function draw(){
   // Full-screen documents cover the map; keep its animation idle until return.
   if(document.hidden||document.body.classList.contains('gbr-making-open')||document.body.classList.contains('gbr-observatory-open')){requestAnimationFrame(draw);return}
-  const w=ui.stage.clientWidth,h=ui.stage.clientHeight,t=tracks[index],c=accent(t),gas={r:255,g:174,b:82},music=musicVisualState(t),level=music.level,visualLamp=testMode?1:(albumLightEnabled?lamp:0);camera.x+=(camera.targetX-camera.x)*.14;camera.y+=(camera.targetY-camera.y)*.14;camera.zoom+=(camera.targetZoom-camera.zoom)*.14;ctx.clearRect(0,0,w,h);const worldAnchorScreen=viewToScreen(playingAnchor.x,playingAnchor.y),coreScreen=worldAnchorScreen,anchorScreen=worldAnchorScreen;const mobileCore=matchMedia('(max-width:900px)').matches,coreSize=GBRDisplay.coverSize,lyricHeight=GBRDisplay.lyricHeight;if(ui.playingCoverViewport&&ui.playingCoverScreen){const sr=ui.stage.getBoundingClientRect();ui.playingCoverViewport.style.left=`${sr.left}px`;ui.playingCoverViewport.style.top=`${sr.top}px`;ui.playingCoverViewport.style.width=`${sr.width}px`;ui.playingCoverViewport.style.height=`${sr.height}px`;ui.playingCoverScreen.style.left=`${coreScreen.x}px`;ui.playingCoverScreen.style.top=`${coreScreen.y}px`;if(ui.easterStoryOverlay){ui.easterStoryOverlay.style.left=`${coreScreen.x}px`;ui.easterStoryOverlay.style.top=`${coreScreen.y}px`;ui.easterStoryOverlay.style.width=`${coreSize}px`;ui.easterStoryOverlay.style.height=`${coreSize}px`;}ui.playingCoverScreen.style.visibility=viewMode==='knowledge'?'hidden':'visible';if(ui.easterStoryOverlay)ui.easterStoryOverlay.style.visibility=viewMode==='knowledge'?'hidden':'visible';}ui.centerStack.style.setProperty('left',`${coreScreen.x}px`,'important');ui.centerStack.style.setProperty('top',`${coreScreen.y+coreSize/2+10*GBRDisplay.scale}px`,'important');ui.centerStack.style.setProperty('width',`${coreSize}px`,'important');ui.centerStack.style.setProperty('min-width',`${coreSize}px`,'important');ui.centerStack.style.setProperty('max-width',`${coreSize}px`,'important');ui.centerStack.style.transform='translate(-50%,0)';ui.centerStack.style.zoom='1';ui.centerCard.style.setProperty('display','none','important');if(ui.playingCoverScreen)ui.playingCoverScreen.dataset.renderSize=`${coreSize}x${coreSize}`;ui.lyric.style.setProperty('width',`${coreSize}px`,'important');ui.lyric.style.setProperty('height',`${lyricHeight}px`,'important');const grad=ctx.createRadialGradient(coreScreen.x,coreScreen.y,36,coreScreen.x,coreScreen.y,Math.max(w,h)*.62);grad.addColorStop(0,`rgba(${gas.r},${gas.g},${gas.b},${((easter?.08:.028)+.08*visualLamp)*visualLamp})`);grad.addColorStop(.35,`rgba(${gas.r},${gas.g},${gas.b},${(.018+.035*visualLamp)*visualLamp})`);grad.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);drawStars(w,h,music);
+  const w=ui.stage.clientWidth,h=ui.stage.clientHeight,t=tracks[index],c=accent(t),gas={r:255,g:174,b:82},music=musicVisualState(t),level=music.level,visualLamp=testMode?1:(albumLightEnabled?lamp:0);camera.x+=(camera.targetX-camera.x)*.14;camera.y+=(camera.targetY-camera.y)*.14;camera.zoom+=(camera.targetZoom-camera.zoom)*.14;ctx.clearRect(0,0,w,h);const worldAnchorScreen=viewToScreen(playingAnchor.x,playingAnchor.y),coreScreen=worldAnchorScreen,anchorScreen=worldAnchorScreen;const coreSize=GBRDisplay.coverSize,lyricHeight=GBRDisplay.lyricHeight;if(ui.playingCoverViewport&&ui.playingCoverScreen){const sr=ui.stage.getBoundingClientRect();ui.playingCoverViewport.style.left=`${sr.left}px`;ui.playingCoverViewport.style.top=`${sr.top}px`;ui.playingCoverViewport.style.width=`${sr.width}px`;ui.playingCoverViewport.style.height=`${sr.height}px`;ui.playingCoverScreen.style.left=`${coreScreen.x}px`;ui.playingCoverScreen.style.top=`${coreScreen.y}px`;if(ui.easterStoryOverlay){ui.easterStoryOverlay.style.left=`${coreScreen.x}px`;ui.easterStoryOverlay.style.top=`${coreScreen.y}px`;ui.easterStoryOverlay.style.width=`${coreSize}px`;ui.easterStoryOverlay.style.height=`${coreSize}px`;}ui.playingCoverScreen.style.visibility=viewMode==='knowledge'?'hidden':'visible';if(ui.easterStoryOverlay)ui.easterStoryOverlay.style.visibility=viewMode==='knowledge'?'hidden':'visible';}ui.centerStack.style.setProperty('left',`${coreScreen.x}px`,'important');ui.centerStack.style.setProperty('top',`${coreScreen.y+coreSize/2+10*GBRDisplay.scale}px`,'important');ui.centerStack.style.setProperty('width',`${coreSize}px`,'important');ui.centerStack.style.setProperty('min-width',`${coreSize}px`,'important');ui.centerStack.style.setProperty('max-width',`${coreSize}px`,'important');ui.centerStack.style.transform='translate(-50%,0)';ui.centerStack.style.zoom='1';ui.centerCard.style.setProperty('display','none','important');if(ui.playingCoverScreen)ui.playingCoverScreen.dataset.renderSize=`${coreSize}x${coreSize}`;ui.lyric.style.setProperty('width',`${coreSize}px`,'important');ui.lyric.style.setProperty('height',`${lyricHeight}px`,'important');const grad=ctx.createRadialGradient(coreScreen.x,coreScreen.y,36,coreScreen.x,coreScreen.y,Math.max(w,h)*.62);grad.addColorStop(0,`rgba(${gas.r},${gas.g},${gas.b},${((easter?.08:.028)+.08*visualLamp)*visualLamp})`);grad.addColorStop(.35,`rgba(${gas.r},${gas.g},${gas.b},${(.018+.035*visualLamp)*visualLamp})`);grad.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);drawStars(w,h,music);
   if(viewMode==='knowledge'){
     drawKnowledge(w,h,music);
     document.documentElement.style.setProperty('--audio-level',level.toFixed(3));
@@ -6812,74 +6832,35 @@ function draw(){
     drawSpectrum();phase+=.016;requestAnimationFrame(draw);return
   }
   knowledgeAlpha=0;
-  const focus=hoverIndex>=0?hoverIndex:index,focusNode=nodes[focus];
-  /* v10.11.6: child/subgenre closed borders are removed on every layout.
-     Parent cluster separators remain as the only geographic structure. */
-  drawGenreTerritories(worldAnchorScreen,music);
-
-  const edgeLabelPoint=(group,padPx)=>{
-    if(!group.length)return null;
-    const cx=group.reduce((a,n)=>a+n.baseX,0)/group.length,cy=group.reduce((a,n)=>a+n.baseY,0)/group.length;
-    let dx=cx-playingAnchor.x,dy=cy-playingAnchor.y,d=Math.hypot(dx,dy);
-    if(d<1){dx=0;dy=-1;d=1}
-    const ux=dx/d,uy=dy/d,outer=Math.max(...group.map(n=>Math.hypot(n.baseX-playingAnchor.x,n.baseY-playingAnchor.y)));
-    const padWorld=padPx/Math.max(.24,camera.zoom);
-    return viewToScreen(playingAnchor.x+ux*(outer+padWorld),playingAnchor.y+uy*(outer+padWorld));
-  };
-  const drawMapLabel=(text,sp,col,size,alpha,weight=800)=>{
-    if(!sp||!text||sp.x<-220||sp.x>w+220||sp.y<-100||sp.y>h+100)return;
-    size*=GBRDisplay.scale;
-    const label=String(text).toUpperCase();
-    ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`${weight} ${size}px Courier New`;
-    const metrics=ctx.measureText(label),tw=metrics.width,th=size*1.06,padX=size>=14?12:8,padY=size>=14?7:5,bw=tw+padX*2,bh=th+padY*2,rx=sp.x-bw/2,ry=sp.y-bh/2;
-    ctx.fillStyle='rgba(4,5,4,.74)';ctx.strokeStyle=`rgba(${col.r},${col.g},${col.b},${Math.min(.42,alpha*.40)})`;ctx.lineWidth=1.1;ctx.beginPath();ctx.roundRect(rx,ry,bw,bh,5);ctx.fill();ctx.stroke();
-    ctx.lineJoin='round';ctx.lineWidth=size>=14?6:3;ctx.strokeStyle='rgba(0,0,0,.96)';ctx.strokeText(label,sp.x,sp.y+1);
-    ctx.fillStyle=`rgba(${Math.min(255,col.r+90)},${Math.min(255,col.g+90)},${Math.min(255,col.b+90)},${alpha})`;
-    if(size>=14){ctx.shadowColor=`rgba(${col.r},${col.g},${col.b},.46)`;ctx.shadowBlur=7}
-    ctx.fillText(label,sp.x,sp.y+1);ctx.restore();
-  };
-  const drawAllMapLabels=()=>{
-    const clusterGroups=new Map();
-    for(const n of nodes){const name=n.t?.genre?.cluster||n.parent||'Unclassified';if(!clusterGroups.has(name))clusterGroups.set(name,[]);clusterGroups.get(name).push(n)}
-    for(const [name,group] of clusterGroups){const sample=group[0]?.t,col=rgb(sample?.genre?.parent_colour||sample?.genre?.child_colour||'#8a7559'),sp=edgeLabelPoint(group,camera.zoom<.42?68:176);drawMapLabel(name,sp,col,camera.zoom<.42?17:20,.98,900)}
-    if(camera.zoom>.34){
-      const parentGroups=new Map();
-      for(const n of nodes){const name=n.parent||'Unclassified';if(!parentGroups.has(name))parentGroups.set(name,[]);parentGroups.get(name).push(n)}
-      for(const [name,group] of parentGroups){const sample=group[0]?.t,col=rgb(sample?.genre?.parent_colour||'#8a7559'),sp=edgeLabelPoint(group,88);drawMapLabel(name,sp,col,9,.76,800)}
-    }
-    if(camera.zoom>.58){
-      const childGroups=new Map();
-      for(const n of nodes){const key=`${n.parent}|${n.child}`;if(!childGroups.has(key))childGroups.set(key,[]);childGroups.get(key).push(n)}
-      for(const group of childGroups.values()){const n=group[0],col=rgb(n.t?.genre?.child_colour||'#c49a6c'),sp=edgeLabelPoint(group,48);drawMapLabel(n.child,sp,col,7,.58,800)}
-    }
-  };
-  if(focusNode){const fs=focus===index?coreScreen:viewToScreen(focusNode.x,focusNode.y);for(const n of nodes){if(n.i===focus)continue;if(n.t.composition&&n.t.composition===focusNode.t.composition){const ns=viewToScreen(n.x,n.y);ctx.strokeStyle=`rgba(${c.r},${c.g},${c.b},.32)`;ctx.lineWidth=Math.max(1,1.25*camera.zoom);ctx.beginPath();ctx.moveTo(fs.x,fs.y);ctx.lineTo(ns.x,ns.y);ctx.stroke()}}}
-  document.documentElement.style.setProperty('--audio-level',level.toFixed(3));if(anchorScreen.x>-500&&anchorScreen.x<w+500&&anchorScreen.y>-500&&anchorScreen.y<h+500){const ag=ctx.createRadialGradient(anchorScreen.x,anchorScreen.y,80,anchorScreen.x,anchorScreen.y,250+level*110);ag.addColorStop(0,`rgba(${gas.r},${gas.g},${gas.b},${(.10+level*.22)*visualLamp})`);ag.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=ag;ctx.fillRect(anchorScreen.x-380,anchorScreen.y-380,760,760)}
-  for(const n of nodes){
-    const laneActive=!activeParent||n.parent===activeParent,sel=n.i===index,hov=n.i===hoverIndex;
-    if(sel)continue;
-    const sameComp=focusNode&&n.i!==focus&&(n.t.composition&&n.t.composition===focusNode.t.composition),sameChild=focusNode&&n.child===focusNode.child&&n.parent===focusNode.parent;
-    const driftAmp=easter?n.drift*1.55:n.drift;
-    const shimmerX=Math.sin(phase*(.72+n.seed1*.65)+n.seed2*6.283)*driftAmp+Math.cos(phase*(.37+n.seed3*.44)+n.seed4*6.283)*driftAmp*.35;
-    const shimmerY=Math.cos(phase*(.69+n.seed2*.72)+n.seed1*6.283)*driftAmp*.82+Math.sin(phase*(.41+n.seed4*.38)+n.seed3*6.283)*driftAmp*.28;
-    const sp=viewToScreen(n.x+shimmerX,n.y+shimmerY),eligible=isTrackEligible(n.t),baseNodeSize=nodeDisplaySize(n,hov,sameComp,sameChild),size=eligible?baseNodeSize:Math.max(20,baseNodeSize*(hov?.86:.72)),im=imageFor(n.t);
-    // Cull against the settled node position, not the animated shimmer position.
-    // This prevents covers at the edge of the centre exclusion zone blinking
-    // in/out as their decorative drift crosses the boundary.
-    const stableSp=viewToScreen(n.x,n.y),stableSize=nodeDisplaySize(n,false,false,false),coreMargin=(camera.zoom<.22?(mobileCore?16:28):(mobileCore?52:76))*GBRDisplay.scale;
-    const halfCore=coreSize/2+coreMargin,coreLeft=anchorScreen.x-halfCore,coreRight=anchorScreen.x+halfCore,coreTop=anchorScreen.y-halfCore,coreBottom=anchorScreen.y+halfCore+lyricHeight+coreMargin*.72;
-    const overlapsCore=(stableSp.x+stableSize/2>coreLeft&&stableSp.x-stableSize/2<coreRight&&stableSp.y+stableSize/2>coreTop&&stableSp.y-stableSize/2<coreBottom);
-    if(overlapsCore)continue;
-    if(sp.x+size<0||sp.x-size>w||sp.y+size<0||sp.y-size>h)continue;
-    ctx.globalAlpha=(laneActive?(hov?1:sameComp?.96:sameChild?.90:.84):.11)*(eligible?1:(hov?.74:.46));
-    if(im.complete&&im.naturalWidth){
-      ctx.save();ctx.beginPath();ctx.roundRect(sp.x-size/2,sp.y-size/2,size,size,Math.max(2,4*camera.zoom));ctx.clip();if(!eligible)ctx.filter='grayscale(1) saturate(0) brightness(.58) contrast(.88)';ctx.drawImage(im,sp.x-size/2,sp.y-size/2,size,size);ctx.restore();
-      ctx.strokeStyle=!eligible?(hov?'rgba(210,210,205,.44)':'rgba(160,160,155,.14)'):hov?`rgba(${c.r},${c.g},${c.b},.95)`:sameComp?`rgba(${c.r},${c.g},${c.b},.66)`:sameChild?'rgba(255,255,255,.30)':'rgba(255,255,255,.12)';ctx.lineWidth=hov?2.5:1;ctx.strokeRect(sp.x-size/2-.5,sp.y-size/2-.5,size+1,size+1)
-    }else{const tc=rgb(n.t.genre?.child_colour);ctx.fillStyle=`rgb(${tc.r},${tc.g},${tc.b})`;ctx.fillRect(sp.x-size/2,sp.y-size/2,size,size)}
-    ctx.globalAlpha=1
+  const focus=hoverIndex>=0?hoverIndex:index,group=songGroups.byIndex[focus];
+  const layout=coverBoxes(w,h,anchorScreen,coreSize,lyricHeight);
+  coverFrame=layout.visible;
+  if(camera.zoom<=.55)drawGenreTerritories(worldAnchorScreen,music);
+  document.documentElement.style.setProperty('--audio-level',level.toFixed(3));
+  if(anchorScreen.x>-500&&anchorScreen.x<w+500&&anchorScreen.y>-500&&anchorScreen.y<h+500){
+    const ag=ctx.createRadialGradient(anchorScreen.x,anchorScreen.y,80,anchorScreen.x,anchorScreen.y,250+level*110);
+    ag.addColorStop(0,`rgba(${gas.r},${gas.g},${gas.b},${(.10+level*.22)*visualLamp})`);ag.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=ag;ctx.fillRect(anchorScreen.x-380,anchorScreen.y-380,760,760)
   }
-
-  drawAllMapLabels();
+  for(const {n,rect} of coverFrame){
+    const laneActive=!activeParent||n.parent===activeParent,hovered=n.i===hoverIndex;
+    const related=group&&songGroups.byIndex[n.i]===group,eligible=isTrackEligible(n.t);
+    const image=imageFor(n.t),{x,y,width:size}=rect;
+    ctx.save();
+    ctx.globalAlpha=(laneActive?(hovered||related?1:.95):.19)*(eligible?1:.56);
+    if(image.complete&&image.naturalWidth){
+      const side=Math.min(image.naturalWidth,image.naturalHeight);
+      ctx.beginPath();ctx.roundRect(x,y,size,size,Math.min(5,size*.06));ctx.clip();
+      if(!eligible)ctx.filter='grayscale(.75) saturate(.45)';
+      ctx.drawImage(image,(image.naturalWidth-side)/2,(image.naturalHeight-side)/2,side,side,x,y,size,size);
+    }else{
+      ctx.fillStyle='#171510';ctx.fillRect(x,y,size,size)
+    }
+    ctx.restore();
+    ctx.strokeStyle=hovered?`rgba(${c.r},${c.g},${c.b},.95)`:related?`rgba(${c.r},${c.g},${c.b},.62)`:'rgba(255,255,255,.16)';
+    ctx.lineWidth=hovered?2.5:1;ctx.strokeRect(x-.5,y-.5,size+1,size+1)
+  }
+  drawOverviewLabels(w,h,layout.core);
 
   let l=.04,r=.04;if(testMode){l=r=1}else if(analyser&&power&&!audio.paused){l=level;r=Math.min(1,level*.92+((freq[12]||0)/255)*.08)}ui.vuL.style.transform=`rotate(${-43+l*86}deg)`;ui.vuR.style.transform=`rotate(${-43+r*86}deg)`;drawSpectrum();updateLyrics();phase+=.016;requestAnimationFrame(draw)
 }
@@ -6988,8 +6969,37 @@ if(ui.deskFormatToggle)ui.deskFormatToggle.onclick=()=>{
   clickSound('toggle');
   switchAudioFormat(preferredAudioFormat==='flac'?'mp3':'flac');
 };
-function hitNode(clientX,clientY){if(viewMode==='knowledge')return hitKnowledgeNode(clientX,clientY);const r=canvas.getBoundingClientRect(),sx=clientX-r.left,sy=clientY-r.top,anchor=viewToScreen(playingAnchor.x,playingAnchor.y),mobileCore=matchMedia('(max-width:900px)').matches,coreSize=GBRDisplay.coverSize,coreMargin=(mobileCore?52:76)*GBRDisplay.scale;let best=null;for(const n of nodes){if(n.i===index)continue;const settled=viewToScreen(n.x,n.y),baseSize=nodeDisplaySize(n,false,false,false),halfCore=coreSize/2+coreMargin;if(settled.x+baseSize/2>anchor.x-halfCore&&settled.x-baseSize/2<anchor.x+halfCore&&settled.y+baseSize/2>anchor.y-halfCore&&settled.y-baseSize/2<anchor.y+halfCore+GBRDisplay.lyricHeight+coreMargin*.72)continue;const shimmerX=(Math.sin(phase*(.72+n.seed1*.65)+n.seed2*6.283)*n.drift+Math.cos(phase*(.37+n.seed3*.44)+n.seed4*6.283)*n.drift*.35),shimmerY=(Math.cos(phase*(.69+n.seed2*.72)+n.seed1*6.283)*n.drift*.82+Math.sin(phase*(.41+n.seed4*.38)+n.seed3*6.283)*n.drift*.28),sp=viewToScreen(n.x+shimmerX,n.y+shimmerY),hit=Math.max(34,nodeDisplaySize(n,false,false,false)*.58),d=Math.hypot(sx-sp.x,sy-sp.y);if(d<hit&&(!best||d<best.d))best={d,n,sp}}return{best,sx,sy,r}}
-canvas.addEventListener('mousemove',e=>{if(pointer.down)return;const {best,sx,sy,r}=hitNode(e.clientX,e.clientY);if(viewMode==='knowledge'){knowledgeHoverId=best?.n?.id||null;hoverIndex=-1;if(best){ui.mapTip.style.display='block';ui.mapTip.style.left=`${Math.min(r.width-260,sx+16)}px`;ui.mapTip.style.top=`${Math.max(44,sy-22)}px`;ui.mapTip.querySelector('strong').textContent=best.n.title;ui.mapTip.querySelector('small').textContent=best.n.kind==='root'?"HOW IT'S MADE":best.n.kind==='document'?`${best.n.title} · STAGE`:best.n.kind==='chain'?`${best.n.docLabel} · DOCUMENT`:`${best.n.docLabel} · DETAIL`}else ui.mapTip.style.display='none';return}hoverIndex=best?best.n.i:-1;if(best){ui.mapTip.style.display='block';ui.mapTip.style.left=`${Math.min(r.width-260,sx+16)}px`;ui.mapTip.style.top=`${Math.max(44,sy-22)}px`;ui.mapTip.querySelector('strong').textContent=titleOf(best.n.t);ui.mapTip.querySelector('small').textContent=[best.n.t.genre?.child_genre||variantOf(best.n.t),best.n.t.genre?.parent_genre,isTrackEligible(best.n.t)?'AUTOPLAY ON':'AUTOPLAY FILTERED','ORBIT = PARENT · RADIUS = CHILD'].filter(Boolean).join(' · ')}else ui.mapTip.style.display='none'});
+function hitNode(clientX,clientY){
+  if(viewMode==='knowledge')return hitKnowledgeNode(clientX,clientY);
+  const r=canvas.getBoundingClientRect(),sx=clientX-r.left,sy=clientY-r.top;
+  let best=null;
+  for(const {n,sp,rect} of coverFrame){
+    const d=Math.hypot(sx-sp.x,sy-sp.y);
+    const half=Math.max(12,rect.width/2);
+    if(Math.abs(sx-sp.x)<=half&&Math.abs(sy-sp.y)<=half&&(!best||d<best.d))best={d,n,sp};
+  }
+  return {best,sx,sy,r};
+}
+canvas.addEventListener('mousemove',event=>{
+  if(pointer.down)return;
+  const {best,sx,sy,r}=hitNode(event.clientX,event.clientY);
+  const knowledge=viewMode==='knowledge';
+  knowledgeHoverId=knowledge?best?.n?.id||null:null;
+  hoverIndex=!knowledge&&best?best.n.i:-1;
+  ui.mapTip.style.display=best?'block':'none';
+  if(!best)return;
+  ui.mapTip.style.left=`${Math.max(6,Math.min(r.width-250,sx+16))}px`;
+  ui.mapTip.style.top=`${Math.max(44,sy-22)}px`;
+  const node=best.n;
+  ui.mapTip.querySelector('strong').textContent=knowledge?node.title:titleOf(node.t);
+  if(knowledge){
+    ui.mapTip.querySelector('small').textContent=node.kind==='root'?"HOW IT'S MADE":node.kind==='document'?`${node.title} · STAGE`:node.docLabel;
+  }else{
+    const genres=[node.parent,node.child].filter(value=>value&&!['unknown','unclassified','unspecified'].includes(GBRGallery.titleKey(value)));
+    const labels=new Map(genres.map(value=>[GBRGallery.titleKey(value),value]));
+    ui.mapTip.querySelector('small').textContent=[...labels.values()].join(' · ');
+  }
+});
 canvas.addEventListener('mouseleave',()=>{if(!pointer.down){hoverIndex=-1;knowledgeHoverId=null;ui.mapTip.style.display='none'}});
 ui.stage.addEventListener('pointerdown',e=>{if(e.button>0)return;if(e.target.closest('.utility-nav,.knowledge-density,.knowledge-reader,.knowledge-world-card,.side-panel,.genre-strip,.zoom-controls'))return;if(!power)return;try{ui.stage.setPointerCapture(e.pointerId)}catch(_){};if(e.pointerType==='touch'){touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2){window.GBRcoverEgg?.reset();const pts=[...touches.values()],cx=(pts[0].x+pts[1].x)/2,cy=(pts[0].y+pts[1].y)/2,d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y),r=canvas.getBoundingClientRect();pinch={distance:d,zoom:camera.targetZoom,world:screenToWorld(cx-r.left,cy-r.top)};pointer.down=false}else if(touches.size===1){pointer={down:true,id:e.pointerId,startX:e.clientX,startY:e.clientY,camX:camera.targetX,camY:camera.targetY,moved:false}}}else pointer={down:true,id:e.pointerId,startX:e.clientX,startY:e.clientY,camX:camera.targetX,camY:camera.targetY,moved:false};ui.stage.classList.add('is-panning')});
 ui.stage.addEventListener('pointermove',e=>{if(e.pointerType==='touch'&&touches.has(e.pointerId)){touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2&&pinch){const pts=[...touches.values()],cx=(pts[0].x+pts[1].x)/2,cy=(pts[0].y+pts[1].y)/2,d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y),r=canvas.getBoundingClientRect(),next=Math.max(cameraMinZoom(),Math.min(10,pinch.zoom*d/Math.max(1,pinch.distance))),sx=cx-r.left,sy=cy-r.top,w=ui.stage.clientWidth,h=ui.stage.clientHeight;camera.targetZoom=next;camera.targetX=pinch.world.x-(sx-w/2)/next;camera.targetY=pinch.world.y-(sy-h/2)/next;updateZoomLabel();return}}if(!pointer.down||pointer.id!==e.pointerId)return;const dx=e.clientX-pointer.startX,dy=e.clientY-pointer.startY;if(Math.hypot(dx,dy)>4){pointer.moved=true;window.GBRcoverEgg?.reset();}camera.targetX=pointer.camX-dx/camera.targetZoom;camera.targetY=pointer.camY-dy/camera.targetZoom;});
@@ -7356,6 +7366,12 @@ load().then(()=>draw()).catch(err=>{ui.loading.textContent=`Landscape build erro
 <style id="v10111-panel-layer-and-knowledge-zoom">
 /* GBR v10.11.1 — shared desktop/mobile panel stacking and knowledge overview. */
 .side-panel{z-index:580!important}
+body[data-view="tracks"] .genre-label small:empty{display:none!important}
+body[data-view="tracks"] .genre-label .mobile-song-title{text-transform:none!important}
+@media(max-width:900px){
+  body[data-view="tracks"] .zoom-controls{display:flex!important;gap:2px}
+  body[data-view="tracks"] .zoom-controls output{display:none!important}
+}
 .utility-button#tracksButton.active{color:#fff1dd!important;border-color:var(--accent)!important;box-shadow:inset 0 0 14px rgba(var(--accent-rgb),.18),0 0 9px rgba(var(--accent-rgb),.12)!important}
 </style>
 

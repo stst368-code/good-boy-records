@@ -25,6 +25,12 @@ def limiter_filters(ffmpeg, limit_db, sample_rate):
             f'atrim=start_sample={delay}', 'asetpts=PTS-STARTPTS'], 'explicit_samples'
 
 
+def afir_gain_option(ffmpeg):
+    options = subprocess.run([ffmpeg, '-hide_banner', '-h', 'filter=afir'], capture_output=True,
+                             text=True, check=True, encoding='utf-8', errors='replace').stdout
+    return 'irnorm=-1' if 'irnorm' in options else 'gtype=none'
+
+
 def render(request):
     import numpy as np
     import soundfile as sf
@@ -32,6 +38,9 @@ def render(request):
     if not ffmpeg:raise RuntimeError('FFmpeg is required for previews and master candidates')
     version=subprocess.run([ffmpeg,'-version'],capture_output=True,text=True,check=True, encoding="utf-8", errors="replace").stdout.splitlines()[0]
     recipe=request['recipe'];mix=recipe['mix'];duration=float(request['duration'])
+    stems = request.get('stems')
+    audio = sf.info(stems['vocals'] if stems else request['source'])
+    effects = [effect for effect in mix.get('effects', []) if effect['strength'] and not effect.get('bypassed')]
     output=Path(request['output']).with_suffix('.wav' if request['kind']=='mix_preview' else '.flac')
     filters=[]
     if mix['gain_db']:filters.append(f"volume={mix['gain_db']}dB")
@@ -40,10 +49,13 @@ def render(request):
     if mix['treble_db']:filters.append(f"treble=g={mix['treble_db']}")
     command=[ffmpeg,'-hide_banner','-v','error','-nostdin','-n','-i',request['source']]
     input_label='0:a';prefix=''
-    if request.get('stems'):
-        command+=['-i',request['stems']['vocals'],'-i',request['stems']['accompaniment']]
+    if stems:
+        command+=['-i',stems['vocals'],'-i',stems['accompaniment']]
         prefix=f"[1:a]volume={mix['vocal_db']}dB[v];[2:a]volume={mix['accompaniment_db']}dB[m];[v][m]amix=inputs=2:normalize=0[stem_mix];";input_label='stem_mix'
+    next_input = 3 if stems else 1
     graph=prefix+'['+input_label+']'+','.join(filters or ['anull'])+'[tone];'
+    source = 'tone'
+    afir_gain = None
     if mix['reverb']:
         rate=44100
         t=np.arange(int(rate*mix['room_seconds']))/rate
@@ -52,27 +64,35 @@ def render(request):
         impulse[0]=1
         ir=output.parent/'room-ir.wav';sf.write(ir,impulse,rate,subtype='FLOAT')
         command+=['-i',str(ir)]
-        help_text=subprocess.run([ffmpeg,'-hide_banner','-h','filter=afir'],capture_output=True,text=True,check=True, encoding="utf-8", errors="replace").stdout
-        normalise='irnorm=-1' if 'irnorm' in help_text else 'gtype=none'
-        graph+=f'[tone][{3 if request.get("stems") else 1}:a]afir=dry=1:wet=1:irgain=1:irfmt=mono:{normalise}[room];'
+        afir_gain = afir_gain_option(ffmpeg)
+        graph+=f'[tone][{next_input}:a]afir=dry=1:wet=1:irgain=1:irfmt=mono:{afir_gain}[room];'
+        next_input += 1
         source='room'
-    else:source='tone'
+    if effects:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / '_04_preparation'))
+        from _gbr_preparation.mastering import PRESETS, effect_graph
+
+        if afir_gain is None and any('room' in PRESETS[effect['preset']] for effect in effects):
+            afir_gain = afir_gain_option(ffmpeg)
+        source, filters, impulses = effect_graph(effects, source, audio, output.parent, next_input, afir_gain)
+        graph += ';'.join(filters) + ';'
+        for impulse in impulses:
+            command += ['-i', str(impulse)]
     final=[];limiter_compensation=None
     if mix['limiter_db'] is not None:
-        sample_rate=sf.info(request['stems']['vocals'] if request.get('stems') else request['source']).samplerate
-        limiter,limiter_compensation=limiter_filters(ffmpeg,mix['limiter_db'],sample_rate)
+        limiter,limiter_compensation=limiter_filters(ffmpeg,mix['limiter_db'],audio.samplerate)
         final.extend(limiter)
     if mix['fade_in']:final.append(f"afade=t=in:st=0:d={min(duration,mix['fade_in'])}")
     if mix['fade_out']:final.append(f"afade=t=out:st={max(0,duration-mix['fade_out'])}:d={min(duration,mix['fade_out'])}")
     # Fades use whole-recording time before audition trimming; preview and master share a chain.
     if request['kind']=='mix_preview':final+=['atrim=start='+str(recipe['start'])+':duration='+str(recipe['seconds']),'asetpts=PTS-STARTPTS']
-    else:final.append('atrim=end_sample='+str(round(duration*sf.info(request['stems']['vocals']).samplerate) if request.get('stems') else sf.info(request['source']).frames))
+    else:final.append('atrim=end_sample='+str(round(duration*audio.samplerate) if stems else audio.frames))
     graph+=f'[{source}]'+','.join(final or ['anull'])+'[out]'
     command+=['-filter_complex',graph,'-map','[out]','-map_metadata','-1','-c:a',
               'pcm_s24le' if request['kind']=='mix_preview' else 'flac']
     if request['kind']=='mix_master':command+=['-sample_fmt','s32','-bits_per_raw_sample','24']
     command+=[str(output)]
-    bypass=request['kind']=='mix_master' and not request.get('stems') and not any(mix[key] for key in ['gain_db','bass_db','mid_db','treble_db','reverb','fade_in','fade_out']) and mix['limiter_db'] is None
+    bypass=request['kind']=='mix_master' and not stems and not effects and not any(mix[key] for key in ['gain_db','bass_db','mid_db','treble_db','reverb','fade_in','fade_out']) and mix['limiter_db'] is None
     if bypass:
         # Keep bit depth/container bytes for a true bypass. This temporary hard
         # link is removed with the task directory after the source is reused.

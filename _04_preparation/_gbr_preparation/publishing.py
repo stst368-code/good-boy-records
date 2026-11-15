@@ -18,7 +18,7 @@ from urllib.error import HTTPError
 
 from .service import canonical, digest, now
 from .editorial import lighting
-from .release_catalogue import (POINTER, destination, read_catalogue, remove_other,
+from .release_catalogue import (POINTER, destination, display_title, read_catalogue, remove_other,
                                 release_url)
 
 PUBLIC_BASE = 'https://pub-a5c11159f6144ae885f7795a5bf7086a.r2.dev'
@@ -449,7 +449,7 @@ class Publisher:
             if reuse:
                 previous=reuse['track'];song={'album_name':previous.get('album',{}).get('name'),'album_position':previous.get('album',{}).get('position')};title=previous.get('displayTitle') or meta.get('title')
             else:song,title=self.catalogue_song(meta)
-            title=patch.get('title',title)
+            title=display_title(patch.get('title',title))
             for key in ('album_name','album_position'):
                 if key in patch:song[key]=patch[key]
             original=self.prep.source(gid)[1]

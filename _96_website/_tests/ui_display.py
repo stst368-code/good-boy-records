@@ -30,7 +30,14 @@ def main():
         wav.writeframes(b'\0' * 44100 * 4)
 
     def media(route):
-        if route.request.url.endswith(('.flac', '.mp3')):
+        if route.request.url.endswith('/gbr/v2/catalogue.json'):
+            base = route.request.url.split('/gbr/v2/', 1)[0]
+            route.fulfill(json={'format': 'gbr-public-releases-v1', 'tracks': [
+                {'id': 'gbr-9-artwork-test', 'displayTitle': 'johnny three fridges', 'composition': '9',
+                 'audio': {'sources': {'mp3': base + '/cover-map-test.mp3'}},
+                 'artwork_url': base + '/cover-map-test.png'},
+            ]}, headers={'Access-Control-Allow-Origin': '*'})
+        elif route.request.url.endswith(('.flac', '.mp3')):
             route.fulfill(content_type='audio/wav', body=audio.getvalue(), headers={'Access-Control-Allow-Origin': '*'})
         elif route.request.url.endswith(('.jpg', '.png', '.webp')):
             route.fulfill(content_type='image/png', body=IMAGE)
@@ -68,6 +75,8 @@ def main():
 
                 page.locator('#tracksButton').click()
                 page.wait_for_function('''()=>{const r=document.querySelector('#sidePanel').getBoundingClientRect();return r.x>=0&&r.right<=innerWidth&&r.bottom<=innerHeight+1}''')
+                johnny = page.locator('.track-song-group summary', has_text='Johnny Three Fridges')
+                assert johnny.count() == 1 and '8 VERSIONS' in johnny.inner_text()
                 panel = page.locator('#sidePanel').bounding_box()
                 if width == 3840:
                     assert panel['width'] >= 1600
@@ -86,10 +95,11 @@ def main():
                     # larger density, rather than only scaling the DOM sleeve.
                     target = page.evaluate('''()=>{const r=canvas.getBoundingClientRect();for(const n of nodes){const p=viewToScreen(n.x,n.y);if(p.x<20||p.x>r.width-20||p.y<110||p.y>r.height-90)continue;const hit=hitNode(p.x+r.left,p.y+r.top);if(hit.best?.n.i===n.i&&n.i!==index)return {x:p.x+r.left,y:p.y+r.top,i:n.i}}return null}''')
                     assert target is not None
+                    assert page.evaluate('''coverFrame.every(({rect},i)=>coverFrame.slice(i+1).every(other=>!GBRGallery.overlaps(rect,other.rect)))''')
                     page.mouse.click(target['x'], target['y'])
                     page.wait_for_function('index==='+str(target['i']))
                     page.evaluate('camera.zoom=camera.targetZoom=10')
-                    assert page.evaluate('nodeDisplaySize(nodes[0])') >= (550 if width == 3840 else 290)
+                    assert page.evaluate('GBRGallery.coverSize(camera.zoom,ui.stage.clientWidth,ui.stage.clientHeight)') >= (550 if width == 3840 else 290)
                     assert page.locator('#playingCoverScreen').bounding_box()['width'] == sleeve['width']
                 page.locator('#gbrAnalyticsButton').click()
                 frame = page.frame_locator('#gbrObservatory iframe')

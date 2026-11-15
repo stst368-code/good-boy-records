@@ -51,7 +51,13 @@ def main():
                     page.locator('#preparationTab').click()
                     page.wait_for_selector('#prepWorkspace:not([hidden])')
                     assert 'Browser song' in page.locator('#prepProject').inner_text()
+                    page.locator('#prepMixDetails summary').click()
                     page.locator('[data-mix=gain_db]').fill('-6')
+                    page.locator('[data-preset=tape_warmth]').click()
+                    page.locator('[data-preset=live_room]').click()
+                    page.locator('#prepEffectChain li').last.get_by_role('button',name='Move Live Room up').click()
+                    page.locator('#prepEffectChain li').first.locator('input').fill('42')
+                    assert page.locator('#prepEffectChain li').first.locator('output').text_content() == '42%'
                     page.locator('#prepPreview').click()
                     page.wait_for_function("()=>document.querySelector('#prepHistory').textContent.includes('mix preview · done')",timeout=25000)
                     page.wait_for_function("()=>document.getElementById('prepProcessed').src.includes('/artifacts/')")
@@ -66,16 +72,19 @@ def main():
                     page.locator('#prepAB').click()
                     page.wait_for_function("()=>!document.getElementById('prepRaw').paused")
                     page.locator('#prepRaw').evaluate('(a)=>a.pause()')
+                    page.locator('#prepBriefDetails summary').click()
                     page.locator('#prepDirection').fill('Ink engraving, emerald and copper')
                     page.locator('#prepBrief').click()
                     page.wait_for_function("()=>document.getElementById('prepPrompt').value.includes('Ink engraving')")
                     assert 'test the room' in page.locator('#prepPrompt').input_value()
+                    page.locator('#prepHistoryHeading summary').click()
                     assert 'Sample peak' in page.locator('#prepHistory').inner_text()
                     page.reload()
                     if width<1080:page.locator('#workspaceMenu').click()
                     page.locator('#preparationTab').click()
                     page.wait_for_function("()=>document.getElementById('prepPrompt').value.includes('Ink engraving')")
                     assert page.locator('#prepDirection').input_value()=='Ink engraving, emerald and copper'
+                    page.locator('#prepMixDetails summary').click()
                     page.locator('[data-mix=gain_db]').fill('-6')
                     page.locator('#prepMaster').click()
                     page.wait_for_function("()=>document.getElementById('prepHistory').textContent.includes('mix master · done')",timeout=25000)
@@ -153,7 +162,7 @@ def main():
                     assert transport['y']>=0 and transport['y']+transport['height']<=950
                     page.locator('.prep-timeline-toolbar').scroll_into_view_if_needed()
                     page.screenshot(path=f'/tmp/gbr-lyric-timeline-{width}.png')
-                    page.locator('#prepAudioSource').select_option(master_id:=(next(a['id'] for t in prep.tasks(gid) for a in t['artifacts'] if a['kind']=='master_candidate')))
+                    page.locator('#prepUseMaster').click()
                     page.wait_for_function("()=>document.getElementById('prepTimelineStatus').textContent.includes('Calculate visual features')")
                     assert page.locator('.prep-word-tag.estimated').count()==6
                     assert page.locator('#prepApproveLyrics').get_attribute('aria-pressed')=='false'

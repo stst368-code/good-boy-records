@@ -89,7 +89,7 @@ def test_real_web_package_strips_private_tags_preserves_source_and_pcm(publicati
     before=source.read_bytes();saved_reviews=review.db.all('SELECT * FROM reviews');saved_tags=review.db.all('SELECT * FROM review_tags')
     pid,recipe=prepare(publication)
     assert not store.objects
-    assert recipe['track']['displayTitle']=='moses-supposes' and recipe['track']['album']['name']=='Dog Days'
+    assert recipe['track']['displayTitle']=='Moses-Supposes' and recipe['track']['album']['name']=='Dog Days'
     assert 'private' not in json.dumps(recipe['track']).lower() and 'yamlUrl' not in recipe['track']
     flac=next(Path(i['path']) for i in recipe['files'] if i['path'].endswith('.flac'))
     assert not FLAC(flac).tags and not FLAC(flac).pictures

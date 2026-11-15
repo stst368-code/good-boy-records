@@ -71,13 +71,14 @@ def main():
                     if width<1080:page.locator('#workspaceMenu').click()
                     page.locator('#preparationTab').click();page.wait_for_selector('#prepProject option',state='attached');page.locator('#prepProject').select_option(gid)
                     page.wait_for_function("()=>document.getElementById('prepYamlRaw').textContent.includes('encoder_cfg: 1.7')")
-                    page.wait_for_selector('#prepQueueJobs .prep-task')
+                    page.wait_for_selector('#prepQueueJobs .prep-task',state='attached')
                     assert 'Processing environment missing' in page.locator('#prepQueueStatus').text_content()
                     assert 'песня' in page.locator('#prepYamlCaption').text_content()
                     assert 'first line\n' in page.locator('#prepYamlLyrics').text_content().replace('\r\n','\n')
                     page.wait_for_function("()=>document.getElementById('prepAlignmentStatus').textContent.includes('Alignment: waiting')")
                     original_raw=raw
                     if width==1440:
+                        page.locator('#prepYamlDetails summary').first.click()
                         page.locator('#prepIdentitySong').select_option('13');page.locator('#prepIdentityVariant').select_option('2');page.locator('#prepSaveIdentity').click()
                         page.wait_for_function("()=>document.getElementById('prepYamlRaw').textContent.includes('song_id: 13')")
                         raw=raw.replace(b'title:',b'song_id: 13\r\nvariant_id: 2\r\ntitle:')+b'explicit: yes\r\n'
@@ -85,6 +86,7 @@ def main():
                         page.wait_for_function("()=>document.getElementById('prepYamlRaw').textContent.includes('explicit: yes')")
                     page.locator('#prepArtworkFile').set_input_files(cover)
                     page.locator('#prepImportArtwork').click()
+                    page.wait_for_function("()=>document.getElementById('prepCoverImage').naturalWidth>0")
                     page.wait_for_function("()=>document.getElementById('prepReleaseArtwork').value!==''")
                     page.locator('#prepApproveLyrics').click();page.wait_for_function("()=>document.getElementById('prepApproveLyrics').textContent==='Approved'")
                     page.screenshot(path=f'/tmp/gbr-stage-preparation-{width}.png',full_page=True)

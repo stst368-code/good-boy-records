@@ -541,6 +541,7 @@ async function openPublishedRecording(item) {
     $('preparationView').hidden = false;
     await preparation.open({
       published: item.generation_id, master_id: item.master_id, room: item.room,
+      artwork_id: item.artwork_id,
       onBack: async () => {
         preparation.close();
         restorePreparation();

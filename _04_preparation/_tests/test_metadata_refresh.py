@@ -30,7 +30,7 @@ def test_external_legacy_identity_edit_publishes_and_moves_using_current_ids(pub
     assert '_song-13/_variant-2/' in final.as_posix()
     assert final.with_suffix('.yaml').read_bytes()==changed
     assert recipe['track']['song_id']==13 and recipe['track']['variant_id']==2 and recipe['track']['explicit'] is True
-    assert json.loads(store.objects[POINTER])['tracks'][0]['displayTitle']=='moses-supposes'
+    assert json.loads(store.objects[POINTER])['tracks'][0]['displayTitle']=='Moses-Supposes'
     assert review.db.one('SELECT raw_yaml_bytes FROM generation_metadata WHERE generation_id=?',(gid,))['raw_yaml_bytes']==original
     assert review.db.all('SELECT * FROM reviews')==reviews and not review.db.all('PRAGMA foreign_key_check')
 
