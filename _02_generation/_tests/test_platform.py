@@ -67,9 +67,9 @@ class SharedReferenceTests(unittest.TestCase):
 
     def test_shared_catalogue_has_one_thousand_originals_without_duplicate_ids(self):
         catalogue = Styles(ROOT / '_01_writing/_references/styles.csv')
-        self.assertEqual(len(catalogue.rows), 1000)
-        self.assertEqual({row['template_source'] for row in catalogue.rows}, {'minimax'})
-        self.assertEqual(len(catalogue.by_id), 1000)
+        originals = [row for row in catalogue.rows if row['template_source'] == 'minimax']
+        self.assertEqual(len(originals), 1000)
+        self.assertEqual(len(catalogue.by_id), len(catalogue.rows))
 
     def test_custom_caption_requires_the_shared_heading_format_in_order(self):
         validate_template_format('Global Metadata\nVocal Details\nArrangement\n', 'custom')
