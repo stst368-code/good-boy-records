@@ -154,7 +154,13 @@ export function initTimeline({root,api,toast,audio,getTime,seek,play=()=>audio.p
   if(!data||saving||dragging)return;saving=true;const savedRevision=revision;
   q('prepSaveLyrics').disabled=q('prepApproveLyrics').disabled=true;
   try{
-   const result=await api(`/preparation/projects/${gid}/editorial/lyric_edit`,{...payload(),parent_task_id:data.lyric_task_id,words:data.words,approved});
+   const body = {...payload(), parent_task_id: data.lyric_task_id, lyrics_sha256: data.lyrics_sha256, approved};
+   if (dirty || !approved) {
+    body.words = data.words.map(({id, text, start, end, confirmed, omitted, estimated}) => ({
+     id, text, start, end, confirmed, omitted, estimated,
+    }));
+   }
+   const result=await api(`/preparation/projects/${gid}/editorial/lyric_edit`,body);
    data.lyric_task_id=result.lyric_task_id;
    if(revision===savedRevision){dirty=false;data.approved=result.approved;data.words=result.words;paint();approval();q('prepTimelineStatus').textContent='Lyric revision saved'+(result.approved?' · Approved for publishing':'');}
    else q('prepTimelineStatus').textContent='Revision saved; newer changes are still unsaved';

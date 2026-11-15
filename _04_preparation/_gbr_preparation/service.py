@@ -508,8 +508,9 @@ class Preparation:
     def editorial(self,gid,artifact_id=None):
         self.require();row,source=self.source(gid,artifact_id=artifact_id);sha=digest(source)
         metadata=self.metadata.read(gid)
-        result={'source_sha256':sha,'duration':row['duration'],'language':json.loads(row['parsed_json']).get('language') or 'en',
-                'words':lyric_words(json.loads(row['parsed_json']).get('lyrics','')),'approved':False,'lyric_task_id':None,
+        fields=metadata['metadata']
+        result={'source_sha256':sha,'lyrics_sha256':metadata['lyrics_sha256'],'duration':row['duration'],'language':fields.get('language') or 'en',
+                'words':lyric_words(fields.get('lyrics','')),'approved':False,'lyric_task_id':None,
                 'features':None,'feature_artifact_id':None,'lighting_task_id':None,'sensitivity':1,'sections':[]}
         for kinds,key in [(('lyric_edit','lyric_alignment'),'lyric'),(('visuals',),'visual'),(('visual_edit',),'light')]:
             placeholders=','.join('?' for _ in kinds)
@@ -540,9 +541,13 @@ class Preparation:
             if data.get('parent_task_id')!=current[key]:raise ValueError('This draft is stale; reload the latest saved revision before editing')
             if data.get('source_sha256')!=current['source_sha256']:raise ValueError('Audio changed; reload the timeline')
             if kind=='lyric_edit':
-                words=validate_lyrics(data,current['words'],current['duration'])
                 approved=data.get('approved',False)
                 if type(approved) is not bool:raise ValueError('Invalid lyric approval')
+                approval_only = approved and 'words' not in data
+                if (approval_only or 'lyrics_sha256' in data) and data.get('lyrics_sha256') != current['lyrics_sha256']:
+                    raise ValueError('Lyrics changed; reload the timeline')
+                draft = {'words': current['words']} if approval_only else data
+                words = validate_lyrics(draft, current['words'], current['duration'])
                 payload={'format':'gbr-lyrics-v1','source_sha256':current['source_sha256'],'language':current['language'],
                          'words':words,'approved':approved,'unmatched_recognition':current.get('unmatched_recognition',[])}
             elif kind=='visual_edit':
@@ -550,7 +555,7 @@ class Preparation:
                 payload=lighting(data,current['features'])
             else:raise ValueError('Unknown editorial kind')
             recipe={'parent_task_id':current[key],'input_artifact_id':data.get('input_artifact_id'),'feature_artifact_id':current['feature_artifact_id'] if kind=='visual_edit' else None}
-            if kind=='lyric_edit':recipe['lyrics_sha256']=self.metadata.read(gid)['lyrics_sha256']
+            if kind=='lyric_edit':recipe['lyrics_sha256']=current['lyrics_sha256']
             raw=canonical(payload).encode('utf-8');sha=hashlib.sha256(raw).hexdigest();recipe['output_sha256']=sha
             _,source=self.source(gid,artifact_id=data.get('input_artifact_id'));destination=source.parent.parent/'_derived';destination.mkdir(parents=True,exist_ok=True)
             path=destination/(sha+'.json')

@@ -255,6 +255,46 @@ def test_editorial_revision_confidence_approval_and_source_binding(prepared):
     with pytest.raises(ValueError,match='Audio changed'):prep.save_editorial(gid,'lyric_edit',body)
 
 
+def test_long_lyric_corrections_and_approval_pass_through_http(prepared):
+    from fastapi.testclient import TestClient
+    from _review.app import create_app
+
+    service,prep,_,_,gid,raw=prepared
+    source=promote(prepared)
+    working_yaml=next(source.parent.glob('*.yaml'))
+    raw=raw.replace(b'  first line\r\n  second line\r\n',b'  Across the midnight sky our colours carry like a song\r\n'*120)
+    working_yaml.write_bytes(raw)
+    app=create_app(service.config.path,start_worker=False)
+    app.state.preparation.tracks=prep.tracks
+    route=f'/api/preparation/projects/{gid}/editorial'
+    with TestClient(app,base_url='http://localhost',headers={'X-GBR-Request':'1'}) as client:
+        timeline=client.get(route).json()
+        draft={'source_sha256':timeline['source_sha256'],'parent_task_id':timeline['lyric_task_id']}
+        words=timeline['words']
+        words[0]['text']='Through'
+        response=client.post(route+'/lyric_edit',json={**draft,'words':words,'approved':True})
+        assert int(response.request.headers['content-length'])>100000
+        assert response.status_code==200,response.text
+        saved=response.json()
+        assert saved['approved'] and saved['words'][0]['text']=='Through'
+        assert saved['words'][0]['source_text']=='Across'
+        assert len(saved['words'])==len(words)
+
+        approval={**draft,'parent_task_id':saved['lyric_task_id'],'lyrics_sha256':saved['lyrics_sha256'],'approved':True}
+        response=client.post(route+'/lyric_edit',json=approval)
+        assert response.status_code==200,response.text
+        assert response.json()['words']==saved['words']
+
+        working_yaml.write_bytes(raw.replace(b'Across',b'Under'))
+        stale=client.post(route+'/lyric_edit',json={**approval,'parent_task_id':None})
+        assert stale.status_code==400 and 'Lyrics changed' in stale.json()['detail']
+        changed=client.get(route).json()
+        assert not changed['approved']
+        response=client.post(route+'/lyric_edit',json={**approval,'parent_task_id':None,'lyrics_sha256':changed['lyrics_sha256']})
+        assert response.status_code==200,response.text
+        assert response.json()['approved'] and response.json()['words'][0]['text']=='Under'
+
+
 def test_saved_lighting_has_real_events_and_master_specific_history(prepared):
     service,prep,path,aid,gid,raw=prepared;source=promote(prepared)
     result=prep.submit(gid,'visuals',{});wait(prep,result['id'])
