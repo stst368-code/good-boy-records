@@ -122,6 +122,7 @@ class Library:
                 source=self.db.one('SELECT a.archive_path FROM audio a JOIN generations g ON g.audio_id=a.id WHERE g.id=?',(gid,))
                 return {'generation_id':gid,'prepared_id':pid,'publication_id':task['id'],'track':recipe['track'],
                         'master_id':recipe.get('options',{}).get('master_id'),
+                        'artwork_id':recipe.get('options',{}).get('artwork_id'),
                         'lossy_source':Path(source['archive_path'] or '').suffix.lower()=='.mp3',
                         'visibility':request.get('visibility') or recipe.get('options',{}).get('visibility','public'),
                         'published_at':task['created_at'],'recipe':recipe}

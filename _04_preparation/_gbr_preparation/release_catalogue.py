@@ -2,9 +2,17 @@
 import hashlib
 import json
 import re
+import unicodedata
 
 POINTER = 'gbr/v2/catalogue.json'
 HIDDEN_POINTER = 'gbr/v2/hidden/catalogue.json'
+
+
+def display_title(value):
+    title = ' '.join(unicodedata.normalize('NFC', str(value or '')).split())
+    if title.islower():
+        title = re.sub(r"(?<![\w'’])[^\W\d_]", lambda letter: letter[0].upper(), title)
+    return title
 
 
 def destination(visibility='public'):

@@ -1,0 +1,84 @@
+song_id: 102
+variant_id: 1
+title: the-phantom-of-the-opera
+cluster:
+version:
+explicit:
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |-
+  [intro]
+  [instrumental]
+  [verse]
+  in sleep, he sang to me
+  in dreams, he came
+  that voice which calls to me
+  and speaks my name
+  and do i dream again?
+  for now, i find
+  the phantom of the opera is there
+  inside my mind
+  [pre-chorus]
+  sing once again with me
+  our strange duet
+  my power over you
+  grows stronger yet
+  and though you turn from me
+  to glance behind
+  the phantom of the opera is there
+  inside your mind
+  [chorus]
+  those who have seen your face
+  draw back in fear
+  i am the mask you wear
+  it's me they hear
+  your spirit and my voice (my spirit and your voice)
+  in one combined
+  the phantom of the opera is there
+  inside my mind (inside your mind)
+  [post-chorus]
+  he's there, the phantom of the opera
+  beware the phantom of the opera
+  [chorus]
+  in all your fantasies
+  you always knew
+  that man and mystery
+  were both in you
+  and in this labyrinth
+  where night is blind
+  the phantom of the opera is here (the phantom of the opera is there)
+  inside my mind (inside your mind)
+  [post-chorus]
+  sing, my angel of music
+  he's there, the phantom of the opera
+  sing
+  ah
+  sing
+  ah
+  sing for me
+  ah
+  ah
+  sing, my angel of music
+  ah
+  ah
+  sing for me
+  ah
+  [outro]
+  i have brought you to the seat of sweet music's throne
+  to this kingdom where all must pay homage to music, music
+  you have come here for one purpose and one alone
+  since the moment i first heard you sing
+  i have needed you with me to serve me, to sing
+  all my music, my music

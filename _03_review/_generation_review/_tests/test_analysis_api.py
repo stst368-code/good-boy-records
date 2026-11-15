@@ -1,5 +1,7 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 import numpy as np
 import pytest
 import soundfile as sf
@@ -57,6 +59,34 @@ def test_full_and_range_playback_preserve_sample_rate(service):
     raw=sf.read(snippet)[0]
     assert len(raw)==16000 and raw[0]==0 and raw[-1]==0
     with pytest.raises(ValueError):service.playback.render(gid,'range','wav',2,1)
+
+
+def test_slow_render_only_delays_requests_for_the_same_audio(service, monkeypatch):
+    slow_source, _, slow = track(service, 'slow')
+    _, _, fast = track(service, 'fast', frequency=440)
+    started, unblock = Event(), Event()
+    encoded = []
+    encode = service.playback.encode
+
+    def delayed(source, *args):
+        encoded.append(source)
+        if source == slow_source:
+            started.set()
+            assert unblock.wait(5)
+        return encode(source, *args)
+
+    monkeypatch.setattr(service.playback, 'encode', delayed)
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        first = pool.submit(service.playback.render, slow, 'full', 'wav')
+        try:
+            assert started.wait(5)
+            same = pool.submit(service.playback.render, slow, 'full', 'wav')
+            other = pool.submit(service.playback.render, fast, 'full', 'wav')
+            assert other.result(timeout=3).is_file()
+        finally:
+            unblock.set()
+        assert same.result() == first.result()
+    assert encoded.count(slow_source) == 1
 
 
 def test_loudness_matched_blind_comparison(service):

@@ -154,7 +154,13 @@ export function initTimeline({root,api,toast,audio,getTime,seek,play=()=>audio.p
   if(!data||saving||dragging)return;saving=true;const savedRevision=revision;
   q('prepSaveLyrics').disabled=q('prepApproveLyrics').disabled=true;
   try{
-   const result=await api(`/preparation/projects/${gid}/editorial/lyric_edit`,{...payload(),parent_task_id:data.lyric_task_id,words:data.words,approved});
+   const body = {...payload(), parent_task_id: data.lyric_task_id, lyrics_sha256: data.lyrics_sha256, approved};
+   if (dirty || !approved) {
+    body.words = data.words.map(({id, text, start, end, confirmed, omitted, estimated}) => ({
+     id, text, start, end, confirmed, omitted, estimated,
+    }));
+   }
+   const result=await api(`/preparation/projects/${gid}/editorial/lyric_edit`,body);
    data.lyric_task_id=result.lyric_task_id;
    if(revision===savedRevision){dirty=false;data.approved=result.approved;data.words=result.words;paint();approval();q('prepTimelineStatus').textContent='Lyric revision saved'+(result.approved?' · Approved for publishing':'');}
    else q('prepTimelineStatus').textContent='Revision saved; newer changes are still unsaved';
@@ -187,6 +193,6 @@ export function initTimeline({root,api,toast,audio,getTime,seek,play=()=>audio.p
   if(changedSong){gid=p.generation_id;artifact='';signature='';dirty=lightDirty=false;viewStart=0;auditionEnd=null;}
   const source=q('prepAudioSource'),old=artifact;source.replaceChildren(new Option('Reviewed source',''));
   for(const a of p.masters||p.tasks.flatMap(t=>t.artifacts.filter(a=>a.available&&a.kind==='master_candidate').map(a=>({...a,created_at:t.created_at}))))source.append(new Option(`Master · ${a.created_at}`,a.id));source.value=old;
-  if(signature!==nextSig||changedSong){signature=nextSig;await load();}if(!frame&&data)tick();
+  if(signature!==nextSig||changedSong){signature=nextSig;await load();}if(!frame&&data&&!panel.closest('[hidden]'))tick();
  },onSourceChange(fn){q('prepAudioSource').onchange=handle(async()=>{if(dirty||lightDirty||saving||dragging){q('prepAudioSource').value=artifact;throw Error('Save or reload the timeline draft before changing audio');}artifact=q('prepAudioSource').value;viewStart=0;auditionEnd=null;pause();await fn(artifact);await load(true);});},close:()=>{if(frame)cancelAnimationFrame(frame);frame=null;auditionEnd=null;}};
 }

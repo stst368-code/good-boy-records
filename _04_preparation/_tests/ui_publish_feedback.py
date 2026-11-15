@@ -22,7 +22,9 @@ const api=async(path,body)=>{
  if(path.endsWith('/publish')){const id=path.split('/')[2];fixture.calls.push(id);await new Promise((resolve,reject)=>fixture.posts[id]={resolve,reject});return {id:'job-'+id};}
  throw Error('Unexpected request '+path);
 };
-window.ui=initPublishing({api,toast:()=>{}});await ui.open();window.ready=true;
+window.ui=initPublishing({api,toast:()=>{},onListChange:()=>{},
+ onPlay:(items,index)=>{fixture.played=items.map(item=>item.id);fixture.playing=items[index].id;}
+});await ui.open();window.ready=true;
 </script>'''
     with sync_playwright() as pw:
         browser=pw.chromium.launch(executable_path=args.browser,headless=True,args=['--no-sandbox','--use-angle=swiftshader'])
@@ -34,7 +36,7 @@ window.ui=initPublishing({api,toast:()=>{}});await ui.open();window.ready=true;
             # Start a slow refresh, then immediately click two different tracks.
             # All three operations must run instead of the clicks disappearing.
             page.evaluate('''()=>{
- fixture.delay=350;window.originalAudio=document.querySelector('[data-pending="first"] audio');
+ fixture.delay=350;window.originalPlayButton=document.querySelector('[data-preview="first"]');
  document.getElementById('pubRefresh').click();
  document.querySelector('[data-publish="first"]').click();
  document.querySelector('[data-publish="second"]').click();
@@ -56,7 +58,7 @@ window.ui=initPublishing({api,toast:()=>{}});await ui.open();window.ready=true;
             page.wait_for_timeout(4300)
             assert 'Publishing destination changed' in page.locator('[data-pending="first"] [data-publication-error]').inner_text()
             assert 'AccessDenied' in page.locator('[data-pending="second"] [data-publication-error]').inner_text()
-            assert page.evaluate("originalAudio===document.querySelector('[data-pending=first] audio')")
+            assert page.evaluate("originalPlayButton===document.querySelector('[data-preview=first]')")
             page.locator('[data-publish="second"]').click();page.wait_for_function('fixture.calls.length===3')
             page.evaluate('''()=>{
  fixture.projects[1].publication={prepared_id:'second',status:'queued',created_at:'2026-10-29T12:01:00Z',progress:{phase:'waiting_processing',message:'Waiting for lyric alignment before moving files'}};
@@ -70,6 +72,22 @@ window.ui=initPublishing({api,toast:()=>{}});await ui.open();window.ready=true;
             page.evaluate("fixture.projects=[];document.getElementById('pubRefresh').click()")
             page.wait_for_selector('[data-pending]',state='detached')
             assert 'Published recordings are in Library' in page.locator('#pubStatus').inner_text()
+            page.evaluate("""()=>{
+ const take=(id,audioId,variant)=>({prepared_id:id,generation_id:id+'-generation',audio_id:audioId,
+  track:{displayTitle:'Shared title',song_id:13,variant_id:variant,variant:'Punk',duration:8},
+  options:{},files:[{content_type:'audio/mpeg'}]});
+ fixture.projects=[take('take-a','aaaaaaaa',2),take('alias-a','aaaaaaaa',3),take('take-b','bbbbbbbb',2)];
+ document.getElementById('pubRefresh').click();
+}""")
+            page.wait_for_function("'2 recordings'===document.querySelector('.publish-song-heading span')?.textContent")
+            assert page.locator('[data-pending="take-a"]').is_visible()
+            assert page.locator('[data-pending="take-b"]').is_visible()
+            assert page.locator('[data-pending="alias-a"]').is_hidden()
+            page.locator('.publish-alternatives summary').click()
+            assert page.locator('[data-pending="alias-a"]').is_visible()
+            assert 'Variant 3' in page.locator('[data-pending="alias-a"]').inner_text()
+            page.locator('[data-preview="alias-a"]').click()
+            assert page.evaluate('fixture.played')==['alias-a','take-b']
             assert not errors,errors
             print(json.dumps({'width':width,'passed':True,'checks':'rapid clicks during refresh, persistent request and job errors, retry, processing state, player preservation, completed removal'}),flush=True)
             page.evaluate('ui.close()');page.close()

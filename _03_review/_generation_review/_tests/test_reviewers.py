@@ -52,6 +52,7 @@ def test_identity_required_and_names_are_trimmed_casefolded(clients):
     blank = TestClient(create_app(s.config.path, False), base_url='http://localhost')
     assert blank.get('/api/bootstrap').json()['reviewer'] is None
     assert blank.get('/api/queue/next').status_code == 428
+    assert blank.get('/api/queue/browse').status_code == 428
     for name in ('', '   ', '\t\n'):
         assert blank.post('/api/reviewer/select', json={'name': name}, headers=WRITE).status_code == 400
     assert select(blank, '  sImOn  ') == simon
@@ -76,6 +77,29 @@ def test_concurrent_allocation_is_exclusive_and_server_persisted(clients):
     assert {r['reviewer_id'] for r in rows} == {ar, br}
     assert current(a)['track']['audio_id'] == one
     assert current(b)['track']['audio_id'] == two
+
+
+def test_browsing_review_queue_is_read_only_and_excludes_other_reservations(clients):
+    s, a, b, ar, br = clients
+    seed(s, 12)
+    ga = current(a)['track']['id']
+    current(b)
+    leases = s.db.all('SELECT * FROM queue_reservations ORDER BY audio_id')
+    sessions = s.db.all('SELECT * FROM sessions ORDER BY id')
+    other = {row['generation_id'] for row in leases if row['reviewer_id'] == br}
+
+    first = a.get('/api/queue/browse?limit=3').json()
+    rest = a.get('/api/queue/browse?offset=3').json()
+    ids = [item['id'] for item in first['items'] + rest['items']]
+    assert first['items'][0]['id'] == ga
+    assert first['has_more'] and not rest['has_more']
+    assert len(ids) == len(set(ids)) == 12 - len(other)
+    assert not other.intersection(ids)
+    assert a.get('/api/queue/browse?limit=3').json() == first
+    assert s.db.all('SELECT * FROM sessions ORDER BY id') == sessions
+    assert s.db.all('SELECT * FROM queue_reservations ORDER BY audio_id') == leases
+    assert a.post('/api/queue/open', json={'generation_id': ids[-1]}, headers=WRITE).json()['track']['id'] == ids[-1]
+    assert s.db.all('SELECT * FROM queue_skips') == []
 
 
 def test_duplicate_audio_and_yaml_cannot_bypass_reservation(clients):
@@ -106,6 +130,37 @@ def test_prefetch_uses_only_the_selected_reviewers_reserved_next(clients):
     assert s.db.one('SELECT COUNT(*) AS n FROM reviews')['n'] == 0
     assert save(a, ga).status_code == 200
     assert current(a)['track']['id'] == ra['track_id']
+
+
+def test_review_navigation_can_load_without_counts_or_waveform(clients, monkeypatch):
+    s, a, _, ar, _ = clients
+    ids = seed(s, 6)
+    first = s.public_track(ids[0])
+    s.analyzer.run(first['audio_id'])
+    analysis = s.db.one('SELECT id,preview_path FROM analyses WHERE audio_id=?', (first['audio_id'],))
+    s.queue_settings('alphabetical', 'asc', {}, reviewer_id=ar)
+    read_text = Path.read_text
+
+    def ignore_waveform(path, *args, **kwargs):
+        assert path != Path(analysis['preview_path']), 'Navigation read the waveform'
+        return read_text(path, *args, **kwargs)
+
+    def no_count(*args, **kwargs):
+        pytest.fail('Navigation counted the whole queue')
+
+    monkeypatch.setattr(Path, 'read_text', ignore_waveform)
+    monkeypatch.setattr(s.queues, 'count_scope', no_count)
+    start = a.get('/api/queue/next?include_counts=false').json()
+    assert start['track']['id'] == ids[0]
+    assert start['track']['sampling']['analysis_id'] == analysis['id']
+    assert start['track']['sampling']['segments']
+    assert 'counts' not in start and 'preview' not in start
+    assert a.post('/api/queue/prefetch', json={'current_id': ids[0], 'mode': 'full'}, headers=WRITE).json()['track_id'] == ids[1]
+    assert a.post('/api/reviewer/heartbeat?include_counts=false', json={'current_id': ids[0]}, headers=WRITE).json()['valid_current']
+    assert save(a, ids[0]).status_code == 200
+    assert a.get('/api/queue/next?include_counts=false').json()['track']['id'] == ids[1]
+    assert a.post('/api/queue/open?include_counts=false', json={'generation_id': ids[-1]}, headers=WRITE).json()['track']['id'] == ids[-1]
+    assert a.get('/api/queue/back').json()['track']['id'] == ids[0]
 
 
 def test_skip_back_and_corrections_do_not_change_other_reviewer(clients):

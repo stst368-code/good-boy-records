@@ -90,6 +90,8 @@ CREATE INDEX IF NOT EXISTS idx_media_audio ON media_files(audio_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_media_active_path ON media_files(path) WHERE storage_state IN ('input','archived');
 CREATE INDEX IF NOT EXISTS idx_analysis_audio ON analyses(audio_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_events_audio ON audio_events(audio_id);
+CREATE INDEX IF NOT EXISTS idx_events_analysis_start ON audio_events(analysis_id,start);
+CREATE INDEX IF NOT EXISTS idx_segments_analysis_mode ON segments(analysis_id,mode,ordinal);
 CREATE INDEX IF NOT EXISTS idx_archive_status ON archive_operations(status,created_at);
 CREATE INDEX IF NOT EXISTS idx_publishing_status ON publishing_selection(status);
 CREATE INDEX IF NOT EXISTS idx_metadata_params ON generation_metadata(sampler,scheduler,sampler_cfg,sampler_steps);

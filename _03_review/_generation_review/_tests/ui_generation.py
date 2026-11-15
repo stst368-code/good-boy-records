@@ -182,7 +182,7 @@ def main():
                 assert 'CPU boundary fixture' not in page.locator('#genJobs').inner_text()
                 page.locator('#genJobs button',has_text='Show full log').first.click()
                 page.wait_for_function("()=>document.getElementById('genJobs').textContent.includes('CPU boundary fixture')")
-                page.locator('#reviewTab').click()
+                page.locator('#listenTab').click()
                 page.wait_for_selector('#reviewCard:not([hidden])')
                 assert '1 left' in page.locator('#queueCount').inner_text()
                 for dimension in ('audio_quality', 'composition', 'consistency', 'realism'):

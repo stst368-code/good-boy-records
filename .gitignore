@@ -5,7 +5,9 @@ __pycache__/
 
 # C extensions
 *.so
-
+_tracks/
+_tracks\
+_workers_processing/
 # Distribution / packaging
 .Python
 build/
