@@ -8,6 +8,18 @@ import sys
 import time
 
 
+def worker_error(log):
+    lines = [line.strip() for line in log.splitlines() if line.strip()]
+    if any('Another GBR worker is already using this GPU' in line for line in lines):
+        return 'Another GBR worker is already using this GPU'
+    for line in reversed(lines):
+        if line.startswith('FileNotFoundError:') and 'snakers4_silero-vad_' in line and 'hubconf.py' in line:
+            return 'The Silero voice detection cache is incomplete. Retry the task to rebuild that cache.'
+        if re.match(r'^(\w*Error|\w*Exception):', line):
+            return line[:500]
+    return lines[-1][:500] if lines else 'Processing worker failed. See the worker log.'
+
+
 class ProcessingQueue:
     def __init__(self,prep):self.prep=prep;self.db=prep.db
 
@@ -63,7 +75,7 @@ class ProcessingQueue:
             if not self.alive(owner) and not self.alive(data.get('child',{})):
                 self.db.execute("UPDATE processing_tasks SET status='interrupted',completed_at=?,error='Previous alignment controller stopped. Retry this task from the processing queue.' WHERE id=? AND status IN ('queued','running')",(now(),row['id']))
 
-    def status(self):
+    def status(self, flagged_only=False):
         if not self.prep.enabled:return {'enabled':False,'items':[]}
         self.recover()
         rows=self.db.all("""SELECT t.id,t.generation_id,t.kind,t.status,t.error,t.created_at,t.started_at,t.completed_at,t.telemetry_json,s.title
@@ -73,10 +85,14 @@ class ProcessingQueue:
                 (SELECT rowid FROM processing_tasks WHERE kind='lyric_alignment' AND status='done' ORDER BY rowid DESC LIMIT 5))
             AND (t.status NOT IN ('failed','interrupted') OR NOT EXISTS (SELECT 1 FROM processing_tasks newer
                 WHERE newer.generation_id=t.generation_id AND newer.kind=t.kind AND newer.rowid>t.rowid))
-            ORDER BY CASE t.status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END,t.rowid""")
+            AND (?=0 OR EXISTS(SELECT 1 FROM publishing_selection p WHERE p.generation_id=t.generation_id AND p.status='selected'))
+            ORDER BY CASE t.status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END,t.rowid""", (flagged_only,))
         waiting=0
         for row in rows:
             row['progress']=json.loads(row.pop('telemetry_json'))
+            if row['error'] and len(row['error']) > 500:
+                row['progress'].setdefault('log_tail', row['error'])
+                row['error'] = worker_error(row['error'])
             if row['status'] in {'waiting','queued'}:
                 waiting+=1;row['position']=waiting
             if row['status']=='waiting':row['reason']=self.reason({'id':row['id'],'telemetry_json':json.dumps(row['progress'])}) or 'Ready for the next automatic queue check.'

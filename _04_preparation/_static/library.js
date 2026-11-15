@@ -1,9 +1,9 @@
-export function initLibrary({api,toast,onEdit}){
+export function initLibrary({api,toast,onEdit,onPlay,onListChange}){
  const root=document.getElementById('libraryView'),q=id=>root.querySelector('#'+id);
  const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- root.innerHTML=`<div id="libraryManager"><div class="prep-heading"><div><h1>Library</h1><p>Published recordings, rooms and website presentation.</p></div><button id="libraryRefresh">Refresh</button></div><p id="libraryStatus" role="status"></p>
- <nav class="library-tabs" aria-label="Library sections"><button data-library-tab="recordings" aria-pressed="true">Recordings</button><button data-library-tab="rooms">Rooms</button><button data-library-tab="settings">Library settings</button><button data-library-tab="import">Import old showcase</button></nav>
- <section data-library-panel="recordings"><div class="library-filters"><label>Room<select id="libraryRoomFilter"></select></label><label>Song<select id="librarySongFilter"></select></label><label>Genre cluster<select id="libraryClusterFilter"></select></label><output id="libraryCount"></output></div><div id="libraryRecordings" class="library-list"></div><section id="libraryEdit" hidden><h2 id="libraryEditHeading"></h2><div class="library-form"><label>Title<input id="libraryTitle"></label><label>Room<select id="libraryRoom"></select></label><label>Cluster<select id="libraryCluster"></select></label><label>Style<select id="libraryStyle"></select></label><label>Language<input id="libraryLanguage" maxlength="3"></label><label>Explicit<select id="libraryExplicit"><option value="no">No</option><option value="yes">Yes</option></select></label><label>Album<input id="libraryAlbum"></label><label>Album position<input id="libraryAlbumPosition" type="number" min="0"></label><label>Display position<input id="libraryPosition" type="number" min="0"></label><label>Artwork<select id="libraryArtwork"></select></label><label>Replace artwork<input id="libraryArtworkFile" type="file" accept="image/png,image/jpeg,image/webp"></label></div><label>Lyrics<textarea id="libraryLyrics" rows="9"></textarea></label><div class="prep-actions"><button id="librarySave">Save draft</button><button id="libraryPublish">Update website</button><button id="libraryTimeline">Edit timings, lights and audio</button><button id="libraryWithdraw" class="secondary">Withdraw from website</button></div><p id="libraryEditStatus" role="status"></p><div id="libraryWork"></div></section></section>
+ root.innerHTML=`<div id="libraryManager"><p id="libraryStatus" role="status"></p>
+ <nav class="library-tabs" aria-label="Library sections"><button data-library-tab="recordings" aria-pressed="true">Recordings</button><button data-library-tab="rooms">Rooms</button><button data-library-tab="settings">Library settings</button><button data-library-tab="import">Import old showcase</button><button id="libraryRefresh" class="quiet-button">Refresh</button></nav>
+ <section data-library-panel="recordings"><div class="library-filters"><label>Room<select id="libraryRoomFilter"></select></label><label>Song<select id="librarySongFilter"></select></label><label>Genre cluster<select id="libraryClusterFilter"></select></label><output id="libraryCount"></output></div><div id="libraryRecordings" class="listen-list"></div><section id="libraryEdit" hidden><h2 id="libraryEditHeading"></h2><div class="library-form"><label>Title<input id="libraryTitle"></label><label>Room<select id="libraryRoom"></select></label><label>Cluster<select id="libraryCluster"></select></label><label>Style<select id="libraryStyle"></select></label><label>Language<input id="libraryLanguage" maxlength="3"></label><label>Explicit<select id="libraryExplicit"><option value="no">No</option><option value="yes">Yes</option></select></label><label>Album<input id="libraryAlbum"></label><label>Album position<input id="libraryAlbumPosition" type="number" min="0"></label><label>Display position<input id="libraryPosition" type="number" min="0"></label><label>Artwork<select id="libraryArtwork"></select></label><label>Replace artwork<input id="libraryArtworkFile" type="file" accept="image/png,image/jpeg,image/webp"></label></div><label>Lyrics<textarea id="libraryLyrics" rows="9"></textarea></label><div class="prep-actions"><button id="librarySave">Save draft</button><button id="libraryPublish">Update website</button><button id="libraryTimeline">Edit timings, lights and audio</button><button id="libraryWithdraw" class="secondary">Withdraw from website</button></div><p id="libraryEditStatus" role="status"></p><div id="libraryWork"></div></section></section>
  <section data-library-panel="rooms" hidden><div class="prep-heading"><div><h2>Rooms and cover entrances</h2><p>Three clicks on each chosen playing cover open its room.</p></div><button id="libraryAddRoom">Create room</button></div><div id="libraryRooms"></div><div class="prep-actions"><button id="librarySaveRooms">Save rooms &amp; sync website</button></div></section>
  <section data-library-panel="settings" hidden><h2>Library defaults</h2><div class="library-form"><label>Overall lighting sensitivity<input id="librarySensitivity" type="range" min="0.25" max="3" step="0.05"><output id="librarySensitivityValue"></output></label><label>Display order<select id="libraryOrder"><option value="genre">Genre</option><option value="title">Title</option><option value="album">Album</option><option value="newest">Newest</option><option value="manual">Display position</option></select></label><label>Default room<select id="libraryDefaultRoom"></select></label><label><input id="libraryFlac" type="checkbox"> Include lossless FLAC when available</label><label><input id="libraryTimedLyrics" type="checkbox"> Include approved lyric timings by default</label></div><button id="librarySaveSettings">Save defaults &amp; sync website</button><div class="prep-actions"><button id="libraryResearch">Publish research snapshot</button></div></section>
  <section data-library-panel="import" hidden><h2>One-time porto showcase import</h2><p>Imports existing releases into this Library, keeps old public identities, and moves verified local files into the recording folders. MP3-only recordings remain labelled as lossy sources.</p><label>Old showcase directory<input id="libraryImportPath"></label><label class="library-check"><input id="libraryImportSync" type="checkbox" checked> Align imported releases with R2</label><button id="libraryImportStart">Import / resume showcase</button><p id="libraryImportStatus" role="status"></p><progress id="libraryImportProgress" max="1" value="0"></progress><div id="libraryImportIssues"></div></section>
@@ -13,12 +13,47 @@ export function initLibrary({api,toast,onEdit}){
  const action=fn=>{queuedActions++;busy=true;actionQueue=actionQueue.then(fn).catch(error=>{q('libraryStatus').textContent=error.message;q('libraryEditStatus').textContent=error.message;}).finally(()=>{busy=--queuedActions>0;});return actionQueue;};
  const roomOptions=(value,onlyEnabled=true)=>config.settings.rooms.filter(r=>!onlyEnabled||r.enabled||r.id===value).map(r=>{const option=new Option(r.name+(r.enabled?'':' · disabled'),r.id,false,r.id===value);option.disabled=!r.enabled;return option;});
  function options(id,values,label){const previous=q(id).value;q(id).replaceChildren(new Option(label,''),...values.map(v=>new Option(v.label||v,v.value||v)));if([...q(id).options].some(o=>o.value===previous))q(id).value=previous;}
- function list(){
-  const room=q('libraryRoomFilter').value,song=q('librarySongFilter').value,cluster=q('libraryClusterFilter').value;
-  const filtered=items.filter(i=>(!room||i.visibility===room)&&(!song||i.track.displayTitle===song)&&(!cluster||i.track.genre?.parent_genre===cluster));
-  q('libraryCount').textContent=filtered.length+' published recordings';
-  q('libraryRecordings').innerHTML=filtered.map(item=>`<article class="library-card"><div><h2>${esc(item.track.displayTitle)}</h2><p>${esc(item.track.genre?.parent_genre)} · ${esc(item.track.variant||'')} · ${esc(config.settings.rooms.find(r=>r.id===item.visibility)?.name||item.visibility)}${item.lossy_source?' · MP3 source':''}</p></div><button data-edit="${esc(item.generation_id)}">Manage recording</button></article>`).join('')||'<p>No published recordings in this selection. Import the old showcase to manage historical releases.</p>';
-  for(const button of q('libraryRecordings').querySelectorAll('[data-edit]'))button.onclick=()=>action(()=>detail(button.dataset.edit));
+ let visible = false;
+ let entries = [];
+ function list() {
+  const room = q('libraryRoomFilter').value;
+  const song = q('librarySongFilter').value;
+  const cluster = q('libraryClusterFilter').value;
+  const filtered = items.filter(item => (!room || item.visibility === room) &&
+    (!song || item.track.displayTitle === song) && (!cluster || item.track.genre?.parent_genre === cluster));
+  const recordings = q('libraryRecordings');
+  const rows = filtered.map(item => {
+    const roomName = config.settings.rooms.find(room => room.id === item.visibility)?.name || item.visibility;
+    return {
+      id: item.generation_id,
+      key: `library:${item.prepared_id}`,
+      source: 'library',
+      title: item.track.displayTitle,
+      subtitle: `Library · ${roomName}`,
+      duration: item.track.duration,
+      url: item.playback_url,
+      description: [item.track.genre?.parent_genre, item.track.variant, roomName, item.lossy_source && 'MP3 source'].filter(Boolean).join(' · '),
+    };
+  });
+  const signature = JSON.stringify(rows);
+  if (recordings.dataset.signature === signature) return;
+  recordings.dataset.signature = signature;
+  entries = rows.filter(row => row.url);
+  q('libraryCount').textContent = filtered.length + ' published recordings';
+  recordings.innerHTML = rows.map(row => `
+    <article class="listen-row" data-play-key="${esc(row.key)}">
+      <button type="button" class="listen-play" data-title="${esc(row.title)}" aria-label="Play ${esc(row.title)}" title="${row.url ? 'Play ' + esc(row.title) : 'Published audio is unavailable locally'}" ${row.url ? '' : 'disabled'}><span class="play-symbol" aria-hidden="true"></span></button>
+      <div><h2 class="listen-track-title">${esc(row.title)}</h2><p>${esc(row.description)}${row.url ? '' : ' · Audio unavailable locally'}</p></div>
+      <div class="library-card-actions"><button type="button" class="listen-open" data-edit="${esc(row.id)}">Manage recording</button></div>
+    </article>`).join('') || '<p class="subtle">No published recordings match these filters.</p>';
+  for (const [index, row] of [...recordings.children].entries()) {
+    const play = row.querySelector('.listen-play');
+    const track = rows[index];
+    if (play && track.url) play.onclick = () => Promise.resolve(onPlay(entries, entries.indexOf(track))).catch(error => toast(error.message));
+    const edit = row.querySelector('[data-edit]');
+    if (edit) edit.onclick = () => action(() => detail(edit.dataset.edit));
+  }
+  onListChange();
  }
  function styleOptions(value){const styles=config.genres[q('libraryCluster').value]||[];if(value&&!styles.includes(value))styles.push(value);q('libraryStyle').replaceChildren(...styles.map(v=>new Option(v,v)));if(value)q('libraryStyle').value=value;}
  async function detail(gid){
@@ -56,5 +91,23 @@ export function initLibrary({api,toast,onEdit}){
  for(const id of ['libraryRoomFilter','librarySongFilter','libraryClusterFilter'])q(id).onchange=list;
  async function refresh(){items=(await api('/releases/library')).items;const counts=new Map();for(const i of items)counts.set(i.visibility,(counts.get(i.visibility)||0)+1);options('libraryRoomFilter',config.settings.rooms.filter(r=>counts.has(r.id)).map(r=>({value:r.id,label:r.name+' · '+counts.get(r.id)})),'All rooms');options('librarySongFilter',[...new Set(items.map(i=>i.track.displayTitle))].sort(),'All songs');options('libraryClusterFilter',[...new Set(items.map(i=>i.track.genre?.parent_genre).filter(Boolean))].sort(),'All clusters');list();importStatus(await api('/releases/library/import'));if(selected){const latest=await api(`/releases/library/recordings/${selected.generation_id}`);work(latest);if(publishingRevision&&latest.publication_id!==selected.publication_id&&latest.draft.applied){publishingRevision=false;selected=latest;q('libraryEditStatus').textContent='Website updated. Published recording is current.';}}}
  q('libraryRefresh').onclick=()=>action(refresh);
- return {open:async()=>{q('libraryManager').hidden=false;q('libraryEditorContainer').hidden=true;config=await api('/releases/library/settings');rooms();settings();if(!q('libraryImportPath').value)q('libraryImportPath').value=config.legacy_directory;await action(refresh);clearInterval(timer);timer=setInterval(()=>{if(!busy&&!root.querySelector('input:focus,select:focus,textarea:focus')&&!q('libraryManager').hidden)action(refresh);},4000);},close:()=>{clearInterval(timer);}};
+ return {
+  async open() {
+   visible = true;
+   q('libraryManager').hidden = false;
+   q('libraryEditorContainer').hidden = true;
+   config = await api('/releases/library/settings');
+   if (!visible) return;
+   rooms();
+   settings();
+   if (!q('libraryImportPath').value) q('libraryImportPath').value = config.legacy_directory;
+   await action(refresh);
+   if (!visible) return;
+   clearInterval(timer);
+   timer = setInterval(() => {
+    if (!busy && !root.querySelector('input:focus,select:focus,textarea:focus') && !q('libraryManager').hidden) action(refresh);
+   }, 4000);
+  },
+  close() { visible = false; clearInterval(timer); },
+ };
 }

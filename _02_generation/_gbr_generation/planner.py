@@ -74,6 +74,45 @@ class CheckedInput:
                 'experiments': self.planned_runs[:30] if self.planned_runs is not None else None}
 
 
+def read_caption(row, template_root):
+    root = Path(template_root).resolve(strict=True)
+    path = (root / row["template"].replace(chr(92), "/")).resolve(strict=True)
+    if not path.is_relative_to(root):
+        raise ValueError("Template path escapes the chosen template root")
+    raw = path.read_bytes()
+    caption = raw.decode("utf-8-sig").replace("\r\n", "\n")
+    if not caption.strip():
+        raise ValueError("The selected caption template is empty")
+    validate_template_format(caption, row.get("template_source"))
+    return caption, {"id": row["ID"], "sha256": sha(raw), "path": str(path),
+                     "source": row.get("template_source")}
+
+
+def caption_sections(caption):
+    sections = {}
+    heading = ''
+    for line in caption.splitlines():
+        if line.startswith('#') or line.strip().rstrip(':') in {'Global Metadata', 'Vocal Details', 'Arrangement'}:
+            heading = line.strip().lstrip('#').strip().rstrip(':').casefold()
+            if heading in sections:
+                raise ValueError("Caption mixing requires unique section headings")
+            sections[heading] = [line]
+        else:
+            sections.setdefault(heading, []).append(line)
+    return {key: "\n".join(lines) for key, lines in sections.items()}
+
+
+def mix_caption(base, partner):
+    original, alternate = caption_sections(base), caption_sections(partner)
+    shared = [key for key in original if key and alternate.get(key) and
+              original[key] != alternate[key]]
+    if len(shared) < 2:
+        raise ValueError("Choose two captions in the same style with at least two matching, distinct sections")
+    swapped = set(secrets.SystemRandom().sample(shared, len(shared) // 2))
+    return "\n".join(alternate[key] if key in swapped else section
+                     for key, section in original.items())
+
+
 def preflight(inputs, specification, styles=None, template_root=None, require_parameters=True):
     checked = []
     for item in inputs:
@@ -96,17 +135,12 @@ def preflight(inputs, specification, styles=None, template_root=None, require_pa
                         raise ValueError('This caption is linked to another song; choose an unlinked caption or one linked to this song')
                     if template_root is None:
                         raise ValueError("Template selection requires --template-root")
-                    root = Path(template_root).resolve(strict=True)
-                    path = (root / row["template"].replace("\\", "/")).resolve(strict=True)
-                    if not path.is_relative_to(root):
-                        raise ValueError("Template path escapes the chosen template root")
-                    raw = path.read_bytes()
-                    caption = raw.decode("utf-8-sig").replace("\r\n", "\n")
-                    if not caption.strip():
-                        raise ValueError("The selected caption template is empty")
-                    validate_template_format(caption, row.get("template_source"))
-                    template = {"id": row["ID"], "sha256": sha(raw), "path": str(path),
-                                "source": row.get("template_source")}
+                    caption, template = read_caption(row, template_root)
+                    mix_id = specification.get("caption_mix_partner")
+                    if mix_id:
+                        partner_caption, partner = read_caption(styles.by_id[mix_id], template_root)
+                        caption = mix_caption(caption, partner_caption)
+                        template["mixed_with"] = partner
                     values, provenance = resolve(document, specification, {
                         "cluster": row["cluster"], "style": row["style_primary"], "caption": caption})
                     # A source caption winning precedence was not produced by this template.
@@ -142,6 +176,13 @@ class BatchRejected(ValueError):
     def __init__(self, message, checked):
         super().__init__(message)
         self.report = [item.summary() for item in checked]
+
+
+def ensure_queue_order(conn):
+    conn.execute("""CREATE TABLE IF NOT EXISTS generation_queue_order (
+        run_id TEXT PRIMARY KEY REFERENCES generation_runs(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL
+    )""")
 
 
 def open_database(path):

@@ -43,8 +43,21 @@ def main():
             assert page.locator('#trackGenre').inner_text()=='Chiptune'
             assert page.locator('.rating-values button').count()==24
             page.locator('#play').click();page.wait_for_function("()=>!document.getElementById('audio').paused")
-            page.locator('#selectionTab').click();assert page.evaluate("!document.getElementById('audio').paused")
-            page.locator('#reviewTab').click();page.locator('#play').click()
+            # The review form and the listening queue have independent state.
+            page.locator('#reason').fill('Keep this draft while listening')
+            initial = page.locator('#audio').get_attribute('src')
+            page.locator('#selectionTab').click()
+            page.locator('#reviewTab').click()
+            assert page.locator('#audio').get_attribute('src') == initial
+            assert page.evaluate("!document.getElementById('audio').paused")
+            assert page.locator('#reason').input_value() == 'Keep this draft while listening'
+            page.locator('#playerNext').click()
+            page.wait_for_function("(src) => document.querySelector('#audio').getAttribute('src') !== src && !document.querySelector('#audio').paused", arg=initial)
+            assert page.locator('#reason').input_value() == 'Keep this draft while listening'
+            assert service.db.all('SELECT * FROM queue_skips') == []
+            page.locator('#reviewPlay').click()
+            page.wait_for_function("(src) => document.querySelector('#audio').getAttribute('src') === src && !document.querySelector('#audio').paused", arg=initial)
+            page.locator('#play').click()
             assert not page.locator('#reviewCard').inner_text().lower().__contains__('sampler')
             if screenshots:page.screenshot(path=str(screenshots/'desktop-review.png'),full_page=True)
             page.set_viewport_size({'width':390,'height':844})
@@ -68,28 +81,39 @@ def main():
             page.locator('#selectRange').click();page.locator('[data-mode="quick"]').click()
             for dimension in ('audio_quality','composition','consistency','realism'):
                 page.locator(f'[data-dimension="{dimension}"] [data-score="5"]').click()
-            page.wait_for_function("()=>document.querySelectorAll('[aria-pressed=true]').length===0")
+            page.wait_for_function("()=>document.querySelectorAll('.rating-values [aria-pressed=true]').length===0")
             assert service.db.one('SELECT COUNT(*) AS n FROM reviews')['n']==1
             page.locator('#back').click();page.wait_for_selector('#correctionBadge:not([hidden])')
             page.locator('[data-dimension="audio_quality"] [data-score="4"]').click()
-            page.wait_for_function("()=>document.querySelectorAll('[aria-pressed=true]').length===0")
+            page.wait_for_function("()=>document.querySelectorAll('.rating-values [aria-pressed=true]').length===0")
             assert service.db.one('SELECT COUNT(*) AS n FROM reviews')['n']==2
             page.locator('#skip').click()
             page.wait_for_timeout(300)
             for dimension in ('audio_quality','composition','consistency','realism'):
                 page.locator(f'[data-dimension="{dimension}"] [data-score="5"]').click()
-            page.wait_for_function("()=>document.querySelectorAll('[aria-pressed=true]').length===0")
+            page.wait_for_function("()=>document.querySelectorAll('.rating-values [aria-pressed=true]').length===0")
             page.locator('#selectionTab').click();page.wait_for_selector('.candidate')
             page.locator('.candidate select').first.select_option('selected')
             page.wait_for_timeout(300)
             assert service.db.one("SELECT status FROM publishing_selection")['status']=='selected'
             page.locator('.candidate input[type=checkbox]').nth(0).check();page.locator('.candidate input[type=checkbox]').nth(1).check()
+            rows = page.locator('.candidate')
+            first_id = rows.nth(0).get_attribute('data-generation-id')
+            second_id = rows.nth(1).get_attribute('data-generation-id')
+            rows.nth(0).locator('.listen-play').click()
+            page.wait_for_function("(id) => document.querySelector('#audio').src.includes(id) && !document.querySelector('#audio').paused", arg=first_id)
+            assert page.locator('#selectionView').is_visible()
+            page.locator('#playerNext').click()
+            page.wait_for_function("(id) => document.querySelector('#audio').src.includes(id) && !document.querySelector('#audio').paused", arg=second_id)
+            page.locator('#playerPrevious').click()
+            page.wait_for_function("(id) => document.querySelector('#audio').src.includes(id) && !document.querySelector('#audio').paused", arg=first_id)
             page.locator('#compare').click();page.wait_for_selector('#compareDialog[open]')
             page.locator('#playA').click();page.wait_for_function("()=>!document.getElementById('audio').paused")
             page.locator('#playB').click();page.wait_for_function("()=>document.getElementById('audio').src.includes('/b/audio')&&!document.getElementById('audio').paused")
             page.locator('[data-prefer="a"]').click();page.wait_for_function("()=>document.getElementById('compareResult').textContent.includes('saved')")
             assert service.db.one('SELECT COUNT(*) AS n FROM preferences')['n']==1
             page.locator('[data-close="compareDialog"]').click()
+            page.wait_for_function("(id) => document.querySelector('#audio').src.includes(id) && !document.querySelector('#audio').paused", arg=first_id)
             page.locator('#reviewTab').click();page.locator('#settingsButton').click();page.wait_for_selector('#settingsDialog[open]')
             if screenshots:page.screenshot(path=str(screenshots/'mobile-settings.png'),full_page=True)
             assert not errors,errors

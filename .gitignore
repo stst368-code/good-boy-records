@@ -5,7 +5,8 @@ __pycache__/
 
 # C extensions
 *.so
-
+_tracks/
+_workers_processing/
 # Distribution / packaging
 .Python
 build/
@@ -242,3 +243,5 @@ _Reviewed/
 !/_99_tools/_yaml_editor/_tests/test_*.py
 _03_review/_generation_review/config.json
 _03_review/_generation_review/config.json
+
+.caption-history/

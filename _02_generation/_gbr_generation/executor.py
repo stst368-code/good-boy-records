@@ -397,10 +397,17 @@ def execute(manifest_path, *, worker_python=None, limit=1, retry_failed=False, t
     results = []
     with closing(open_database(manifest["database"])) as conn:
         upgrade_database(conn)
-        for run in manifest["runs"]:
-            if len(results) >= limit:
-                break
+        from .planner import ensure_queue_order
+        ensure_queue_order(conn)
+        remaining_runs = {run["id"]:run for run in manifest["runs"]}
+        while remaining_runs and len(results) < limit:
             conn.execute("BEGIN IMMEDIATE")
+            promoted = conn.execute("""SELECT q.run_id FROM generation_queue_order q
+                JOIN generation_runs r ON r.id=q.run_id
+                WHERE r.batch_id=? AND r.status='prepared' ORDER BY q.position""",
+                (manifest["batch_id"],))
+            run_id = next((row[0] for row in promoted if row[0] in remaining_runs), None)
+            run = remaining_runs.pop(run_id or next(iter(remaining_runs)))
             status = conn.execute("SELECT status FROM generation_runs WHERE id=?", (run["id"],)).fetchone()[0]
             backend, address = execution_target(run["execution"])
             if status in {'succeeded','cancelled'} or status == "failed" and not retry_failed:

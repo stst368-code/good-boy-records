@@ -202,7 +202,7 @@ class GenerationService:
         self.parameter_sources(spec,data)
         reference_root, styles = self.styles()
         caption_templates=data.get('caption_templates')
-        if caption_templates is not None and data.get('caption_mode')=='random' and not data.get('template_id'):
+        if caption_templates is not None and data.get('caption_mode') in {'random','mix'} and not data.get('template_id'):
             if not caption_templates:raise ValueError('Turn on at least one caption cluster or template')
             if set(caption_templates)-set(styles.by_id):raise ValueError('Selected caption templates are no longer in styles.csv; refresh the caption list')
         experiment = data.get('experiments') or {}
@@ -211,7 +211,7 @@ class GenerationService:
         if type(caption_count) is not int or not 1 <= caption_count <= 1000:
             raise ValueError('Choose 1 to 1000 caption templates per track')
         caption_mode = data.get('caption_mode')
-        if caption_mode not in {None, 'random', 'yaml', 'catalogue'}:
+        if caption_mode not in {None, 'random', 'mix', 'yaml', 'catalogue'}:
             raise ValueError('Unknown caption selection mode')
         if data.get('template_id') and caption_count != 1 or caption_mode in {'yaml', 'catalogue', None} and caption_count != 1:
             raise ValueError('Several captions require random caption selection')
@@ -224,33 +224,51 @@ class GenerationService:
             try:
                 if not data.get('_comfy_inventory'):data['_comfy_inventory']=Client(connection['address']).inventory()
             except OSError as error:raise ValueError('Cannot query ComfyUI pod URL: '+str(error)) from error
+        allowed_templates = None if caption_templates is None else set(caption_templates)
+        rng = secrets.SystemRandom()
+        worker_contexts = []
+        for entry,report in pool or []:
+            candidate_data={**data,'connection':entry['connection'],'_worker':entry,'_comfy_inventory':report.get('_inventory')}
+            candidate_spec={**deepcopy(spec),'defaults':self.worker_parameters(candidate_data,entry,report.get('_inventory')),
+                'execution':execution(entry['connection'],data.get('encoding_cache','prefer')),
+                'model_revision':None if entry['connection']['backend']=='comfyui' else data.get('model_revision') or SMOKE_MODEL_REVISION}
+            if data.get('parameter_priority')=='form':candidate_spec['batch']=dict(candidate_spec['defaults'])
+            worker_contexts.append((entry,candidate_data,candidate_spec))
         checked = []
         for item in selected:
             planned = []
             random_ids = None
-            if caption_mode == 'random' and not data.get('template_id'):
+            if caption_mode in {'random','mix'} and not data.get('template_id'):
                 caption_cluster = data.get('caption_cluster') or (rating_filter or {}).get('cluster')
                 caption_style = data.get('caption_style') or (rating_filter or {}).get('style')
                 caption_pool = [key for key, row in styles.by_id.items()
-                        if (caption_templates is None or key in caption_templates)
+                        if (allowed_templates is None or key in allowed_templates)
                         and (not row.get('song_id') or str(row['song_id'])==str(item.song_id))
                         and (not caption_cluster or row['cluster'].casefold() == caption_cluster.strip().casefold())
                         and (not caption_style or row['style_primary'].casefold() == caption_style.strip().casefold())]
+                if caption_mode == 'mix':
+                    sets = {}
+                    for key in caption_pool:
+                        row = styles.by_id[key]
+                        style = '' if row.get('template_source') == 'custom' else row['style_primary'].casefold()
+                        sets.setdefault((row['cluster'].casefold(), style), []).append(key)
+                    partners = {key: [other for other in group if other != key]
+                                for group in sets.values() if len(group) >= 2 for key in group}
+                    caption_pool = list(partners)
+                    if not caption_pool:
+                        raise ValueError('Select at least two eligible captions of the same style to mix')
                 if caption_count > len(caption_pool):
                     raise ValueError(f'Caption pool has {len(caption_pool)} templates; choose fewer captions or broaden the filters')
-                random_ids = secrets.SystemRandom().sample(caption_pool, caption_count)
+                random_ids = rng.sample(caption_pool, caption_count)
+                if caption_mode == 'mix':
+                    random_ids = [(key, rng.choice(partners[key])) for key in random_ids]
             for caption_index, chosen_template in enumerate(random_ids or [data.get('template_id')]):
                 for overrides, combination_index, repeat_index in combinations:
                     if not pool:
                         case=self._preview_case(item, spec, styles, reference_root, data,chosen_template,overrides,caption_index,combination_index,repeat_index)
                     else:
                         candidates=[];errors=[];case=None
-                        for entry,report in pool:
-                            candidate_data={**data,'connection':entry['connection'],'_worker':entry,'_comfy_inventory':report.get('_inventory')}
-                            candidate_spec={**deepcopy(spec),'defaults':self.worker_parameters(candidate_data,entry,report.get('_inventory')),
-                                'execution':execution(entry['connection'],data.get('encoding_cache','prefer')),
-                                'model_revision':None if entry['connection']['backend']=='comfyui' else data.get('model_revision') or SMOKE_MODEL_REVISION}
-                            if data.get('parameter_priority')=='form':candidate_spec['batch']=dict(candidate_spec['defaults'])
+                        for entry,candidate_data,candidate_spec in worker_contexts:
                             trial=self._preview_case(item,candidate_spec,styles,reference_root,candidate_data,chosen_template,overrides,caption_index,combination_index,repeat_index)
                             if trial.ready:
                                 if not candidates:case=trial
@@ -303,6 +321,8 @@ class GenerationService:
             request = deepcopy(spec)
             auto_fields={k for k,v in overrides.items() if v=='auto'}
             explicit = bool(template_id)
+            if isinstance(template_id, tuple):
+                template_id, request['caption_mix_partner'] = template_id
             if not template_id and (data.get('caption_mode') == 'catalogue' or data.get('caption_mode') is None and data.get('catalogue_captions', True)):
                 try:
                     source = YamlDocument(item.path.read_bytes()).values
@@ -464,13 +484,15 @@ class GenerationService:
             self.review.scan_event.set()
             return result
 
-    def tasks(self,include_logs=True):
+    def tasks(self,include_logs=True,live_only=False):
         from .job_state import read_state
         items = []
         root = self.runtime / 'app_jobs'
         if not root.is_dir():
             return items
-        for index,folder in enumerate(sorted(root.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)):
+        folders = [root / identifier for identifier in list(self.processes)] if live_only else sorted(root.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+        for index,folder in enumerate(folders):
+            if live_only and not self.active(folder.name):continue
             if index>=50 and not self.active(folder.name):continue
             if not folder.is_dir() or not (folder / 'task.json').is_file():
                 continue
@@ -481,6 +503,9 @@ class GenerationService:
                     'active': active, 'manifest': task.get('manifest'),'worker_id':task.get('worker_id'),
                     'runpod_pod_id':task.get('runpod_pod_id') or (str(task['worker_id']).split('|',1)[1] if str(task.get('worker_id','')).startswith('runpod|') else None),
                     'created_at':folder.stat().st_ctime}
+            if live_only:
+                items.append(item)
+                continue
             log = folder / 'controller.log'
             if include_logs and log.is_file():
                 with log.open('rb') as stream:

@@ -20,6 +20,8 @@ from .connections import connection_key, normalize
 from _gbr_worker.hardware import gpu_lock
 from _gbr_worker.contract import python_environment
 
+LIVE_POD_STATES = frozenset({'RUNNING', 'STARTING', 'PROVISIONING', 'RESTARTING'})
+
 DEFAULT_FIELDS = {'text_encoder', 'dit', 'sampler', 'scheduler', 'encoder_cfg', 'top_k',
                   'sampler_cfg', 'sampler_steps', 'duration'}
 
@@ -345,7 +347,8 @@ class Workers:
         return report
 
     def list(self, refresh=False):
-        entries = self.entries()
+        entries = [entry for entry in self.entries()
+                   if not entry.get('runpod') or entry['runpod'].get('state') in LIVE_POD_STATES]
         if refresh and entries:
             with ThreadPoolExecutor(max_workers=4) as pool:
                 list(pool.map(self.query, entries))

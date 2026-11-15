@@ -14,6 +14,7 @@ from urllib.request import Request,build_opener,HTTPRedirectHandler
 
 from .connections import normalize,connection_key,key_candidates
 from .credentials import AccountCredential
+from .workers import LIVE_POD_STATES
 
 LOG=logging.getLogger('gbr_runpod')
 API='https://api.runpod.io/v2'
@@ -159,7 +160,7 @@ class RunpodDiscovery:
 
     def status(self):
         with self.lock:progress=deepcopy(self.progress)
-        rows=[{**entry,'status':{k:v for k,v in self.g.workers.reports.get(entry['id'],{}).items() if not k.startswith('_')}} for entry in self.g.workers.entries() if entry.get('runpod')]
+        rows=[{**entry,'status':{k:v for k,v in self.g.workers.reports.get(entry['id'],{}).items() if not k.startswith('_')}} for entry in self.g.workers.entries() if (entry.get('runpod') or {}).get('state') in LIVE_POD_STATES]
         return {'settings':self.settings(),'has_api_key':bool(self.credential.get()),'progress':progress,'workers':rows}
 
     def start(self):
@@ -199,7 +200,7 @@ class RunpodDiscovery:
                 if pod['id'] in seen:continue
                 seen.add(pod['id'])
             pods=list({p['id']:p for p in pods}.values())
-            self.note(account_ok=True,pods=len(pods),running_pods=sum(str(p.get('status') or p.get('desiredStatus')).upper() in {'RUNNING','STARTING','PROVISIONING','RESTARTING'} for p in pods),operation='Inspecting generation services')
+            self.note(account_ok=True,pods=len(pods),running_pods=sum(str(p.get('status') or p.get('desiredStatus')).upper() in LIVE_POD_STATES for p in pods),operation='Inspecting generation services')
             with ThreadPoolExecutor(max_workers=4,thread_name_prefix='gbr-runpod-probe') as pool:
                 jobs=[pool.submit(self.inspect_pod,api,pod,settings,key) for pod in pods if not target or pod['id']==target]
                 for job in as_completed(jobs):
@@ -229,7 +230,7 @@ class RunpodDiscovery:
         with self.lock:self.progress['current_pods'].append(pod_id)
         report=None;incompatible_report=None;connection=previous.get('connection') if previous else None;attempts=[]
         try:
-            if meta['state'] in {'RUNNING','STARTING','PROVISIONING','RESTARTING'}:
+            if meta['state'] in LIVE_POD_STATES:
                 try:
                     detail=api.request('/pods/'+pod_id)
                     if isinstance(detail,dict) and detail.get('id')==pod_id:pod={**pod,**detail};meta=pod_summary(pod)
@@ -243,7 +244,7 @@ class RunpodDiscovery:
                     if previous is None:
                         self.g.workers.discovered({**meta,'eligible':False,'last_error':'Cannot inspect pod: '+safe_error(error,key)},None,None)
                     return
-                if meta['state'] not in {'RUNNING','STARTING','PROVISIONING','RESTARTING'}:
+                if meta['state'] not in LIVE_POD_STATES:
                     self.g.workers.discovered({**meta,'eligible':False,'last_error':'Pod became '+meta['state'].lower()+' during discovery'},connection,None)
                     with self.lock:self.progress['unavailable']+=1
                     return

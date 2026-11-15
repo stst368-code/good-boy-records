@@ -323,6 +323,53 @@ class WritingService:
             connection.execute("UPDATE writing_tasks SET status='published',publication_json=? WHERE id=?",(packed(plan),identifier))
         return self.public(identifier)
 
+    def caption_library(self):
+        folder = self.root/'_01_writing/_references'
+        return {'captions': [dict(id=row['ID'], cluster=row['cluster'], style=row['style_primary'],
+                                  version=row.get('version') or row.get('template_version'))
+                             for row in Styles(folder/'styles.csv').rows]}
+
+    def caption_revision(self, identifier, revision=None, replacement=None, expected=None):
+        folder = (self.root/'_01_writing/_references').resolve()
+        with self.lock, gpu_lock('gbr-caption-catalogue:'+str(folder)):
+            row = Styles(folder/'styles.csv').by_id.get(identifier)
+            if row is None:
+                raise ValueError('Caption is absent from styles.csv')
+            path = (folder/row['template'].replace(chr(92), '/')).resolve()
+            if not path.is_relative_to(folder):
+                raise ValueError('Invalid caption template path')
+            history = folder/'.caption-history'/sha(identifier.encode())
+            raw = path.read_bytes()
+            current = sha(raw)
+            if replacement is not None and expected != current:
+                raise Conflict('Caption changed. Reload it before saving.')
+            if replacement is not None and replacement.encode('utf-8') != raw:
+                if not replacement.strip():
+                    raise ValueError('Caption cannot be empty')
+                validate_template_format(replacement, row.get('template_source'))
+                history.mkdir(parents=True, exist_ok=True)
+                snapshot = history/(current+'.txt')
+                if not snapshot.exists():
+                    snapshot.write_bytes(raw)
+                temporary = path.with_name(path.name+'.'+uuid.uuid4().hex+'.tmp')
+                try:
+                    temporary.write_text(replacement, encoding='utf-8', newline='\n')
+                    temporary.replace(path)
+                finally:
+                    temporary.unlink(missing_ok=True)
+                raw = path.read_bytes()
+                current = sha(raw)
+            versions = sorted(history.glob('*.txt'), key=lambda item: item.stat().st_mtime, reverse=True)
+            if revision and revision != current:
+                snapshot = next((item for item in versions if item.stem == revision), None)
+                if snapshot is None:
+                    raise ValueError('Caption revision was not found')
+                raw = snapshot.read_bytes()
+            return {'id':identifier,'current':current,'revision':revision or current,
+                    'caption':raw.decode('utf-8-sig'),
+                    'versions':[{'id':item.stem,'saved_at':item.stat().st_mtime}
+                                for item in versions if item.stem != current]}
+
     def save_caption_template(self, identifier, template_id, source='llm', extra=None):
         if not re.fullmatch('[a-z0-9][a-z0-9_-]{1,119}',template_id):raise ValueError('Use a unique lowercase template ID with letters, digits, underscores or hyphens')
         folder = self.root/'_01_writing/_references';catalogue = folder/'styles.csv'

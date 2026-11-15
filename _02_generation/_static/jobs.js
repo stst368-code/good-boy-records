@@ -6,11 +6,131 @@ const node=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.classNa
 const time=value=>value?new Date(value).toLocaleString():'';
 const model=value=>String(value||'Default').split(/[\\/]/).pop().replace(/\.(safetensors|gguf|ckpt)$/,'');
 
-export function initJobs({root,api,toast,onQueued}){
+export function initJobs({root:container,api,toast,onQueued}){
   const state={purpose:'production',sorts:new Map(),open:new Set(),pages:new Map(),texts:new Map(),logs:new Map(),busy:new Set(),jobs:[],sequence:0,cursors:JSON.parse(sessionStorage.getItem('gbr-generation-log-cursors')||'{}')};
   const guard=fn=>async(...args)=>{try{await fn(...args);}catch(e){toast(e.message);}};
   const publication=experimentPublishing({api,toast,refresh});
   const button=(text,fn,cls='')=>{const b=node('button',cls,text);b.type='button';b.onclick=guard(fn);return b;};
+  const queue=node('section','generation-run-queue');
+  const controls=node('details','job-controls');
+  const root=node('div','generation-jobs');
+  controls.append(node('summary','','Job controls and diagnostics'),root);
+  container.append(queue,controls);
+  const selected=new Map();
+  let tab='queued',offset=0,queueSequence=0,queueSignature='',acting=false;
+  const tabs=node('div','generation-inline');
+  const tabButtons=new Map();
+  for(const name of ['queued','completed','cancelled','failed']){
+    const title=name[0].toUpperCase()+name.slice(1);
+    const control=button(title,async()=>{
+      tab=name;offset=0;selected.clear();await refreshQueue();
+    });
+    control.setAttribute('aria-pressed',String(tab===name));
+    tabButtons.set(name,{title,control});tabs.append(control);
+  }
+  const actions=node('div','generation-inline');
+  const cancel=button('Cancel selected',async()=>{
+    if(acting||!selected.size)return;
+    if(!window.confirm(`Cancel ${selected.size} selected runs?`))return;
+    acting=true;updateActions();
+    const failed=[];
+    try{
+      for(const run of selected.values()){
+        try{await api(`/generation/jobs/${run.batch_id}/runs/${run.id}/cancel`,{});}
+        catch(error){failed.push(error.message);}
+      }
+      if(failed.length)toast(`${failed.length} runs could not be cancelled. ${failed[0]}`);
+      selected.clear();
+    }finally{acting=false;await refreshQueue();}
+  });
+  async function reorder(action){
+    if(acting)return;
+    acting=true;updateActions();
+    try{await api('/generation/queue/order',{action,run_ids:[...selected.keys()]});}
+    finally{acting=false;await refreshQueue();}
+  }
+  const promote=button('Promote within job',()=>reorder('promote'));
+  const shuffle=button('Shuffle within jobs',()=>reorder('shuffle'));
+  const previous=button('Previous',async()=>{offset=Math.max(0,offset-50);selected.clear();await refreshQueue();});
+  const next=button('Next',async()=>{offset+=50;selected.clear();await refreshQueue();});
+  const range=node('span','subtle small');
+  const pager=node('div','generation-inline');
+  const table=node('div','generation-queue-table');
+  const pickAll=node('input');pickAll.type='checkbox';pickAll.setAttribute('aria-label','Select all cancellable runs on this page');
+  let displayed=[];
+  pickAll.onchange=()=>{
+    for(const run of displayed.filter(isCancellable)){
+      if(pickAll.checked)selected.set(run.id,run);else selected.delete(run.id);
+    }
+    syncSelection();
+  };
+  function isCancellable(run){return ['prepared','running'].includes(run.status);}
+  function updateActions(){
+    actions.hidden=tab!=='queued';
+    cancel.disabled=acting||!selected.size;
+    promote.disabled=acting||![...selected.values()].some(run=>run.status==='prepared');
+    shuffle.disabled=acting;
+  }
+  function syncSelection(){
+    const selectable=displayed.filter(isCancellable);
+    const checked=selectable.filter(run=>selected.has(run.id)).length;
+    pickAll.hidden=tab!=='queued';
+    pickAll.disabled=!selectable.length;
+    pickAll.checked=!!checked&&checked===selectable.length;
+    pickAll.indeterminate=checked>0&&!pickAll.checked;
+    for(const box of table.querySelectorAll('tbody input'))box.checked=selected.has(box.value);
+    updateActions();
+  }
+  actions.append(cancel,promote,shuffle);pager.append(previous,range,next);
+  queue.append(tabs,actions,table,pager);
+  async function refreshQueue(){
+    const sequence=++queueSequence;
+    const data=await api(`/generation/queue?status=${tab}&offset=${offset}`);
+    if(sequence!==queueSequence||state.purpose!=='production')return;
+    const count=data.counts[tab];
+    if(offset&&!data.runs.length){offset=Math.max(0,Math.floor((count-1)/50)*50);return refreshQueue();}
+    displayed=data.runs;
+    for(const id of selected.keys()){
+      const row=displayed.find(run=>run.id===id&&isCancellable(run));
+      if(row)selected.set(id,row);else selected.delete(id);
+    }
+    for(const [name,{title,control}] of tabButtons){
+      control.textContent=`${title} · ${data.counts[name]}`;
+      control.setAttribute('aria-pressed',String(name===tab));
+    }
+    range.textContent=count?`${offset+1}–${offset+displayed.length} of ${count}`:'';
+    previous.disabled=offset===0;next.disabled=offset+displayed.length>=count;pager.hidden=count<=50;
+    const signature=JSON.stringify([tab,displayed]);
+    if(signature!==queueSignature){
+      queueSignature=signature;
+      const grid=node('table'),header=node('tr'),select=node('th'),body=node('tbody');
+      select.append(pickAll);header.append(select);
+      for(const column of ['Track','Job ID','Progress'])header.append(node('th','',column));
+      const head=node('thead');head.append(header);grid.append(head,body);
+      for(const run of displayed){
+        const row=node('tr'),cell=node('td'),track=node('td');
+        if(tab==='queued'&&isCancellable(run)){
+          const checkbox=node('input');checkbox.type='checkbox';checkbox.value=run.id;
+          checkbox.setAttribute('aria-label','Select '+run.title);
+          checkbox.onchange=()=>{if(checkbox.checked)selected.set(run.id,run);else selected.delete(run.id);syncSelection();};
+          cell.append(checkbox);
+        }
+        track.append(node('strong','',run.title),node('div','subtle small',run.style));
+        const job=node('td'),id=node('code','',run.batch_id.slice(0,8));id.title=run.batch_id;job.append(id);
+        const progress=node('td','',label(run.stage||run.status));
+        if(['running','publishing','cancel_requested'].includes(run.status)){
+          const bar=node('progress','job-step-progress');bar.setAttribute('aria-label',run.title+' generation progress');
+          if(run.steps>0&&run.step!=null){bar.max=run.steps;bar.value=run.step;progress.append(node('div','small',`${run.step} / ${run.steps}`));}
+          progress.append(bar);
+        }
+        if(run.error&&run.status==='failed')progress.append(node('div','error small',run.error));
+        row.append(cell,track,job,progress);body.append(row);
+      }
+      table.replaceChildren(displayed.length?grid:node('p','subtle','No '+tab+' runs.'));
+    }
+    syncSelection();
+  }
+  controls.ontoggle=()=>{if(controls.open)guard(refresh)();};
   function drawer(key,title){const e=node('details','job-drawer');e.dataset.key=key;e.open=state.open.has(key);e.append(node('summary','',title));e.addEventListener('toggle',()=>{if(!e.isConnected)return;if(e.open)state.open.add(key);else state.open.delete(key);});return e;}
   function metadata(run){const p=run.parameters;return [['Encoder',model(p.text_encoder)],['DiT',model(p.dit)],['Sampling',p.sampler+' / '+p.scheduler],['Encoder CFG',p.encoder_cfg],['Diffusion CFG',p.sampler_cfg],['Top-k',p.top_k],['Steps',p.sampler_steps],['Seconds',p.duration]].map(([k,v])=>k+': '+v).join(' · ');}
   async function loadRuns(id,more=false,sequence=null){
@@ -137,6 +257,12 @@ export function initJobs({root,api,toast,onQueued}){
       for(const [index,job] of jobs.entries()){let existing=root.querySelector(`[data-batch="${job.id}"]`);if(existing)updateCard(existing,job);else existing=card(job);if(list.children[index]!==existing)list.insertBefore(existing,list.children[index]||null);}
     }
   }
-  async function refresh(){const sequence=++state.sequence,data=await api('/generation/jobs?purpose='+state.purpose);if(sequence!==state.sequence)return;state.jobs=data.jobs;for(const job of data.jobs)if(state.open.has(job.id+'/runs'))await loadRuns(job.id,false,sequence);if(sequence!==state.sequence)return;render();await Promise.all([...root.querySelectorAll('details[open]')].filter(e=>e.refreshLog).map(e=>e.refreshLog()));onQueued?.(data);return data;}
-  return {refresh,setPurpose(purpose){if(state.purpose===purpose)return;state.purpose=purpose;state.sequence++;state.jobs=[];root.replaceChildren();},hasActive:()=>state.jobs.some(j=>j.section==='active')};
+  async function refresh(){
+    if(state.purpose==='production'){
+      const load=refreshQueue();
+      if(!controls.open)return load;
+      await load;
+    }
+    const sequence=++state.sequence,data=await api('/generation/jobs?purpose='+state.purpose);if(sequence!==state.sequence)return;state.jobs=data.jobs;for(const job of data.jobs)if(state.open.has(job.id+'/runs'))await loadRuns(job.id,false,sequence);if(sequence!==state.sequence)return;render();await Promise.all([...root.querySelectorAll('details[open]')].filter(e=>e.refreshLog).map(e=>e.refreshLog()));onQueued?.(data);return data;}
+  return {refresh,setPurpose(purpose){if(state.purpose===purpose)return;state.purpose=purpose;state.sequence++;state.jobs=[];root.replaceChildren();queue.hidden=purpose==='experiment';controls.open=purpose==='experiment';},hasActive:()=>state.jobs.some(j=>j.section==='active')};
 }

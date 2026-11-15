@@ -31,6 +31,11 @@ class Connection(Body):
     auto_setup: StrictBool = True
 
 
+class QueueOrder(BaseModel):
+    action: Literal['promote','shuffle']
+    run_ids: list[str] = Field(default_factory=list,max_length=1000)
+
+
 class Preferences(Body):
     connection: Connection | None = None
     worker_id: str | None = Field(default=None, max_length=2100)
@@ -106,7 +111,7 @@ class Preview(Body):
     field_precedence: dict = Field(default_factory=dict)
     template_id: str | None = None
     catalogue_captions: StrictBool = True
-    caption_mode: Literal['random', 'yaml', 'catalogue'] | None = None
+    caption_mode: Literal['random', 'mix', 'yaml', 'catalogue'] | None = None
     caption_count: int = Field(default=1, ge=1, le=1000, strict=True)
     caption_cluster: str | None = Field(default=None, max_length=1000)
     caption_style: str | None = Field(default=None, max_length=1000)
@@ -273,6 +278,13 @@ def router(root, review_service, local):
     @routes.get('/tasks')
     def tasks():
         return {'tasks': service.tasks()}
+
+    @routes.get('/queue')
+    def queue(status:Literal['queued','completed','cancelled','failed']='queued',offset:int=0):
+        return jobs_service.queue(status,max(0,offset))
+
+    @routes.post('/queue/order')
+    def reorder(body:QueueOrder):return jobs_service.reorder(body.action,body.run_ids)
 
     @routes.get('/jobs')
     def jobs(purpose:Literal['production','experiment','all']='production'):return jobs_service.listing(purpose)

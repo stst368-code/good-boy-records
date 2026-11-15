@@ -61,6 +61,11 @@ class CaptionSave(Body):
     fields: dict[str,str] = Field(max_length=12)
 
 
+class CaptionRevision(Body):
+    caption: str = Field(min_length=1,max_length=200000)
+    expected: str = Field(pattern=r'^[a-f0-9]{64}$')
+
+
 def router(root, review, local, reviewer_id):
     service = WritingService(root,review)
     authoring = Authoring(service)
@@ -80,6 +85,17 @@ def router(root, review, local, reviewer_id):
     def auditions(field:str,template_id:str):return authoring.auditions(field,template_id)
     @routes.post('/captions')
     def save_caption(body: CaptionSave,request: Request):return authoring.save_caption(body.model_dump(),reviewer_id(request))
+
+    @routes.get('/caption-library')
+    def caption_library():return service.caption_library()
+
+    @routes.get('/caption-library/{identifier}')
+    def caption_revision(identifier:str,revision:str|None=None):
+        return service.caption_revision(identifier,revision)
+
+    @routes.post('/caption-library/{identifier}')
+    def save_caption_revision(identifier:str,body:CaptionRevision):
+        return service.caption_revision(identifier,replacement=body.caption,expected=body.expected)
 
     @routes.get('/settings')
     def settings():return service.settings()

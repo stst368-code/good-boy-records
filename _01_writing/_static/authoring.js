@@ -15,6 +15,16 @@ export function initAuthoring({root,api,toast,onPublished,refreshDrafts}) {
     <div class="caption-meta"><label>Cluster<input id="captionCluster" list="writingClusters" autocomplete="off" required><datalist id="writingClusters"></datalist></label><label>Version (optional)<input id="captionVersion"></label><label>Song link<select id="captionSong"><option value="">Unlinked · available for any song</option></select></label></div>
     <p class="subtle small">Choose reference sections to copy into the editable boxes. Duplicate cluster/version names receive -2, -3, …</p></div>
     <div id="captionSections" class="caption-sections"></div><div class="generation-panel writing-heading"><span id="captionStatus" role="status" class="small"></span><button id="captionSave" type="button" class="primary">Save custom caption</button></div>`;
+  const library=document.createElement('details');
+  library.className='generation-panel';
+  library.innerHTML=`<summary>Caption library and versions</summary>
+    <label>Search captions<input id="captionLibrarySearch" type="search"></label>
+    <label>Caption<select id="captionLibraryPick"></select></label>
+    <label>Revision<select id="captionLibraryRevision"></select></label>
+    <label>Caption text<textarea id="captionLibraryText" rows="16" spellcheck="false"></textarea></label>
+    <button id="captionLibrarySave" type="button" class="primary" disabled>Save as current revision</button>
+    <p id="captionLibraryStatus" role="status"></p>`;
+  caption.prepend(library);
   root.insertBefore(nav,assistant);root.insertBefore(base,assistant);root.insertBefore(caption,assistant);
   const panels=[base,caption,assistant];const names=['Base','Captions','Model assistant'];
   panels.forEach((panel,index)=>{panel.setAttribute('role','tabpanel');const button=document.createElement('button');button.type='button';button.textContent=names[index];button.id='writingMode'+index;button.setAttribute('role','tab');button.setAttribute('aria-controls',panel.id);button.setAttribute('aria-selected',String(index===0));panel.setAttribute('aria-labelledby',button.id);
@@ -27,6 +37,55 @@ export function initAuthoring({root,api,toast,onPublished,refreshDrafts}) {
   for(const node of base.querySelectorAll('input,textarea'))node.addEventListener('input',changed);
   for(const node of caption.querySelectorAll('input,select'))node.addEventListener('input',captionChanged);
   function guard(button,status,fn){return async()=>{button.disabled=true;status.textContent='Saving…';try{await fn();}catch(error){status.textContent=error.message;toast(error.message);}finally{button.disabled=false;}};}
+  let libraryRows=null,loadedCaption=null,revisionSequence=0;
+  function paintLibrary(){
+    const pick=$('captionLibraryPick'),current=pick.value;
+    const query=$('captionLibrarySearch').value.trim().toLowerCase();
+    const choices=(libraryRows||[]).filter(row=>[row.cluster,row.style,row.id,row.version].join(' ').toLowerCase().includes(query));
+    pick.replaceChildren(new Option('Choose a caption',''),...choices.map(row=>
+      new Option([...new Set([row.cluster,row.style,row.version].filter(Boolean))].join(' · ')+' — '+row.id,row.id)));
+    if(choices.some(row=>row.id===current))pick.value=current;
+  }
+  async function loadLibrary(){
+    const data=await api('/writing/caption-library');
+    libraryRows=data.captions;paintLibrary();
+  }
+  library.ontoggle=async()=>{
+    if(!library.open||libraryRows)return;
+    try{await loadLibrary();}catch(error){$('captionLibraryStatus').textContent=error.message;}
+  };
+  $('captionLibrarySearch').oninput=paintLibrary;
+  function paintRevision(data){
+    loadedCaption=data;
+    $('captionLibraryText').value=data.caption;
+    $('captionLibraryRevision').replaceChildren(new Option('Current',data.current),
+      ...data.versions.map(version=>new Option(new Date(version.saved_at*1000).toLocaleString()+' · '+version.id.slice(0,8),version.id)));
+    $('captionLibraryRevision').value=data.revision;
+    $('captionLibrarySave').disabled=false;
+    $('captionLibraryStatus').textContent=data.current===data.revision?'':'Viewing an older revision. Save to make this text current.';
+  }
+  async function loadRevision(revision=''){
+    const sequence=++revisionSequence,id=$('captionLibraryPick').value;
+    loadedCaption=null;$('captionLibrarySave').disabled=true;
+    if(!id){$('captionLibraryText').value='';$('captionLibraryRevision').replaceChildren();return;}
+    try{
+      const data=await api('/writing/caption-library/'+encodeURIComponent(id)+(revision?'?revision='+encodeURIComponent(revision):''));
+      if(sequence===revisionSequence)paintRevision(data);
+    }catch(error){if(sequence===revisionSequence)$('captionLibraryStatus').textContent=error.message;}
+  }
+  $('captionLibraryPick').onchange=()=>loadRevision();
+  $('captionLibraryRevision').onchange=()=>loadRevision($('captionLibraryRevision').value);
+  $('captionLibrarySave').onclick=async()=>{
+    if(!loadedCaption)return;
+    const {id,current}=loadedCaption,sequence=revisionSequence,save=$('captionLibrarySave');
+    save.disabled=true;
+    try{
+      const data=await api('/writing/caption-library/'+encodeURIComponent(id),{expected:current,caption:$('captionLibraryText').value});
+      if(sequence===revisionSequence){paintRevision(data);$('captionLibraryStatus').textContent='Saved revision.';}
+      onPublished?.('template');
+    }catch(error){if(sequence===revisionSequence)$('captionLibraryStatus').textContent=error.message;}
+    finally{if(sequence===revisionSequence)save.disabled=false;}
+  };
   function key(){return crypto.randomUUID().replaceAll('-','');}
   function tracks(){return (options?.tracks||[]).filter(r=>r.song_id);}
   function buildOptions(){
@@ -86,7 +145,7 @@ export function initAuthoring({root,api,toast,onPublished,refreshDrafts}) {
   $('captionClear').onclick=()=>{for(const audio of caption.querySelectorAll('audio'))audio.pause();for(const node of caption.querySelectorAll('[data-caption-field],input')){node.value='';node.dispatchEvent(new Event('input'));}$('captionSong').value='';captionChanged();$('captionStatus').textContent='';};
   $('captionSave').onclick=guard($('captionSave'),$('captionStatus'),async()=>{
     const request=captionRequest||{request_id:key(),cluster:$('captionCluster').value,version:$('captionVersion').value,song_id:$('captionSong').value,fields:fields()};captionRequest=request;
-    const result=await api('/writing/captions',request);options=await api('/writing/authoring');buildOptions();await refreshDrafts();onPublished?.('template');
+    const result=await api('/writing/captions',request);if(library.open)await loadLibrary();else libraryRows=null;options=await api('/writing/authoring');buildOptions();await refreshDrafts();onPublished?.('template');
     $('captionStatus').textContent='Saved custom caption: '+result.id+(request.song_id?' · linked to song #'+request.song_id:' · unlinked pool');toast('Custom caption saved.');
   });
   return {async open(){options=await api('/writing/authoring');buildOptions();sections();}};

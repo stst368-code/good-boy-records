@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 
 
 ASR_MODEL='Systran/faster-whisper-large-v3'
@@ -46,6 +47,25 @@ def prepare_model_cache(language):
         are_symlinks_supported(folder)
 
 
+def recover_silero_cache(torch):
+    """Let Torch Hub redownload an incomplete Silero checkout on the next load."""
+    hub = Path(torch.hub.get_dir())
+    for branch in ('master', 'main'):
+        cache = hub / f'snakers4_silero-vad_{branch}'
+        if not cache.is_dir() or (cache / 'hubconf.py').is_file():
+            continue
+        if cache.is_symlink():
+            raise RuntimeError(f'Silero cache is incomplete at {cache}. Repair the cache directory and retry.')
+        backup = cache.with_name(f'{cache.name}.incomplete-{uuid.uuid4().hex[:8]}')
+        try:
+            cache.rename(backup)
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            raise RuntimeError(f'Silero cache repair could not move {cache}. Check folder access and retry.') from error
+        print(f'Preserved incomplete Silero cache at {backup}. Torch Hub will download a fresh copy.', file=sys.stderr)
+
+
 def match_words(expected, recognised):
     def normal(text):return ''.join(c for c in text.casefold() if c.isalnum())
     a=[normal(w['text']) for w in expected];b=[normal(w.get('word','')) for w in recognised]
@@ -72,6 +92,7 @@ def run(request):
     import soundfile as sf
     language=request['recipe']['language']
     prepare_model_cache(language)
+    recover_silero_cache(torch)
     device='cuda' if torch.cuda.is_available() else 'cpu';out=Path(request['output']).parent
     report(request,'separation_model','Loading / downloading Demucs model',device=device)
     model=get_model('htdemucs');model.to(device);model.eval()

@@ -153,3 +153,21 @@ def test_comfy_cancellation_is_id_scoped_and_old_servers_discard_safely(setup,ta
             assert all(url!='/interrupt' for method,url in state['requests'])
             if completed_output or not targeted and not pending:assert state['acked']
         finally:gate.set();thread.join(timeout=8)
+
+
+def test_flat_queue_promotes_next_worker_claim_and_separates_cancelled_runs(setup):
+    f, jobs = setup
+    path, manifest = batch(f)
+    first, middle, last = [r['id'] for r in manifest['runs']]
+    jobs.cancel(manifest['batch_id'], middle)
+    response = f.client.post('/api/generation/queue/order', headers=f.headers,
+                             json={'action': 'promote', 'run_ids': [last]})
+    assert response.status_code == 200
+    queued = f.client.get('/api/generation/queue', headers=f.headers).json()
+    assert [r['id'] for r in queued['runs']] == [last, first]
+    assert queued['counts']['cancelled'] == 1
+    worker = boundary()
+    execute(path, worker_python=sys.executable, launcher=worker.worker)
+    assert [call['run_id'] for call in worker.calls] == [last]
+    assert jobs.queue('completed', 0)['runs'][0]['id'] == last
+    assert jobs.queue('cancelled', 0)['runs'][0]['id'] == middle

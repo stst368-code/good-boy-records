@@ -5,8 +5,10 @@ from datetime import datetime,timezone
 import json
 from pathlib import Path
 import re
+from random import shuffle
 
 from .planner import open_database,verify_plan
+from .workers import LIVE_POD_STATES
 from .yaml_document import YamlDocument
 
 LIVE={'running','publishing','cancel_requested'}
@@ -27,6 +29,52 @@ class Jobs:
             if key not in latest or task['active'] and not latest[key]['active']:latest[key]=task
         return list(latest.values())
 
+    def queue(self, status, offset):
+        tabs = {'queued': ('prepared', 'running', 'publishing', 'cancel_requested'),
+                'completed': ('succeeded',), 'cancelled': ('cancelled',), 'failed': ('failed',)}
+        with closing(open_database(self.g.review.config.database)) as conn:
+            from .planner import ensure_queue_order
+            ensure_queue_order(conn)
+            scope = """FROM generation_runs r JOIN generation_batches b ON b.id=r.batch_id
+                LEFT JOIN generation_queue_order q ON q.run_id=r.id
+                WHERE COALESCE(json_extract(b.policy_json,'$.purpose'),'production')='production'"""
+            counts = dict(conn.execute('SELECT r.status,COUNT(*) '+scope+' GROUP BY r.status'))
+            states = tabs[status]
+            order = ("r.status='prepared',b.created_at,COALESCE(q.position,r.rowid),r.rowid"
+                     if status == 'queued' else 'r.completed_at DESC,r.rowid DESC')
+            rows = [dict(row) for row in conn.execute("""SELECT r.id,r.batch_id,r.title,r.style,r.status,
+                (SELECT error FROM generation_attempts WHERE run_id=r.id ORDER BY started_at DESC,rowid DESC LIMIT 1) AS error """
+                +scope+' AND r.status IN ('+','.join('?' for _ in states)+') ORDER BY '+order+' LIMIT 50 OFFSET ?',
+                (*states,offset))]
+        if status == 'queued':
+            live = {task['run_id']:task for task in self.g.tasks(include_logs=False,live_only=True) if task.get('run_id')}
+            for row in rows:
+                row.update({key:live.get(row['id'],{}).get(key) for key in ('worker_id','stage','step','steps')})
+        return {'runs':rows,'counts':{key:sum(counts.get(state,0) for state in states) for key,states in tabs.items()}}
+
+    def reorder(self, action, run_ids):
+        selected = set(run_ids)
+        with closing(open_database(self.g.review.config.database)) as conn, conn:
+            from .planner import ensure_queue_order
+            ensure_queue_order(conn)
+            conn.execute('BEGIN IMMEDIATE')
+            groups = {}
+            for row in conn.execute("""SELECT r.batch_id,r.id FROM generation_runs r
+                    JOIN generation_batches b ON b.id=r.batch_id LEFT JOIN generation_queue_order q ON q.run_id=r.id
+                    WHERE r.status='prepared' AND COALESCE(json_extract(b.policy_json,'$.purpose'),'production')='production'
+                    ORDER BY r.batch_id,COALESCE(q.position,r.rowid),r.rowid"""):
+                groups.setdefault(row['batch_id'],[]).append(row['id'])
+            for queue in groups.values():
+                if action == 'shuffle':
+                    shuffle(queue)
+                elif selected.intersection(queue):
+                    queue.sort(key=lambda run_id: run_id not in selected)
+                else:
+                    continue
+                conn.executemany('INSERT OR REPLACE INTO generation_queue_order(run_id,position) VALUES (?,?)',
+                                 [(run_id,position) for position,run_id in enumerate(queue)])
+        return {'ok':True}
+
     def listing(self,purpose='production'):
         if purpose not in {'production','experiment','all'}:raise ValueError('Unknown run purpose')
         tasks=self.controllers();by_batch={}
@@ -46,7 +94,7 @@ class Jobs:
             elif counts['cancelled']:section='failed';status='cancelled'
             else:section='completed';status='completed'
             known={t.get('worker_id') or identity(t['connection']) for t in workers}
-            available=[{'id':e['id'],'connection':e['connection']} for e in self.g.workers.entries() if e['enabled'] and e['id'] not in known] if counts['prepared'] else []
+            available=[{'id':e['id'],'connection':e['connection']} for e in self.g.workers.entries() if e['enabled'] and e['id'] not in known and (not e.get('runpod') or e['runpod'].get('state') in LIVE_POD_STATES)] if counts['prepared'] else []
             automatic=policy.get('automatic_workers',selection.get('worker_id') in {'auto','all'} or selection.get('worker_id') is None and any(t.get('worker_id') for t in workers))
             result.append({**batch,'purpose':policy.get('purpose','production'),'experiment_label':policy.get('experiment_label',''),
                 'status':status,'section':section,'counts':dict(counts),'total':sum(counts.values()),'available_workers':available,'automatic_workers':automatic,

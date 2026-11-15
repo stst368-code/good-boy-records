@@ -235,3 +235,20 @@ def test_base_and_variant_save_canonical_tags_without_rewriting_source_or_other_
         actual=after.one(entry.name)
         assert before.text[entry.start:entry.end]==after.text[actual.start:actual.end]
     assert f.source.read_bytes()==original and not list(f.root.rglob('*.tmp'))
+
+
+def test_caption_library_keeps_previous_text_and_rejects_stale_saves(app):
+    f, _ = app
+    created = post(f, 'captions', caption())
+    route = '/api/writing/caption-library/' + created['id']
+    original = f.client.get(route).json()
+    edited = original['caption'] + '\nNew arrangement detail\n'
+    saved = f.client.post(route, headers=f.headers,
+                          json={'caption': edited, 'expected': original['current']})
+    assert saved.status_code == 200
+    assert f.client.get(route).json()['caption'] == edited
+    stale = f.client.post(route, headers=f.headers,
+                          json={'caption': edited, 'expected': original['current']})
+    assert stale.status_code == 409
+    older = f.client.get(route, params={'revision': original['current']}).json()
+    assert older['caption'] == original['caption']

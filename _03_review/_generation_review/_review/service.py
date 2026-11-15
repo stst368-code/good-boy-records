@@ -138,9 +138,9 @@ class Service:
                 result.update(review_id=r["id"], scores={k: r[k] for k in ("audio_quality", "composition", "consistency", "realism")}, previous_mode=r["mode"], reason=r['reason'], tags=tags, tags_recorded=bool(r['tags_recorded']))
         return result
 
-    def next(self, peek=False, reviewer_id=None, expected_current=None):
+    def next(self, peek=False, reviewer_id=None, expected_current=None, include_counts=True):
         rid = reviewer_id or self.default_reviewer_id
-        result = self.queues.next(rid, peek, expected_current)
+        result = self.queues.next(rid, peek, expected_current, include_counts)
         if rid == self.default_reviewer_id:
             self.prefetched_id = result["track"]["id"] if peek and result["track"] else None
         return result

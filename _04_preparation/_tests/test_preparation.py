@@ -21,7 +21,8 @@ from conftest import complete,archive_all
 @pytest.fixture
 def prepared(tmp_path):
     root=tmp_path/'repo'
-    for relative in ['_98_database/_gbr_database/processing.sql','_99_tools/_workers_processing/worker.py']:
+    for relative in ['_98_database/_gbr_database/processing.sql','_99_tools/_workers_processing/worker.py',
+                     '_04_preparation/_gbr_preparation/mastering.py']:
         path=root/relative;path.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/relative,path)
     database=tmp_path/'shared.sqlite3';initialize(database)
     inp=tmp_path/'input';inp.mkdir()
@@ -215,6 +216,36 @@ def test_bypassed_master_reuses_canonical_pcm_without_a_duplicate_flac(prepared)
     assert source.is_file()
 
 
+def test_ordered_effects_render_the_same_in_preview_and_master(prepared):
+    _, prep, _, _, gid, _ = prepared
+    source = promote(prepared)
+    original_hash = digest(source)
+    effects = [
+        {'preset': 'tape_warmth', 'strength': 65},
+        {'preset': 'lofi_radio', 'strength': 100, 'bypassed': True},
+        {'preset': 'live_room', 'strength': 55},
+        {'preset': 'mix_glue', 'strength': 44},
+    ]
+    mix = {'effects': effects, 'limiter_db': -1}
+    master = prep.submit(gid, 'mix_master', {'mix': mix})
+    task = wait(prep, master['id'])
+    assert [row['preset'] for row in json.loads(task['recipe_json'])['mix']['effects']] == [row['preset'] for row in effects]
+    preview = prep.submit(gid, 'mix_preview', {'mix': mix, 'start': .5, 'seconds': 1})
+    wait(prep, preview['id'])
+    rendered, rate = sf.read(prep.artifact(master['id'] + '-output'))
+    excerpt, preview_rate = sf.read(prep.artifact(preview['id'] + '-output'))
+    original, _ = sf.read(source)
+    assert preview_rate == rate and len(rendered) == len(original)
+    np.testing.assert_allclose(excerpt, rendered[rate//2:rate//2+rate], atol=2/2**23)
+    assert np.max(np.abs(rendered - original)) > .01
+    reverse = prep.submit(gid, 'mix_master', {'mix': {**mix, 'effects': list(reversed(effects))}})
+    wait(prep, reverse['id'])
+    assert digest(prep.artifact(reverse['id'] + '-output')) != digest(prep.artifact(master['id'] + '-output'))
+    assert digest(source) == original_hash
+    with pytest.raises(ValueError, match='Effect strength'):
+        mix_recipe({'effects': [{'preset': 'live_room', 'strength': 101}]})
+
+
 def test_processing_history_download_is_complete_and_temporary_export_is_removed(prepared):
     from fastapi.testclient import TestClient
     from _review.app import create_app
@@ -254,6 +285,67 @@ def test_editorial_revision_confidence_approval_and_source_binding(prepared):
     body['source_sha256']='0'*64;body['parent_task_id']=second['id']
     with pytest.raises(ValueError,match='Audio changed'):prep.save_editorial(gid,'lyric_edit',body)
 
+
+def test_long_lyric_corrections_and_approval_pass_through_http(prepared):
+    from fastapi.testclient import TestClient
+    from _review.app import create_app
+
+    service,prep,_,_,gid,raw=prepared
+    source=promote(prepared)
+    working_yaml=next(source.parent.glob('*.yaml'))
+    raw=raw.replace(b'  first line\r\n  second line\r\n',b'  Across the midnight sky our colours carry like a song\r\n'*120)
+    working_yaml.write_bytes(raw)
+    app=create_app(service.config.path,start_worker=False)
+    app.state.preparation.tracks=prep.tracks
+    route=f'/api/preparation/projects/{gid}/editorial'
+    with TestClient(app,base_url='http://localhost',headers={'X-GBR-Request':'1'}) as client:
+        timeline=client.get(route).json()
+        draft={'source_sha256':timeline['source_sha256'],'parent_task_id':timeline['lyric_task_id']}
+        words=timeline['words']
+        words[0]['text']='Through'
+        response=client.post(route+'/lyric_edit',json={**draft,'words':words,'approved':True})
+        assert int(response.request.headers['content-length'])>100000
+        assert response.status_code==200,response.text
+        saved=response.json()
+        assert saved['approved'] and saved['words'][0]['text']=='Through'
+        assert saved['words'][0]['source_text']=='Across'
+        assert len(saved['words'])==len(words)
+
+        approval={**draft,'parent_task_id':saved['lyric_task_id'],'lyrics_sha256':saved['lyrics_sha256'],'approved':True}
+        response=client.post(route+'/lyric_edit',json=approval)
+        assert response.status_code==200,response.text
+        assert response.json()['words']==saved['words']
+
+        working_yaml.write_bytes(raw.replace(b'Across',b'Under'))
+        stale=client.post(route+'/lyric_edit',json={**approval,'parent_task_id':None})
+        assert stale.status_code==400 and 'Lyrics changed' in stale.json()['detail']
+        changed=client.get(route).json()
+        assert not changed['approved']
+        response=client.post(route+'/lyric_edit',json={**approval,'parent_task_id':None,'lyrics_sha256':changed['lyrics_sha256']})
+        assert response.status_code==200,response.text
+        assert response.json()['approved'] and response.json()['words'][0]['text']=='Under'
+
+
+def test_missing_visual_cache_and_relocated_lyric_sidecar_keep_approval(prepared):
+    _, prep, _, _, gid, _ = prepared
+    promote(prepared)
+    initial = prep.editorial(gid)
+    saved = prep.save_editorial(gid, 'lyric_edit', {**initial, 'approved': True})
+    art_id = saved['id'] + '-output'
+    sidecar = prep.artifact(art_id)
+    prep.db.execute('UPDATE generation_artifacts SET uri=? WHERE id=?', (str(sidecar.parent / 'old-path.json'), art_id))
+    features = prep.submit(gid, 'visuals', {})
+    wait(prep, features['id'])
+    prep.artifact(features['id'] + '-output').unlink()
+    restored = prep.editorial(gid)
+    assert restored['approved'] and restored['words'] == saved['words'] and restored['features'] is None
+    assert prep.artifact(art_id) == sidecar
+    sidecar.unlink()
+    assert prep.editorial(gid)['approved']
+    prep.db.execute("UPDATE generation_artifacts SET metadata_json=json_remove(metadata_json, '$.lyrics_backup_zlib') WHERE id=?", (art_id,))
+    fallback = prep.editorial(gid)
+    assert fallback['lyric_revision_missing'] and not fallback['approved']
+    assert [word['text'] for word in fallback['words']] == ['first', 'line', 'second', 'line']
 
 def test_saved_lighting_has_real_events_and_master_specific_history(prepared):
     service,prep,path,aid,gid,raw=prepared;source=promote(prepared)

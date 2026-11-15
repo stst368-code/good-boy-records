@@ -67,9 +67,15 @@ def test_discovery_idempotent_endpoint_change_stop_restore_and_preferences(app,m
     changed=g.workers.get(entry['id']);assert any(e['address'].endswith('-8190.proxy.runpod.net') for e in changed['runpod']['endpoints'])
     assert changed['defaults']=={'top_k':42} and not changed['enabled'] and not changed['runpod']['auto_allocate']
     rows[0]['status']='EXITED';g.runpod.cycle();assert not g.workers.get(entry['id'])['runpod']['eligible']
+    assert not g.runpod.status()['workers']
+    assert entry['id'] not in {worker['id'] for worker in g.workers.list(refresh=True)}
+    rows[0]['status']='TERMINATED';g.runpod.cycle()
+    assert not g.runpod.status()['workers']
+    assert entry['id'] not in {worker['id'] for worker in g.workers.list()}
     rows[0]['status']='RUNNING';g.runpod.cycle();assert g.workers.get(entry['id'])['runpod']['eligible']
     assert len([e for e in g.workers.entries() if e.get('runpod')])==1
     rows.clear();g.runpod.cycle();assert g.workers.get(entry['id'])['runpod']['state']=='NOT_RETURNED'
+    assert not g.runpod.status()['workers']
 
 
 def test_multiple_independent_pods_unknown_and_403_are_visible_without_allocation(app,monkeypatch):
