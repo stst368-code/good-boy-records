@@ -104,3 +104,11 @@ footer{color:var(--muted);border-top:1px solid var(--line);padding:26px 0 40px;f
 .next-section{margin-top:62px}
 @media(max-width:850px){.instruction-steps{grid-template-columns:1fr;gap:11px}.recipe-header{align-items:stretch;flex-direction:column}.recipe-selection{max-width:none;min-width:0}.evidence-heading{display:block}.evidence-heading p{text-align:left}}
 @media(max-width:600px){.chapter-one{margin-top:46px}.instruction-steps{margin:28px 0 45px}.instruction-step{padding:20px}.recipe-pair,.evidence-columns{grid-template-columns:1fr}.recipe-lab{padding:17px;border-radius:18px}.recipe-variant{padding:17px}.evidence-tabs button{flex:1;padding:10px 12px}.recipe-variant-heading{margin-bottom:12px}.evidence-column pre{max-height:240px}}
+
+
+.recipe-technical{border-top:1px solid var(--line);margin-top:17px;padding-top:14px}
+.recipe-technical summary{color:var(--cyan);cursor:pointer;font-size:.83rem;font-weight:650;list-style-position:inside}
+.recipe-technical summary:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.recipe-technical dl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px 12px;margin:15px 0 0;font-size:.8rem}
+.recipe-technical dt{color:var(--muted)}
+.recipe-technical dd{color:var(--ink);margin:0;text-align:right;overflow-wrap:anywhere}
