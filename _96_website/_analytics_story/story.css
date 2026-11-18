@@ -54,3 +54,53 @@ a:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-off
 footer{color:var(--muted);border-top:1px solid var(--line);padding:26px 0 40px;font-size:.8rem;text-align:center}
 @media(max-width:760px){.comparison{grid-template-columns:1fr;gap:16px;margin-top:30px}.shell{width:min(100% - 28px,1240px)}.site-header{padding:18px 0}.hero{padding-top:44px}.visual{height:205px}.recording .inner{padding:20px}.card-description{min-height:0}.bridge{margin-top:30px}.back{padding:9px 11px;font-size:.83rem}}
 @media(prefers-reduced-motion:reduce){.playing .bar{animation:none}html{scroll-behavior:auto}}
+
+
+/* Chapter 01: narrative explanation and listening comparison. */
+.chapter-one{padding:clamp(50px,7vw,90px) 0 24px;border-top:1px solid var(--line);margin-top:70px}
+.chapter-intro{max-width:760px;margin:0 auto;text-align:center}
+.chapter-intro h2{font-size:clamp(2.4rem,5.3vw,4.8rem);letter-spacing:-.055em;line-height:1.08;margin:18px 0 22px}
+.chapter-intro h2 em{font-style:normal;color:var(--accent)}
+.chapter-intro p{font-size:clamp(1.03rem,1.45vw,1.19rem);line-height:1.7;color:var(--muted);margin:0 auto}
+.chapter-intro p strong{color:var(--ink)}
+.instruction-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:44px 0 70px}
+.instruction-step{padding:27px 25px 29px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,#1c2931,#121a20);min-width:0}
+.step-number{font-size:.73rem;letter-spacing:.15em;color:var(--accent);font-weight:750}
+.instruction-step h3{font-size:1.35rem;letter-spacing:-.025em;margin:17px 0 12px}
+.instruction-step p{color:var(--muted);font-size:.95rem;line-height:1.65;margin:0}
+.instruction-step code{color:#dceadf;background:#293840;padding:1px 5px;border-radius:4px;white-space:nowrap}
+.recipe-lab{padding:clamp(20px,3.7vw,42px);border-radius:24px;border:1px solid #49606c;background:linear-gradient(180deg,#182830 0%,#0f171d 100%)}
+.recipe-header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:28px}
+.recipe-header h3{font-size:clamp(1.6rem,3vw,2.5rem);letter-spacing:-.04em;margin:10px 0}
+.recipe-header p{color:var(--muted);line-height:1.6;max-width:570px;margin:0}
+.recipe-selection{min-width:230px;max-width:320px;flex-shrink:0}
+.recipe-selection,.recipe-variant label{font-size:.8rem;font-weight:700;letter-spacing:.035em;color:var(--muted)}
+.recipe-lab select{display:block;width:100%;margin-top:8px;border:1px solid #506673;border-radius:10px;padding:12px 35px 12px 13px;font-size:.95rem;color:var(--ink);background:#111b22;min-height:45px}
+.recipe-lab select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.recipe-lab select:disabled{opacity:.55}
+.recipe-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.recipe-variant{background:#0b141a;border:1px solid var(--line);padding:22px;border-radius:17px;min-width:0;transition:border-color .15s}
+.recipe-variant.playing{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.recipe-variant-heading{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:22px;color:var(--accent);font-size:.74rem;letter-spacing:.13em;font-weight:800}
+.recipe-variant-heading span:last-child{font-size:.85rem;color:var(--muted);letter-spacing:0;text-transform:none;text-align:right;font-weight:500}
+.recipe-style{min-height:40px;font-size:.87rem;line-height:1.45;color:var(--muted);margin:13px 0 17px}
+.recipe-variant .primary{width:100%}
+.recipe-playback{color:var(--cyan);font-size:.87rem;line-height:1.5;margin:21px 0}
+.recipe-evidence{margin-top:26px;border-top:1px solid var(--line);padding-top:25px}
+.evidence-heading{display:flex;justify-content:space-between;align-items:baseline;gap:16px}
+.evidence-heading h4{font-size:1.3rem;letter-spacing:-.025em;margin:0 0 12px}
+.evidence-heading p{color:var(--muted);font-size:.85rem;line-height:1.5;text-align:right;margin:0 0 12px}
+.evidence-tabs{display:flex;gap:8px;margin:14px 0}
+.evidence-tabs button{border:1px solid var(--line);background:#121f26;color:var(--muted);border-radius:999px;padding:10px 18px;font-weight:700;min-height:42px}
+.evidence-tabs button.selected,.evidence-tabs button[aria-selected="true"]{background:var(--accent);color:#101519;border-color:var(--accent)}
+.evidence-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.evidence-column{background:#0b1318;border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.evidence-column h5{font-size:.83rem;color:var(--accent);text-transform:uppercase;letter-spacing:.12em;margin:0 0 13px}
+.evidence-column pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#d5e2e5;line-height:1.65;font-size:.84rem;max-height:320px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;margin:0}
+.evidence-link{display:inline-block;font-size:.8rem;color:var(--accent);margin-top:15px;text-underline-offset:4px}
+.evidence-link[hidden]{display:none}
+.evidence-explainer{color:var(--muted);font-size:.88rem;line-height:1.6;margin:15px 0 0}
+.recipe-disclaimer{margin:27px 0 0;color:#bdc9cb;font-size:.82rem;line-height:1.55;border-left:3px solid #718b96;padding-left:13px}
+.next-section{margin-top:62px}
+@media(max-width:850px){.instruction-steps{grid-template-columns:1fr;gap:11px}.recipe-header{align-items:stretch;flex-direction:column}.recipe-selection{max-width:none;min-width:0}.evidence-heading{display:block}.evidence-heading p{text-align:left}}
+@media(max-width:600px){.chapter-one{margin-top:46px}.instruction-steps{margin:28px 0 45px}.instruction-step{padding:20px}.recipe-pair,.evidence-columns{grid-template-columns:1fr}.recipe-lab{padding:17px;border-radius:18px}.recipe-variant{padding:17px}.evidence-tabs button{flex:1;padding:10px 12px}.recipe-variant-heading{margin-bottom:12px}.evidence-column pre{max-height:240px}}
