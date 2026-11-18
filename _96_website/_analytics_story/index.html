@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#090e12">
+<title>GBR — How Music Is Made</title>
+<meta name="description" content="Listen to the transformation from a decoded empty latent to a finished Good Boy Records song.">
+<link rel="stylesheet" href="./story.css">
+</head>
+<body>
+<div class="shell">
+  <header class="site-header">
+    <div class="wordmark">GOOD BOY RECORDS</div>
+    <a class="back" href="../">← Back to music</a>
+  </header>
+  <main>
+    <section class="hero" aria-labelledby="opening">
+      <div class="eyebrow">The making of a song · Chapter 00</div>
+      <h1 id="opening">From <em>noise</em><br>to music.</h1>
+      <p>Every song has a beginning. Listen to a decoded, unprocessed MiniMax Music 3 empty latent, then hear a completed recording from the GBR collection.</p>
+    </section>
+    <section class="comparison" aria-label="Before and after audio comparison">
+      <article class="recording" id="noiseCard">
+        <div class="visual" aria-hidden="true"><div class="wave" id="noiseWave"></div></div>
+        <div class="inner">
+          <div class="card-header"><span class="number">01 / BEFORE</span><span class="card-type">Empty latent</span></div>
+          <h2 class="card-title">The starting point</h2>
+          <p class="card-description">Ten seconds of a MiniMax Music 3 empty latent decoded through its VAE, without generation steps or musical conditioning.</p>
+          <div class="controls"><button class="primary" type="button" id="noisePlay" disabled>▶ Listen to the latent</button></div>
+          <p class="meta" id="noiseMeta">Your actual ComfyUI export · 10 seconds · stereo source</p>
+        </div>
+      </article>
+      <article class="recording finished" id="trackCard">
+        <div class="visual" aria-hidden="true"><img class="art" id="songArtwork" alt="" hidden><div class="wave" id="trackWave"></div></div>
+        <div class="inner">
+          <div class="card-header"><span class="number">02 / AFTER</span><span class="card-type">Finished recording</span></div>
+          <h2 class="card-title" id="songTitle">Selecting a song…</h2>
+          <p class="card-description" id="songDescription">A random recording from the public Good Boy Records catalogue.</p>
+          <div class="controls"><button class="primary" type="button" id="trackPlay" disabled>▶ Listen to the song</button><button class="secondary" type="button" id="shuffleSong" disabled>↻ Different song</button></div>
+          <p class="meta">Randomly chosen from the public showcase. Switch to hear another recording.</p>
+        </div>
+      </article>
+    </section>
+    <div class="bridge">How do we get from this… to this?</div>
+    <div class="now-playing" id="playbackStatus" role="status" aria-live="polite">Preparing your listening comparison…</div>
+    <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="playbackProgress"></div></div>
+    <audio id="storyAudio" preload="none"></audio>
+    <section class="next-section" aria-labelledby="nextTitle">
+      <div class="chapter-marker">UP NEXT · CHAPTER 01</div>
+      <h2 id="nextTitle">First, we need to tell the machine what to make.</h2>
+      <p>Lyrics, captions, style and structure guide the generation process. In the next chapter, we'll hear what happens when those instructions change.</p>
+    </section>
+  </main>
+  <footer>GOOD BOY RECORDS · AN INTERACTIVE STORY OF MUSIC GENERATION</footer>
+</div>
+<script src="../showcase-host.js"></script>
+<script src="./latent-audio.js"></script>
+<script src="./story.js" defer></script>
+</body>
+</html>
