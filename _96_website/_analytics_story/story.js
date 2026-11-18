@@ -186,11 +186,40 @@
     $('recipeVariantB').value = comparison.b.id;
     updateRecipe();
   }
+  function showSettings(item, suffix) {
+    const list = $('recipeSettings' + suffix);
+    list.replaceChildren();
+    const generation = item?.generation || {};
+    const rows = [
+      ['Model',item?.model?.name],
+      ['Sampler',generation.sampler],
+      ['Scheduler',generation.scheduler],
+      ['Steps',generation.steps],
+      ['Sampler CFG',generation.samplerCfg],
+      ['Encoder CFG',generation.encoderCfg],
+      ['Top K',generation.topK]
+    ];
+    for (const [name,value] of rows) {
+      if (value === null || value === undefined || value === '') continue;
+      const label = document.createElement('dt');
+      label.textContent = name;
+      const detail = document.createElement('dd');
+      detail.textContent = String(value);
+      list.appendChild(label);
+      list.appendChild(detail);
+    }
+    if (!list.children.length) {
+      const missing = document.createElement('dd');
+      missing.textContent = 'Generation settings not published for this version.';
+      list.appendChild(missing);
+    }
+  }
   function updateRecipe() {
     for (const [key,suffix] of [['a','A'],['b','B']]) {
       const item = comparison[key];
       $('recipeName' + suffix).textContent = item?.displayTitle || item?.title || 'Untitled';
       $('recipeStyle' + suffix).textContent = compareStyles(item);
+      showSettings(item,suffix);
       $('comparePlay' + suffix).disabled = !item?.source;
     }
     $('recipeMatch').textContent = sameWords(comparison.a,comparison.b)
