@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#090e12">
 <title>GBR — How Music Is Made</title>
-<meta name="description" content="Listen to the transformation from a decoded empty latent to a finished Good Boy Records song.">
+<meta name="description" content="Explore real Good Boy Records recordings and their instructions, from empty latent to finished song.">
 <link rel="stylesheet" href="./story.css">
 </head>
 <body>
@@ -46,10 +46,88 @@
     <div class="now-playing" id="playbackStatus" role="status" aria-live="polite">Preparing your listening comparison…</div>
     <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="playbackProgress"></div></div>
     <audio id="storyAudio" preload="none"></audio>
+    <section id="chapter-one" class="chapter-one" aria-labelledby="chapterOneTitle">
+      <div class="chapter-intro">
+        <span class="chapter-marker">CHAPTER 01 · THE INSTRUCTIONS</span>
+        <h2 id="chapterOneTitle">The music starts with <em>words.</em></h2>
+        <p>The model doesn't hear a band playing. GBR gives it written musical instructions and a starting latent. Those instructions describe <strong>what to sing</strong>, <strong>what it should sound like</strong> and <strong>how the song is organised</strong>.</p>
+      </div>
+      <div class="instruction-steps">
+        <article class="instruction-step">
+          <div class="step-number">01 / LYRICS</div>
+          <h3>What should be sung?</h3>
+          <p>Words, ad-libs and vocal cues give the model material for the performance. The words are guidance, not a guarantee of perfect pronunciation.</p>
+        </article>
+        <article class="instruction-step">
+          <div class="step-number">02 / CAPTION</div>
+          <h3>What should it sound like?</h3>
+          <p>A musical description can request instrumentation, arrangement, vocals, pace, mood and production character. It steers the sound rather than strictly controlling it.</p>
+        </article>
+        <article class="instruction-step">
+          <div class="step-number">03 / STRUCTURE</div>
+          <h3>How should it unfold?</h3>
+          <p>Markers such as <code>[verse]</code>, <code>[chorus]</code> and <code>[bridge]</code> suggest the sequence of sections. You can inspect the actual markers in GBR's published lyrics below.</p>
+        </article>
+      </div>
+      <section class="recipe-lab" aria-labelledby="recipeTitle">
+        <div class="recipe-header">
+          <div>
+            <span class="chapter-marker">LISTENING EXPERIMENT · ARCHIVED GBR VERSIONS</span>
+            <h3 id="recipeTitle">One song. Different directions.</h3>
+            <p>Choose a composition, then switch between two published versions. Read what the catalogue tells us about the instructions while you listen.</p>
+          </div>
+          <label class="recipe-selection">Composition
+            <select id="recipeSong" disabled><option>Loading published recordings…</option></select>
+          </label>
+        </div>
+        <div class="recipe-pair">
+          <article class="recipe-variant" id="compareCardA">
+            <div class="recipe-variant-heading"><span>VERSION A</span><span id="recipeNameA">—</span></div>
+            <label for="recipeVariantA">Choose arrangement</label>
+            <select id="recipeVariantA" disabled><option>Loading…</option></select>
+            <p class="recipe-style" id="recipeStyleA">—</p>
+            <button id="comparePlayA" type="button" class="primary" disabled>▶ Listen to A</button>
+          </article>
+          <article class="recipe-variant" id="compareCardB">
+            <div class="recipe-variant-heading"><span>VERSION B</span><span id="recipeNameB">—</span></div>
+            <label for="recipeVariantB">Choose arrangement</label>
+            <select id="recipeVariantB" disabled><option>Loading…</option></select>
+            <p class="recipe-style" id="recipeStyleB">—</p>
+            <button id="comparePlayB" type="button" class="primary" disabled>▶ Listen to B</button>
+          </article>
+        </div>
+        <p class="recipe-playback" id="recipePlayback" aria-live="polite">Choose A or B to hear the actual recordings. Only one recording plays at a time.</p>
+        <div class="recipe-evidence">
+          <div class="evidence-heading">
+            <h4>Look inside the instructions</h4>
+            <p id="recipeMatch">Comparing published catalogue metadata…</p>
+          </div>
+          <div class="evidence-tabs" role="tablist" aria-label="Inspect generation inputs">
+            <button id="evidenceLyrics" role="tab" aria-selected="true" aria-controls="evidencePanel" type="button" class="selected" data-evidence="lyrics">Lyrics</button>
+            <button id="evidenceStructure" role="tab" aria-selected="false" aria-controls="evidencePanel" type="button" data-evidence="structure">Structure</button>
+            <button id="evidenceCaption" role="tab" aria-selected="false" aria-controls="evidencePanel" type="button" data-evidence="caption">Caption</button>
+          </div>
+          <div class="evidence-columns" id="evidencePanel" role="tabpanel" aria-label="Published track inputs">
+            <div class="evidence-column">
+              <h5>Version A</h5>
+              <pre id="recipeEvidenceA">Choose a composition to inspect its lyrics.</pre>
+              <a id="recipeYamlA" class="evidence-link" target="_blank" rel="noopener noreferrer" hidden>View published YAML for A</a>
+            </div>
+            <div class="evidence-column">
+              <h5>Version B</h5>
+              <pre id="recipeEvidenceB">Choose a composition to inspect its lyrics.</pre>
+              <a id="recipeYamlB" class="evidence-link" target="_blank" rel="noopener noreferrer" hidden>View published YAML for B</a>
+            </div>
+          </div>
+          <p id="evidenceExplainer" class="evidence-explainer">These are the lyric texts recorded in GBR's published catalogue.</p>
+        </div>
+        <p class="recipe-disclaimer"><strong>Important:</strong> These are archived versions, not a controlled experiment. Seeds, samplers, models or other parameters may differ. Listening reveals differences, but doesn't prove which instruction caused them.</p>
+      </section>
+    </section>
     <section class="next-section" aria-labelledby="nextTitle">
-      <div class="chapter-marker">UP NEXT · CHAPTER 01</div>
-      <h2 id="nextTitle">First, we need to tell the machine what to make.</h2>
-      <p>Lyrics, captions, style and structure guide the generation process. In the next chapter, we'll hear what happens when those instructions change.</p>
+      <div class="chapter-marker">UP NEXT · CHAPTER 02</div>
+      <h2 id="nextTitle">How does the model turn instructions into sound?</h2>
+      <p>Next we'll follow the generation process from the starting latent through denoising, sampling and decoding, with actual recordings where available.</p>
     </section>
   </main>
   <footer>GOOD BOY RECORDS · AN INTERACTIVE STORY OF MUSIC GENERATION</footer>
