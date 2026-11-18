@@ -17,8 +17,8 @@
   <main>
     <section class="hero" aria-labelledby="opening">
       <div class="eyebrow">The making of a song · Chapter 00</div>
-      <h1 id="opening">From <em>noise</em><br>to music.</h1>
-      <p>Every song has a beginning. Listen to a decoded, unprocessed MiniMax Music 3 empty latent, then hear a completed recording from the GBR collection.</p>
+      <h1 id="opening">From <em>blank</em><br>to music.</h1>
+      <p>Every song has a beginning. Hear a zero-filled MiniMax Music 3 latent decoded as audio, then compare it with a completed recording from the GBR collection. The sampler adds seeded noise later in the process.</p>
     </section>
     <section class="comparison" aria-label="Before and after audio comparison">
       <article class="recording" id="noiseCard">
@@ -26,7 +26,7 @@
         <div class="inner">
           <div class="card-header"><span class="number">01 / BEFORE</span><span class="card-type">Empty latent</span></div>
           <h2 class="card-title">The starting point</h2>
-          <p class="card-description">Ten seconds of a MiniMax Music 3 empty latent decoded through its VAE, without generation steps or musical conditioning.</p>
+          <p class="card-description">Ten seconds of a zero-filled MiniMax Music 3 latent, decoded through its VAE. This is the empty canvas before the sampler adds seeded noise—not a step from the selected finished song.</p>
           <div class="controls"><button class="primary" type="button" id="noisePlay" disabled>▶ Listen to the latent</button></div>
           <p class="meta" id="noiseMeta">Your actual ComfyUI export · 10 seconds · stereo source</p>
         </div>
@@ -126,10 +126,74 @@
         <p class="recipe-disclaimer"><strong>Important:</strong> These are archived versions, not a controlled experiment. Seeds, samplers, models or other parameters may differ. Listening reveals differences, but doesn't prove which instruction caused them.</p>
       </section>
     </section>
+    <section class="chapter-two" id="chapter-two" aria-labelledby="processTitle">
+      <div class="process-intro">
+        <span class="chapter-marker">CHAPTER 02 · THE GENERATION PROCESS</span>
+        <h2 id="processTitle">How does a machine <em>make music?</em></h2>
+        <p>Between written instructions and a finished recording, the model builds an audio representation that a decoder can turn into sound. Follow the actual stages of a MiniMax Music 3 generation.</p>
+      </div>
+      <div class="process-lab">
+        <div class="process-top">
+          <div>
+            <span class="eyebrow">FOLLOW A REAL GBR RECORDING</span>
+            <h3 id="processTrackTitle">Finding a recording…</h3>
+            <p class="process-byline" id="processTrackByline">The settings shown below come from its published generation record.</p>
+          </div>
+          <div class="process-track-select">
+            <label for="processSong">Choose a recording</label>
+            <select id="processSong" disabled><option>Loading catalogue…</option></select>
+            <button type="button" class="secondary" id="processRandom" disabled>↻ Choose another</button>
+          </div>
+        </div>
+        <div class="process-stages" role="group" aria-label="Explore generation stages">
+          <button class="process-stage selected" type="button" data-process-stage="empty" aria-pressed="true"><span>01</span><strong>Blank latent</strong><small>Before sampling</small></button>
+          <button class="process-stage" type="button" data-process-stage="condition" aria-pressed="false"><span>02</span><strong>Conditioning</strong><small>Read the instructions</small></button>
+          <button class="process-stage" type="button" data-process-stage="noise" aria-pressed="false"><span>03</span><strong>Seeded noise</strong><small>Set the starting state</small></button>
+          <button class="process-stage" type="button" data-process-stage="sampling" aria-pressed="false"><span>04</span><strong>Sampling</strong><small>Update the latent</small></button>
+          <button class="process-stage" type="button" data-process-stage="decode" aria-pressed="false"><span>05</span><strong>Decode</strong><small>Turn it into audio</small></button>
+          <button class="process-stage" type="button" data-process-stage="result" aria-pressed="false"><span>06</span><strong>Result</strong><small>Hear the recording</small></button>
+        </div>
+        <div class="process-stage-main">
+          <div class="process-illustration">
+            <div class="process-illustration-top"><span id="processVisualLabel">ZERO-FILLED LATENT</span><span id="processVisualValue">00 / 06</span></div>
+            <div class="process-symbol" id="processSymbol" aria-hidden="true"></div>
+            <p class="process-illustration-note" id="processVisualNote">Conceptual diagram · not a recording or reconstructed intermediate latent</p>
+          </div>
+          <div class="process-explain">
+            <span class="chapter-marker" id="processStageNumber">01 / 06</span>
+            <h3 id="processStageTitle">A blank space for a song.</h3>
+            <p id="processStageText">The generation starts with a zero-filled latent canvas of the required duration.</p>
+            <div class="process-facts" id="processFacts" aria-live="polite"></div>
+          </div>
+        </div>
+        <div class="process-steps-lab" id="processStepsLab" hidden>
+          <div class="process-steps-head">
+            <div><h4>Inside the denoising loop</h4><p>Move through the step count recorded for this song.</p></div>
+            <output id="processStepCount" for="processStepSlider">—</output>
+          </div>
+          <label class="process-slider-label" for="processStepSlider">Illustrative position in the sampling loop</label>
+          <input id="processStepSlider" type="range" min="1" max="30" step="1" value="1">
+          <div class="process-step-ends"><span>First update</span><span>Final update</span></div>
+          <p id="processStepDetail" class="process-step-detail">Intermediate audio is not available for this generation.</p>
+        </div>
+        <div class="process-audio">
+          <div>
+            <h4>Listen to the endpoints</h4>
+            <p>The empty latent audio is a separate ten-second demonstration. The finished song is the selected, actual GBR recording.</p>
+          </div>
+          <div class="process-audio-buttons">
+            <button type="button" class="secondary" id="processPlayEmpty" disabled>▶ Empty latent</button>
+            <button type="button" class="primary" id="processPlayFinished" disabled>▶ Finished song</button>
+          </div>
+          <p class="process-audio-status" id="processAudioStatus" role="status" aria-live="polite">Choose a recording to begin.</p>
+        </div>
+        <p class="process-honesty"><strong>What's real?</strong> Published track settings, the provided empty-latent recording and the selected finished song. The stage visualisation illustrates the algorithm; it is <strong>not</strong> a reconstruction of intermediate audio. Capturing genuine audio at each step requires new instrumented generations.</p>
+      </div>
+    </section>
     <section class="next-section" aria-labelledby="nextTitle">
-      <div class="chapter-marker">UP NEXT · CHAPTER 02</div>
-      <h2 id="nextTitle">How does the model turn instructions into sound?</h2>
-      <p>Next we'll follow the generation process from the starting latent through denoising, sampling and decoding, with actual recordings where available.</p>
+      <div class="chapter-marker">UP NEXT · CHAPTER 03</div>
+      <h2 id="nextTitle">Why can the same instructions produce very different songs?</h2>
+      <p>Samplers, schedulers, CFG and sampling steps change how a generation unfolds. Next we'll explore the actual results of GBR's large sampler-and-scheduler experiment.</p>
     </section>
   </main>
   <footer>GOOD BOY RECORDS · AN INTERACTIVE STORY OF MUSIC GENERATION</footer>
