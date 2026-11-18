@@ -1,1 +1,61 @@
-<!doctype html><html lang="en" class="gbr-analytics"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#080a09"><title>GBR / Signal Observatory</title><link rel="stylesheet" href="./analytics.css?v=20261019-platform1"><link rel="stylesheet" href="../display.css?v=20261023"><script src="../display.js?v=20261023"></script></head><body><div class="lab-shell"><header class="lab-top"><div class="brand"><div class="brand-mark">G<span>✦</span>BR</div><div><small>GOOD BOY RECORDS / RESEARCH DIVISION</small><strong>SIGNAL OBSERVATORY <span class="live-dot"></span></strong></div></div><div class="top-tools"><span id="dataStamp">READING THE ARCHIVE</span><a class="home-link" href="../">↖ RECORD PLAYER</a></div></header><div class="lab-body"><aside class="lab-side"><div class="side-heading">EXPERIMENT DECK <span>00–04</span></div><nav id="nav"><button data-view="explorer" class="active"><span class="idx">00</span><span>Experiment Floor<small>Interactive discovery</small></span><span class="arrow">✧</span></button><button data-view="parameters"><span class="idx">01</span><span>Control room<small>CFG, steps, algorithms</small></span><span class="arrow">↗</span></button><button data-view="audio"><span class="idx">02</span><span>Signal anatomy<small>Inside the FLAC</small></span><span class="arrow">↗</span></button><button data-view="precision"><span class="idx">03</span><span>Compute laboratory<small>Precision and efficiency</small></span><span class="arrow">↗</span></button><button data-view="archive"><span class="idx">04</span><span>The vault<small>Every reviewed generation</small></span><span class="arrow">↗</span></button></nav><div class="side-bottom"><span class="green-led"></span><div><strong id="sideCount">— RECORDINGS</strong><small>HUMAN-RATED / AUDIO-TESTED</small></div></div></aside><main class="workbench"><div class="page-head"><div><div class="eyebrow" id="kicker">LIVE RESEARCH INSTRUMENTS</div><h1 id="headline">The sound of <i>discovery.</i></h1><p id="subtitle">What makes a generation worth keeping?</p></div><div class="dial-ornament" aria-hidden="true"><div class="dial-outer"><div class="dial-inner"><div class="dial-needle"></div></div></div><small>GBR / ANALOGUE DIVISION</small></div></div><section class="filter-bank"><div class="filter-caption">SIGNAL PATH <span>LIVE FILTERS</span></div><div class="filter-grid"><label>FIND A RECORDING<input id="search" type="search" placeholder="Search songs, genres, styles…"></label><label>SONG<select id="song"><option value="">All songs</option></select></label><label>GENRE CLUSTER<select id="cluster"><option value="">All clusters</option></select></label><label>CAPTION SOURCE<select id="captionSource"><option value="">All caption sources</option><option value="sample">MiniMax templates</option><option value="custom">Custom captions</option><option value="missing">Unclassified</option></select></label><label>LISTENING GRADE<select id="grade"><option value="">All grades</option><option value="5">5 / Good</option><option value="4">4 / Above average</option><option value="3">3 / Average</option><option value="2">2 / Below average</option><option value="1">1 / Bad</option><option value="0">0 / Unlistenable (noise)</option></select></label><button id="reset">CLEAR ↺</button></div></section><div id="metrics" class="meters"></div><section id="viewContent" class="view-content"></section><footer>GOOD BOY RECORDS <span>HUMAN OPINION × MACHINE MEASUREMENT · CORRELATION IS NOT CAUSATION</span></footer></main></div></div><div class="scrim" id="scrim" hidden></div><aside class="record-drawer" id="drawer" aria-hidden="true"><div class="drawer-top"><span>THE GENERATION FILE / <span id="drawerId">—</span></span><button id="closeDrawer">CLOSE ×</button></div><div id="drawerBody"></div></aside><script src="../showcase-host.js"></script><script src="./platform.js?v=20261019-platform1" defer></script><script src="./analytics.js?v=20261019-platform1" defer></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#090e12">
+<title>GBR — How Music Is Made</title>
+<meta name="description" content="Listen to the transformation from a decoded empty latent to a finished Good Boy Records song.">
+<link rel="stylesheet" href="./story.css">
+</head>
+<body>
+<div class="shell">
+  <header class="site-header">
+    <div class="wordmark">GOOD BOY RECORDS</div>
+    <a class="back" href="../">← Back to music</a>
+  </header>
+  <main>
+    <section class="hero" aria-labelledby="opening">
+      <div class="eyebrow">The making of a song · Chapter 00</div>
+      <h1 id="opening">From <em>noise</em><br>to music.</h1>
+      <p>Every song has a beginning. Listen to a decoded, unprocessed MiniMax Music 3 empty latent, then hear a completed recording from the GBR collection.</p>
+    </section>
+    <section class="comparison" aria-label="Before and after audio comparison">
+      <article class="recording" id="noiseCard">
+        <div class="visual" aria-hidden="true"><div class="wave" id="noiseWave"></div></div>
+        <div class="inner">
+          <div class="card-header"><span class="number">01 / BEFORE</span><span class="card-type">Empty latent</span></div>
+          <h2 class="card-title">The starting point</h2>
+          <p class="card-description">Ten seconds of a MiniMax Music 3 empty latent decoded through its VAE, without generation steps or musical conditioning.</p>
+          <div class="controls"><button class="primary" type="button" id="noisePlay" disabled>▶ Listen to the latent</button></div>
+          <p class="meta" id="noiseMeta">Your actual ComfyUI export · 10 seconds · stereo source</p>
+        </div>
+      </article>
+      <article class="recording finished" id="trackCard">
+        <div class="visual" aria-hidden="true"><img class="art" id="songArtwork" alt="" hidden><div class="wave" id="trackWave"></div></div>
+        <div class="inner">
+          <div class="card-header"><span class="number">02 / AFTER</span><span class="card-type">Finished recording</span></div>
+          <h2 class="card-title" id="songTitle">Selecting a song…</h2>
+          <p class="card-description" id="songDescription">A random recording from the public Good Boy Records catalogue.</p>
+          <div class="controls"><button class="primary" type="button" id="trackPlay" disabled>▶ Listen to the song</button><button class="secondary" type="button" id="shuffleSong" disabled>↻ Different song</button></div>
+          <p class="meta">Randomly chosen from the public showcase. Switch to hear another recording.</p>
+        </div>
+      </article>
+    </section>
+    <div class="bridge">How do we get from this… to this?</div>
+    <div class="now-playing" id="playbackStatus" role="status" aria-live="polite">Preparing your listening comparison…</div>
+    <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="playbackProgress"></div></div>
+    <audio id="storyAudio" preload="none"></audio>
+    <section class="next-section" aria-labelledby="nextTitle">
+      <div class="chapter-marker">UP NEXT · CHAPTER 01</div>
+      <h2 id="nextTitle">First, we need to tell the machine what to make.</h2>
+      <p>Lyrics, captions, style and structure guide the generation process. In the next chapter, we'll hear what happens when those instructions change.</p>
+    </section>
+  </main>
+  <footer>GOOD BOY RECORDS · AN INTERACTIVE STORY OF MUSIC GENERATION</footer>
+</div>
+<script src="../showcase-host.js"></script>
+<script src="./latent-audio.js"></script>
+<script src="./story.js" defer></script>
+</body>
+</html>
