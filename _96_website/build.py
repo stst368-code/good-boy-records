@@ -78,7 +78,7 @@ def stage(root, target):
     for name in ('index.html', 'landscape.html'):
         shutil.copyfile(root / '_templates/landscape.html', target / name)
     (target / 'analytics').mkdir()
-    for name in ('index.html', 'analytics.js', 'analytics.css', 'platform.js'):
+    for name in ('index.html', 'analytics.js', 'analytics.css', 'platform.js', 'story.js', 'story.css', 'latent-audio.js'):
         shutil.copyfile(root / '_analytics' / name, target / 'analytics' / name)
     destination = target / 'data/analytics'
     destination.mkdir(parents=True)
