@@ -48,7 +48,7 @@ def output_path(root, output):
     if root.is_relative_to(output):
         raise ValueError('Build output cannot replace website source or its parent')
     if output.is_relative_to(root) and output.relative_to(root).parts[0] in {
-        '_templates', '_analytics', '_how_its_made', '_data', '_tools', '_content', '_tests', '_showcase'}:
+        '_templates', '_analytics', '_analytics_story', '_how_its_made', '_data', '_tools', '_content', '_tests', '_showcase'}:
         raise ValueError('Build output cannot replace website content or media')
     if output.exists():
         marker = output / 'build-manifest.json'
@@ -80,6 +80,11 @@ def stage(root, target):
     (target / 'analytics').mkdir()
     for name in ('index.html', 'analytics.js', 'analytics.css', 'platform.js'):
         shutil.copyfile(root / '_analytics' / name, target / 'analytics' / name)
+    # Unlisted standalone story: independent of the existing Analytics workspace.
+    story_target = target / 'analytics-story'
+    story_target.mkdir()
+    for name in ('index.html', 'story.js', 'story.css', 'latent-audio.js'):
+        shutil.copyfile(root / '_analytics_story' / name, story_target / name)
     destination = target / 'data/analytics'
     destination.mkdir(parents=True)
     for name in ('generations.json', 'summary.json', 'cost-analysis.json', 'platform.json'):
