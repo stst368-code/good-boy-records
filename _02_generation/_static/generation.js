@@ -412,15 +412,16 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     $("genStart").disabled = true;
     try {
       const experimental = state.preview?.purpose === "experiment";
-      const started = await api("/generation/start", {
+      const count = state.preview.generation_count ?? state.preview.ready;
+      await api("/generation/start", {
         token: state.token,
         skip_errors: $("genDropErrors").checked,
       });
       invalidate();
-      if (!experimental) dashboard.focusBatch(started.batch_id);
+      if (!experimental) dashboard.showQueue();
       await showPanel(experimental?'experiments':'queue');
       (experimental ? $('genExperimentsTab') : $('genQueueTab')).focus();
-      toast(experimental?"Experiment queued. Results and timings appear under Experiments.":"Batch submitted.");
+      toast(experimental?"Experiment queued. Results and timings appear under Experiments.":`Added ${count.toLocaleString()} generations to the queue.`);
       if (state.remix) {
         const id = state.remix.generation_id;
         try {

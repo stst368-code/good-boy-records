@@ -148,10 +148,51 @@ def main():
             page.wait_for_function("()=>[...document.querySelectorAll('.job-song-text')].some(e=>e.textContent.includes('[chorus]'))")
             assert last.locator('details[open]').count()==2
             assert f.source.read_bytes()==f.original
+
+            submitted_runs=set()
+            expected=2  # The two worker-owned runs above remain in the queue.
+            for count in (100,25):
+                page.locator('#genSetupTab').click()
+                page.locator('#genSelectVisible').click()
+                page.locator('#genCaptionMode').select_option('yaml')
+                page.locator('#genRepetitions').fill(str(count))
+                page.locator('#genPreview').click()
+                page.locator('#genPlan:not([hidden])').wait_for()
+                assert f'{count} generations' in page.locator('#genPlanSummary').inner_text()
+                page.locator('#genQueueTab').click()
+                if count==100:
+                    statuses.get_by_role('tab',name='Completed').click()
+                    page.get_by_role('searchbox',name='Find generation runs').fill('an old search')
+                else:
+                    queue.get_by_role('button',name='Next',exact=True).click()
+                    page.wait_for_function("()=>document.querySelector('.queue-range').textContent.startsWith('51')")
+                page.locator('#genSetupTab').click()
+                with page.expect_response('**/api/generation/start') as added:
+                    page.locator('#genStart').click()
+                batch_id=added.value.json()['batch_id']
+                expected+=count
+                page.wait_for_function('(count)=>document.querySelector("#genRunTab-queued .generation-tab-count").textContent===String(count)',arg=expected)
+                assert statuses.get_by_role('tab',name='Queue').get_attribute('aria-selected')=='true'
+                assert page.get_by_role('searchbox',name='Find generation runs').input_value()==''
+                assert page.locator('.queue-range').inner_text()==f'1–50 of {expected}'
+                assert page.locator('.queue-job-filter').count()==0
+                assert 'batch=' not in requests[-1]
+                added_manifest=verify_plan(f.launched[-1]['manifest'])
+                assert added_manifest['batch_id']==batch_id and len(added_manifest['runs'])==count
+                submitted_runs.update(run['id'] for run in added_manifest['runs'])
+                stored={row['id'] for row in f.app.state.service.db.all("SELECT id FROM generation_runs WHERE status='prepared'")}
+                assert stored==submitted_runs
+            shown=set()
+            for offset in (0,50,100):
+                payload=f.client.get('/api/generation/queue',headers=f.headers,params={'offset':offset}).json()
+                assert payload['counts']['queued']==127
+                shown.update(row['id'] for row in payload['runs'])
+            assert submitted_runs<=shown and len(shown)==127
             assert not errors,errors
             browser.close()
             print(json.dumps({'queue_status_and_steps':'passed','keyboard_tabs_and_times':'passed',
-                              'bulk_cancel':'passed','desktop_mobile':'passed','job_diagnostics':'passed'}))
+                              'bulk_cancel':'passed','desktop_mobile':'passed','job_diagnostics':'passed',
+                              'appending_100_and_25_runs':'passed'}))
     finally:
         if server:server.should_exit=True;thread.join(timeout=10)
         f.doCleanups()

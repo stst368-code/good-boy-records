@@ -212,18 +212,6 @@
   max-width: 340px;
   min-width: 0;
 }
-.queue-job-filter {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.queue-job-filter button {
-  min-height: 36px;
-  padding: 5px 10px;
-  font-size: 12px;
-}
 .queue-actions,
 .queue-pagination {
   display: flex;

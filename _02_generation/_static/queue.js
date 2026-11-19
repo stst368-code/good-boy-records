@@ -118,8 +118,6 @@ export function initQueue({api, toast}) {
   const order = node('select');
   order.setAttribute('aria-label', 'Order queued runs');
   order.append(new Option('Newest jobs first', 'newest'), new Option('Oldest jobs first', 'dispatch'));
-  const scope = node('div', 'queue-job-filter');
-  const scopeText = node('span');
   const toolbar = node('div', 'queue-toolbar-actions');
   const actions = node('div', 'queue-actions');
   const pickAll = node('input');
@@ -145,8 +143,6 @@ export function initQueue({api, toast}) {
   let tab = 'queued';
   let searchText = '';
   let searchTimer;
-  let batchId = null;
-  let revealBatch = false;
   let offset = 0;
   let sequence = 0;
   let pending = null;
@@ -202,17 +198,12 @@ export function initQueue({api, toast}) {
     });
   }, 'queue-cancel');
   const reorder = action => changeQueue(() => api('/generation/queue/order', {
-    action, run_ids: [...selected.keys()], batch_id:batchId,
+    action, run_ids: [...selected.keys()],
   }));
   const promote = button('Move to front', () => reorder('promote'));
   promote.title = 'Move selected queued runs to the front of their jobs';
   const shuffle = button('Shuffle within jobs', () => reorder('shuffle'));
   const range = node('span', 'queue-range');
-  const clearJob = button('All jobs', () => {
-    batchId = null;
-    revealBatch = false;
-    return changePage(0);
-  });
   const previous = button('Previous', () => changePage(offset - pageSize));
   const next = button('Next', () => changePage(offset + pageSize));
   const pager = node('div', 'queue-pagination');
@@ -220,8 +211,7 @@ export function initQueue({api, toast}) {
   const footer = node('div', 'queue-footer');
   footer.append(range, pager);
   actions.append(pickLabel, promote, shuffle, cancel);
-  scope.append(scopeText, clearJob);
-  filters.append(search, order, scope);
+  filters.append(search, order);
   toolbar.append(actions, health);
   content.append(filters, toolbar, notice, table, footer);
   entries[0].panel.append(content);
@@ -269,8 +259,6 @@ export function initQueue({api, toast}) {
     pickAll.indeterminate = checked > 0 && !pickAll.checked;
     actions.hidden = tab !== 'queued' && tab !== 'attention';
     promote.hidden = shuffle.hidden = order.hidden = tab !== 'queued';
-    scope.hidden = !batchId;
-    scopeText.textContent = batchId ? 'Job ' + batchId.slice(0,8) : '';
     cancel.textContent = selected.size ? `Cancel selected (${selected.size})` : 'Cancel selected';
     cancel.disabled = acting || !selected.size;
     promote.disabled = acting || ![...selected.values()].some(run => run.status === 'prepared');
@@ -400,7 +388,6 @@ export function initQueue({api, toast}) {
     if (element.hidden) return;
     const parameters = new URLSearchParams({status:tab,offset,order:order.value});
     if (searchText) parameters.set('q',searchText);
-    if (batchId) parameters.set('batch',batchId);
     const key = parameters.toString();
     if (!force && pending?.key === key) return pending.promise;
     const request = ++sequence;
@@ -411,13 +398,6 @@ export function initQueue({api, toast}) {
     const promise = api('/generation/queue?' + key).then(data => {
       if (request !== sequence) return;
       const count = data.counts[tab];
-      if (revealBatch) {
-        revealBatch = false;
-        if (tab==='queued' && !count) {
-          const actual = ['attention','failed','completed','cancelled'].find(name => data.counts[name]);
-          if (actual) return selectTab(actual);
-        }
-      }
       if (offset && !data.runs.length) {
         offset = Math.max(0, Math.floor((count - 1) / pageSize) * pageSize);
         return refresh();
@@ -442,10 +422,9 @@ export function initQueue({api, toast}) {
   return {
     element,
     refresh,
-    focusBatch(id) {
-      if (!id) return;
-      batchId = id;
-      revealBatch = true;
+    showQueue() {
+      sequence++;
+      pending = null;
       clearTimeout(searchTimer);
       search.value = searchText = '';
       if (tab !== 'queued') selectTab('queued')?.catch(error => toast(error.message));

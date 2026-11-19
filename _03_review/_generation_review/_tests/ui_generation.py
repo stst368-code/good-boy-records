@@ -176,7 +176,8 @@ def main():
                 with page.expect_response('**/api/generation/start') as submitted:
                     page.locator('#genStart').click()
                 batch_id = submitted.value.json()['batch_id']
-                page.locator('.queue-job-filter',has_text=f'Job {batch_id[:8]}').wait_for()
+                page.locator('#genRunTab-queued[aria-selected=true]').wait_for()
+                assert page.locator('.queue-job-filter').count()==0
                 assert page.get_by_role('searchbox',name='Find generation runs').input_value()==''
                 page.get_by_role('tab',name='Completed',exact=False).click()
                 page.locator('.queue-row[data-phase=succeeded]').wait_for()

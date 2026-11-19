@@ -170,7 +170,7 @@ export function initJobs({root:container,api,toast,onQueued}){
     const sequence=++state.sequence,data=await api('/generation/jobs?purpose='+state.purpose);if(sequence!==state.sequence)return;state.jobs=data.jobs;for(const job of data.jobs)if(state.open.has(job.id+'/runs'))await loadRuns(job.id,false,sequence);if(sequence!==state.sequence)return;render();await Promise.all([...root.querySelectorAll('details[open]')].filter(e=>e.refreshLog).map(e=>e.refreshLog()));onQueued?.(data);return data;}
   return {
     refresh,
-    focusBatch: queue.focusBatch,
+    showQueue: queue.showQueue,
     setPurpose(purpose) {
       if (state.purpose === purpose) return;
       state.purpose = purpose;
