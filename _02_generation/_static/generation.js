@@ -3,6 +3,7 @@ import {selectChoices} from "/static/choices.js";
 import {initCaptions} from "/tools/generation/captions.js";
 import {initJobs} from "/tools/generation/jobs.js";
 import {workerLabel} from "/tools/generation/workers.js";
+import {bindMultiSelect} from './selection.js';
 export function initGeneration({api,toast,browse,configureWorkers}) {
   const root=document.getElementById('generationView');
   root.innerHTML=`
@@ -16,13 +17,22 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     <div class="gen-workerbar"><label>Run on<select id="genWorker"><option value="auto">All available workers · shared queue</option></select></label><div class="generation-inline"><button id="genWorkerSettings" type="button">Worker settings</button><button id="genRefreshWorkers" type="button">Refresh availability</button></div><p id="genConnectionStatus" class="subtle small" role="status"></p></div>
     <div class="generation-panel">
     <div class="gen-purpose"><label>Run purpose<select id="genPurpose"><option value="production">Production · send to review</option><option value="experiment">Experiment · keep out of review</option></select></label><label id="genExperimentLabelBox" hidden>Experiment name (optional)<input id="genExperimentLabel" maxlength="160" placeholder="Encoding shortlist / step sweep"></label><p id="genPurposeNote" class="subtle small"></p></div>
-    <h2>Tracks</h2><label>Writing catalogue<div class="generation-inline"><input id="genRoot"><button id="genBrowse" type="button">Browse</button><button id="genScan" type="button">Load</button></div></label>
+    <div id="genCatalogue"><h2>Tracks</h2><label>Writing catalogue<div class="generation-inline"><input id="genRoot"><button id="genBrowse" type="button">Browse</button><button id="genScan" type="button">Load</button></div></label>
     <div class="generation-inline"><label class="flex">Find a song or file<input id="genSearch" type="search"></label><label>Album<select id="genAlbum"><option value="">All albums</option></select></label></div>
     <div class="generation-inline"><button id="genSelectVisible" type="button">Select shown</button><button id="genClear" type="button">Clear</button><span id="genSelected" class="subtle small"></span></div><div id="genFiles" class="generation-files" aria-label="Writing inputs"></div>
-    <details><summary>Selection and order</summary><label>Run order<select id="genOrder"><option value="selection">Selection order</option><option value="filename">Filename</option><option value="album">Album track order</option></select></label><label class="generation-check"><input id="genLowRated" type="checkbox">Only tracks with low saved ratings</label><div class="generation-fields"><label>Mean rating at or below<input id="genRatingMax" type="number" min="0" max="5" step="0.1" value="3"></label><label>Review cluster<select id="genRatingCluster"><option value="">Any cluster</option></select></label><label>Review style<select id="genRatingStyle"><option value="">Any style</option></select></label></div></details>
+    <p class="subtle small selection-help">Drag across rows or Shift-click to select a range.</p>
+    <details><summary>Selection and order</summary><label>Run order<select id="genOrder"><option value="selection">Selection order</option><option value="filename">Filename</option><option value="album">Album track order</option></select></label><label class="generation-check"><input id="genLowRated" type="checkbox">Only tracks with low saved ratings</label><div class="generation-fields"><label>Mean rating at or below<input id="genRatingMax" type="number" min="0" max="5" step="0.1" value="3"></label><label>Review cluster<select id="genRatingCluster"><option value="">Any cluster</option></select></label><label>Review style<select id="genRatingStyle"><option value="">Any style</option></select></label></div></details></div>
+    <section id="genRemix" class="generation-remix" hidden aria-label="Remix editor">
+      <div class="generation-queue-heading"><h2 id="genRemixHeading">Remix</h2><button id="genRemixExit" type="button">Back to catalogue</button></div>
+      <p id="genRemixNote" class="subtle small"></p>
+      <label>Saved remix versions<select id="genRemixVersion"></select></label>
+      <label>Track title<input id="genRemixTitle" maxlength="1000"></label>
+      <div class="generation-remix-text"><label>Lyrics<textarea id="genRemixLyrics" rows="16" spellcheck="false"></textarea></label><label>Caption<textarea id="genRemixCaption" rows="16" spellcheck="false"></textarea></label></div>
+      <details><summary>Song details</summary><div class="generation-fields"><label>Cluster<input id="genRemixCluster"></label><label>Style<input id="genRemixStyle"></label><label>Language<input id="genRemixLanguage"></label><label>Explicit<select id="genRemixExplicit"><option value="">Unspecified</option><option value="no">No</option><option value="yes">Yes</option></select></label></div><label>Story<textarea id="genRemixStory" rows="3"></textarea></label></details>
+    </section>
 
       <div class="generation-modules">
-    <section class="generation-module"><h2>Captions</h2><div class="generation-fields"><label>Caption source<select id="genCaptionMode"><option value="random">Random templates</option><option value="mix">Mix selected captions</option><option value="yaml">YAML caption</option><option value="catalogue">Catalogue style</option></select></label><label>Captions per track<input id="genCaptionCount" type="number" min="1" max="1000" value="1"></label></div><div id="genCaptionPool"><h3 class="caption-pool-title">Template clusters</h3><div id="genCaptionClusters"></div></div></section>
+    <section id="genCaptionTemplates" class="generation-module"><h2>Captions</h2><div class="generation-fields"><label>Caption source<select id="genCaptionMode"><option value="random">Random templates</option><option value="mix">Mix selected captions</option><option value="yaml">YAML caption</option><option value="catalogue">Catalogue style</option></select></label><label>Captions per track<input id="genCaptionCount" type="number" min="1" max="1000" value="1"></label></div><div id="genCaptionPool"><h3 class="caption-pool-title">Template clusters</h3><div id="genCaptionClusters"></div></div></section>
     <section class="generation-module"><h2>Output</h2><div class="generation-fields"><label>Generations per combination<input id="genRepetitions" type="number" min="1" max="10000" value="1"></label><label>Output grouping<select id="genLayout"><option value="single">Single inbox</option><option value="track">By track</option><option value="album">By album</option></select></label></div><p id="genOutput" class="subtle small"></p></section>
         <details class="generation-advanced">
           <summary>Advanced model and sampling settings</summary>
@@ -124,7 +134,90 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
   }
   function preferences(){return {worker_id:$('genWorker').value,input_root:$('genRoot').value,parameters:parameters(),controls:controlSettings(),layout:$('genLayout').value};}
   function invalidate(){state.revision++;state.token=null;state.preview=null;$('genPlan').hidden=true;estimate();}
-  function estimate(){purposeNotice();$('genCaptionPool').hidden=!['random','mix'].includes($('genCaptionMode').value);$('genCaptionCount').disabled=!['random','mix'].includes($('genCaptionMode').value);for(const group of pairs)$(group.container).hidden=$(group.mode).value!=='pairs';try{const e=experiments();let n=e.groups.reduce((n,g)=>n*g.length,1);for(const value of Object.values(e.sweeps))n*=typeof value==='object'?Math.max(0,Math.floor((Number(value.stop)-Number(value.start))/Number(value.step)+1+1e-8)):value.split(',').length;if(e.strategy==='sample')n=e.samples;const captions=!['random','mix'].includes($('genCaptionMode').value)?1:Number($('genCaptionCount').value);$('genEstimate').textContent=`Estimated ${state.selected.size*captions*n*e.repetitions} generations · ${state.selected.size} tracks × ${captions} captions × ${n} combinations × ${e.repetitions} repeats. Each job runs once on a compatible worker.`;}catch{$('genEstimate').textContent='Complete the selected ranges and combinations to estimate the batch.';}$('genSamplesLabel').hidden=$('genStrategy').value!=='sample';}
+  function estimate() {
+    purposeNotice();
+    $('genCatalogue').hidden = Boolean(state.remix);
+    $('genRemix').hidden = !state.remix;
+    $('genCaptionTemplates').hidden = Boolean(state.remix);
+    $('genPreview').textContent = state.remix ? 'Check remix' : 'Check selected tracks';
+    $('genStart').textContent = state.remix ? 'Queue remix' : 'Generate checked tracks';
+    $('genCaptionPool').hidden = !['random','mix'].includes($('genCaptionMode').value);
+    $('genCaptionCount').disabled = !['random','mix'].includes($('genCaptionMode').value);
+    for (const group of pairs) $(group.container).hidden = $(group.mode).value !== 'pairs';
+    try {
+      const experiment = experiments();
+      let combinations = experiment.groups.reduce((count,group)=>count*group.length,1);
+      for (const value of Object.values(experiment.sweeps)) {
+        combinations *= typeof value === 'object'
+          ? Math.max(0,Math.floor((Number(value.stop)-Number(value.start))/Number(value.step)+1+1e-8))
+          : value.split(',').length;
+      }
+      if (experiment.strategy === 'sample') combinations = experiment.samples;
+      const captions = state.remix || !['random','mix'].includes($('genCaptionMode').value) ? 1 : Number($('genCaptionCount').value);
+      const tracks = state.remix ? 1 : state.selected.size;
+      $('genEstimate').textContent = `Estimated ${tracks*captions*combinations*experiment.repetitions} generations · ${tracks} tracks × ${captions} captions × ${combinations} combinations × ${experiment.repetitions} repeats.`;
+    } catch {
+      $('genEstimate').textContent = 'Complete the selected ranges and combinations to estimate the batch.';
+    }
+    $('genSamplesLabel').hidden = $('genStrategy').value !== 'sample';
+  }
+
+  const remixFields = {title:'Title',lyrics:'Lyrics',caption:'Caption',cluster:'Cluster',style:'Style',language:'Language',explicit:'Explicit',story:'Story'};
+  let catalogueControls = null;
+  let remixSequence = 0;
+  function remixVersions(source) {
+    const versions = $('genRemixVersion');
+    versions.replaceChildren(new Option('Original recording',''));
+    for (const version of source.versions) versions.append(new Option(
+      new Date(version.created_at).toLocaleString() + ' · ' + version.generations + ' generations · ' + version.batch_id.slice(0,8),version.batch_id));
+    versions.value = source.revision || '';
+  }
+  async function loadRemix(generationId,revision=null) {
+    const sequence = ++remixSequence;
+    const query = revision ? '?' + new URLSearchParams({revision}) : '';
+    const source = await api('/generation/remix/' + generationId + query);
+    if (sequence !== remixSequence) return;
+    if (!state.remix) catalogueControls = {controls:controlSettings(),purpose:$('genPurpose').value};
+    state.remix = source;
+    for (const [key,name] of Object.entries(remixFields)) $('genRemix'+name).value = source.fields[key] || '';
+    $('genRemixHeading').textContent = 'Remix · ' + source.fields.title;
+    $('genRemixNote').textContent = 'Lyrics and captions are saved as a version with each queued remix. Use the controls below for a fixed setting, a list such as 30,35, or a range.'
+      + (source.missing_parameters.length ? ' Unrecorded settings use worker defaults or automatic seeds. Missing values include ' + source.missing_parameters.join(', ') + '.' : ' The recorded generation settings and seeds are loaded.');
+    remixVersions(source);
+    for (const [key,id] of numericFields) {
+      const value = source.parameters[key];
+      $(id+'Mode').value = value == null ? 'yaml' : 'fixed';
+      $(id).value = value ?? (key.endsWith('_seed') ? 'auto' : $(id).defaultValue);
+      $(id+'List').value = '';
+      $(id+'Mode').dispatchEvent(new Event('change'));
+    }
+    for (const group of pairs) {
+      $(group.container).replaceChildren();
+      addPair(group,source.parameters);
+      $(group.mode).value = 'pairs';
+    }
+    $('genCaptionMode').value = 'yaml';
+    $('genCaptionCount').value = $('genRepetitions').value = '1';
+    $('genSeedPolicy').value = 'preserve';
+    $('genStrategy').value = 'grid';
+    $('genPurpose').value = 'production';
+    $('genCache').value = 'prefer';
+    root.querySelector('.generation-advanced').open = true;
+    invalidate();
+    await showPanel('setup');
+    $('genRemixTitle').focus();
+  }
+  $('genRemixVersion').onchange = guarded(()=>loadRemix(state.remix.generation_id,$('genRemixVersion').value || null));
+  $('genRemixExit').onclick = () => {
+    remixSequence++;
+    state.remix = null;
+    if (catalogueControls) {
+      restoreControls(catalogueControls.controls);
+      $('genPurpose').value = catalogueControls.purpose;
+      catalogueControls = null;
+    }
+    invalidate();
+  };
   function purposeNotice(){const experimental=$('genPurpose').value==='experiment';$('genExperimentLabelBox').hidden=!experimental;$('genPurposeNote').textContent=experimental?'Saved separately with timings, hardware and cache data. Listen here, then send only the results you want to review.':'Completed songs enter the review inbox.';if(state.paths)$('genOutput').textContent=experimental?`Experiments: ${state.paths.experiment_root} · one folder per batch. Encoding caches stay with their worker.`:`Inbox: ${state.paths.output_root}. Each generation keeps its FLAC, completed YAML, source and report together until review.`;}
   $('genPurpose').onchange=()=>{if($('genPurpose').value==='experiment'&&$('genSeedPolicy').value==='preserve')$('genSeedPolicy').value='shared';invalidate();};
   async function save(){return api('/generation/preferences',preferences());}
@@ -148,15 +241,10 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     for (const row of shown) {
       const label = document.createElement("label");
       label.className = "generation-file";
+      label.dataset.selectionKey = row.relative;
       const check = document.createElement("input");
       check.type = "checkbox";
       check.checked = state.selected.has(row.relative);
-      check.onchange = () => {
-        if (check.checked) state.selected.add(row.relative);
-        else state.selected.delete(row.relative);
-        invalidate();
-        paintSelected();
-      };
       const text = document.createElement("span");
       const title = document.createElement("strong");
       title.textContent = row.title;
@@ -166,6 +254,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
       label.append(check, text);
       $("genFiles").append(label);
     }
+    fileSelection.sync();
     paintSelected();
   }
   function paintSelected() {
@@ -173,6 +262,14 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     $("genSelected").textContent =
       `${state.selected.size} selected · ${visible().length} shown / ${state.rows.length}`;
   }
+  const fileSelection = bindMultiSelect({
+    container:$('genFiles'),
+    rows:()=>[...$('genFiles').children],
+    key:row=>row.dataset.selectionKey,
+    selected:id=>state.selected.has(id),
+    select:(id,checked)=>checked ? state.selected.add(id) : state.selected.delete(id),
+    changed:()=>{invalidate();paintSelected();},
+  });
   function clearCatalogue() {
     state.scanSequence++;
     state.catalogueRoot = null;
@@ -228,20 +325,20 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
       !plan.ready || Boolean(plan.invalid && !$("genDropErrors").checked);
   }
   async function preview() {
-    if (!state.catalogueRoot || $("genRoot").value.trim() !== state.catalogueRoot)
+    if (!state.remix && (!state.catalogueRoot || $("genRoot").value.trim() !== state.catalogueRoot))
       throw new Error("Load the writing catalogue before checking tracks.");
-    if (!state.selected.size)
+    if (!state.remix && !state.selected.size)
       throw new Error("Select one or more writing YAMLs first.");
     if(['random','mix'].includes($('genCaptionMode').value)&&!captionPicker.ids().length)throw new Error('Turn on at least one caption cluster.');
-    const loadedRoot = state.catalogueRoot, files = [...state.selected];
+    const loadedRoot = state.catalogueRoot, files = state.remix ? [] : [...state.selected];
     const requestedWorker = $('genWorker').value;
-    await save();
-    if (loadedRoot !== state.catalogueRoot || $("genRoot").value.trim() !== loadedRoot)
+    if (!state.remix) await save();
+    if (!state.remix && (loadedRoot !== state.catalogueRoot || $("genRoot").value.trim() !== loadedRoot))
       throw new Error("Writing folder changed. Load it again before checking tracks.");
     const body = {
       purpose: $('genPurpose').value,
       experiment_label: $('genExperimentLabel').value.trim(),
-      input_root: loadedRoot,
+      input_root: loadedRoot || '',
       worker_id: requestedWorker,
       files,
       order: $("genOrder").value,
@@ -254,7 +351,12 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
       experiments: experiments(),
       encoding_cache: $("genCache").value,
       layout: $("genLayout").value,
-      rating_filter: $("genLowRated").checked
+      remix: state.remix ? {
+        generation_id:state.remix.generation_id,revision:state.remix.revision,
+        fields:Object.fromEntries(Object.entries(remixFields).map(([key,name])=>[key,$('genRemix'+name).value])),
+      } : null,
+      model_revision:state.remix?.model_revision || null,
+      rating_filter: !state.remix && $("genLowRated").checked
         ? {
             threshold: Number($("genRatingMax").value),
             cluster: $("genRatingCluster").value.trim() || null,
@@ -264,7 +366,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     };
     const revision = state.revision;
     const result = await api("/generation/preview", body);
-    if (revision !== state.revision || loadedRoot !== state.catalogueRoot || $("genRoot").value.trim() !== loadedRoot) return;
+    if (revision !== state.revision || !state.remix && (loadedRoot !== state.catalogueRoot || $("genRoot").value.trim() !== loadedRoot)) return;
     $("genConnectionStatus").textContent = `Batch checked · ${result.generation_count} configurations · ${result.workers?.length||1} worker(s)`;
     state.preview = result;
     state.token = state.preview.token;
@@ -319,6 +421,18 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
       await showPanel(experimental?'experiments':'queue');
       (experimental ? $('genExperimentsTab') : $('genQueueTab')).focus();
       toast(experimental?"Experiment queued. Results and timings appear under Experiments.":"Batch submitted.");
+      if (state.remix) {
+        const id = state.remix.generation_id;
+        try {
+          const source = await api('/generation/remix/' + id);
+          if (state.remix?.generation_id === id) {
+            state.remix.versions = source.versions;
+            remixVersions(state.remix);
+          }
+        } catch {
+          toast('Remix queued. Reopen Remix to refresh its saved history.');
+        }
+      }
     } finally {
       state.busy = false;
     }
@@ -335,6 +449,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     )
       element.addEventListener("input", invalidate);
   return {
+    remix:loadRemix,
     reloadWorkers,
     close() {
       clearInterval(state.poll);

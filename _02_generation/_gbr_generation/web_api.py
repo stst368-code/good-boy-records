@@ -99,6 +99,12 @@ class RatingFilter(Body):
     style: str | None = Field(default=None, max_length=1000)
 
 
+class Remix(Body):
+    generation_id: str = Field(pattern=r'^[0-9a-f]{64}$')
+    revision: str | None = Field(default=None,pattern=r'^[0-9a-f]{32}$')
+    fields: dict[str,str] = Field(default_factory=dict,max_length=8)
+
+
 class Preview(Body):
     input_root: str
     purpose: Literal['production','experiment'] = 'production'
@@ -129,6 +135,7 @@ class Preview(Body):
     rerun: dict = Field(default_factory=dict)
     parent_review_generation_id: str | None = None
     request_id: str | None = Field(default=None, min_length=1, max_length=1000)
+    remix: Remix | None = None
 
 
 class Start(Body):
@@ -270,6 +277,11 @@ def router(root, review_service, local):
             raise ValueError('Cannot connect to the generation worker: ' + str(exc.reason)) from None
         except OSError as exc:
             raise ValueError('Cannot read a writing input or caption reference: ' + str(exc)) from None
+
+    @routes.get('/remix/{generation_id}')
+    def remix_source(generation_id:str,revision:str|None=Query(default=None,pattern=r'^[0-9a-f]{32}$')):
+        from .remix import Remixes
+        return Remixes(service).source(generation_id,revision)
 
     @routes.post('/start')
     def start(body: Start):

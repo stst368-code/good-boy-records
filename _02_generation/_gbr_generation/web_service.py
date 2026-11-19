@@ -175,9 +175,23 @@ class GenerationService:
             data['connection'] = connection
         else:
             raise ValueError('Select a saved worker or Automatic')
-        catalogue = Catalogue(self.catalogue_root(data.get('input_root')))
-        selected = catalogue.select(all_inputs=data.get('all_inputs', False), songs=data.get('songs', []),
-            albums=data.get('albums', []), files=data.get('files', []), order=data.get('order', 'selection'))
+        remix_source = None
+        if data.get('remix'):
+            from types import SimpleNamespace
+            from .remix import Remixes
+            item,remix_source = Remixes(self).input(data['remix'])
+            selected = [item]
+            catalogue = SimpleNamespace(root=self.runtime/'remixes')
+            data['parent_review_generation_id'] = remix_source['generation_id']
+            data['caption_mode'] = 'yaml'
+            data['caption_count'] = 1
+            data['template_id'] = None
+            if not data.get('model_revision'):
+                data['model_revision'] = remix_source['model_revision']
+        else:
+            catalogue = Catalogue(self.catalogue_root(data.get('input_root')))
+            selected = catalogue.select(all_inputs=data.get('all_inputs', False), songs=data.get('songs', []),
+                albums=data.get('albums', []), files=data.get('files', []), order=data.get('order', 'selection'))
         rating_filter = data.get('rating_filter')
         rating_evidence = None
         if rating_filter:
@@ -202,6 +216,12 @@ class GenerationService:
             spec['field_precedence'] = data['field_precedence']
         self.parameter_sources(spec,data)
         reference_root, styles = self.styles()
+        if remix_source:
+            # A hand-edited caption defines its own style pair without needing
+            # a reusable template in the caption catalogue.
+            fields = {**remix_source['fields'],**data['remix'].get('fields',{})}
+            if fields['cluster'] and fields['style'] and not styles.candidates(fields['cluster'],fields['style']):
+                styles.rows.append({'ID':'remix-source','cluster':fields['cluster'],'style_primary':fields['style']})
         caption_templates=data.get('caption_templates')
         if caption_templates is not None and data.get('caption_mode') in {'random','mix'} and not data.get('template_id'):
             if not caption_templates:raise ValueError('Turn on at least one caption cluster or template')
@@ -393,7 +413,7 @@ class GenerationService:
                 'launcher': (data.get('_worker') or {}).get('launcher'),
                 'workers':data.get('_pool'),
                 'root': catalogue.root, 'layout': data.get('layout', 'single'),
-                'selection': {key: data.get(key) for key in ('purpose','experiment_label','worker_id','files', 'all_inputs', 'songs', 'albums', 'order', 'rating_filter', 'parameter_priority', 'template_id', 'catalogue_captions', 'caption_mode', 'caption_count', 'caption_cluster', 'caption_style','caption_templates', 'experiments')}}
+                'selection': {key: data.get(key) for key in ('purpose','experiment_label','worker_id','files', 'all_inputs', 'songs', 'albums', 'order', 'rating_filter', 'parameter_priority', 'template_id', 'catalogue_captions', 'caption_mode', 'caption_count', 'caption_cluster', 'caption_style','caption_templates', 'experiments','remix')}}
             self.previews[token]['selection']['resolved_worker_id']=(data.get('_worker') or {}).get('id',connection_key(connection))
             if rating_evidence is not None:
                 self.previews[token]['selection']['review_filter'] = rating_evidence

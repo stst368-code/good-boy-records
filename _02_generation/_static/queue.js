@@ -1,4 +1,5 @@
 import {bindTabs} from './tabs.js';
+import {bindMultiSelect} from './selection.js';
 
 const tabs = [
   ['queued', 'Queue', 'No runs in the queue.'],
@@ -155,6 +156,17 @@ export function initQueue({api, toast}) {
   let acting = false;
   let lastUpdate = null;
   const rows = new Map();
+  const selection = bindMultiSelect({
+    container:table,
+    rows:()=>acting ? [] : [...body.children].filter(row=>displayed.some(run=>run.id===row.dataset.run && cancellable(run))),
+    key:row=>row.dataset.run,
+    selected:id=>selected.has(id),
+    select(id,checked) {
+      if (checked) selected.set(id,displayed.find(run=>run.id===id));
+      else selected.delete(id);
+    },
+    changed:syncSelection,
+  });
 
   function button(title, handler, className = '') {
     const control = node('button', className, title);
@@ -267,6 +279,7 @@ export function initQueue({api, toast}) {
       row.pick.checked = selected.has(id);
       row.pick.disabled = acting;
     }
+    selection.sync();
   }
 
   pickAll.onchange = () => {

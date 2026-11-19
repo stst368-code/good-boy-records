@@ -83,6 +83,8 @@ function paintRatings(){
   $('retryReview').hidden = !state.autoSubmit || !state.saveError || state.reservationLost || state.advancePending;
   $('retryReview').disabled = busy;
   $('reason').disabled = state.loadingReview || state.submitting || state.advancePending;
+  $('remixTrack').hidden = !state.track || !state.canConfigure;
+  $('remixTrack').disabled = busy;
   $('autoSubmit').disabled = $('reason').disabled;
   paintFlags();
   reviewTags.setDisabled(!state.track || $('reason').disabled || state.reservationLost);
@@ -527,6 +529,13 @@ function openTool(name) {
   }
   return openings.get(name);
 }
+
+async function remixTrack(generationId) {
+  await navigate('generation');
+  const generation = await loadTool('generation');
+  await generation.remix(generationId);
+}
+$('remixTrack').onclick = guarded(() => state.track && remixTrack(state.track.id));
 
 function restorePreparation() {
   if ($('preparationView').parentElement?.id === 'libraryEditorContainer') preparationAnchor.after($('preparationView'));
@@ -1148,6 +1157,13 @@ function candidateRow(item, list, index) {
     $('compare').disabled = state.chosen.length !== 2;
   };
   actions.append(reassess, select, bookmark, details, reference, compareLabel);
+  if (state.canConfigure) {
+    const remix = document.createElement('button');
+    remix.type = 'button';
+    remix.textContent = 'Remix';
+    remix.onclick = guarded(() => remixTrack(item.generation_id));
+    actions.append(remix);
+  }
   card.append(playButton(list, index), title, actions);
   return card;
 }
