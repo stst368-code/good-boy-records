@@ -148,6 +148,8 @@ def router(root,review,preparation,local):
     def reset(gid:str):return service.showcase.reset(gid)
     @routes.post('/{identifier}/publish')
     def publish(identifier:str,body:Publish|None=None):return service.start_publish(identifier,body.visibility if body else None)
+    @routes.post('/tasks/{identifier}/retry')
+    def retry(identifier:str):return service.retry(identifier)
     @routes.post('/{identifier}/discard')
     def discard(identifier:str):return service.discard(identifier)
     @routes.post('/{identifier}/retry-archive')

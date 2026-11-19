@@ -153,6 +153,7 @@ class Publisher:
         self.library=Library(self)
         from .library_import import LibraryImport
         self.library_import=LibraryImport(self)
+        preparation.publisher=self
         # Interrupted requests are never replayed automatically. Publish retries
         # reconcile the remote pointer before changing local release state.
         if preparation.enabled:
@@ -371,17 +372,18 @@ class Publisher:
 
     def releases(self):
         if not self.prep.enabled:return []
-        rows=self.db.all("""SELECT t.id,t.generation_id,g.audio_id,t.kind,t.status,t.error,t.recipe_json,t.telemetry_json,t.created_at
-            FROM processing_tasks t JOIN generations g ON g.id=t.generation_id
+        rows=self.db.all("""SELECT t.id,t.generation_id,g.audio_id,t.kind,t.status,t.error,t.recipe_json,t.telemetry_json,t.created_at,s.title AS source_title
+            FROM processing_tasks t JOIN generations g ON g.id=t.generation_id JOIN songs s ON s.id=g.song_id
             WHERE t.kind IN ('release_prepare','release_publish','showcase_move') ORDER BY t.rowid DESC LIMIT 100""")
         for row in rows:
             recipe=json.loads(row.pop('recipe_json'));row['progress']=json.loads(row.pop('telemetry_json'))
-            row['title']=recipe.get('track',{}).get('displayTitle') or (recipe.get('legacy_track') or {}).get('displayTitle') or recipe.get('title','Release')
+            source_title=row.pop('source_title')
+            row['title']=recipe.get('track',{}).get('displayTitle') or (recipe.get('legacy_track') or {}).get('displayTitle') or recipe.get('title') or display_title(source_title or 'Release')
             row['legacy_migration']=bool(recipe.get('legacy_root'))
             row['prepared_id']=recipe.get('prepared_id');row['track']=recipe.get('track')
             row['visibility']=recipe.get('visibility') or recipe.get('options',{}).get('visibility','public')
             row['files']=recipe.get('files',[])
-            row['can_retry']=row['kind']=='release_publish' and row['status'] in {'failed','interrupted'}
+            row['can_retry']=row['kind'] in {'release_prepare','release_publish'} and row['status'] in {'failed','interrupted'}
             row['retained']=self.retained_preview(row['id'],row['generation_id'],recipe) if row['kind']=='release_prepare' else False
         return rows
 
@@ -412,13 +414,45 @@ class Publisher:
                          VALUES(?,?,'release_prepare','queued',?,?,?,?)''',(identifier,gid,identifier,canonical(options),digest(source),now()))
         self.pool.submit(self._prepare,identifier);return {'id':identifier}
 
+    def retry(self,identifier):
+        """Resume a failed release through its publisher, preserving its intent."""
+        self.prep.require()
+        with self.lock:
+            task=self.db.one("SELECT * FROM processing_tasks WHERE id=? AND kind IN ('release_prepare','release_publish')",(identifier,))
+            if not task:raise KeyError('Release task not found')
+            if task['status'] not in {'failed','interrupted'}:
+                raise ValueError('Only a failed or interrupted release can be retried')
+            recipe=json.loads(task['recipe_json'])
+            if task['kind']=='release_publish':
+                result=self.start_publish(recipe['prepared_id'],recipe.get('visibility'))
+            else:
+                gid=task['generation_id']
+                active=self.db.one("SELECT id FROM processing_tasks WHERE generation_id=? AND kind IN ('release_prepare','release_publish') AND status IN ('queued','running') ORDER BY rowid DESC LIMIT 1",(gid,))
+                if active:return {'id':active['id'],'previous_task_id':identifier}
+                # Early failures retain the input options; later failures may
+                # already contain a built preview with those options nested.
+                options=recipe.get('options',recipe)
+                _,source=self.prep.source(gid,artifact_id=options.get('master_id'))
+                if digest(source)!=task['input_sha256']:
+                    raise ValueError('Release audio changed; finish Preparation again to create a new release')
+                if options.get('complete_publish'):result=self.start_complete(gid,options)
+                elif options.get('finish_preparation'):result=self.finish_preparation(gid,options)
+                else:result=self.start_prepare(gid,options)
+            return {**result,'previous_task_id':identifier}
+
     def progress(self,identifier,**data):
         self.db.execute('UPDATE processing_tasks SET telemetry_json=? WHERE id=?',(canonical(data),identifier))
 
     def catalogue_song(self,meta):
-        with (self.root/'_01_writing/_built/track_list.csv').open(encoding='utf-8-sig',newline='') as stream:
-            matches=[r for r in csv.DictReader(stream) if str(r.get('song_id'))==str(meta.get('song_id'))]
-        if len(matches)!=1:raise ValueError('Song ID must match exactly one master catalogue row')
+        from _review.song_names import identifier
+        sid=identifier(str(meta.get('song_id') or '').strip())
+        if not sid:raise ValueError('Choose a valid Song ID in Preparation → YAML details')
+        path=self.root/'_01_writing/_built/track_list.csv'
+        if not path.is_file():raise ValueError(f'Master catalogue is unavailable at {path}. Update this checkout before retrying preparation.')
+        with path.open(encoding='utf-8-sig',newline='') as stream:
+            matches=[r for r in csv.DictReader(stream) if identifier(str(r.get('song_id') or '').strip())==sid]
+        if not matches:raise ValueError(f'Song ID {sid} is missing from the master catalogue at {path}. Update this checkout, or choose a listed song in Preparation → YAML details.')
+        if len(matches)>1:raise ValueError(f'Song ID {sid} matches {len(matches)} master catalogue rows at {path}. Each Song ID must have exactly one entry.')
         song=matches[0];title=song.get('song_name') or song.get('title')
         if not title:raise ValueError('Master catalogue title is missing')
         return song,title

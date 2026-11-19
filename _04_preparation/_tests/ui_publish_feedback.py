@@ -9,17 +9,18 @@ ROOT=Path(__file__).resolve().parents[2]
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--browser',required=True);args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--browser',required=True);parser.add_argument('--width',type=int,action='append');args=parser.parse_args()
     module=(ROOT/'_04_preparation/_static/publishing.js').read_text(encoding='utf-8')
     html='''<main id="publishingView"></main><section id="hostSettings"></section>
 <script type="module">
 import {initPublishing} from '/publishing.js';
 const projects=['first','second'].map(id=>({prepared_id:id,can_return:true,track:{displayTitle:id,genre:{parent_genre:'Rock'}},options:{},files:[{content_type:'audio/mpeg'}]}));
-window.fixture={projects,calls:[],posts:{},delay:0};
+window.fixture={projects,releases:[],calls:[],retries:[],posts:{},delay:0};
 const api=async(path,body)=>{
  if(path==='/releases/library/settings')return {settings:{rooms:[{id:'public',name:'Main player',enabled:true}],default_room:'public'}};
- if(path==='/releases/projects'){if(fixture.delay)await new Promise(r=>setTimeout(r,fixture.delay));return {projects:structuredClone(fixture.projects),releases:[]};}
+ if(path==='/releases/projects'){if(fixture.delay)await new Promise(r=>setTimeout(r,fixture.delay));return {projects:structuredClone(fixture.projects),releases:structuredClone(fixture.releases)};}
  if(path.endsWith('/publish')){const id=path.split('/')[2];fixture.calls.push(id);await new Promise((resolve,reject)=>fixture.posts[id]={resolve,reject});return {id:'job-'+id};}
+ if(path.endsWith('/retry')){fixture.retries.push(path);await new Promise((resolve,reject)=>fixture.retryPost={resolve,reject});return {id:'retried-release'};}
  throw Error('Unexpected request '+path);
 };
 window.ui=initPublishing({api,toast:()=>{},onListChange:()=>{},
@@ -28,7 +29,7 @@ window.ui=initPublishing({api,toast:()=>{},onListChange:()=>{},
 </script>'''
     with sync_playwright() as pw:
         browser=pw.chromium.launch(executable_path=args.browser,headless=True,args=['--no-sandbox','--use-angle=swiftshader'])
-        for width in [1440,3840,390]:
+        for width in args.width or [1440,3840,390]:
             page=browser.new_page(viewport={'width':width,'height':1000});errors=[]
             page.on('pageerror',lambda error:errors.append(str(error)))
             page.route('http://gbr.test/**',lambda route:route.fulfill(body=module if route.request.url.endswith('/publishing.js') else html,content_type='text/javascript' if route.request.url.endswith('/publishing.js') else 'text/html'))
@@ -88,8 +89,36 @@ window.ui=initPublishing({api,toast:()=>{},onListChange:()=>{},
             assert 'Variant 3' in page.locator('[data-pending="alias-a"]').inner_text()
             page.locator('[data-preview="alias-a"]').click()
             assert page.evaluate('fixture.played')==['alias-a','take-b']
+            # A failed preparation has no prepared release ID. Its Retry button
+            # must target the failed task, preserve errors and prevent double clicks.
+            page.evaluate('''()=>{
+ fixture.releases=[{id:'failed-prepare',generation_id:'gremlin',kind:'release_prepare',status:'failed',
+  title:'One Gremlin',can_retry:true,created_at:'2026-11-19T21:34:55Z',
+  progress:{},error:'Song ID 98 is missing from the master catalogue'}];
+ document.getElementById('pubRefresh').click();
+}''')
+            page.locator('#pubHistorySummary').click()
+            retry=page.locator('#pubHistory [data-retry="failed-prepare"]')
+            retry.wait_for(state='visible')
+            assert retry.inner_text()=='Retry preparation'
+            retry.click()
+            assert retry.is_disabled()
+            page.wait_for_function('fixture.retries.length===1')
+            assert page.evaluate('fixture.retries')==['/releases/tasks/failed-prepare/retry']
+            page.evaluate("fixture.retryPost.reject(Error('Release audio changed; finish Preparation again'))")
+            page.wait_for_function("document.getElementById('pubError').textContent.includes('Release audio changed')")
+            assert retry.is_enabled()
+            retry.click()
+            page.wait_for_function('fixture.retries.length===2')
+            page.evaluate('''()=>{
+ fixture.releases.unshift({...fixture.releases[0],id:'retried-release',status:'done',can_retry:false});
+ fixture.retryPost.resolve();
+}''')
+            retry.wait_for(state='detached')
+            assert '0 active or failed' in page.locator('#pubHistorySummary').inner_text()
+            assert page.locator('#pubError').inner_text()==''
             assert not errors,errors
-            print(json.dumps({'width':width,'passed':True,'checks':'rapid clicks during refresh, persistent request and job errors, retry, processing state, player preservation, completed removal'}),flush=True)
+            print(json.dumps({'width':width,'passed':True,'checks':'rapid clicks during refresh, persistent errors, publication and preparation retry, processing state, player preservation, completed removal'}),flush=True)
             page.evaluate('ui.close()');page.close()
         browser.close()
 

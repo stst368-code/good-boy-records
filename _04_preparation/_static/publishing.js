@@ -156,8 +156,15 @@ export function initPublishing({api,toast,onPlay,onListChange}){
     ['queued','running','failed','interrupted'].includes(r.status)&&
     !(r.kind==='release_publish'&&visiblePreviews.has(r.prepared_id)));
   q('pubHistorySummary').textContent=`Publication history · ${history.length} active or failed jobs`;
-  q('pubHistory').innerHTML=history.map(r=>`<article class="prep-task"><strong>${escape(r.title)} · ${escape(r.kind.replaceAll('_',' '))} · ${escape(r.status)}</strong><span>${escape(timestamp(r.created_at))} · ${escape(r.progress.message||r.progress.phase||'')}${r.progress.total?' · '+r.progress.completed+'/'+r.progress.total:''}</span>${r.error?`<p>${escape(r.error)}</p>`:''}${r.can_retry?`<button data-retry="${escape(r.prepared_id)}">Retry publication</button>`:''}</article>`).join('')||'<p>No active or failed jobs.</p>';
-  for(const button of q('pubHistory').querySelectorAll('[data-retry]'))button.onclick=()=>action(()=>publish(button.dataset.retry));
+  q('pubHistory').innerHTML=history.map(r=>`<article class="prep-task"><strong>${escape(r.title)} · ${escape(r.kind.replaceAll('_',' '))} · ${escape(r.status)}</strong><span>${escape(timestamp(r.created_at))} · ${escape(r.progress.message||r.progress.phase||'')}${r.progress.total?' · '+r.progress.completed+'/'+r.progress.total:''}</span>${r.error?`<p>${escape(r.error)}</p>`:''}${r.can_retry?`<button data-retry="${escape(r.id)}">${r.kind==='release_prepare'?'Retry preparation':'Retry publication'}</button>`:''}</article>`).join('')||'<p>No active or failed jobs.</p>';
+  for(const button of q('pubHistory').querySelectorAll('[data-retry]'))button.onclick=()=>{
+   button.disabled=true;
+   action(async()=>{
+    q('pubError').textContent='';
+    try{await api(`/releases/tasks/${encodeURIComponent(button.dataset.retry)}/retry`,{});toast('Release retry queued.');await refresh();}
+    finally{if(button.isConnected)button.disabled=false;}
+   });
+  };
  }
  q('pubRefresh').onclick=()=>action(refresh);
  const menu=document.createElement('details');menu.id='pubConfig';menu.innerHTML=`<summary>Publishing · R2 and website</summary><p class="subtle small">Already used the old uploader on this PC? Reuse its saved rclone connection.</p><button id="pubUseRclone" type="button">Use saved rclone r2 connection</button><p class="subtle small">Manual setup below is optional when using rclone. Keys stay on this device; blank key fields retain saved credentials.</p><div id="pubSettingsFields"></div><div class="actions"><button id="pubSaveConfig" type="button">Save publishing settings</button><button id="pubCheckConfig" type="button">Check public connection</button></div><p id="pubConfigMessage" role="status"></p>`;

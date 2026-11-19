@@ -70,6 +70,7 @@ class Preparation:
         self.submitted=set()
         self.owner_nonce=uuid.uuid4().hex
         self.closed=False;self.next_auto_sweep=0
+        self.publisher=None
         self.pool=ThreadPoolExecutor(max_workers=1,thread_name_prefix='gbr-preparation')
         self.enabled=self.db.one("SELECT COUNT(*) n FROM sqlite_master WHERE type='table' AND name IN ('generation_artifacts','worker_sessions','platform_migration_report')")['n']==3
         if self.enabled:
@@ -466,6 +467,11 @@ class Preparation:
         self.require()
         task=self.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,))
         if not task:raise KeyError('Processing task not found')
+        if task['kind'] in {'release_prepare','release_publish'}:
+            if not self.publisher:raise ValueError('Open Publishing to retry this release')
+            return self.publisher.retry(identifier)
+        if task['kind'] not in {'lyric_alignment','mix_preview','mix_master','visuals'}:
+            raise ValueError('This task needs its own recovery action; release and archive work must be recovered from Publishing')
         if task['kind']=='lyric_alignment' and self.processing.alive(json.loads(task['telemetry_json']).get('child',{})):
             raise ValueError('The alignment worker process is still running; inspect the local processing queue before retrying')
         if task['status'] in {'queued','running'}:

@@ -268,14 +268,17 @@ def test_app_publishing_settings_use_existing_csrf_and_host_protection(tmp_path)
           'website_url':'https://test.github.io/good-boy-records/','access_key':'private-key','secret_key':'private-secret'}
     with TestClient(app,base_url='http://127.0.0.1') as client:
         assert client.post('/api/releases/settings',json=body).status_code==403
+        assert client.post('/api/releases/tasks/missing/retry',json={}).status_code==403
         result=client.post('/api/releases/settings',json=body,headers={'x-gbr-request':'1'})
         assert result.status_code==200,result.text
         assert 'private-secret' not in result.text and 'private-key' not in result.text
         assert 'private-secret' not in client.get('/api/releases/settings').text
         assert client.post('/api/releases/missing/publish',json={},headers={'x-gbr-request':'1'}).status_code==400
+        assert client.post('/api/releases/tasks/missing/retry',json={},headers={'x-gbr-request':'1'}).status_code==400
     # A remote client cannot read host settings in a local-only installation.
     with TestClient(app,base_url='http://127.0.0.1',client=('203.0.113.9',1234)) as client:
         assert client.get('/api/releases/settings').status_code in {401,403}
+        assert client.post('/api/releases/tasks/missing/retry',json={},headers={'x-gbr-request':'1'}).status_code in {401,403}
 
 
 def test_selection_revoked_at_final_commit_keeps_public_pointer_unchanged(publication,monkeypatch):
@@ -502,3 +505,126 @@ def test_public_verifier_uses_browser_compatible_headers_and_keeps_validation(mo
     with pytest.raises(ValueError,match='Public verification returned HTTP 403 for https://media.test/file') as error:
         store.public_check('https://media.test/file','https://site.test')
     assert 'private response' not in str(error.value)
+
+
+def test_retry_failed_release_preparation_after_catalogue_repair(publication, monkeypatch):
+    review, prep, publisher, store, gid, source, _ = publication
+    catalogue = publisher.root/'_01_writing/_built/track_list.csv'
+    original = catalogue.read_bytes()
+    catalogue.write_text('song_id,song_name,filename,album_name,album_position\n')
+    before = source.read_bytes()
+    reviews = review.db.all('SELECT * FROM reviews')
+    artwork = prep.import_artwork(gid, image_bytes())['id']
+    options = {'include_flac': False, 'artwork_id': artwork, 'visibility': 'public'}
+    first = wait(review.db, publisher.finish_preparation(gid, options)['id'])
+    assert first['status'] == 'failed'
+    assert '13' in first['error'] and str(catalogue) in first['error']
+    history = next(item for item in publisher.releases() if item['id'] == first['id'])
+    assert history['can_retry'] and history['title'] != 'Release'
+    catalogue.write_bytes(original)
+
+    def wrong_worker(*args, **kwargs):
+        raise AssertionError('A release must never be sent to the audio-processing worker')
+    monkeypatch.setattr(prep.pool, 'submit', wrong_worker)
+    retry = prep.retry(first['id'])
+    second = wait(review.db, retry['id'])
+    assert second['status'] == 'done', second['error']
+    assert retry['previous_task_id'] == first['id']
+    recipe = json.loads(second['recipe_json'])
+    assert recipe['options'] == {**options, 'finish_preparation': True, 'complete_publish': False}
+    assert recipe['track']['song_id'] == 13
+    assert recipe['track']['displayTitle'] == 'Moses-Supposes'
+    assert {item['content_type'] for item in recipe['files']} == {'audio/mpeg', 'image/jpeg'}
+    assert publisher.projects()['projects'][0]['prepared_id'] == second['id']
+    assert source.read_bytes() == before
+    assert review.db.all('SELECT * FROM reviews') == reviews
+    assert review.db.one('SELECT status FROM processing_tasks WHERE id=?', (first['id'],))['status'] == 'failed'
+    assert not store.objects
+
+
+def test_catalogue_lookup_normalizes_ids_but_rejects_ambiguous_rows(publication):
+    _, _, publisher, _, _, _, _ = publication
+    catalogue = publisher.root/'_01_writing/_built/track_list.csv'
+    catalogue.write_text('song_id,song_name\n 0013 ,moses-supposes\n')
+    assert publisher.catalogue_song({'song_id': 13})[1] == 'moses-supposes'
+    with catalogue.open('a') as f:
+        f.write('13,other-song\n')
+    with pytest.raises(ValueError, match='Song ID 13 matches 2 master catalogue rows') as error:
+        publisher.catalogue_song({'song_id': 13})
+    assert str(catalogue) in str(error.value)
+
+
+def test_release_retry_preserves_publish_intent_and_deduplicates_active_work(publication, monkeypatch):
+    review, prep, publisher, _, gid, source, _ = publication
+    catalogue = publisher.root/'_01_writing/_built/track_list.csv'
+    original = catalogue.read_bytes()
+    catalogue.write_text('song_id,song_name\n')
+    first = wait(review.db, publisher.start_complete(gid, {'include_flac': False})['id'])
+    assert first['status'] == 'failed'
+    catalogue.write_bytes(original)
+    # Represent an interrupted preparation without starting any R2 work.
+    # The submitted callback is captured so two retry clicks can be compared.
+    review.db.execute("UPDATE processing_tasks SET status='interrupted',recipe_json=? WHERE id=?",
+                      (json.dumps({'include_flac': False, 'complete_publish': True}), first['id']))
+    submitted = []
+    monkeypatch.setattr(publisher.pool, 'submit', lambda function, identifier: submitted.append((function, identifier)))
+    one = publisher.retry(first['id'])
+    two = publisher.retry(first['id'])
+    assert one['id'] == two['id'] and len(submitted) == 1
+    task = review.db.one('SELECT * FROM processing_tasks WHERE id=?', (one['id'],))
+    assert task['kind'] == 'release_prepare'
+    assert json.loads(task['recipe_json'])['complete_publish']
+    assert submitted[0][0] == publisher._prepare
+    with pytest.raises(ValueError, match='failed or interrupted'):
+        publisher.retry(one['id'])
+
+
+def test_retry_release_publish_uses_existing_prepared_assets(publication):
+    review, prep, publisher, store, _, _, _ = publication
+    pid, _ = prepare(publication)
+    store.fail_key = '.flac'
+    failed = wait(review.db, publisher.start_publish(pid)['id'])
+    assert failed['status'] == 'failed'
+    store.fail_key = None
+    retried = prep.retry(failed['id'])
+    assert wait(review.db, retried['id'])['status'] == 'done'
+    assert json.loads(store.objects[POINTER])['tracks'][0]['release_id'] == pid
+    assert review.db.one("SELECT COUNT(*) AS n FROM processing_tasks WHERE kind='release_prepare'")['n'] == 1
+
+
+def test_retry_prepare_failure_after_encoding_uses_nested_options(publication, monkeypatch):
+    review, prep, publisher, store, gid, _, _ = publication
+    # Run synchronously to inspect the failure after the preview was built but
+    # before its upload could be queued.
+    monkeypatch.setattr(publisher.pool, 'submit', lambda function, identifier: function(identifier))
+    start_publish = publisher.start_publish
+    def unavailable(*args, **kwargs):
+        raise ValueError('Simulated publication startup failure')
+    monkeypatch.setattr(publisher, 'start_publish', unavailable)
+    first = wait(review.db, publisher.start_complete(gid, {'include_flac': False})['id'])
+    assert first['status'] == 'failed' and 'startup failure' in first['error']
+    assert json.loads(first['recipe_json'])['options']['complete_publish']
+    monkeypatch.setattr(publisher, 'start_publish', start_publish)
+    retried = prep.retry(first['id'])
+    second = wait(review.db, retried['id'])
+    assert second['status'] == 'done', second['error']
+    recipe = json.loads(second['recipe_json'])
+    assert recipe['options'] == {'include_flac': False, 'complete_publish': True, 'visibility': 'public'}
+    assert recipe['track']['audio']['sources']['flac'] is None
+    assert json.loads(store.objects[POINTER])['tracks'][0]['release_id'] == second['id']
+
+
+def test_release_retry_requires_unchanged_working_audio(publication):
+    review, prep, publisher, store, gid, source, _ = publication
+    catalogue = publisher.root/'_01_writing/_built/track_list.csv'
+    original = catalogue.read_bytes()
+    catalogue.write_text('song_id,song_name\n')
+    first = wait(review.db, publisher.start_prepare(gid, {})['id'])
+    assert first['status'] == 'failed'
+    catalogue.write_bytes(original)
+    count = review.db.one('SELECT COUNT(*) AS n FROM processing_tasks')['n']
+    source.write_bytes(source.read_bytes() + b'changed')
+    with pytest.raises(ValueError, match='Release audio changed'):
+        prep.retry(first['id'])
+    assert review.db.one('SELECT COUNT(*) AS n FROM processing_tasks')['n'] == count
+    assert not store.objects
