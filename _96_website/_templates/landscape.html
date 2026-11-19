@@ -4843,25 +4843,15 @@ body[data-view="knowledge"] #easterStoryOverlay{display:none!important}
 
       <div class="desktop-master-panel" aria-label="Desktop master controls">
         <div class="desktop-control-column genre-zone-column">
-          <span class="desktop-switch-label">GENRE<br>ZONES</span>
+          <span class="desktop-switch-label">GENRE<br>LABELS</span>
           <div class="guarded-switch-shell">
             <button class="guarded-toggle" id="deskGenreZones" type="button"
-                    aria-label="Genre zones" aria-pressed="true" title="Toggle genre segmentation zones">
+                    aria-label="Genre labels" aria-pressed="true" title="Show genre labels on the overview">
               <span class="toggle-lever" aria-hidden="true"></span>
             </button>
           </div>
           <div class="toggle-state"><span>OFF</span><span>ON</span></div>
 
-          <div class="desktop-dial">
-            <span class="desktop-dial-label">INTENSITY</span>
-            <div class="desktop-dial-ring">
-              <button class="knob desktop-knob" id="deskIntensity" type="button" role="slider"
-                      aria-label="Genre zone intensity" aria-valuemin="0" aria-valuemax="100"
-                      aria-valuenow="55"></button>
-            </div>
-            <div class="dial-scale"><span>MIN</span><span>MAX</span></div>
-            <output class="desktop-dial-readout" id="deskIntensityValue">55</output>
-          </div>
         </div>
 
         <div class="desktop-control-column album-light-column">
@@ -4962,13 +4952,6 @@ body[data-view="knowledge"] #easterStoryOverlay{display:none!important}
             <small>SENSE</small>
             <output class="fx-readout" id="fxSensitivityValue">1.0×</output>
           </div>
-          <div class="fx-knob-wrap">
-            <button class="knob fx-knob" id="lineLamp" type="button" role="slider"
-                    aria-label="Genre segmentation line brightness" aria-valuemin="0" aria-valuemax="100"
-                    aria-valuenow="55" title="Genre segmentation line brightness"></button>
-            <small>LINES</small>
-            <output class="fx-readout" id="lineLampValue">55</output>
-          </div>
           <button class="fx-test-button" id="fxTest" type="button" aria-pressed="false"
                   title="Hold to test meters, spectrum and lighting">TEST</button>
         </div>
@@ -5013,12 +4996,12 @@ function externaliseShowcasePaths(value){
   if(value&&typeof value==='object'){for(const k of Object.keys(value))value[k]=externaliseShowcasePaths(value[k]);return value}
   return typeof value==='string'?showcaseUrl(value):value;
 }
-const ui={stage:$('stage'),starCanvas:$('starCanvas'),loading:$('loading'),brandText:$('brandText'),title:$('title'),variant:$('variant'),mobileSongTitle:$('mobileSongTitle'),genreParent:$('genreParent'),genreChild:$('genreChild'),cover:$('cover'),fixedCover:$('fixedCover'),playingCoverViewport:$('playingCoverViewport'),playingCoverScreen:$('playingCoverScreen'),easterStoryOverlay:$('easterStoryOverlay'),centerStack:$('centerStack'),centerCard:$('centerCard'),lyric:$('lyric'),metaTitle:$('metaTitle'),metaSub:$('metaSub'),play:$('play'),prev:$('prev'),next:$('next'),shuffle:$('shuffle'),wakeLock:$('wakeLock'),seek:$('seek'),seekSegments:$('seekSegments'),time:$('time'),power:$('power'),volumeKnob:$('volumeKnob'),lampKnob:$('lampKnob'),vuL:$('vuL'),vuR:$('vuR'),statusLed:$('statusLed'),genreStrip:$('genreStrip'),mapTip:$('mapTip'),spectrum:$('spectrum'),zoomIn:$('zoomIn'),zoomOut:$('zoomOut'),zoomReset:$('zoomReset'),zoomLevel:$('zoomLevel'),utilityNav:$('utilityNav'),knowledgeButton:$('knowledgeButton'),tracksButton:$('tracksButton'),filterButton:$('filterButton'),storyButton:$('storyButton'),shareButton:$('shareButton'),knowledgeTabs:$('knowledgeTabs'),sidePanel:$('sidePanel'),panelTitle:$('panelTitle'),panelBody:$('panelBody'),panelClose:$('panelClose'),knowledgeReader:$('knowledgeReader'),knowledgeReaderTitle:$('knowledgeReaderTitle'),knowledgeReaderPath:$('knowledgeReaderPath'),knowledgeReaderBody:$('knowledgeReaderBody'),knowledgePrev:$('knowledgePrev'),knowledgeNext:$('knowledgeNext'),knowledgeReaderClose:$('knowledgeReaderClose'),mobileMixToggle:$('mobileMixToggle'),fmtFlac:$('fmtFlac'),fmtMp3:$('fmtMp3'),fxSensitivity:$('fxSensitivity'),fxSensitivityValue:$('fxSensitivityValue'),lineLamp:$('lineLamp'),lineLampValue:$('lineLampValue'),fxTest:$('fxTest'),
+const ui={stage:$('stage'),starCanvas:$('starCanvas'),loading:$('loading'),brandText:$('brandText'),title:$('title'),variant:$('variant'),mobileSongTitle:$('mobileSongTitle'),genreParent:$('genreParent'),genreChild:$('genreChild'),cover:$('cover'),fixedCover:$('fixedCover'),playingCoverViewport:$('playingCoverViewport'),playingCoverScreen:$('playingCoverScreen'),easterStoryOverlay:$('easterStoryOverlay'),centerStack:$('centerStack'),centerCard:$('centerCard'),lyric:$('lyric'),metaTitle:$('metaTitle'),metaSub:$('metaSub'),play:$('play'),prev:$('prev'),next:$('next'),shuffle:$('shuffle'),wakeLock:$('wakeLock'),seek:$('seek'),seekSegments:$('seekSegments'),time:$('time'),power:$('power'),volumeKnob:$('volumeKnob'),lampKnob:$('lampKnob'),vuL:$('vuL'),vuR:$('vuR'),statusLed:$('statusLed'),genreStrip:$('genreStrip'),mapTip:$('mapTip'),spectrum:$('spectrum'),zoomIn:$('zoomIn'),zoomOut:$('zoomOut'),zoomReset:$('zoomReset'),zoomLevel:$('zoomLevel'),utilityNav:$('utilityNav'),knowledgeButton:$('knowledgeButton'),tracksButton:$('tracksButton'),filterButton:$('filterButton'),storyButton:$('storyButton'),shareButton:$('shareButton'),knowledgeTabs:$('knowledgeTabs'),sidePanel:$('sidePanel'),panelTitle:$('panelTitle'),panelBody:$('panelBody'),panelClose:$('panelClose'),knowledgeReader:$('knowledgeReader'),knowledgeReaderTitle:$('knowledgeReaderTitle'),knowledgeReaderPath:$('knowledgeReaderPath'),knowledgeReaderBody:$('knowledgeReaderBody'),knowledgePrev:$('knowledgePrev'),knowledgeNext:$('knowledgeNext'),knowledgeReaderClose:$('knowledgeReaderClose'),mobileMixToggle:$('mobileMixToggle'),fmtFlac:$('fmtFlac'),fmtMp3:$('fmtMp3'),fxSensitivity:$('fxSensitivity'),fxSensitivityValue:$('fxSensitivityValue'),fxTest:$('fxTest'),
 deskGenreZones:$('deskGenreZones'),deskAlbumLight:$('deskAlbumLight'),deskPower:$('deskPower'),
-deskFormatToggle:$('deskFormatToggle'),deskIntensity:$('deskIntensity'),deskIntensityValue:$('deskIntensityValue'),
+deskFormatToggle:$('deskFormatToggle'),
 deskSensitivity:$('deskSensitivity'),deskSensitivityValue:$('deskSensitivityValue'),
 deskVolume:$('deskVolume'),deskTest:$('deskTest')};
-let tracks=[],mainTracks=[],easterTracks=[],index=0,audioCandidateIndex=0,preferredAudioFormat='flac',shuffle=false,power=true,easter=false,nodes=[],dpr=1,ac=null,analyser=null,source=null,freq=null,timeData=null,phase=0,volume=.5,lamp=.5,fxSensitivity=.333,lineLamp=.55,genreZonesEnabled=true,albumLightEnabled=true,testMode=false,parentLanes=[],hoverIndex=-1,activeParent=null,lyricLines=[],coverImages=new Map(),spectrumCtx=null,starCtx=null,powerCycleCount=0,powerCycleTimer=null,stars=[],lyricState={line:-1,word:-2};let playbackVisualCache=new Map(),activePlaybackVisuals=null,playbackVisualToken=0;let world={w:1800,h:1100},playingAnchor={x:900,y:550},camera={x:900,y:550,zoom:1,targetX:900,targetY:550,targetZoom:1},pointer={down:false,id:null,startX:0,startY:0,camX:0,camY:0,moved:false},touches=new Map(),pinch=null;
+let tracks=[],mainTracks=[],easterTracks=[],index=0,audioCandidateIndex=0,preferredAudioFormat='flac',shuffle=false,power=true,easter=false,nodes=[],dpr=1,ac=null,analyser=null,source=null,freq=null,timeData=null,phase=0,volume=.5,lamp=.5,fxSensitivity=.333,genreZonesEnabled=true,albumLightEnabled=true,testMode=false,parentLanes=[],hoverIndex=-1,activeParent=null,lyricLines=[],coverImages=new Map(),spectrumCtx=null,starCtx=null,powerCycleCount=0,powerCycleTimer=null,stars=[],lyricState={line:-1,word:-2};let playbackVisualCache=new Map(),activePlaybackVisuals=null,playbackVisualToken=0;let world={w:1800,h:1100},playingAnchor={x:900,y:550},camera={x:900,y:550,zoom:1,targetX:900,targetY:550,targetZoom:1},pointer={down:false,id:null,startX:0,startY:0,camX:0,camY:0,moved:false},touches=new Map(),pinch=null;
 let viewMode='tracks',knowledgeReady=false,knowledgeLoading=false,knowledgeManifest=[],knowledgeNodes=[],knowledgeEdges=[],knowledgeHoverId=null,knowledgeSelectedId=null,knowledgeAlpha=0,trackCameraSnapshot=null;
 let knowledgeDensity='overview',knowledgeExpanded=new Set(),knowledgeReaderPinned=false,knowledgeReaderMode='peek';
 let activeKnowledgeTab='how-its-made';
@@ -5522,16 +5505,6 @@ function setFxSensitivity(v,persist=true){
   if(ui.deskSensitivityValue)ui.deskSensitivityValue.textContent=text;
   if(persist)try{localStorage.setItem('gbr:fx-sensitivity',String(fxSensitivity))}catch(_){}
 }
-function setLineLamp(v,persist=true){
-  lineLamp=clamp01(v);
-  setRotaryVisual(ui.lineLamp,lineLamp);
-  setRotaryVisual(ui.deskIntensity,lineLamp);
-  const text=String(Math.round(lineLamp*100));
-  if(ui.lineLampValue)ui.lineLampValue.textContent=text;
-  if(ui.deskIntensityValue)ui.deskIntensityValue.textContent=text;
-  if(persist)try{localStorage.setItem('gbr:line-lamp',String(lineLamp))}catch(_){}
-}
-
 function syncDesktopToggles(){
   if(ui.deskGenreZones)ui.deskGenreZones.setAttribute('aria-pressed',String(genreZonesEnabled));
   if(ui.deskAlbumLight)ui.deskAlbumLight.setAttribute('aria-pressed',String(albumLightEnabled));
@@ -6762,57 +6735,6 @@ function drawOverviewLabels(w,h,core){
   }
   ctx.restore();
 }
-/* v10.12.5 — genre territories replace the old peak-event "firework" rays.
-   These are low-opacity local motifs: they explain ownership of space and react
-   gently to the music rather than shooting lines across the whole map. */
-function drawGenreTerritories(anchorScreen,music={level:0,high:0,beat:0,beatPulse:0,subPulse:0}){
-  if(easter||!nodes.length)return;
-  const lineDrive=testMode?1:(genreZonesEnabled?lineLamp:0);if(lineDrive<=.003)return;
-  const groups=new Map();for(const n of nodes){const key=String(n.cluster||n.t?.genre?.cluster||'unclassified').toLowerCase();if(!groups.has(key))groups.set(key,[]);groups.get(key).push(n)}
-  const beat=Math.max(Number(music.beatPulse)||0,Number(music.subPulse)||0),level=Math.max(Number(music.level)||0,Number(music.high)||0),pulse=.90+.10*beat,energy=.72+.28*level;
-  const glow=(col,a=.08)=>`rgba(${col.r},${col.g},${col.b},${a*lineDrive*energy})`;
-  const stroke=(col,a=.12,w=1.15,dash=null)=>{ctx.strokeStyle=glow(col,a);ctx.lineWidth=w;ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash(dash||[])};
-  const fill=(col,a=.04)=>{ctx.fillStyle=glow(col,a)};
-  for(const [key,group] of groups){
-    const pts=group.map(n=>viewToScreen(n.x,n.y)).filter(Boolean);if(!pts.length)continue;
-    const cx=pts.reduce((a,p)=>a+p.x,0)/pts.length,cy=pts.reduce((a,p)=>a+p.y,0)/pts.length;if(cx<-420||cx>ui.stage.clientWidth+420||cy<-420||cy>ui.stage.clientHeight+420)continue;
-    let radius=0;for(const p of pts)radius=Math.max(radius,Math.hypot(p.x-cx,p.y-cy));radius=Math.max(74,Math.min(340,radius+34));
-    const sample=group[0]?.t,col=rgb(sample?.genre?.parent_colour||sample?.genre?.child_colour||'#8a7559'),ang=Math.atan2(cy-anchorScreen.y,cx-anchorScreen.x);
-    ctx.save();ctx.translate(cx,cy);ctx.rotate(ang+Math.PI/2);ctx.globalCompositeOperation='screen';
-    const smallDot=(x,y,r=1.6,a=.18)=>{ctx.beginPath();ctx.fillStyle=glow(col,a);ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()};
-    if(key.includes('electronic')){
-      for(let k=0;k<3;k++){const rr=radius*(.70+k*.10)*pulse;stroke(col,.12+k*.02,1.05,[2+k,8+k*3]);ctx.beginPath();ctx.arc(0,0,rr,-2.18,.58);ctx.stroke()}
-      stroke(col,.08,1,[1,11]);ctx.beginPath();ctx.arc(0,0,radius*.96,-2.08,.42);ctx.stroke();
-      for(let i=0;i<6;i++){const a=-2.02+i*.48,r=radius*(.82+(i%2)*.06);smallDot(Math.cos(a)*r,Math.sin(a)*r,1.7,.16)}
-    }else if(key.includes('classical')){
-      for(let k=0;k<3;k++){const rr=radius*(.60+k*.12);stroke(col,.10+k*.015,1.0);ctx.beginPath();ctx.ellipse(0,0,rr,rr*.44,0,-2.3,.62);ctx.stroke()}
-      stroke(col,.08,.95,[1,10]);ctx.beginPath();ctx.ellipse(0,0,radius*.98,radius*.58,0,-2.08,.40);ctx.stroke();
-    }else if(key.includes('heavy')||key.includes('experimental')){
-      for(let k=0;k<3;k++){const rr=radius*(.62+k*.12);stroke(col,.13-k*.01,1.3);for(let seg=0;seg<3;seg++){const a0=-2.42+seg*.82+k*.06,a1=a0+.34;ctx.beginPath();ctx.arc(0,0,rr,a0,a1);ctx.stroke()}}
-      stroke(col,.08,1.0,[2,9]);ctx.beginPath();ctx.arc(0,0,radius*.98,-2.1,.3);ctx.stroke();
-    }else if(key.includes('country')||key.includes('folk')){
-      for(let k=0;k<2;k++){stroke(col,.12-k*.02,1.05,[7,8]);ctx.beginPath();ctx.ellipse(0,0,radius*(.78+k*.12),radius*(.48+k*.06),0,-2.25,.54);ctx.stroke()}
-      stroke(col,.07,.95,[1,10]);ctx.beginPath();ctx.ellipse(0,0,radius*.98,radius*.62,0,-2.08,.36);ctx.stroke();
-    }else if(key.includes('rap')||key.includes('hip hop')){
-      const baseR=radius*.80;stroke(col,.12,1.6);for(let i=-5;i<=5;i++){const x=i*radius*.09,h=(10+Math.abs(Math.sin(i*2.31))*20)*(1+.18*beat);ctx.beginPath();ctx.moveTo(x,-h/2-baseR*.12);ctx.lineTo(x,h/2-baseR*.12);ctx.stroke()}
-      stroke(col,.07,1.0,[1,10]);ctx.beginPath();ctx.arc(0,0,radius*.98,-2.12,.34);ctx.stroke();
-    }else if(key.includes('rhythm')){
-      for(let k=0;k<3;k++){const rr=radius*(.64+k*.11),amp=(5+k*2)*(1+.12*beat);stroke(col,.10+k*.01,1.0);ctx.beginPath();for(let i=0;i<=18;i++){const a=-2.18+i*((.54+2.18)/18),r=rr+Math.sin(i*1.8+k)*amp;if(i===0)ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r);else ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.stroke()}
-    }else if(key==='pop'||key.includes('pop')){
-      for(let k=0;k<3;k++){stroke(col,.095+k*.015,1.0);ctx.beginPath();ctx.arc(0,0,radius*(.50+k*.12)*pulse,-2.12,.44);ctx.stroke()}
-      fill(col,.12);for(let i=0;i<6;i++){const a=-2.0+i*.38,r=radius*(.66+(i%2)*.08);smallDot(Math.cos(a)*r,Math.sin(a)*r,1.5+(i%3===0?.6:0),.14)}
-    }else if(key.includes('rock')){
-      for(let k=0;k<3;k++){const rr=radius*(.62+k*.12);stroke(col,.12,1.2);for(let seg=0;seg<4;seg++){const a0=-2.55+seg*.74+k*.04,a1=a0+.26;ctx.beginPath();ctx.arc(0,0,rr,a0,a1);ctx.stroke()}}
-      stroke(col,.07,.95,[1,10]);ctx.beginPath();ctx.arc(0,0,radius*.98,-2.14,.32);ctx.stroke();
-    }else{
-      stroke(col,.09,1.0,[2,12]);ctx.beginPath();ctx.arc(0,0,radius*.96,-2.1,.36);ctx.stroke();
-      for(let i=0;i<9;i++){const a=-2.02+i*.27,r=radius*(.70+.16*((i%3)/2));smallDot(Math.cos(a)*r,Math.sin(a)*r,1.1+(i%4===0?.8:0),.16)}
-    }
-    ctx.restore()
-  }
-}
-
-
 function knowledgeNodeSize(n){
   // v10.10.19: node geometry is SCREEN geometry. Camera zoom changes only
   // world positions/distances, never the rendered size of a node.
@@ -6910,7 +6832,6 @@ function draw(){
   const focus=hoverIndex>=0?hoverIndex:index,group=songGroups.byIndex[focus];
   const layout=coverBoxes(w,h,anchorScreen,coreSize,lyricHeight);
   coverFrame=layout.visible;
-  if(camera.zoom<=.55)drawGenreTerritories(worldAnchorScreen,music);
   document.documentElement.style.setProperty('--audio-level',level.toFixed(3));
   if(anchorScreen.x>-500&&anchorScreen.x<w+500&&anchorScreen.y>-500&&anchorScreen.y<h+500){
     const ag=ctx.createRadialGradient(anchorScreen.x,anchorScreen.y,80,anchorScreen.x,anchorScreen.y,250+level*110);
@@ -7027,14 +6948,10 @@ updateSeekSegments(0);
 bindSlider(ui.volumeKnob,setVolume);bindSlider(ui.lampKnob,setLamp);
 try{
   const savedSense=Number(localStorage.getItem('gbr:fx-sensitivity'));
-  const savedLines=Number(localStorage.getItem('gbr:line-lamp'));
   setFxSensitivity(Number.isFinite(savedSense)?savedSense:.333,false);
-  setLineLamp(Number.isFinite(savedLines)?savedLines:.55,false);
-}catch(_){setFxSensitivity(.333,false);setLineLamp(.55,false)}
+}catch(_){setFxSensitivity(.333,false)}
 bindRotary(ui.fxSensitivity,()=>fxSensitivity,setFxSensitivity);
-bindRotary(ui.lineLamp,()=>lineLamp,setLineLamp);
 bindRotary(ui.deskSensitivity,()=>fxSensitivity,setFxSensitivity);
-bindRotary(ui.deskIntensity,()=>lineLamp,setLineLamp);
 bindSlider(ui.deskVolume,setVolume);
 bindFxTest();
 
