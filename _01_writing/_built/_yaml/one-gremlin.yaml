@@ -1,0 +1,124 @@
+song_id: 98
+variant_id: 1
+title: one-gremlin
+cluster: "Hip-Hop & Rap"
+version:
+explicit:
+language: en
+duration: 360.0
+style: shook-gremelin
+model: MiniMaxAI/MiniMax-Music3
+dit: minimax_music3_dit_fp32.safetensors
+text_encoder: minimax_music3_text_encoder_bf16.safetensors
+encoder_cfg: 1.6
+encoder_seed: "13561281658307238442"
+top_k: 50
+sampler: seeds_3
+scheduler: linear_quadratic
+sampler_cfg: 1.7
+sampler_seed: "6021837534476744998"
+sampler_steps: 35
+generation_datetime: "2610292205"
+caption: |
+  Global Metadata
+  Basic Attributes: Dark, gritty 1990s East Coast hardcore hip-hop, underground New York boom-bap, approximately 92 BPM, minor-key, raw street-rap aesthetic. Sparse, ominous, sample-driven production with haunting piano motifs, hard drums and subterranean bass. Structure
+  
+  Sparse, atmospheric opening with isolated detuned piano notes and low-level vinyl noise. Gradual introduction of heavy drums and bass. The central piano motif remains recognisable and repetitive throughout, providing an unchanging sense of menace.
+  
+  Verses maintain a stripped, spacious instrumental foundation, leaving room for dense, aggressive vocal phrasing. Hooks gain weight through thicker drums, doubled vocals and stronger bass emphasis rather than additional melody. Brief instrumental dropouts punctuate threatening statements. Final passages become increasingly oppressive before ending abruptly. Cold, confident and intimidating, never theatrical or comedic. The rapper sounds genuinely dangerous, calculating and territorially aggressive. Precise rhythmic emphasis, unpredictable pauses and sudden bursts of hostility. Sharp consonants and forceful syllabic attacks. Growls and guttural ad-libs should sound instinctive and animalistic rather than cartoonish. Preserve the natural imperfections of a raw, uncompromising street performance. Production Authentic mid-1990s underground East Coast hip-hop character. Dusty MPC-style drum sampling, gritty analogue saturation, slightly degraded piano samples, weighty mono-compatible bass and minimal processing. Punchy transients, dry vocals and thick, dark midrange.
+  
+  Maintain an oppressive, claustrophobic atmosphere through repetition, unresolved harmony and negative space. Avoid modern trap percussion, rapid hi-hat rolls, glossy synthesizers, autotune, polished pop hooks, cinematic orchestral crescendos and excessive reverb. Overall sonic identity: A haunting, paranoid piano loop over brutally simple boom-bap drums, supporting a gravel-voiced, relentless street rapper. Cold, menacing, hypnotic and unmistakably underground.
+  Global Emotional Progression: Relentlessly threatening, paranoid, claustrophobic and cold-blooded. An atmosphere of constant danger, mistrust and impending violence. Controlled intimidation punctuated by explosive aggression. No emotional release, optimism or warmth.
+  Application Scenarios & Imagery: Deserted housing projects after midnight, flickering streetlights, wet concrete, shadowy alleyways, distant sirens, unseen threats, territorial confrontation and predatory surveillance. Cinematic urban dread, as though danger is waiting around every corner.
+  Sonics & Production Profile: Lo-fi analogue grit, dusty vinyl texture, dark midrange, heavy low-end, narrow stereo imaging and minimal harmonic movement. Repetitive, hypnotic arrangements emphasising tension over melody. Raw, oppressive and deliberately unsettling.
+  Vocal Details
+  Vocal Gender & Timbre: Deep masculine baritone, gravelly, weathered, raspy and slightly hoarse. Heavy chest resonance, harsh consonants, dry throat texture and an intimidating low-register presence.
+  Vocal Style: Aggressive 1990s East Coast street rap. Menacing, conversational delivery with tightly controlled rhythmic phrasing, internal rhymes, syncopated syllables and deliberate pauses. Alternates between quiet, contemptuous threats and sudden explosive outbursts. Naturally rough, confrontational and unapologetically hostile. Occasional animalistic growls, snarls and guttural vocal punctuation. Absolutely no melodic singing.
+  Harmony/Backing Vocals: Sparse, rough male gang-vocal responses, aggressive shouted doubles, low-pitched echoes and occasional overlapping street-style ad-libs. Unison reinforcement of memorable phrases, never polished harmonies.
+  Vocal FX: Mostly dry, intimate and upfront. Light tape saturation, subtle compression, occasional short slapback delays on isolated words, gritty double-tracking and selective distorted emphasis. Minimal reverb.
+  Arrangement
+  Instrument Lifecycle Description (Primary/Secondary Layering):
+  Primary: Haunting, repetitive minor-key piano sample forming the central musical identity. Short, dissonant, slightly detuned piano phrases with unsettling intervals, unresolved notes and deliberate empty spaces. Chopped, filtered and degraded as though sampled from an obscure, deteriorating record. Deep, ominous bass notes shadowing the piano's root movement. Hard, dry boom-bap drums with heavy, punchy kicks, cracking snares and dusty, loosely swung hi-hats.
+  Secondary: Faint atmospheric drones, occasional reversed piano tails, distant metallic resonance, barely audible vinyl crackle and subtle low-frequency rumble. Rare, eerie high-register piano accents. No lush orchestration, bright synths or cheerful melodic elements.
+  Groove & Foundation Progression: Heavy, head-nodding, approximately 92 BPM boom-bap rhythm. Hard snares on beats two and four, thick kicks with syncopated variations, restrained swung hi-hats and occasional ghost notes. Steady, repetitive, almost hypnotic groove. Bass remains deep, minimal and physically imposing. Short drum interruptions and sudden silences increase tension without disrupting the fundamental pulse.
+  Embellishments, Textures & Spatial FX: Subtle vinyl hiss, muffled urban ambience, distant sirens, ominous reverse swells, brief turntable scratches and abrupt tape-like cuts. Occasional piano notes left hanging in isolation. Selective silence creates a sense of unease and anticipation.
+lyrics: |-
+  [intro]
+  yo, word up, yeah boy
+  uh, yeah yeah yeah
+  one gremlin'
+  gremlin' speakin', yo, gremlin' in effect
+  [verse]
+  don't run, don't hide, listen up when i'm speakin'
+  i'm just gettin' started, you'll know when i'm finished
+  i'm the one, the gremlin'
+  read my lips, let my teeth sink in
+  act up, i'll leave your back legs bleedin'
+  come through your hood and let off a clip
+  see me fly past and grrrrrrrrrrrrrrr!
+  right at ya head, drop dead, cold concrete your final bed
+  so for the real dogs who respect my name
+  y'all clearly understand the game
+  the one and only gremlin', no way i'll ever come tame
+  [chorus]
+  i'm the infamous, the gremlin'
+  you can't stop me, i'm forever
+  you can't cage me, i'll put you down whenever
+  teeth out, head down, don't step to me
+  dead eyes, cold heart
+  it'll be over 'fore you regret the start
+  back down, son, don't make me begin
+  the one and only, infamous gremlin'
+  [verse]
+  fuck around with my name and boom
+  one hit in your side, tearin' apart your pride
+  boom boom, two in your back, no hope, no end in my attack
+  boom boom boom grrrr
+  once unleashed, there's nowhere to hide
+  been plannin' your demise since before you were born
+  four steps ahead in my mind, bang bang, leave your body torn
+  no recallin' me
+  no trick or treat
+  shoot first, ask questions never
+  trouble me and you're sleepin' forever
+  [chorus]
+  i'm the infamous, the gremlin'
+  you can't stop me, i'm forever
+  you can't cage me, i'll put you down whenever
+  teeth out, head down, don't step to me
+  dead eyes, cold heart
+  it'll be over 'fore you regret the start
+  back down, son, don't make me begin
+  the one and only, infamous gremlin'
+  [verse]
+  when it's done and you're dead
+  when they're pickin' up what little's left
+  when they're questionin' why you ended ya' life
+  i'll be onto the next
+  take you one on one
+  or take out your entire pack
+  if you're gonna roll up on me
+  better roll in heavy, you can bring a gun, bring a knife
+  i don't need any of that
+  remove your ears from your head
+  i'll rip ya' throat out
+  my mind stay steady, always ready
+  zero to a hundred, don't test me
+  no warning signs, no second chance
+  one wrong move, and it's your last dance
+  [chorus]
+  i'm the infamous, the gremlin'
+  you can't stop me, i'm forever
+  you can't cage me, i'll put you down whenever
+  teeth out, head down, don't step to me
+  dead eyes, cold heart
+  it'll be over 'fore you regret the start
+  back down, son, don't make me begin
+  the one and only, infamous gremlin'
+  [outro]
+  aight' that's it
+  you've had your warning
+  i'll let you rest one more night
+  next time you step to me
+  grrrrrrrrrrrrrrrrr
+  it's over
