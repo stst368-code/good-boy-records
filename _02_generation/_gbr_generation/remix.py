@@ -72,7 +72,8 @@ class Remixes:
             fields['explicit'] = 'yes' if values['explicit'] else 'no'
         from .web_service import DEFAULT_PARAMETERS
         parameters = {key:values[key] for key in PARAMETERS-TEXT_FIELDS if values.get(key) is not None and values[key]!=''}
-        missing = sorted(key for key in DEFAULT_PARAMETERS if key not in parameters)
+        missing = sorted(key for key in DEFAULT_PARAMETERS
+                         if key not in parameters or key in SEEDS and parameters[key]=='auto')
         versions = self.db.all('''SELECT batch_id,MIN(created_at) AS created_at,COUNT(*) AS generations
             FROM generation_runs WHERE parent_review_generation_id=? AND batch_id IS NOT NULL
             GROUP BY batch_id ORDER BY created_at DESC LIMIT 50''', (generation_id,))

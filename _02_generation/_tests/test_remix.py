@@ -91,7 +91,6 @@ def test_remix_uses_saved_recipe_after_audio_and_writing_files_are_gone(recordin
 
 def test_remix_preview_freezes_text_and_rejects_another_recordings_revision(recording):
     fixture,generation_id,_,_ = recording
-    source = fixture.client.get('/api/generation/remix/'+generation_id).json()
     preview = fixture.preview(remix={'generation_id':generation_id,'fields':{'lyrics':'[verse]\nFirst edit\n'}})
     next_preview = fixture.preview(remix={'generation_id':generation_id,'fields':{'lyrics':'[verse]\nSecond edit\n'}})
     fixture.generation.start(preview['token'])
@@ -106,3 +105,16 @@ def test_remix_preview_freezes_text_and_rejects_another_recordings_revision(reco
         'input_root':'','connection':{'backend':'local'},'remix':{'generation_id':generation_id,'fields':{'sampler_seed':'1'}},
     })
     assert response.status_code==400
+
+
+def test_legacy_automatic_seeds_are_reported_as_unrecorded(recording):
+    fixture,generation_id,_,_ = recording
+    db=fixture.app.state.service.db
+    meta=json.loads(db.one('SELECT parsed_json FROM generation_metadata WHERE generation_id=?',(generation_id,))['parsed_json'])
+    meta.pop('gbr_run_id',None)
+    meta.update(encoder_seed='auto',sampler_seed='auto')
+    db.execute('DELETE FROM generation_output_links WHERE review_generation_id=?',(generation_id,))
+    db.execute("UPDATE generation_metadata SET parsed_json=?,encoder_seed='auto',sampler_seed='auto' WHERE generation_id=?",
+               (json.dumps(meta),generation_id))
+    source=fixture.client.get('/api/generation/remix/'+generation_id).json()
+    assert {'encoder_seed','sampler_seed'} <= set(source['missing_parameters'])
