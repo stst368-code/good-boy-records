@@ -352,6 +352,10 @@ class Preparation:
         self.require();self.editable(gid);row,source=self.source(gid,artifact_id=data.get('input_artifact_id'))
         if kind not in {'mix_preview','mix_master','visuals','lyric_alignment'}:raise ValueError('This processing adapter is not installed')
         recipe={'mix':mix_recipe(data.get('mix',{}))} if kind.startswith('mix_') else {'version':2,'fps':10,'energy':'channel_rms'}
+        if kind.startswith('mix_'):
+            for effect in recipe['mix'].get('effects', []):
+                if effect.get('range', {}).get('end', 0) > row['duration'] + .001 or any(p['time'] > row['duration'] + .001 for p in effect.get('automation', [])):
+                    raise ValueError('Effect ranges and automation must fit inside the working audio')
         if kind=='lyric_alignment':
             language=data.get('language') or json.loads(row['parsed_json']).get('language') or 'en'
             if not isinstance(language,str) or not __import__('re').fullmatch('[a-z]{2,3}',language):raise ValueError('Use an ISO language code, e.g. en or de')

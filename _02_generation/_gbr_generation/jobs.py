@@ -220,6 +220,8 @@ class Jobs:
                     'current_title':next((r['title'] for r in t.get('runs',[]) if r['id']==t.get('run_id')),None)} for t in workers]})
             if policy.get('purpose')=='experiment' and getattr(self.g,'experiment_publisher',None):
                 result[-1]['publications']=self.g.experiment_publisher.listing(batch['id'])
+            if selection.get('lab'):
+                result[-1].update(lab=True,lab_source_path=selection['lab'].get('source_path'))
         return {'jobs':result,'history_limit':100}
 
     def batch(self,batch_id):

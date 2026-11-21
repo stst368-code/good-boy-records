@@ -176,7 +176,20 @@ class GenerationService:
         else:
             raise ValueError('Select a saved worker or Automatic')
         remix_source = None
-        if data.get('remix'):
+        lab_values = None
+        if data.get('lab'):
+            from types import SimpleNamespace
+            from .lab import Lab
+            if run_purpose != 'experiment' or data.get('remix'):
+                raise ValueError('Quick lab trials must run as experiments')
+            seconds = data.get('parameters', {}).get('duration')
+            if type(seconds) not in (int,float) or not 5 <= seconds <= 60:
+                raise ValueError('Choose a lab clip length from 5 to 60 seconds')
+            item, lab_values = Lab(self).input(data['lab'], data.get('input_root'))
+            selected = [item]
+            catalogue = SimpleNamespace(root=self.runtime/'lab')
+            data.update(caption_mode='yaml', caption_count=1, template_id=None, parameter_priority='form')
+        elif data.get('remix'):
             from types import SimpleNamespace
             from .remix import Remixes
             item,remix_source = Remixes(self).input(data['remix'])
@@ -216,6 +229,8 @@ class GenerationService:
             spec['field_precedence'] = data['field_precedence']
         self.parameter_sources(spec,data)
         reference_root, styles = self.styles()
+        if lab_values and lab_values.get('cluster') and lab_values.get('style') and not styles.candidates(lab_values['cluster'],lab_values['style']):
+            styles.rows.append({'ID':'lab-source','cluster':lab_values['cluster'],'style_primary':lab_values['style']})
         if remix_source:
             # A hand-edited caption defines its own style pair without needing
             # a reusable template in the caption catalogue.
@@ -228,6 +243,9 @@ class GenerationService:
             if set(caption_templates)-set(styles.by_id):raise ValueError('Selected caption templates are no longer in styles.csv; refresh the caption list')
         experiment = data.get('experiments') or {}
         combinations = expand(experiment)
+        if data.get('lab'):
+            if len(combinations) > 16 or any('duration' in overrides and overrides['duration'] != data['parameters']['duration'] for overrides,_,_ in combinations):
+                raise ValueError('Quick lab supports up to 16 trials at one fixed clip length')
         caption_count = data.get('caption_count', 1)
         if type(caption_count) is not int or not 1 <= caption_count <= 1000:
             raise ValueError('Choose 1 to 1000 caption templates per track')
@@ -413,7 +431,7 @@ class GenerationService:
                 'launcher': (data.get('_worker') or {}).get('launcher'),
                 'workers':data.get('_pool'),
                 'root': catalogue.root, 'layout': data.get('layout', 'single'),
-                'selection': {key: data.get(key) for key in ('purpose','experiment_label','worker_id','files', 'all_inputs', 'songs', 'albums', 'order', 'rating_filter', 'parameter_priority', 'template_id', 'catalogue_captions', 'caption_mode', 'caption_count', 'caption_cluster', 'caption_style','caption_templates', 'experiments','remix')}}
+                'selection': {key: data.get(key) for key in ('purpose','experiment_label','worker_id','files', 'all_inputs', 'songs', 'albums', 'order', 'rating_filter', 'parameter_priority', 'template_id', 'catalogue_captions', 'caption_mode', 'caption_count', 'caption_cluster', 'caption_style','caption_templates', 'experiments','remix','lab')}}
             self.previews[token]['selection']['resolved_worker_id']=(data.get('_worker') or {}).get('id',connection_key(connection))
             if rating_evidence is not None:
                 self.previews[token]['selection']['review_filter'] = rating_evidence

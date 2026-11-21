@@ -95,6 +95,10 @@ def router(root,review,local):
 
     @routes.get('/projects/{gid}/editorial')
     def editorial(gid: str,artifact: str | None=None):return service.editorial(gid,artifact)
+    @routes.get('/projects/{gid}/waveform')
+    def waveform(gid: str,artifact: str | None=None):
+        from .waveform import waveform as build_waveform
+        return build_waveform(service,gid,artifact)
     @routes.get('/projects/{gid}/yaml')
     def yaml_details(gid:str):
         return {k:v for k,v in service.metadata.read(gid).items() if not k.startswith('_')}

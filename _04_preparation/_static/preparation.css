@@ -133,3 +133,25 @@
   .prep-effect-buttons button { min-height: 38px; min-width: 38px; }
   .prep-cover-frame { max-width: none; }
 }
+.mastering-studio {margin:18px 0;padding:16px;background:#0c141d;border:1px solid #344553;border-radius:12px}
+.studio-transport,.studio-selection,.studio-effect-scope {display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.studio-transport>output {font:20px ui-monospace,monospace;color:#f2bf68;min-width:72px}
+.studio-transport label {display:flex;gap:8px;align-items:center}
+.studio-transport select {width:auto}
+.studio-selection {margin-top:8px}
+.studio-selection label {flex:1;min-width:110px}
+.studio-selection input {width:100%}
+#mixWave {display:block;width:100%;height:220px;touch-action:none;cursor:crosshair;border-radius:8px}
+#mixScroll {width:100%;margin-top:12px}
+.studio-effect-scope {margin:8px 0}
+.studio-effect-scope>span {margin-right:auto;color:#a4c4dd;font:12px ui-monospace,monospace}
+.studio-effect-scope button {padding:6px 10px;min-height:34px}
+.studio-parameters {display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.studio-parameters label {min-width:0;font-size:12px}
+.studio-parameters input {width:100%;min-height:36px}
+.studio-automation {margin-top:12px;border-top:1px solid #344553;padding-top:10px}
+.studio-automation canvas {width:100%;height:100px;display:block;margin:12px 0;touch-action:none;cursor:crosshair;border:1px solid #344553}
+.studio-point {display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin:8px 0}
+.studio-point label {min-width:0;font-size:12px}
+.studio-point input {width:100%}
+@media(max-width:600px){.mastering-studio{padding:10px}.studio-transport button,.studio-selection button{flex:1}.studio-transport label{min-width:120px}.studio-parameters{grid-template-columns:1fr 1fr}}

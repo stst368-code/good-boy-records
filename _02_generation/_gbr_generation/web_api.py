@@ -104,6 +104,12 @@ class Remix(Body):
     revision: str | None = Field(default=None,pattern=r'^[0-9a-f]{32}$')
     fields: dict[str,str] = Field(default_factory=dict,max_length=8)
 
+class LabRecipe(Body):
+    title: str = Field(min_length=1,max_length=160)
+    caption: str = Field(min_length=1,max_length=20000)
+    lyrics: str = Field(min_length=1,max_length=40000)
+    source_path: str | None = Field(default=None,max_length=4000)
+
 
 class Preview(Body):
     input_root: str
@@ -136,6 +142,7 @@ class Preview(Body):
     parent_review_generation_id: str | None = None
     request_id: str | None = Field(default=None, min_length=1, max_length=1000)
     remix: Remix | None = None
+    lab: LabRecipe | None = None
 
 
 class Start(Body):
@@ -295,6 +302,11 @@ def router(root, review_service, local):
     @routes.get('/tasks')
     def tasks():
         return {'tasks': service.tasks()}
+
+    @routes.get('/lab/source')
+    def lab_source(path: str,root: str | None=None):
+        from .lab import Lab
+        return Lab(service).read(root,path)
 
     @routes.get('/queue')
     def queue(status:Literal['queued','attention','completed','cancelled','failed']='queued',offset:int=0,

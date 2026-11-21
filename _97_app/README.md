@@ -51,6 +51,44 @@ selected database. A configuration's optional `database_path` resolves relative
 to that configuration file; command-line overrides resolve from the current
 working directory.
 
+## Quick lab and section mastering
+
+**Generation → Quick lab** is a separate short-test workspace. Start from a
+writing recipe or a blank trial, edit the caption and a short lyric excerpt,
+choose 10–60 seconds and check the trial before queueing it. Diffusion seeds and
+steps accept comma-separated lists or inclusive `start:stop:step` ranges, with
+up to 16 combinations. Encoder seeds are exact unsigned 64-bit values.
+
+Use fixed seeds, duration, model and worker settings for comparisons. A short
+generation is a test of the idea; a longer run can develop differently even
+with the same seeds. Trials use the existing workers and experiment ledger,
+stay out of the production review inbox, and retain their frozen captions,
+lyrics, parameters and outputs. Choose **A** or **B** on a completed result to
+compare it, or **Load recipe** to iterate. The current draft is saved on this
+browser; queued trials remain in the shared database. **All experiments**
+opens the existing experiment dashboard and its output actions.
+
+**Preparation → Mastering** now includes a zoomable waveform, drag selection
+and a selection loop. Click to seek; drag to choose a time range. Add an effect
+and choose **Selection** to restrict it to that range, with fade-in/out edges.
+**Whole track** removes the range restriction.
+
+Alongside the existing presets, Parametric EQ, Compressor, High-pass, Low-pass
+and Delay expose their own parameters. Open **Automation** to draw strength
+points, drag them, enter exact times/values, or create a rise/fall across the
+selected section. Automation scales the effect's Strength control. Undo/redo
+and browser drafts preserve the current edit; every rendered recipe is stored
+with its processing task and can be restored from processing history.
+
+**Preview this section** renders up to 60 seconds for A/B listening. Previews
+and full masters use the same original-track time coordinates and preserve
+duration, so lyric timing stays fixed. These are rendered audio previews;
+turning a control updates the recipe and requires another preview render.
+Finished masters show measured integrated LUFS and true peak when supported by
+FFmpeg, alongside sample peak and RMS. The existing −1 dBFS limiter remains a
+sample-peak limiter. Source recordings are retained unchanged. Lyric alignment
+and correction use the existing tools.
+
 ## Historical generation repair
 
 For automatic recovery followed by permanent removal of everything still

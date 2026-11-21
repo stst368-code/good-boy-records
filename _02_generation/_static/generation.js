@@ -4,6 +4,7 @@ import {initCaptions} from "/tools/generation/captions.js";
 import {initJobs} from "/tools/generation/jobs.js";
 import {workerLabel} from "/tools/generation/workers.js";
 import {bindMultiSelect} from './selection.js';
+import {initLab} from './lab.js';
 export function initGeneration({api,toast,browse,configureWorkers}) {
   const root=document.getElementById('generationView');
   root.innerHTML=`
@@ -11,6 +12,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
   <div id="genWorkspaceTabs" class="generation-tabs generation-workspace-tabs">
     <button id="genSetupTab" type="button">New batch</button>
     <button id="genQueueTab" type="button">Production queue</button>
+    <button id="genLabTab" type="button">Quick lab</button>
     <button id="genExperimentsTab" type="button">Experiments</button>
   </div>
   <section id="genSetupPanel" class="generation-builder">
@@ -60,7 +62,8 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
       <div id="genJobs"></div>
     </div>
   </section>
-  <section id="genExperimentsPanel" hidden></section>`;
+  <section id="genExperimentsPanel" hidden></section>
+  <section id="genLabPanel" hidden></section>`;
   const $=id=>document.getElementById(id);
   let activePanel = 'setup';
   const showPanel = bindTabs({
@@ -68,11 +71,14 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     entries: [
       {name: 'setup', button: $('genSetupTab'), panel: $('genSetupPanel')},
       {name: 'queue', button: $('genQueueTab'), panel: $('genQueuePanel')},
+      {name: 'lab', button: $('genLabTab'), panel: $('genLabPanel')},
       {name: 'experiments', button: $('genExperimentsTab'), panel: $('genExperimentsPanel')},
     ],
     onSelect(name) {
       activePanel = name;
+      if(name !== 'lab') lab.close();
       if (name === 'setup') return;
+      if(name === 'lab') return lab.open().catch(error=>toast(error.message));
       const experiment = name === 'experiments';
       (experiment ? $('genExperimentsPanel') : $('genQueuePanel')).append($('genQueueWorkspace'));
       $('genQueueTitle').textContent = experiment ? 'Experiment runs' : 'Production runs';
@@ -81,6 +87,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     },
   });
   const state={paths:null,rows:[],selected:new Set(),catalogueRoot:null,scanSequence:0,workers:[],resolved:null,token:null,preview:null,loaded:false,poll:null,busy:false,revision:0,logCursors:JSON.parse(sessionStorage.getItem('gbr-generation-log-cursors')||'{}'),tasks:[]};
+  const lab=initLab({root:$('genLabPanel'),api,toast,context:()=>({inputRoot:$('genRoot').value,workers:state.workers}),openExperiments:()=>showPanel('experiments')});
   const guarded=fn=>(...args)=>Promise.resolve(fn(...args)).catch(error=>toast(error.message));
   const numericFields=[['encoder_cfg','genEncoderCfg','Encoder CFG',1.5,'genEncodingControls'],['top_k','genTopK','Top-k',50,'genEncodingControls'],['duration','genDuration','Maximum seconds',360,'genEncodingControls'],['encoder_seed','genEncoderSeed','Encoder seed','auto','genEncodingControls'],['sampler_steps','genSteps','Steps',30,'genDiffusionControls'],['sampler_cfg','genCfg','Diffusion CFG',1.7,'genDiffusionControls'],['sampler_seed','genSamplerSeed','Diffusion seed','auto','genDiffusionControls']];
   for(const [key,id,label,value,container] of numericFields){
@@ -454,11 +461,12 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
     reloadWorkers,
     close() {
       clearInterval(state.poll);
+      lab.close();
       for (const audio of root.querySelectorAll('audio')) audio.pause();
     },
     writingChanged(kind) {if(kind==='track')state.catalogueDirty=true;state.templatesDirty=true;invalidate();},
     async open() {
-      const panels = (activePanel === 'setup' ? ratingOptions() : jobs()).catch(error => {
+      const panels = (activePanel === 'setup' ? ratingOptions() : activePanel === 'lab' ? lab.open() : jobs()).catch(error => {
         if (!root.hidden) toast(error.message);
       });
       if (!state.loaded) {
@@ -488,7 +496,7 @@ export function initGeneration({api,toast,browse,configureWorkers}) {
       let polling = false;
       state.poll = setInterval(async () => {
         ticks++;
-        if (root.hidden || document.hidden || activePanel === 'setup' || polling) return;
+        if (root.hidden || document.hidden || ['setup','lab'].includes(activePanel) || polling) return;
         if (activePanel === 'experiments' && ticks % 2) return;
         polling = true;
         try {await jobs({background:true});} catch { /* Manual refresh reports errors. */ }

@@ -1,4 +1,5 @@
 import {initTimeline} from './timeline.js';
+import {initMasteringStudio} from './mastering-studio.js';
 export function initPreparation({api,toast}){
  const root=document.getElementById('preparationView');
  root.innerHTML=`
@@ -23,8 +24,9 @@ export function initPreparation({api,toast}){
     </div>
     <div class="prep-audition">
      <label>Preview start <input id="prepStart" type="number" min="0" value="0" step="any" aria-label="Preview start in seconds"></label>
+     <label>Length / s<input id="prepSeconds" type="number" min="1" max="60" value="30" step="1"></label>
      <button id="prepFromPlayhead" class="secondary">Use playhead</button>
-     <button id="prepPreview">Render 30s preview</button>
+     <button id="prepPreview">Render preview</button>
      <button id="prepAB" class="secondary" disabled>Compare A/B</button>
      <button id="prepClean" class="secondary" disabled>Clear preview</button>
     </div>
@@ -118,6 +120,21 @@ export function initPreparation({api,toast}){
  const play=async()=>{const time=getTime();q('prepProcessed').pause();q('prepRaw').currentTime=time;await q('prepRaw').play();};
  const seek=time=>{const playing=isPlaying();q('prepProcessed').pause();q('prepRaw').currentTime=time;if(playing&&q('prepRaw').paused)q('prepRaw').play().catch(e=>toast(e.message));};
  const timeline=initTimeline({root,api,toast,audio:q('prepRaw'),getTime,seek,play,pause,isPlaying,setRate:value=>{q('prepRaw').playbackRate=q('prepProcessed').playbackRate=value;}});
+ const studio=initMasteringStudio({root,api,toast,getTime,seek,play,pause,isPlaying,previewStart:()=>previewStart,
+  onSelection:range=>{q('prepStart').value=range.start;q('prepSeconds').value=Math.max(1,Math.min(60,Math.ceil(range.end-range.start)));editMix();q('prepPreview').click();},
+  onChange:()=>editMix()});
+ let mixUndo=[],mixRedo=[],lastMix='';
+ function mixHistory(backwards){
+  const from=backwards?mixUndo:mixRedo,to=backwards?mixRedo:mixUndo;if(!from.length)return;
+  to.push(readMix());loadMix(from.pop(),q('prepUseStems').checked,Number(q('prepStart').value));lastMix=JSON.stringify(readMix());saveDraft();updateRenders(project());historyButtons();
+ }
+ function historyButtons(){studio.history(mixUndo.length,mixRedo.length,()=>mixHistory(true),()=>mixHistory(false));}
+ function saveDraft(){
+  if(editing)drafts.set(editing,{mix:readMix(),stems:q('prepUseStems').checked,start:Number(q('prepStart').value)});
+  try{localStorage.setItem('gbr-mix-drafts-v2',JSON.stringify([...drafts].slice(-50)));}catch{}
+ }
+ try{for(const [id,draft] of JSON.parse(localStorage.getItem('gbr-mix-drafts-v2')||'[]'))drafts.set(id,draft);}catch{}
+ historyButtons();
  q('prepHistoryHeading').before(q('prepComplete').closest('section'));
  const project=()=>projects.find(p=>p.generation_id===selected);
  timeline.onSourceChange(async artifact => {
@@ -129,7 +146,7 @@ export function initPreparation({api,toast}){
 
  function readMix() {
   const values = Object.fromEntries(mixInputs.map(input => [input.dataset.mix, Number(input.value)]));
-  return {...values, limiter_db: q('prepLimit').checked ? -1 : null, effects: effects.map(effect => ({...effect}))};
+  return {...values, limiter_db: q('prepLimit').checked ? -1 : null, effects: structuredClone(effects)};
  }
  function workingStems(p) {
   return p?.tasks?.find(task => task.kind === 'lyric_alignment' && task.status === 'done' &&
@@ -142,7 +159,9 @@ export function initPreparation({api,toast}){
   return values;
  }
  function editMix() {
-  if (editing) drafts.set(editing, {mix: readMix(), stems: q('prepUseStems').checked, start: Number(q('prepStart').value)});
+  const next=JSON.stringify(readMix());
+  if(lastMix&&next!==lastMix){mixUndo.push(JSON.parse(lastMix));if(mixUndo.length>50)mixUndo.shift();mixRedo=[];}
+  lastMix=next;saveDraft();historyButtons();
   updateRenders(project());
  }
  for (const input of mixInputs) {
@@ -153,6 +172,7 @@ export function initPreparation({api,toast}){
  }
  q('prepLimit').onchange = editMix;
  q('prepStart').oninput = editMix;
+ q('prepSeconds').oninput = editMix;
  q('prepUseStems').onchange = () => {
   if (q('prepUseStems').checked && !workingStems(project())) {
    q('prepUseStems').checked = false;
@@ -176,13 +196,15 @@ export function initPreparation({api,toast}){
       <button type="button" data-action="remove" class="secondary" aria-label="Remove ${esc(name)}" title="Remove">×</button>
      </div>
     </div>
-    <label class="prep-effect-strength">Strength <input type="range" min="0" max="100" step="1" value="${effect.strength}" aria-label="${esc(name)} strength"><output>${effect.strength}%</output></label>
+    <label class="prep-effect-strength">Strength <input data-strength type="range" min="0" max="100" step="1" value="${effect.strength}" aria-label="${esc(name)} strength"><output>${effect.strength}%</output></label>
    </li>`;
   }).join('');
+  for(const row of q('prepEffectChain').children)studio.decorate(row,effects[Number(row.dataset.index)],effectPresets.get(effects[Number(row.dataset.index)].preset));
   if (focus != null) q('prepEffectChain').children[focus]?.querySelector('input').focus({preventScroll: true});
  }
  q('prepEffectChain').oninput = event => {
   const input = event.target;
+  if(!input.matches('[data-strength]'))return;
   const row = input.closest('[data-index]');
   effects[Number(row.dataset.index)].strength = Number(input.value);
   row.querySelector('output').textContent = input.value + '%';
@@ -217,7 +239,9 @@ export function initPreparation({api,toast}){
    button.dataset.preset = preset.id;
    button.onclick = () => {
     if (effects.length >= maxEffects) return;
-    effects.push({preset: preset.id, strength: preset.strength, bypassed: false});
+    const effect={preset:preset.id,strength:preset.strength,bypassed:false};
+    if(preset.parameters?.length)effect.parameters=Object.fromEntries(preset.parameters.map(p=>[p.id,p.default]));
+    effects.push(effect);
     paintRack();
     editMix();
    };
@@ -234,7 +258,7 @@ export function initPreparation({api,toast}){
   q('prepLimit').checked = settings.limiter_db === undefined || settings.limiter_db !== null;
   q('prepUseStems').checked = stems;
   q('prepStart').value = start;
-  effects = (settings.effects || []).filter(effect => effectPresets.has(effect.preset)).map(effect => ({...effect}));
+  effects = structuredClone((settings.effects || []).filter(effect => effectPresets.has(effect.preset)));
   paintRack();
  }
 
@@ -279,14 +303,14 @@ export function initPreparation({api,toast}){
  }
  const active = task => ['queued', 'running'].includes(task?.status);
  const playable = task => task.status === 'done' && task.artifacts.some(item => item.available && item.kind === 'preview_audio');
- const effectValues = items => (items || []).map(effect => [effect.preset, effect.strength, Boolean(effect.bypassed)]);
+ const effectValues = items => (items || []).map(effect => [effect.preset,effect.strength,Boolean(effect.bypassed),Object.entries(effect.parameters||{}).sort(),effect.range?[effect.range.start,effect.range.end,effect.range.fade_in||0,effect.range.fade_out||0]:null,(effect.automation||[]).map(p=>[p.time,p.value])]);
  function previewMatches(task) {
   const {effects: currentEffects, ...values} = mix();
   const saved = task.recipe.mix;
   const stem = q('prepUseStems').checked ? workingStems(project())?.id : undefined;
   return Object.entries(values).every(([key, value]) => value === saved[key]) &&
    JSON.stringify(effectValues(currentEffects)) === JSON.stringify(effectValues(saved.effects)) &&
-   task.recipe.start === Number(q('prepStart').value) && task.recipe.stem_task_id === stem;
+   task.recipe.start === Number(q('prepStart').value) && task.recipe.seconds === Math.min(Number(q('prepSeconds').value),(project()?.duration||Infinity)-Number(q('prepStart').value)) && task.recipe.stem_task_id === stem;
  }
  function updateRenders(p) {
   const tasks = p?.tasks || [], source = timeline.artifact();
@@ -308,7 +332,9 @@ export function initPreparation({api,toast}){
   q('prepMaster').disabled = submitting.has('mix_master') || active(masterJob);
   const measurements = masterJob?.telemetry?.measurements;
   const peakValue = measurements?.sample_peak_dbfs;
-  const peak = peakValue != null ? ` · peak ${peakValue.toFixed(1)} dBFS` : '';
+  const peak = (peakValue != null ? ` · sample peak ${peakValue.toFixed(1)} dBFS` : '')+
+   (measurements?.integrated_lufs!=null?` · ${measurements.integrated_lufs.toFixed(1)} LUFS`:'')+
+   (measurements?.true_peak_dbfs!=null?` · true peak ${measurements.true_peak_dbfs.toFixed(1)} dBFS`:'');
   q('prepMasterStatus').textContent = active(masterJob) ? `Master ${masterJob.status}…` : masterJob?.error ? masterJob.error :
    candidate ? (source === candidate.id ? 'Master selected for release' : 'Master ready') + peak : '';
   q('prepReleaseAudio').textContent = source ? 'Release audio · Selected master' : 'Release audio · Reviewed source';
@@ -371,6 +397,7 @@ export function initPreparation({api,toast}){
    editing = selected;
    const draft = drafts.get(selected);
    loadMix(draft?.mix || {}, draft?.stems, draft?.start);
+   mixUndo=[];mixRedo=[];lastMix=JSON.stringify(readMix());historyButtons();
    requestedPreview = requestedMaster = '';
    lastBrief = null;
    q('prepPrompt').value = q('prepDirection').value = q('prepArtworkFile').value = '';
@@ -386,6 +413,7 @@ export function initPreparation({api,toast}){
   }
   history();
   if (project()?.ready) await timeline.update(project());
+  if (sequence === refreshSequence && project()?.ready) await studio.update(selected,timeline.artifact());
   if (sequence !== refreshSequence) return;
   updateRenders(project());
   const yamlKey=selected+':'+(project()?.yaml_sha256||'')+':'+(project()?.yaml_error||'')+':'+libraryMode;
@@ -403,7 +431,7 @@ export function initPreparation({api,toast}){
   updateRenders(project());
   try {
    const result = await api(`/preparation/projects/${encodeURIComponent(id)}/jobs`, {
-    kind, mix: mix(), start: Number(q('prepStart').value), seconds: 30, input_artifact_id: source || null,
+    kind, mix: mix(), start: Number(q('prepStart').value), seconds: Number(q('prepSeconds').value), input_artifact_id: source || null,
     stem_task_id: q('prepUseStems').checked ? workingStems(project())?.id : null,
    });
    if (selected !== id) return;
@@ -531,7 +559,7 @@ export function initPreparation({api,toast}){
   },
   close(){
    ++openSequence;++refreshSequence;++yamlSequence;
-   timeline.close();clearInterval(timer);q('prepRaw').pause();q('prepProcessed').pause();
+   timeline.close();studio.close();clearInterval(timer);q('prepRaw').pause();q('prepProcessed').pause();
   },
  };
 }

@@ -31,6 +31,20 @@ def afir_gain_option(ffmpeg):
     return 'irnorm=-1' if 'irnorm' in options else 'gtype=none'
 
 
+def loudness(ffmpeg, output):
+    """Measure the rendered file, never infer LUFS from RMS or the limiter."""
+    result = subprocess.run([ffmpeg, '-nostdin', '-hide_banner', '-i', str(output),
+                             '-af', 'ebur128=peak=true', '-f', 'null', '-'],
+                            capture_output=True, text=True, timeout=120, encoding='utf-8', errors='replace')
+    summary = result.stderr.rsplit('Summary:', 1)[-1] if result.returncode == 0 else ''
+    measured = {}
+    for key, pattern in [('integrated_lufs', r'\bI:\s+(-?\d+(?:\.\d+)?) LUFS'),
+                         ('true_peak_dbfs', r'True peak:\s+Peak:\s+(-?\d+(?:\.\d+)?) dBFS')]:
+        match = re.search(pattern, summary)
+        if match: measured[key] = float(match[1])
+    return measured
+
+
 def render(request):
     import numpy as np
     import soundfile as sf
@@ -111,7 +125,8 @@ def render(request):
             'measurements':{'duration':info.duration,'sample_rate':info.samplerate,'channels':info.channels,'subtype':info.subtype,
                 'sample_peak_dbfs':20*math.log10(peak) if peak>0 else None,
                 'rms_dbfs':10*math.log10(squares/samples) if squares>0 and samples else None,
-                'limiter_kind':'sample_peak' if mix['limiter_db'] is not None else None}}
+                'limiter_kind':'sample_peak' if mix['limiter_db'] is not None else None,
+                **loudness(ffmpeg,output)}}
 
 
 def visuals(request):
