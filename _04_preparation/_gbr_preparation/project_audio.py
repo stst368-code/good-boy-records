@@ -16,24 +16,26 @@ def checksum(path):
     return result.hexdigest()
 
 
-def music_blocks(source,segment,rate):
+def music_blocks(source,segment,rate,limit=None):
     import numpy as np
     origin=round(segment['at']*rate)
     size=round(segment['until']*rate)-origin
+    count=min(size,max(0,limit-origin)) if limit is not None else size
     if segment['kind']=='gap':
-        for at in range(0,size,BLOCK):yield np.zeros((min(BLOCK,size-at),source.channels),dtype='float32')
+        for at in range(0,count,BLOCK):yield np.zeros((min(BLOCK,count-at),source.channels),dtype='float32')
         return
     gain=10**(segment.get('gain_db',0)/20)
     if segment.get('mode')=='mute':
-        for at in range(0,size,BLOCK):yield np.zeros((min(BLOCK,size-at),source.channels),dtype='float32')
+        for at in range(0,count,BLOCK):yield np.zeros((min(BLOCK,count-at),source.channels),dtype='float32')
         return
     pieces=warp(segment)
     first_frame=max(0,round(segment['start']*rate))
     last_frame=min(source.frames-1,math.ceil(segment['end']*rate)-1)
     for left,right,begin,end in pieces:
         first,last=round((segment['at']+left)*rate)-origin,round((segment['at']+right)*rate)-origin
-        for at in range(first,last,BLOCK):
-            frames=np.arange(at,min(at+BLOCK,last))
+        until=min(last,count)
+        for at in range(first,until,BLOCK):
+            frames=np.arange(at,min(at+BLOCK,until))
             positions=(begin+((frames+origin)/rate-segment['at']-left)/(right-left)*(end-begin))*rate
             if end<begin:positions-=1
             positions=np.clip(positions,first_frame,last_frame)
@@ -90,22 +92,30 @@ def assemble(request):
         if process.returncode:raise ValueError('Separated stem mix failed')
         request={**request,'source':str(stem_mix)}
     timeline=spans(project)
+    # Keep the entire lead-in for causal filter/automation state, plus one
+    # second of lookahead for FFT convolution and limiter buffering. Never
+    # assemble the unused rest of a song just to audition a short range.
+    limit=round((request['recipe']['start']+request['recipe']['seconds']+1)*rate) if request['kind']=='mix_preview' else None
     with sf.SoundFile(request['source']) as source,sf.SoundFile(music,'w',samplerate=rate,channels=info.channels,subtype='FLOAT') as target:
         for index,segment in enumerate(timeline):
+            if limit is not None and round(segment['at']*rate)>=limit:break
             if segment.get('effects'):
                 path=folder/('music-'+str(index)+'.wav')
                 with sf.SoundFile(path,'w',samplerate=rate,channels=info.channels,subtype='FLOAT') as clip:
-                    for block in music_blocks(source,segment,rate):clip.write(block)
+                    for block in music_blocks(source,segment,rate,limit):clip.write(block)
                 effected=section_effects(path,segment,request,index)
                 count=round(segment['until']*rate)-round(segment['at']*rate);written=0
+                if limit is not None:count=min(count,limit-round(segment['at']*rate))
                 for block in sf.blocks(effected,blocksize=BLOCK,dtype='float32',always_2d=True):
                     block=block[:count-written];target.write(block);written+=len(block)
                     if written==count:break
                 if written<count:target.write(np.zeros((count-written,info.channels),dtype='float32'))
             else:
-                for block in music_blocks(source,segment,rate):target.write(block)
+                for block in music_blocks(source,segment,rate,limit):target.write(block)
     if not project['sounds']:return music
-    events=sound_positions(project);handles={}
+    events=[event for event in sound_positions(project) if limit is None or event['position']*rate<limit]
+    if not events:return music
+    handles={}
     try:
         for clip_id in {e['clip_id'] for e in events}:
             item=request['recipe']['clips'][clip_id]
@@ -145,7 +155,8 @@ def assemble(request):
                         data[:,1]*=1+min(0,event.get('pan',0))
                     additions[section]+=data
                 target.write(block+additions);at+=len(block)
-        for item in request['recipe']['clips'].values():
+        for clip_id in handles:
+            item=request['recipe']['clips'][clip_id]
             if checksum(item['path'])!=item['sha256']:raise ValueError('Sound clip changed while rendering')
         return output
     finally:

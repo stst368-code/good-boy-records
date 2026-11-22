@@ -213,3 +213,20 @@ def test_annotation_only_versions_reuse_audio_and_refresh_bound_sidecars(prepare
     changed=save(prep,gid,newer)
     assert changed['reused_master_id'] is None
     with pytest.raises(ValueError,match='latest saved'):prep.song_projects.assert_release(gid,newer['reused_master_id'],None)
+
+
+def test_range_preview_assembles_only_the_required_prefix_and_matches_master(prepared,tmp_path):
+    _,prep,_,_,gid,_=prepared;source=promote(prepared)
+    loaded=prep.song_projects.get(gid);doc=loaded['project']
+    doc['mix']['effects']=[{'preset':'concert_hall','strength':35},{'preset':'compressor','strength':60}]
+    saved=save(prep,gid,loaded);recipe=prep.song_projects.render_recipe(gid,saved['revision_id'])
+    from _gbr_preparation.project_audio import assemble
+    request={'kind':'mix_preview','source':str(source),'output':str(tmp_path/'preview'),
+             'recipe':{'song_project':recipe['project'],'clips':recipe['clips'],'start':.25,'seconds':1}}
+    prefix=assemble(request)
+    assert sf.info(prefix).duration==2.25
+    master=prep.submit(gid,'mix_master',{'song_project_id':saved['revision_id']});wait(prep,master['id'])
+    preview=prep.submit(gid,'mix_preview',{'song_project_id':saved['revision_id'],'start':.25,'seconds':1});wait(prep,preview['id'])
+    full,rate=sf.read(prep.artifact(master['id']+'-output'))
+    actual,_=sf.read(prep.artifact(preview['id']+'-output'))
+    np.testing.assert_allclose(actual,full[rate//4:rate//4+rate],atol=2/2**23)
