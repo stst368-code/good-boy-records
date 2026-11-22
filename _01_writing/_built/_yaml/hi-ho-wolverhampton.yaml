@@ -1,0 +1,74 @@
+song_id: 104
+variant_id: 1
+title: hi-ho-wolverhampton
+cluster:
+version:
+explicit:
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |-
+  [intro]
+  [verse]
+  you're all over my warehouse floor, baby,
+  thats where you're at,
+  you'll be going next tuesday
+  that's what they said to me
+  flying out across the country
+  selfless service to be
+  drop it, scan it, its automation
+  friction free
+  twenty-first century
+  [chorus]
+  and its hi - ho wolverhapton!!
+  and away you go now baby,
+  i see your sun is shining
+  but i wont make a fuss
+  though its obvious.
+  [verse]
+  but next tuesday turned into a maybe
+  on my floor, you stayed sat
+  chased and chased
+  customers waiting
+  internal issues within the county
+  are you leavin' or are you stayin'
+  a permanent part of where you're layin'
+  it's been so long, it's unreal to me
+  that there ever was a time before you came here
+  chase and chase
+  day to night
+  i'm close to helping you take flight
+  a can of gasoline
+  some matches baby
+  i'll get my floor back
+  just as soon as you alight
+  [chorus]
+  and its hi - ho wolverhampton!!
+  now i'm hearing it was never to be
+  hi ho wolverhampton
+  word through the grapevine is
+  c'est la vie
+  turns out its true
+  not meant for england
+  off to france to live out your life
+  so hi ho wolverhampton
+  i won't miss you
+  please don't come back
+  oh
+  hi ho wolverhampton
+  [outro]
+  so long goodbye
+  la belle vie
+  bon voyage
+  et profite bien

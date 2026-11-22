@@ -1,2 +1,9 @@
 ﻿song_id,variant_id,song_name,filename,author,inspiration_author,inspiration_track,album_bool,album_name,album_position,original_cluster,original_style
 13,2,moses-supposes-punk,moses-supposes-punk.yaml,gbr,gbr original,gbr original,f,,,Pop & Alternative Rock,post-punk-indie-rock_0001
+103,2,the-endless-scroll,_yaml/the-endless-scroll__v2.yaml,gbr,karolina teus,real life,f,,,,
+103,3,the-endless-scroll,_yaml/the-endless-scroll__v3.yaml,gbr,karolina teus,real life,f,,,,
+103,4,the-endless-scroll,_yaml/the-endless-scroll__v4.yaml,gbr,karolina teus,real life,f,,,,
+103,5,stacking-up-my-scroll,_yaml/stacking-up-my-scroll__v5.yaml,gbr,karolina teus,real life,f,,,,
+103,6,stacking-up-my-scroll,_yaml/stacking-up-my-scroll__v6.yaml,gbr,karolina teus,real life,f,,,,
+9,2,johnny-three-fridges,_yaml/johnny-three-fridges__v2.yaml,gbr,gbr original,gbr original,f,,,Country & Americana,
+16,2,paradox,_yaml/paradox__v2.yaml,gbr,gbr original,gbr original,f,,,Metal & Heavy Rock,
