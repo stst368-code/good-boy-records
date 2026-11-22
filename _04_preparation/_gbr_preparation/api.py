@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt,StrictBool
 from typing import Literal
 from .service import Preparation
 from .mastering import preset_catalogue
+from starlette.concurrency import run_in_threadpool
 
 
 class Job(BaseModel):
@@ -12,6 +13,7 @@ class Job(BaseModel):
     kind: Literal['mix_preview','mix_master','visuals','lyric_alignment']
     stem_task_id: str | None=None
     input_artifact_id: str | None=None
+    song_project_id: str | None=None
     language: str | None=None
     force:StrictBool=False
     mix: dict=Field(default_factory=dict)
@@ -39,6 +41,21 @@ class RecordingIdentity(BaseModel):
     expected_sha256:str=Field(pattern=r'^[a-f0-9]{64}$')
 
 
+class SongProject(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    parent_revision_id:str|None=None
+    source_sha256:str=Field(pattern=r'^[a-f0-9]{64}$')
+    input_artifact_id:str|None=None
+    project:dict
+    label:str=Field(default='Song edit',max_length=160)
+
+
+class SoundDetails(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    name:str=Field(max_length=160)
+    category:str=Field(default='Imported',max_length=80)
+
+
 def router(root,review,local):
     service=Preparation(root,review)
     def host(request: Request):
@@ -59,6 +76,34 @@ def router(root,review,local):
 
     @routes.get('/effects')
     def effects():return preset_catalogue()
+
+    @routes.get('/sounds')
+    def sounds():return service.sounds.list()
+
+    @routes.get('/sounds/{identifier}/audio')
+    def sound_audio(identifier:str):
+        return FileResponse(service.sounds.audio(identifier),media_type='audio/wav')
+
+    @routes.post('/sounds/{identifier}/details')
+    def sound_details(identifier:str,body:SoundDetails):
+        return service.sounds.rename(identifier,body.name,body.category)
+
+    @routes.post('/sounds/import')
+    async def sound_import(request:Request,name:str='Imported sound',category:str='Imported'):
+        from .sounds import MAX_UPLOAD
+        raw=bytearray()
+        async for chunk in request.stream():
+            if len(raw)+len(chunk)>MAX_UPLOAD:raise HTTPException(413,'Import an audio clip up to 32 MiB')
+            raw.extend(chunk)
+        return await run_in_threadpool(service.sounds.import_audio,bytes(raw),name,category)
+
+    @routes.get('/projects/{gid}/song-project')
+    def song_project(gid:str,revision:str|None=None,artifact:str|None=None):
+        return service.song_projects.get(gid,revision,artifact)
+
+    @routes.post('/projects/{gid}/song-project')
+    def save_song_project(gid:str,body:SongProject):
+        return service.song_projects.save(gid,body.model_dump())
 
     @routes.get('/processing')
     def processing(flagged_only:bool=False):return service.processing.status(flagged_only=flagged_only)

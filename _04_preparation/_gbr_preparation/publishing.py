@@ -405,6 +405,7 @@ class Publisher:
         destination(options.get('visibility','public'))
         self.library.room(options.get('visibility','public'))
         self.eligible(gid);_,source=self.prep.source(gid,artifact_id=options.get('master_id'))
+        if not options.get('reuse_release_id'):self.prep.song_projects.assert_release(gid,options.get('master_id'),options.get('artwork_id'))
         if options.get('artwork_id'):
             art=self.db.one("SELECT * FROM generation_artifacts WHERE id=? AND kind IN ('album_artwork','cover_artwork') AND json_extract(metadata_json,'$.source_generation_id')=?",(options['artwork_id'],gid))
             if not art:raise ValueError('Artwork does not belong to this recording')
@@ -473,6 +474,7 @@ class Publisher:
                 if not draft:raise ValueError('Library revision is unavailable')
                 patch=json.loads(draft['recipe_json'])['changes'];meta.update(patch)
             _,source=self.prep.source(gid,artifact_id=options.get('master_id'))
+            if not reuse:self.prep.song_projects.assert_release(gid,options.get('master_id'),options.get('artwork_id'))
             if digest(source)!=task['input_sha256']:raise ValueError('Working audio changed before preparation')
             import soundfile as sf
             info=sf.info(source)
@@ -573,7 +575,7 @@ class Publisher:
                 'genre':{'parent_genre':str(meta.get('cluster') or 'Unclassified'),'child_genre':str(meta.get('style') or meta.get('style_primary') or 'Unspecified'),
                          'parent_colour':'#a89069','child_colour':'#c4aa82','taxonomy_order':10000},
                 'audio':{'sources':{'mp3':urls['audio.mp3'],'flac':urls.get('audio.flac')}},
-                'artwork_url':urls.get('cover.jpg'),'lyrics':{'raw':str(meta.get('lyrics') or '')},
+                'artwork_url':urls.get('cover.jpg'),'lyrics':{'raw':str(editorial.get('raw_lyrics') if editorial.get('song_project_id') else meta.get('lyrics') or '')},
                 'lyrics_url':urls.get('lyrics.json'),'playback_url':urls.get('playback.json'),
                 'release_id':identifier,'generation_datetime':meta.get('generation_datetime')}
             track['visibility']=options.get('visibility','public')

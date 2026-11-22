@@ -194,7 +194,7 @@ def room_impulse(room, rate, stereo):
     return impulse
 
 
-def effect_graph(effects, source, audio, directory, next_input, afir_gain):
+def effect_graph(effects, source, audio, directory, next_input, afir_gain, time_offset=0):
     """Apply effects in rack order, preserving duration and the dry time origin."""
     filters, impulses = [], []
     for index, effect in enumerate(effects):
@@ -222,6 +222,9 @@ def effect_graph(effects, source, audio, directory, next_input, afir_gain):
             dry_amount = 1 - amount
         if effect.get('range') or effect.get('automation'):
             curve = envelope(effect)
+            if time_offset:
+                import re
+                curve=re.sub(r'\bt\b',f'(t+{time_offset:.9g})',curve)
             dry = '1' if 'room' in preset else f'1-({curve})'
             filters.extend([f"[{direct}]aeval=exprs='val(ch)*({dry})':c=same[dryauto{index}]",
                             f"[{wet}]aeval=exprs='val(ch)*({curve})':c=same[wetauto{index}]",

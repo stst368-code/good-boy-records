@@ -52,6 +52,14 @@ def render(request):
     if not ffmpeg:raise RuntimeError('FFmpeg is required for previews and master candidates')
     version=subprocess.run([ffmpeg,'-version'],capture_output=True,text=True,check=True, encoding="utf-8", errors="replace").stdout.splitlines()[0]
     recipe=request['recipe'];mix=recipe['mix'];duration=float(request['duration'])
+    original_request=request
+    if recipe.get('song_project'):
+        sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'_04_preparation'))
+        from _gbr_preparation.project_audio import assemble
+        from _gbr_preparation.project_model import duration as project_duration
+        arranged=assemble(request)
+        request={**request,'source':str(arranged),'duration':project_duration(recipe['song_project']),'stems':None}
+        duration=request['duration']
     stems = request.get('stems')
     audio = sf.info(stems['vocals'] if stems else request['source'])
     effects = [effect for effect in mix.get('effects', []) if effect['strength'] and not effect.get('bypassed')]
@@ -106,7 +114,7 @@ def render(request):
               'pcm_s24le' if request['kind']=='mix_preview' else 'flac']
     if request['kind']=='mix_master':command+=['-sample_fmt','s32','-bits_per_raw_sample','24']
     command+=[str(output)]
-    bypass=request['kind']=='mix_master' and not stems and not effects and not any(mix[key] for key in ['gain_db','bass_db','mid_db','treble_db','reverb','fade_in','fade_out']) and mix['limiter_db'] is None
+    bypass=request['kind']=='mix_master' and not recipe.get('song_project') and not stems and not effects and not any(mix[key] for key in ['gain_db','bass_db','mid_db','treble_db','reverb','fade_in','fade_out']) and mix['limiter_db'] is None
     if bypass:
         # Keep bit depth/container bytes for a true bypass. This temporary hard
         # link is removed with the task directory after the source is reused.
@@ -120,13 +128,19 @@ def render(request):
     for block in sf.blocks(output,blocksize=65536,dtype='float64',always_2d=True):
         if not np.isfinite(block).all():raise ValueError('Rendered audio contains invalid samples')
         peak=max(peak,float(np.max(np.abs(block))));squares+=float(np.sum(block**2));samples+=block.size
-    return {'output':str(output),'artifact_kind':'preview_audio' if request['kind']=='mix_preview' else 'master_candidate',
+    result={'output':str(output),'artifact_kind':'preview_audio' if request['kind']=='mix_preview' else 'master_candidate',
             'software':{'ffmpeg':version if not bypass else None,'processing_engine':'bypass' if bypass else 'ffmpeg','limiter_compensation':limiter_compensation,'numpy':np.__version__,'soundfile':sf.__version__},
             'measurements':{'duration':info.duration,'sample_rate':info.samplerate,'channels':info.channels,'subtype':info.subtype,
                 'sample_peak_dbfs':20*math.log10(peak) if peak>0 else None,
                 'rms_dbfs':10*math.log10(squares/samples) if squares>0 and samples else None,
                 'limiter_kind':'sample_peak' if mix['limiter_db'] is not None else None,
                 **loudness(ffmpeg,output)}}
+    if recipe.get('song_project') and request['kind']=='mix_master':
+        from _gbr_preparation.project_audio import sidecars,checksum
+        features=visuals({**request,'source':str(output),'source_sha256':checksum(output),
+                          'output':str(output.parent/'song-features')})
+        result['additional_outputs']=sidecars(original_request,output,features)
+    return result
 
 
 def visuals(request):

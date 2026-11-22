@@ -28,6 +28,9 @@ jobs:
       - run: python -m pytest _99_tools/_yaml_editor/_tests -q
       - run: node --input-type=module --check < _04_preparation/_static/preparation.js
       - run: node --input-type=module --check < _04_preparation/_static/mastering-studio.js
+      - run: node --input-type=module --check < _04_preparation/_static/song-editor.js
+      - run: node --input-type=module --check < _04_preparation/_static/song-model.js
+      - run: node --input-type=module --check < _04_preparation/_static/song-player.js
       - run: node --input-type=module --check < _04_preparation/_static/publishing.js
       - run: node --input-type=module --check < _04_preparation/_static/library.js
       - run: node --input-type=module --check < _04_preparation/_static/timeline.js

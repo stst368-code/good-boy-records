@@ -68,26 +68,45 @@ compare it, or **Load recipe** to iterate. The current draft is saved on this
 browser; queued trials remain in the shared database. **All experiments**
 opens the existing experiment dashboard and its output actions.
 
-**Preparation → Mastering** now includes a zoomable waveform, drag selection
-and a selection loop. Click to seek; drag to choose a time range. Add an effect
-and choose **Selection** to restrict it to that range, with fade-in/out edges.
-**Whole track** removes the range restriction.
+**Preparation → Song studio** uses one timeline for music sections, sound clips,
+lyrics, mastering effects and lighting. The source recording stays untouched;
+saving creates a project revision in the existing shared database. Undo/redo
+covers the arrangement, word corrections, mix and artwork. Unsaved browser drafts
+can be recovered after reloading; saved versions can be restored as new drafts.
 
-Alongside the existing presets, Parametric EQ, Compressor, High-pass, Low-pass
-and Delay expose their own parameters. Open **Automation** to draw strength
-points, drag them, enter exact times/values, or create a rise/fall across the
-selected section. Automation scales the effect's Strength control. Undo/redo
-and browser drafts preserve the current edit; every rendered recipe is stored
-with its processing task and can be restored from processing history.
+Click the ruler to seek, drag it to select a range, and zoom for precise edits.
+Split, trim, move, delete or repeat music sections. Their source lyrics and attached
+clips follow. **Silence** inserts time and resumes the music from that point.
+**Needle break** adds a break with needle-lift/drop sounds. Record gestures process
+the selected music: scratch, record stop, stutter, reverse and mute.
 
-**Preview this section** renders up to 60 seconds for A/B listening. Previews
-and full masters use the same original-track time coordinates and preserve
-duration, so lyric timing stays fixed. These are rendered audio previews;
-turning a control updates the recipe and requires another preview render.
-Finished masters show measured integrated LUFS and true peak when supported by
-FFmpeg, alongside sample peak and RMS. The existing −1 dBFS limiter remains a
-sample-peak limiter. Source recordings are retained unchanged. Lyric alignment
-and correction use the existing tools.
+**Sound library → Import audio** accepts WAV, FLAC, MP3, OGG, M4A and other formats
+supported by FFmpeg (up to 32 MiB and 120 seconds per clip). Multiple imports are
+supported. Search, audition and drag a clip onto the timeline, or add it at the
+playhead. Imported sounds remain reusable across songs. Each song also retains
+verified copies of its used clips through archive moves. The starter library has
+original synthesized air horn, needle lift/drop, crackle, impact and riser sounds.
+Select an inserted clip for trim, gain, fades, pan and music ducking. Anchored clips
+follow the music section; disable that option for a fixed timeline position.
+
+The **Mastering rack** retains the presets, editable EQ, compressor, filters,
+delay and separated vocal/accompaniment mixing. Choose **Selection** for a range;
+automation points use the same song clock. Select an effect on the timeline to
+add a strength point at the playhead, or edit exact point times and values in its
+rack controls. A music section can carry its own effect chain when moved/repeated.
+The existing WhisperX alignment engine is unchanged: run alignment, explicitly
+load it into the song, correct words and approve lyrics as before.
+
+Draft playback immediately auditions music edits and clips. **Render range preview**
+(up to 60 seconds) auditions the complete mastering chain; changing a mix requires
+another render. Previews and masters share one render path. Full masters generate
+lyrics and lighting against the final audio and duration, with measured LUFS,
+true peak, sample peak and RMS. The −1 dBFS limiter remains a sample-peak limiter.
+Finish preparation uses a master of the latest saved project, preventing an older
+render from silently discarding timeline edits. Changing only lyrics, artwork or
+lighting reuses verified rendered audio and refreshes its sidecars; it does not
+need another audio render. No new processing dependencies
+or database migration are required.
 
 ## Historical generation repair
 

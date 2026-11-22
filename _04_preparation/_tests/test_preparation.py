@@ -22,7 +22,10 @@ from conftest import complete,archive_all
 def prepared(tmp_path):
     root=tmp_path/'repo'
     for relative in ['_98_database/_gbr_database/processing.sql','_99_tools/_workers_processing/worker.py',
-                     '_04_preparation/_gbr_preparation/mastering.py']:
+                     '_04_preparation/_gbr_preparation/mastering.py',
+                     '_04_preparation/_gbr_preparation/project_audio.py',
+                     '_04_preparation/_gbr_preparation/project_model.py',
+                     '_04_preparation/_gbr_preparation/editorial.py']:
         path=root/relative;path.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/relative,path)
     database=tmp_path/'shared.sqlite3';initialize(database)
     inp=tmp_path/'input';inp.mkdir()

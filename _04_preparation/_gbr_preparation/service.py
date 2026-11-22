@@ -86,6 +86,10 @@ class Preparation:
         self.metadata=PreparationMetadata(self)
         from .processing import ProcessingQueue
         self.processing=ProcessingQueue(self)
+        from .sounds import SoundLibrary
+        from .song_projects import SongProjects
+        self.sounds=SoundLibrary(self)
+        self.song_projects=SongProjects(self)
         self.review.archiver.on_preparation_ready=self.auto_align
 
     def metadata_row(self,gid):
@@ -236,6 +240,8 @@ class Preparation:
             if not artifact:raise ValueError('Choose a master candidate belonging to this recording')
             source=self.artifact(artifact_id)
             if digest(source)!=artifact['sha256']:raise ValueError('Master candidate bytes changed')
+            import soundfile as sf
+            row['duration']=sf.info(source).duration
         return row,source
 
     def tasks(self,gid):
@@ -244,6 +250,11 @@ class Preparation:
             row['recipe']=json.loads(row.pop('recipe_json'));row['telemetry']=json.loads(row.pop('telemetry_json'))
             if row['kind']=='preparation_yaml':
                 row['recipe'].pop('yaml_bytes_b64', None)
+            if row['kind']=='song_project':
+                document=row['recipe'].pop('project',{})
+                row['recipe'].update(sections=len(document.get('segments',[])),sounds=len(document.get('sounds',[])))
+            row['recipe'].pop('song_project',None)
+            row['recipe'].pop('clips',None)
             row['artifacts']=self.db.all("SELECT id,kind,size_bytes,uri FROM generation_artifacts WHERE json_extract(metadata_json,'$.processing_task_id')=?",(row['id'],))
             for artifact in row['artifacts']:
                 artifact['available']=Path(artifact.pop('uri')).is_file()
@@ -352,6 +363,16 @@ class Preparation:
         self.require();self.editable(gid);row,source=self.source(gid,artifact_id=data.get('input_artifact_id'))
         if kind not in {'mix_preview','mix_master','visuals','lyric_alignment'}:raise ValueError('This processing adapter is not installed')
         recipe={'mix':mix_recipe(data.get('mix',{}))} if kind.startswith('mix_') else {'version':2,'fps':10,'energy':'channel_rms'}
+        if data.get('song_project_id'):
+            if kind not in {'mix_preview','mix_master'}:raise ValueError('Render the song before calculating final-audio features')
+            saved=self.song_projects.render_recipe(gid,data['song_project_id'])
+            if saved.get('input_artifact_id')!=data.get('input_artifact_id') or saved['source_sha256']!=digest(source):
+                raise ValueError('The song project belongs to a different source')
+            from .project_model import duration
+            recipe={'mix':saved['project']['mix'],'song_project':saved['project'],
+                    'song_project_id':data['song_project_id'],'clips':saved['clips'],'lyrics_sha256':saved['lyrics_sha256']}
+            row['duration']=duration(saved['project'])
+            data={**data,'stem_task_id':saved['project'].get('stem_task_id')}
         if kind.startswith('mix_'):
             for effect in recipe['mix'].get('effects', []):
                 if effect.get('range', {}).get('end', 0) > row['duration'] + .001 or any(p['time'] > row['duration'] + .001 for p in effect.get('automation', [])):
@@ -437,7 +458,7 @@ class Preparation:
                     output=Path(item['output'])
                     if not output.resolve().is_relative_to(Path(temporary).resolve()) or not output.is_file():raise ValueError('Invalid additional worker output')
                     sha=digest(output);target=destination/(sha+output.suffix)
-                    if task['kind']=='mix_master':
+                    if task['kind']=='mix_master' and item['artifact_kind']=='master_candidate' and not recipe.get('song_project'):
                         from _review.indexer import audio_identity
                         if audio_identity(output)[0]==row['audio_id']:target=source;sha=task['input_sha256']
                     if target.exists():
@@ -455,6 +476,7 @@ class Preparation:
                         c.execute('INSERT OR IGNORE INTO generation_artifacts VALUES(?,NULL,?,?,?,?,NULL,?)',
                             (identifier+('-output' if index==0 else '-'+str(index)),kind,sha,str(target),target.stat().st_size,canonical({'processing_task_id':identifier,'source_generation_id':task['generation_id']})))
                     c.execute("UPDATE processing_tasks SET worker_session_id=? WHERE id=?",(session,identifier))
+                self.song_projects.attach_render(task,published)
             cleanup={}
             if task['kind']=='mix_preview':
                 try:cleanup=self.clean_previews(task['generation_id'],keep=identifier)
@@ -611,7 +633,8 @@ class Preparation:
                         result['lyric_revision_missing'] = True
                     result.update(language=data.get('language', result['language']), words=data['words'],
                                   approved=index == 0 and data.get('approved', False), lyric_task_id=task['id'],
-                                  unmatched_recognition=data.get('unmatched_recognition', []), timing_source=timing)
+                                  unmatched_recognition=data.get('unmatched_recognition', []), timing_source=timing,
+                                  song_project_id=data.get('song_project_id'),raw_lyrics=data.get('raw_lyrics'))
                 elif key == 'visual':
                     result.update(features=data, feature_artifact_id=artifact['id'])
                 else:

@@ -1,4 +1,4 @@
-import {initTimeline} from './timeline.js';
+import {initSongEditor} from './song-editor.js';
 import {initMasteringStudio} from './mastering-studio.js';
 export function initPreparation({api,toast}){
  const root=document.getElementById('preparationView');
@@ -114,15 +114,18 @@ export function initPreparation({api,toast}){
  q('prepFlaggedOnly').checked=localStorage.getItem('gbr-preparation-flagged')!=='false';
  const flaggedOnly=()=>!libraryMode&&q('prepFlaggedOnly').checked;
  const handle=fn=>async()=>{try{await fn()}catch(error){toast(error.message)}};
- const getTime=()=>!q('prepProcessed').paused?q('prepProcessed').currentTime+previewStart:q('prepRaw').currentTime;
- const isPlaying=()=>!q('prepRaw').paused||!q('prepProcessed').paused;
- const pause=()=>{const time=getTime();q('prepRaw').pause();q('prepProcessed').pause();q('prepRaw').currentTime=time;};
- const play=async()=>{const time=getTime();q('prepProcessed').pause();q('prepRaw').currentTime=time;await q('prepRaw').play();};
- const seek=time=>{const playing=isPlaying();q('prepProcessed').pause();q('prepRaw').currentTime=time;if(playing&&q('prepRaw').paused)q('prepRaw').play().catch(e=>toast(e.message));};
- const timeline=initTimeline({root,api,toast,audio:q('prepRaw'),getTime,seek,play,pause,isPlaying,setRate:value=>{q('prepRaw').playbackRate=q('prepProcessed').playbackRate=value;}});
+ const getTime=()=>timeline.time(),isPlaying=()=>timeline.isPlaying(),pause=()=>timeline.pause(),play=()=>timeline.play(),seek=time=>timeline.seek(time);
+ const timeline=initSongEditor({root,api,toast,getMix:()=>mix(),setMix:(settings,stem)=>loadMix(settings,Boolean(stem)),
+  getStems:()=>q('prepUseStems').checked?workingStems(project())?.id:null,
+  getArtwork:()=>q('prepReleaseArtwork').value,
+  setArtwork:id=>{coverChoices.set(selected,id);q('prepReleaseArtwork').value=id;showCover();}});
  const studio=initMasteringStudio({root,api,toast,getTime,seek,play,pause,isPlaying,previewStart:()=>previewStart,
   onSelection:range=>{q('prepStart').value=range.start;q('prepSeconds').value=Math.max(1,Math.min(60,Math.ceil(range.end-range.start)));editMix();q('prepPreview').click();},
-  onChange:()=>editMix()});
+  onChange:()=>editMix(),shared:timeline});
+ for(const selector of ['.prep-audio-pair','.prep-audition','#prepPreviewStatus','#prepMaster','.prep-master-result','#prepVisuals'])root.querySelector(selector).hidden=true;
+ root.querySelector('#prepMixDetails').append(q('prepLimit').closest('label'));
+ root.querySelector('.prep-master-actions').hidden=true;
+ q('prepMasteringHeading').textContent='Mastering rack';
  let mixUndo=[],mixRedo=[],lastMix='';
  function mixHistory(backwards){
   const from=backwards?mixUndo:mixRedo,to=backwards?mixRedo:mixUndo;if(!from.length)return;
@@ -150,7 +153,7 @@ export function initPreparation({api,toast}){
  }
  function workingStems(p) {
   return p?.tasks?.find(task => task.kind === 'lyric_alignment' && task.status === 'done' &&
-   (task.recipe.input_artifact_id || '') === timeline.artifact() &&
+   (task.recipe.input_artifact_id || '') === (timeline.source()||'') &&
    ['stem_vocals', 'stem_accompaniment'].every(kind => task.artifacts.some(item => item.kind === kind && item.available)));
  }
  function mix() {
@@ -162,6 +165,7 @@ export function initPreparation({api,toast}){
   const next=JSON.stringify(readMix());
   if(lastMix&&next!==lastMix){mixUndo.push(JSON.parse(lastMix));if(mixUndo.length>50)mixUndo.shift();mixRedo=[];}
   lastMix=next;saveDraft();historyButtons();
+  timeline.mixChanged();
   updateRenders(project());
  }
  for (const input of mixInputs) {
@@ -286,6 +290,7 @@ export function initPreparation({api,toast}){
  q('prepReleaseArtwork').onchange = () => {
   coverChoices.set(selected, q('prepReleaseArtwork').value);
   showCover();
+  timeline.artworkChanged();
  };
 
  function setPreview(task) {
@@ -317,7 +322,6 @@ export function initPreparation({api,toast}){
   const previews = tasks.filter(task => task.kind === 'mix_preview' && (task.recipe.input_artifact_id || '') === source);
   const previewJob = previews.find(task => task.id === requestedPreview) || previews[0];
   const clip = previewJob && playable(previewJob) ? previewJob : previews.find(playable);
-  if (!q('prepComplete').disabled && !submitting.has('cleanup_previews')) setPreview(clip);
   q('prepPreview').disabled = submitting.has('mix_preview') || active(previewJob);
   q('prepAB').disabled = q('prepClean').disabled = !clip || submitting.has('cleanup_previews');
   q('prepPreviewStatus').textContent = active(previewJob) ? `Preview ${previewJob.status}…` : previewJob?.error ? previewJob.error :
@@ -459,13 +463,14 @@ export function initPreparation({api,toast}){
    if (selected === id) {
     input.value = '';
     await refresh();
+    timeline.artworkChanged();
     toast('Artwork attached.');
    }
   } finally {
    q('prepImportArtwork').disabled = false;
   }
  });
- q('prepComplete').onclick=handle(async()=>{if(!timeline.canSwitch())throw Error('Save or reload the lyric and lighting draft before completing');q('prepRaw').pause();q('prepRaw').removeAttribute('src');q('prepRaw').load();q('prepProcessed').pause();q('prepProcessed').removeAttribute('src');q('prepProcessed').load();q('prepComplete').disabled=true;try{const editorial=await api(`/preparation/projects/${encodeURIComponent(selected)}/editorial?`+new URLSearchParams(timeline.artifact()?{artifact:timeline.artifact()}:{}));if(q('prepReleaseLyrics').checked&&(editorial.lyric_task_id||editorial.lyric_revision_missing)&&!editorial.approved)throw Error('Approve the saved lyric timings, or turn off their inclusion before completing');await api(libraryMode?`/releases/library/recordings/${encodeURIComponent(selected)}/prepare`:`/releases/projects/${encodeURIComponent(selected)}/finish`,{master_id:timeline.artifact()||null,artwork_id:q('prepReleaseArtwork').value||null,include_flac:q('prepIncludeFlac').checked,visibility:q('prepReleaseVisibility').value,timed_lyrics:q('prepReleaseLyrics').checked&&editorial.approved});toast(libraryMode?'Updated Library release queued.':'Preparation queued. The completed package will appear in Publish.');if(libraryMode){await back?.();}else document.getElementById('publishingTab').click();}finally{q('prepComplete').disabled=false;}});
+ q('prepComplete').onclick=handle(async()=>{if(!timeline.canSwitch())throw Error('Save or reload the song timeline before completing');timeline.releaseReady();timeline.pause();q('prepRaw').pause();q('prepRaw').removeAttribute('src');q('prepRaw').load();q('prepProcessed').pause();q('prepProcessed').removeAttribute('src');q('prepProcessed').load();q('prepComplete').disabled=true;try{const editorial=await api(`/preparation/projects/${encodeURIComponent(selected)}/editorial?`+new URLSearchParams(timeline.artifact()?{artifact:timeline.artifact()}:{}));if(q('prepReleaseLyrics').checked&&(editorial.lyric_task_id||editorial.lyric_revision_missing)&&!editorial.approved)throw Error('Approve the saved lyric timings, or turn off their inclusion before completing');await api(libraryMode?`/releases/library/recordings/${encodeURIComponent(selected)}/prepare`:`/releases/projects/${encodeURIComponent(selected)}/finish`,{master_id:timeline.artifact()||null,artwork_id:q('prepReleaseArtwork').value||null,include_flac:q('prepIncludeFlac').checked,visibility:q('prepReleaseVisibility').value,timed_lyrics:q('prepReleaseLyrics').checked&&editorial.approved});toast(libraryMode?'Updated Library release queued.':'Preparation queued. The completed package will appear in Publish.');if(libraryMode){await back?.();}else document.getElementById('publishingTab').click();}finally{q('prepComplete').disabled=false;}});
  function identityVariants(){if(!identity)return;const sid=q('prepIdentitySong').value,variants=identity.variants.filter(r=>r.song_id===sid);q('prepIdentityVariant').replaceChildren(new Option('Base variant · 1','1'),...variants.filter(r=>r.id!=='1').map(r=>new Option(r.title+' · '+r.id,r.id)));if(sid===identity.song_id&&identity.variant_id){if(![...q('prepIdentityVariant').options].some(o=>o.value===identity.variant_id))q('prepIdentityVariant').append(new Option('Existing variant · '+identity.variant_id,identity.variant_id));q('prepIdentityVariant').value=identity.variant_id;}else if(sid===(identity.song_id||identity.suggested_song_id)&&identity.suggested_variant_id)q('prepIdentityVariant').value=identity.suggested_variant_id;}
  q('prepIdentitySong').onchange=identityVariants;
  q('prepSaveIdentity').onclick=handle(async()=>{if(!identity||!q('prepIdentitySong').value)throw Error('Choose a master song');await api(`/preparation/projects/${encodeURIComponent(selected)}/identity`,{song_id:Number(q('prepIdentitySong').value),variant_id:Number(q('prepIdentityVariant').value),expected_sha256:identity.sha256});yamlFor='';await refresh();toast('Preparation identity saved. Original generation metadata and reviews were retained.');});

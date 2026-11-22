@@ -1,4 +1,4 @@
-"""Real API/browser regression for short trials and a section-automated master."""
+"""Real API/browser regression for short trials and the unified song studio."""
 import argparse
 import json
 from pathlib import Path
@@ -91,57 +91,15 @@ def main():
             if args.screenshots:
                 args.screenshots.mkdir(parents=True,exist_ok=True)
                 page.screenshot(path=str(args.screenshots/f'lab-{args.width}.png'),full_page=True)
-            tab('preparationTab')
-            page.locator('#mixWaveStatus').wait_for()
-            page.wait_for_function("()=>document.getElementById('mixWaveStatus').textContent.includes('16000 Hz')")
-            page.locator('#mixWave').scroll_into_view_if_needed()
-            rect=page.locator('#mixWave').bounding_box()
-            page.mouse.move(rect['x']+rect['width']*.25,rect['y']+70);page.mouse.down()
-            page.mouse.move(rect['x']+rect['width']*.75,rect['y']+75,steps=10);page.mouse.up()
-            assert abs(float(page.locator('#mixStart').input_value())-2)<.05
-            assert abs(float(page.locator('#mixEnd').input_value())-6)<.05
-            page.locator('[data-preset=parametric_eq]').click()
-            effect=page.locator('#prepEffectChain li').first
-            effect.locator('[data-parameter=frequency]').fill('330')
-            effect.locator('[data-parameter=gain_db]').fill('6')
-            effect.locator('[data-scope=selection]').click()
-            effect.locator('.studio-automation summary').click()
-            effect.locator('[data-curve=rise]').click()
-            curve=effect.locator('.studio-automation canvas');rect=curve.bounding_box()
-            page.mouse.click(rect['x']+rect['width']*.5,rect['y']+rect['height']*.5)
-            assert effect.locator('[data-point]').count()==6
-            page.locator('#mixUndo').click()
-            assert effect.locator('[data-point]').count()==4
-            page.locator('#mixRedo').click()
-            assert effect.locator('[data-point]').count()==6
-            page.locator('#mixPreviewSelection').click()
-            page.wait_for_function("()=>document.getElementById('prepHistory').textContent.includes('mix preview · done')",timeout=25000)
-            task=review.db.one("SELECT recipe_json FROM processing_tasks WHERE generation_id=? AND kind='mix_preview' ORDER BY rowid DESC LIMIT 1",(gid,))
-            recipe=json.loads(task['recipe_json'])
-            assert len(recipe['mix']['effects'][0]['automation'])==3
-            assert abs(recipe['mix']['effects'][0]['range']['start']-2)<.05
-            page.locator('#prepMaster').click()
-            page.wait_for_function("()=>document.getElementById('prepMasterStatus').textContent.includes('LUFS')",timeout=25000)
-            page.locator('#prepApproveLyrics').click()
-            page.wait_for_function("()=>document.getElementById('prepApproveLyrics').textContent==='Approved'")
-            assert digest(source)==original
-            page.reload()
-            tab('preparationTab')
-            page.locator('#prepEffectChain [data-parameter=gain_db]').wait_for()
-            assert page.locator('#prepEffectChain [data-parameter=gain_db]').input_value()=='6'
-            assert page.locator('#prepEffectChain [data-point]').count()==6
-            page.wait_for_function("()=>document.getElementById('mixWaveStatus').textContent.includes('16000 Hz')")
-            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+2')
-            if args.screenshots:
-                page.locator('#mixWave').scroll_into_view_if_needed()
-                page.screenshot(path=str(args.screenshots/f'studio-{args.width}.png'),full_page=True)
             assert not errors,errors
             assert not failures,failures
-            print(json.dumps({'width':args.width,'passed':True,'checks':['short trial queue','exact seeds','production isolation','A/B results','waveform drag selection','editable EQ','drawn automation','preview and master','lyric approval','source preserved']}))
+            print(json.dumps({'width':args.width,'passed':True,'checks':['short trial queue','exact seeds','production isolation','A/B results','source preserved']}))
             browser.close()
     finally:
         if server:server.should_exit=True;thread.join(timeout=10)
         fixture.doCleanups()
+    from ui_song_studio import main as studio_main
+    studio_main()
 
 
 if __name__=='__main__':main()
