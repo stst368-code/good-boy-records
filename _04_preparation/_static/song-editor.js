@@ -24,6 +24,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  let viewStart=0,viewSpan=1,range={start:0,end:0},undo=[],redo=[],hits=[],drag=null,ticket=0,frame=null,lastDraw=0;
  let sourceChanged=async()=>{},releaseMaster='',renderPending='',renderBusy=false;
  let restoreMix=false,knownVersions='',alignmentId='',lyricProjection=[],lastPreview='',masterSignature='';
+ let alignmentLoading=false,alignmentSequence=0,alignmentFailure=null,requestedAlignment=null;
  const sessionDrafts=new Map();
  let loadingProject=false,localDraftStored=true;
  const endpoint=(suffix='')=>'/preparation/projects/'+encodeURIComponent(gid)+suffix;
@@ -239,7 +240,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  };
  q('songInspector').onclick=guard(async event=>{
   const action=event.target.closest('[data-object]')?.dataset.object;if(!action||!selected)return;
-  if(action==='listenWord'){const word=lyricProjection.find(w=>w.id===selected.id);player.pause();player.seek(word.start);player.setStop(word.end);await player.play();return;}
+  if(action==='listenWord'){const word=wordOccurrence(selected.id);if(!word||word.outside)throw Error('This word is outside the song arrangement');player.pause();player.seek(word.start);player.setStop(word.end);await player.play();return;}
   if(action==='revealEffect'){root.querySelector('#prepEffectChain').children[selected.id]?.scrollIntoView({behavior:'smooth',block:'center'});return;}
   mutate(()=>{
    if(action==='duplicate')selected.id=duplicate(document,selected.id);
@@ -374,17 +375,75 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
   selected={kind:'word',id:occurrence?.id||'source_'+id};if(occurrence){player.seek(occurrence.start);viewSpan=Math.min(viewSpan,10);viewStart=clamp(occurrence.start-viewSpan/3,0,Math.max(0,duration(document)-viewSpan));}rangeInputs();inspect();draw();
  };
  q('songAlign').onclick=guard(async()=>{
-  const request=ticket;
-  const result=await api(endpoint('/jobs'),{kind:'lyric_alignment',input_artifact_id:data.source_artifact_id||null,language:document.language,force:true});
+  const request=ticket,language=document.language,words=JSON.stringify(document.words);
+  const result=await api(endpoint('/jobs'),{kind:'lyric_alignment',input_artifact_id:data.source_artifact_id||null,language,force:true});
   if(request!==ticket)return;
-  q('songAlignmentStatus').textContent='Alignment '+result.status+'. Load it when complete to update this song.';
+  requestedAlignment={id:result.id,language,words};alignmentFailure=null;
+  q('songAlignmentStatus').textContent='Alignment '+result.status+' · timings will load when complete unless you edit the words.';
  });
- q('songLoadAlignment').onclick=guard(async()=>{
-  const request=ticket;
-  const result=await api(endpoint('/editorial')+(data.source_artifact_id?'?'+new URLSearchParams({artifact:data.source_artifact_id}):''));
-  if(request!==ticket)return;
-  mutate(()=>{if(result.words.map(w=>w.id).join('|')!==document.words.map(w=>w.id).join('|'))throw Error('Source lyrics changed. Restore the original lyrics before loading different text.');document.words=clone(result.words);document.approved=false;alignmentId=result.lyric_task_id;});q('songAlignmentStatus').textContent=result.timing_source;
- });
+ function currentAlignment(){
+  return row?.tasks?.find(task=>task.kind==='lyric_alignment'&&task.input_sha256===data?.source_sha256&&
+   (task.recipe.input_artifact_id||null)===(data?.source_artifact_id||null)&&task.recipe.language===document?.language&&
+   (!task.recipe.lyrics_sha256||task.recipe.lyrics_sha256===data?.lyrics_sha256));
+ }
+ function canLoadAlignmentAutomatically(){
+  // A background completion may fill estimates, never saved timing corrections.
+  if(!document||renderBusy)return false;
+  const current=JSON.stringify(document.words);
+  if(requestedAlignment?.id===currentAlignment()?.id&&requestedAlignment.language===document.language&&requestedAlignment.words===current)return true;
+  return !document.approved&&current===JSON.stringify(data.project.words)&&
+   document.words.every(word=>word.omitted||word.estimated||word.start==null);
+ }
+ async function loadAlignment(automatic=false){
+  if(!document||!data||loadingProject)return;
+  const request=ticket,sequence=++alignmentSequence,before=JSON.stringify(document.words),language=document.language;
+  alignmentLoading=true;q('songLoadAlignment').disabled=true;
+  try{
+   const query=new URLSearchParams({alignment_only:'true',language});
+   if(data.source_artifact_id)query.set('artifact',data.source_artifact_id);
+   const result=await api(endpoint('/editorial')+'?'+query);
+   if(request!==ticket||sequence!==alignmentSequence)return;
+   if(JSON.stringify(document.words)!==before||document.language!==language){
+    if(automatic)return;
+    throw Error('Lyrics changed while the alignment was loading. Load it again to apply the timings.');
+   }
+   if(automatic&&!canLoadAlignmentAutomatically())return;
+   if(result.source_sha256!==data.source_sha256)throw Error('The alignment belongs to different audio. Reload this recording.');
+   if(!result.lyric_task_id)throw Error('No completed alignment is available for this audio and language. Check the processing queue.');
+   const matches=result.words.length===document.words.length&&result.words.every((word,index)=>
+    word.id===document.words[index].id&&(word.source_text||word.text)===(document.words[index].source_text||document.words[index].text));
+   if(!matches)throw Error('Source lyrics changed. This alignment was not applied to your edited words.');
+   mutate(()=>{
+    document.words=document.words.map((word,index)=>{const aligned=result.words[index];return {...word,
+     start:aligned.start,end:aligned.end,confidence:aligned.confidence,estimated:Boolean(aligned.estimated),confirmed:false};});
+    document.approved=false;
+   });
+   alignmentId=result.lyric_task_id;alignmentFailure=null;
+   q('songAlignmentStatus').textContent=`${result.timed_words} / ${result.words.length} words aligned · loaded into the timeline`;
+  }catch(error){
+   if(request!==ticket||sequence!==alignmentSequence)return;
+   alignmentFailure={id:currentAlignment()?.id,message:error.message};
+   q('songAlignmentStatus').textContent=error.message;
+   if(!automatic)toast(error.message);
+  }finally{
+   if(request===ticket&&sequence===alignmentSequence){alignmentLoading=false;q('songLoadAlignment').disabled=false;}
+  }
+ }
+ function updateAlignment(){
+  const alignment=currentAlignment();
+  if(!alignment||alignmentLoading)return;
+  if(alignmentFailure?.id===alignment.id){q('songAlignmentStatus').textContent=alignmentFailure.message;return;}
+  if(alignment.status==='done'){
+   if(alignment.id!==alignmentId){
+    if(canLoadAlignmentAutomatically())loadAlignment(true);
+    else q('songAlignmentStatus').textContent='Alignment done · newer alignment available. Load it to replace timings while keeping your lyric text.';
+   }else if(!q('songAlignmentStatus').textContent)q('songAlignmentStatus').textContent=document.words.filter(word=>!word.estimated&&word.start!=null).length+' / '+document.words.length+' words aligned';
+  }else{
+   const detail=['failed','interrupted'].includes(alignment.status)?' · Open Processing queue for the error and retry':alignment.telemetry?.message?' · '+alignment.telemetry.message:'';
+   q('songAlignmentStatus').textContent='Alignment '+alignment.status+detail;
+  }
+ }
+ q('songLoadAlignment').onclick=()=>loadAlignment();
  async function render(kind){
   const request=ticket;
   const saved=dirty||!revision?await save('Before '+(kind==='mix_master'?'master':'preview')+' render'):data;
@@ -449,10 +508,11 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
    row=project;if(!project?.ready)return;
    globalThis.document.getElementById('audio')?.pause();
    if(project.generation_id===gid&&document){
-    renders();if(!frame&&!root.hidden)frame=requestAnimationFrame(tick);const alignment=project.tasks?.find(t=>t.kind==='lyric_alignment');if(alignment)q('songAlignmentStatus').textContent='Alignment '+alignment.status+(alignment.id!==alignmentId&&alignment.status==='done'?' · newer alignment available':'');return;
+    renders();if(!frame&&!root.hidden)frame=requestAnimationFrame(tick);updateAlignment();return;
    }
    cache();
    const request=++ticket;loadingProject=true;host.inert=true;resetPlayback();gid=project.generation_id;document=null;data=null;dirty=false;wave=null;selected=null;undo=[];redo=[];releaseMaster='';masterSignature='';knownVersions='';renderPending='';
+   alignmentLoading=false;alignmentFailure=null;requestedAlignment=null;q('songLoadAlignment').disabled=false;q('songAlignmentStatus').textContent='';
    q('songTitle').textContent=project.title;q('songSaveState').textContent='Loading song…';
    try{
    const value=await api(endpoint('/song-project'));if(request!==ticket)return;data=value;revision=value.revision_id;document=clone(value.project);alignmentId=value.lyric_task_id;
@@ -466,6 +526,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
    if(!revision&&!dirty){document.mix=clone(getMix());document.stem_task_id=getStems?.()||null;document.artwork_id=getArtwork()||null;}
    syncMix();lyricProjection=words(document);viewSpan=Math.min(remembered?.viewSpan||duration(document),duration(document));viewStart=clamp(remembered?.viewStart||0,0,Math.max(0,duration(document)-viewSpan));range=remembered?.range||{start:0,end:Math.min(30,viewSpan)};versions(value.versions);rangeInputs();state();draw();inspect();lyricText();renders();
    loadingProject=false;host.inert=false;cache();
+   updateAlignment();
    if(!frame&&!root.hidden)frame=requestAnimationFrame(tick);
    if(!library.length){try{const result=await api('/preparation/sounds');if(request!==ticket)return;library=result.sounds;libraryList();}catch(error){if(request===ticket)q('songImportStatus').textContent=error.message;}}
    if(request!==ticket)return;

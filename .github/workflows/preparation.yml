@@ -45,6 +45,8 @@ jobs:
         run: |
           GBR_TEST_BROWSER="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
           python _04_preparation/_tests/ui_song_player_switch.py --browser "$GBR_TEST_BROWSER"
+          python _04_preparation/_tests/ui_song_alignment.py --browser "$GBR_TEST_BROWSER"
+          python _04_preparation/_tests/ui_song_alignment.py --browser "$GBR_TEST_BROWSER" --width 390
           python _04_preparation/_tests/ui_preparation_navigation.py --browser "$GBR_TEST_BROWSER"
           python _04_preparation/_tests/ui_publish_feedback.py --browser "$GBR_TEST_BROWSER" --width 390
           python _04_preparation/_tests/ui_song_studio.py --browser "$GBR_TEST_BROWSER" --width 1440

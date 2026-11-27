@@ -139,7 +139,8 @@ def router(root,review,local):
         return plan(service.db)
 
     @routes.get('/projects/{gid}/editorial')
-    def editorial(gid: str,artifact: str | None=None):return service.editorial(gid,artifact)
+    def editorial(gid: str,artifact: str | None=None,alignment_only:bool=False,language:str|None=None):
+        return service.editorial(gid,artifact,alignment_only=alignment_only,alignment_language=language)
     @routes.get('/projects/{gid}/waveform')
     def waveform(gid: str,artifact: str | None=None):
         from .waveform import waveform as build_waveform

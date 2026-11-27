@@ -604,17 +604,24 @@ class Preparation:
             return verified_json(raw)
         return None
 
-    def editorial(self,gid,artifact_id=None):
+    def editorial(self,gid,artifact_id=None,*,alignment_only=False,alignment_language=None):
         self.require();row,source=self.source(gid,artifact_id=artifact_id);sha=digest(source)
         metadata=self.metadata.read(gid)
         fields=metadata['metadata']
         result={'source_sha256':sha,'lyrics_sha256':metadata['lyrics_sha256'],'duration':row['duration'],'language':fields.get('language') or 'en',
                 'words':lyric_words(fields.get('lyrics','')),'approved':False,'lyric_task_id':None,
                 'features':None,'feature_artifact_id':None,'lighting_task_id':None,'sensitivity':1,'sections':[]}
-        for kinds,key in [(('lyric_edit','lyric_alignment'),'lyric'),(('visuals',),'visual'),(('visual_edit',),'light')]:
+        # Rendered lyric revisions use final-timeline IDs and offsets; they
+        # cannot serve as alignment for the original source words.
+        layers=[(('lyric_alignment',) if alignment_only else ('lyric_edit','lyric_alignment'),'lyric')]
+        if not alignment_only:layers.extend([(('visuals',),'visual'),(('visual_edit',),'light')])
+        for kinds,key in layers:
             placeholders=','.join('?' for _ in kinds)
             extra=" AND COALESCE(json_extract(recipe_json,'$.lyrics_sha256'),?)=?" if key=='lyric' else ''
             args=(gid,sha,*kinds,*((metadata['original_lyrics_sha256'],metadata['lyrics_sha256']) if key=='lyric' else ()))
+            if alignment_only and alignment_language:
+                extra+=" AND json_extract(recipe_json,'$.language')=?"
+                args+= (alignment_language,)
             tasks = self.db.all(f"""SELECT id,kind FROM processing_tasks WHERE generation_id=? AND input_sha256=?
                 AND kind IN ({placeholders}) AND status='done'{extra} ORDER BY rowid DESC LIMIT 25""", args)
             for index, task in enumerate(tasks):
