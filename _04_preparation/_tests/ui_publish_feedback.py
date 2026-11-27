@@ -17,7 +17,7 @@ import {initPublishing} from '/publishing.js';
 const projects=['first','second'].map(id=>({prepared_id:id,can_return:true,track:{displayTitle:id,genre:{parent_genre:'Rock'}},options:{},files:[{content_type:'audio/mpeg'}]}));
 window.fixture={projects,releases:[],calls:[],retries:[],posts:{},delay:0};
 const api=async(path,body)=>{
- if(path==='/releases/library/settings')return {settings:{rooms:[{id:'public',name:'Main player',enabled:true}],default_room:'public'}};
+ if(path==='/releases/library/settings')return {settings:{rooms:[{id:'public',name:'Main player',enabled:true},{id:'hidden',name:'Secret room',enabled:true}],default_room:'public'}};
  if(path==='/releases/projects'){if(fixture.delay)await new Promise(r=>setTimeout(r,fixture.delay));return {projects:structuredClone(fixture.projects),releases:structuredClone(fixture.releases)};}
  if(path.endsWith('/publish')){const id=path.split('/')[2];fixture.calls.push(id);await new Promise((resolve,reject)=>fixture.posts[id]={resolve,reject});return {id:'job-'+id};}
  if(path.endsWith('/retry')){fixture.retries.push(path);await new Promise((resolve,reject)=>fixture.retryPost={resolve,reject});return {id:'retried-release'};}
@@ -34,6 +34,21 @@ window.ui=initPublishing({api,toast:()=>{},onListChange:()=>{},
             page.on('pageerror',lambda error:errors.append(str(error)))
             page.route('http://gbr.test/**',lambda route:route.fulfill(body=module if route.request.url.endswith('/publishing.js') else html,content_type='text/javascript' if route.request.url.endswith('/publishing.js') else 'text/html'))
             page.goto('http://gbr.test/');page.wait_for_function('window.ready===true')
+            # A room picker stays focused after its menu closes. It must not
+            # stop new recordings appearing, lose its choice, or be replaced.
+            room=page.locator('[data-room="first"]')
+            room.select_option('hidden');room.focus()
+            page.evaluate('''()=>{
+ window.originalRoom=document.querySelector('[data-room="first"]');
+ fixture.projects.push({prepared_id:'new-arrival',can_return:true,
+  track:{displayTitle:'New arrival'},options:{},files:[{content_type:'audio/mpeg'}]});
+}''')
+            page.locator('[data-pending="new-arrival"]').wait_for(timeout=10000)
+            assert room.input_value()=='hidden'
+            assert page.evaluate('originalRoom===document.querySelector("[data-room=first]")&&document.activeElement===originalRoom')
+            page.evaluate('fixture.projects.pop()')
+            page.locator('[data-pending="new-arrival"]').wait_for(state='detached',timeout=10000)
+            assert page.evaluate('originalRoom===document.querySelector("[data-room=first]")')
             # Start a slow refresh, then immediately click two different tracks.
             # All three operations must run instead of the clicks disappearing.
             page.evaluate('''()=>{

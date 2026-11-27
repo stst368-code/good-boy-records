@@ -24,18 +24,46 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  let viewStart=0,viewSpan=1,range={start:0,end:0},undo=[],redo=[],hits=[],drag=null,ticket=0,frame=null,lastDraw=0;
  let sourceChanged=async()=>{},releaseMaster='',renderPending='',renderBusy=false;
  let restoreMix=false,knownVersions='',alignmentId='',lyricProjection=[],lastPreview='',masterSignature='';
+ const sessionDrafts=new Map();
+ let loadingProject=false,localDraftStored=true;
  const endpoint=(suffix='')=>'/preparation/projects/'+encodeURIComponent(gid)+suffix;
  const sourceUrl=()=>'/api/preparation/audio/'+encodeURIComponent(gid)+(data?.source_artifact_id?'?'+new URLSearchParams({artifact:data.source_artifact_id}):'');
  const player=createSongPlayer({getProject:()=>document,sourceUrl,toast,onTick:()=>clock()});
  const audition=new Audio();audition.preload='none';
+ function resetPlayback(close=false){
+  if(close)player.close();else player.reset();
+  audition.pause();lastPreview='';q('songListen').value='draft';q('songListen').options[1].disabled=true;
+  q('songLoop').checked=false;q('songSpeed').value='1';
+ }
  const guard=fn=>async(...args)=>{try{await fn(...args);}catch(error){toast(error.message);q('songSaveState').textContent=error.message;}};
  const snapshot=()=>clone(document);
  function cache(){
-  if(!gid||!document)return;
-  try{localStorage.setItem('gbr-song-draft:'+gid,JSON.stringify({revision_id:revision,source_sha256:data.source_sha256,project:document}));}catch{}
+  if(!gid||!document||!data||loadingProject)return;
+  const draft={revision_id:revision,source_sha256:data.source_sha256,project:clone(document),dirty,
+   undo:undo.slice(),redo:redo.slice(),viewStart,viewSpan,range:{...range},releaseMaster};
+  sessionDrafts.set(gid,draft);
+  try{
+   if(dirty)localStorage.setItem('gbr-song-draft:'+gid,JSON.stringify({revision_id:revision,source_sha256:data.source_sha256,project:document,dirty:true}));
+   else localStorage.removeItem('gbr-song-draft:'+gid);
+   localDraftStored=true;
+  }catch{localDraftStored=false;}
+ }
+ function equivalentDraft(left,right){
+  // Unsaved originals get a fresh section UUID from the server. Ignore only
+  // those object identities and mix schema bookkeeping when reading old drafts.
+  const normalize=value=>{
+   const result=clone(value),ids=new Map(result.segments.map((s,i)=>[s.id,i]));
+   result.segments=result.segments.map(({id,...segment})=>segment);
+   result.sounds=result.sounds.map(({id,...clip})=>({...clip,segment_id:clip.segment_id==null?null:ids.get(clip.segment_id)}));
+   result.lighting.cues=result.lighting.cues.map(cue=>({...cue,segment_id:cue.segment_id==null?null:ids.get(cue.segment_id)}));
+   delete result.mix.version;result.mix.effects||=[];result.stem_task_id||=null;
+   const ordered=v=>Array.isArray(v)?v.map(ordered):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,ordered(v[k])])):v;
+   return JSON.stringify(ordered(result));
+  };
+  return normalize(left)===normalize(right);
  }
  function state(){
-  q('songSaveState').textContent=dirty?'Unsaved edits · local draft':revision?'Saved · '+revision.slice(0,8):'Original audio · ready to edit';
+  q('songSaveState').textContent=dirty?(localDraftStored?'Unsaved edits · local draft':'Unsaved edits · kept in this session; save a version'):revision?'Saved · '+revision.slice(0,8):'Original audio · ready to edit';
   q('songUndo').disabled=!undo.length;q('songRedo').disabled=!redo.length;q('songSave').disabled=renderBusy||(!dirty&&!!revision);
   q('songLyricState').textContent=document?.approved?'approved':'not approved';q('songApprove').textContent=document?.approved?'Lyrics approved ✓':'Approve lyrics';q('songApprove').setAttribute('aria-pressed',String(Boolean(document?.approved)));
  }
@@ -346,27 +374,38 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
   selected={kind:'word',id:occurrence?.id||'source_'+id};if(occurrence){player.seek(occurrence.start);viewSpan=Math.min(viewSpan,10);viewStart=clamp(occurrence.start-viewSpan/3,0,Math.max(0,duration(document)-viewSpan));}rangeInputs();inspect();draw();
  };
  q('songAlign').onclick=guard(async()=>{
+  const request=ticket;
   const result=await api(endpoint('/jobs'),{kind:'lyric_alignment',input_artifact_id:data.source_artifact_id||null,language:document.language,force:true});
+  if(request!==ticket)return;
   q('songAlignmentStatus').textContent='Alignment '+result.status+'. Load it when complete to update this song.';
  });
  q('songLoadAlignment').onclick=guard(async()=>{
+  const request=ticket;
   const result=await api(endpoint('/editorial')+(data.source_artifact_id?'?'+new URLSearchParams({artifact:data.source_artifact_id}):''));
+  if(request!==ticket)return;
   mutate(()=>{if(result.words.map(w=>w.id).join('|')!==document.words.map(w=>w.id).join('|'))throw Error('Source lyrics changed. Restore the original lyrics before loading different text.');document.words=clone(result.words);document.approved=false;alignmentId=result.lyric_task_id;});q('songAlignmentStatus').textContent=result.timing_source;
  });
  async function render(kind){
+  const request=ticket;
   const saved=dirty||!revision?await save('Before '+(kind==='mix_master'?'master':'preview')+' render'):data;
+  if(request!==ticket)return;
   const start=range.end>range.start?range.start:player.time(),seconds=Math.max(1,Math.min(60,Math.ceil(range.end>range.start?range.end-range.start:30)));
   const result=await api(endpoint('/jobs'),{kind,song_project_id:saved.revision_id,input_artifact_id:saved.source_artifact_id||null,start:Math.min(start,duration(document)-.01),seconds});
+  if(request!==ticket)return;
   renderPending=result.id;q('songRenderState').textContent=(kind==='mix_master'?'Master':'Preview')+' '+result.status+'…';renders();
  }
  q('songPreview').onclick=guard(()=>render('mix_preview'));q('songMaster').onclick=guard(()=>render('mix_master'));
  async function chooseMaster(id){
+  const request=ticket;
   if(id&&!revision&&!dirty){
    const task=(row?.tasks||[]).find(t=>t.artifacts.some(a=>a.id===id));
    if(!task?.recipe.song_project_id){
     const value=await api(endpoint('/song-project')+'?'+new URLSearchParams({artifact:id}));
-    data=value;document=clone(value.project);revision=value.revision_id;player.reset();syncMix();lyricProjection=words(document);viewSpan=duration(document);rangeInputs();state();inspect();lyricText();
-    wave=await api(endpoint('/waveform')+'?'+new URLSearchParams({artifact:id}));draw();
+    if(request!==ticket)return;
+    data=value;document=clone(value.project);revision=value.revision_id;resetPlayback();syncMix();lyricProjection=words(document);viewSpan=duration(document);rangeInputs();state();inspect();lyricText();
+    const result=await api(endpoint('/waveform')+'?'+new URLSearchParams({artifact:id}));
+    if(request!==ticket)return;
+    wave=result;draw();
    }
   }
   releaseMaster=id||'';q('songMasterChoice').value=releaseMaster;await sourceChanged(releaseMaster);renders();
@@ -393,15 +432,15 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
    q('songRenderState').textContent=dirty?'Save and render to include these edits.':(chosen?.current||latest?.id===releaseMaster)?'Current timeline master selected for release.':latest?'Current timeline master ready. Choose it for release.':revision?'Render a master of this timeline before finishing preparation.':'';
   }
  }
- q('songRestore').onclick=guard(async()=>{const value=await api(endpoint('/song-project')+'?'+new URLSearchParams({revision:q('songVersions').value}));mutate(()=>{document=clone(value.project);syncMix();});});
+ q('songRestore').onclick=guard(async()=>{const request=ticket;const value=await api(endpoint('/song-project')+'?'+new URLSearchParams({revision:q('songVersions').value}));if(request!==ticket)return;mutate(()=>{document=clone(value.project);syncMix();});});
  q('songReload').onclick=guard(async()=>{
-  const value=await api(endpoint('/song-project'));player.reset();data=value;revision=value.revision_id;document=clone(value.project);dirty=false;undo=[];redo=[];selected=null;syncMix();lyricProjection=words(document);versions(value.versions);cache();rangeInputs();state();draw();inspect();lyricText();renders();
+  const request=ticket,value=await api(endpoint('/song-project'));if(request!==ticket)return;resetPlayback();data=value;revision=value.revision_id;document=clone(value.project);dirty=false;undo=[];redo=[];selected=null;syncMix();lyricProjection=words(document);versions(value.versions);cache();rangeInputs();state();draw();inspect();lyricText();renders();
  });
  const resize=new ResizeObserver(()=>draw());resize.observe(canvas);
  return {
-  artifact:()=>releaseMaster,chooseSource:chooseMaster,onSourceChange:fn=>sourceChanged=fn,canSwitch:()=>!dirty&&!renderBusy,
-  releaseReady(){if(revision&&releaseMaster!==data.reused_master_id&&!row?.tasks.some(t=>t.kind==='mix_master'&&t.status==='done'&&t.recipe.song_project_id===revision&&t.artifacts.some(a=>a.id===releaseMaster&&a.available)))throw Error('Render and select a master of the latest saved song timeline before finishing');},
-  time:player.time,play:player.play,pause:player.pause,seek:player.seek,isPlaying:player.active,
+  artifact:()=>releaseMaster,chooseSource:chooseMaster,onSourceChange:fn=>sourceChanged=fn,canSwitch:()=>!renderBusy,
+  releaseReady(){if(!document||!data||dirty||renderBusy||loadingProject)throw Error('Save the song timeline before finishing preparation');if(revision&&releaseMaster!==data.reused_master_id&&!row?.tasks.some(t=>t.kind==='mix_master'&&t.status==='done'&&t.recipe.song_project_id===revision&&t.artifacts.some(a=>a.id===releaseMaster&&a.available)))throw Error('Render and select a master of the latest saved song timeline before finishing');},
+  time:player.time,play:player.play,pause:()=>{player.pause();audition.pause();},seek:player.seek,isPlaying:player.active,
   range:()=>{if(range.end<=range.start)throw Error('Select a range on the song timeline first');const fade=Math.min(.1,(range.end-range.start)/4);return {...range,fade_in:fade,fade_out:fade};},
   duration:()=>duration(document),source:()=>data?.source_artifact_id||null,
   mixChanged(){if(!document||restoreMix)return;mutate(()=>{document.mix=clone(getMix());document.stem_task_id=getStems?.()||null;});},
@@ -410,18 +449,29 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
    row=project;if(!project?.ready)return;
    globalThis.document.getElementById('audio')?.pause();
    if(project.generation_id===gid&&document){
-    renders();if(!frame&&!root.hidden)frame=requestAnimationFrame(tick);const alignment=project.tasks.find(t=>t.kind==='lyric_alignment');if(alignment)q('songAlignmentStatus').textContent='Alignment '+alignment.status+(alignment.id!==alignmentId&&alignment.status==='done'?' · newer alignment available':'');return;
+    renders();if(!frame&&!root.hidden)frame=requestAnimationFrame(tick);const alignment=project.tasks?.find(t=>t.kind==='lyric_alignment');if(alignment)q('songAlignmentStatus').textContent='Alignment '+alignment.status+(alignment.id!==alignmentId&&alignment.status==='done'?' · newer alignment available':'');return;
    }
-   const request=++ticket;player.reset();gid=project.generation_id;document=null;dirty=false;wave=null;selected=null;undo=[];redo=[];releaseMaster='';lastPreview='';masterSignature='';knownVersions='';renderPending='';q('songListen').value='draft';q('songListen').options[1].disabled=true;
+   cache();
+   const request=++ticket;loadingProject=true;host.inert=true;resetPlayback();gid=project.generation_id;document=null;data=null;dirty=false;wave=null;selected=null;undo=[];redo=[];releaseMaster='';masterSignature='';knownVersions='';renderPending='';
    q('songTitle').textContent=project.title;q('songSaveState').textContent='Loading song…';
+   try{
    const value=await api(endpoint('/song-project'));if(request!==ticket)return;data=value;revision=value.revision_id;document=clone(value.project);alignmentId=value.lyric_task_id;
-   if(!library.length){const result=await api('/preparation/sounds');if(request!==ticket)return;library=result.sounds;libraryList();}
-   try{const draft=JSON.parse(localStorage.getItem('gbr-song-draft:'+gid)||'null');if(draft?.source_sha256===value.source_sha256&&draft.revision_id===revision&&JSON.stringify(draft.project)!==JSON.stringify(document)){document=draft.project;dirty=true;}}catch{}
+   const remembered=sessionDrafts.get(gid);
+   let draft=remembered;
+   if(!draft){try{draft=JSON.parse(localStorage.getItem('gbr-song-draft:'+gid)||'null');}catch{}}
+   if(draft?.source_sha256===value.source_sha256){
+    if(draft.dirty===true||(draft.dirty===undefined&&draft.revision_id===revision&&!equivalentDraft(draft.project,document))){document=clone(draft.project);dirty=true;revision=draft.revision_id;undo=draft.undo||[];redo=draft.redo||[];}
+    if(draft.revision_id===revision)releaseMaster=draft.releaseMaster||'';
+   }
    if(!revision&&!dirty){document.mix=clone(getMix());document.stem_task_id=getStems?.()||null;document.artwork_id=getArtwork()||null;}
-   syncMix();lyricProjection=words(document);viewStart=0;viewSpan=duration(document);range={start:0,end:Math.min(30,viewSpan)};versions(value.versions);rangeInputs();state();draw();inspect();lyricText();renders();
+   syncMix();lyricProjection=words(document);viewSpan=Math.min(remembered?.viewSpan||duration(document),duration(document));viewStart=clamp(remembered?.viewStart||0,0,Math.max(0,duration(document)-viewSpan));range=remembered?.range||{start:0,end:Math.min(30,viewSpan)};versions(value.versions);rangeInputs();state();draw();inspect();lyricText();renders();
+   loadingProject=false;host.inert=false;cache();
    if(!frame&&!root.hidden)frame=requestAnimationFrame(tick);
-   try{const result=await api(endpoint('/waveform')+(value.source_artifact_id?'?'+new URLSearchParams({artifact:value.source_artifact_id}):''));if(request===ticket){wave=result;draw();}}catch(error){if(request===ticket)toast(error.message);}
+   if(!library.length){try{const result=await api('/preparation/sounds');if(request!==ticket)return;library=result.sounds;libraryList();}catch(error){if(request===ticket)q('songImportStatus').textContent=error.message;}}
+   if(request!==ticket)return;
+   api(endpoint('/waveform')+(value.source_artifact_id?'?'+new URLSearchParams({artifact:value.source_artifact_id}):'')).then(result=>{if(request===ticket){wave=result;draw();}}).catch(error=>{if(request===ticket)toast(error.message);});
+   }catch(error){if(request!==ticket)return;document=null;data=null;loadingProject=false;q('songSaveState').textContent=error.message;draw();throw error;}
   },
-  close(){++ticket;player.close();audition.pause();if(frame)cancelAnimationFrame(frame);frame=null;cache();}
+  close(){cache();++ticket;loadingProject=false;resetPlayback(true);if(frame)cancelAnimationFrame(frame);frame=null;}
  };
 }

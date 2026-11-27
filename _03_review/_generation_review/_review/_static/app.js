@@ -448,6 +448,9 @@ const tools = {};
 const imports = new Map();
 const styles = new Map();
 const openings = new Map();
+const openingOwners = new Map();
+let workspaceActivation = 0;
+function ownOpening(name){const owner=Symbol(name);openingOwners.set(name,owner);return owner;}
 const prepCss = '/tools/preparation/preparation.css';
 const generationCss = '/tools/generation/generation.css';
 const definition = {
@@ -515,19 +518,21 @@ function activeTool() {
 }
 
 function openTool(name) {
-  if (!openings.has(name)) {
+  const activation=workspaceActivation;
+  if (openings.get(name)?.activation!==activation) {
     const opening = (async () => {
       const tool = await loadTool(name);
-      if (activeTool() !== name) return;
+      if (activeTool() !== name||workspaceActivation!==activation) return;
+      const owner=ownOpening(name);
       try {
         await tool.open();
       } finally {
-        if (activeTool() !== name) tool.close?.();
+        if (activeTool() !== name&&openingOwners.get(name)===owner) tool.close?.();
       }
-    })().finally(() => openings.delete(name));
-    openings.set(name, opening);
+    })().finally(() => {if(openings.get(name)?.promise===opening)openings.delete(name);});
+    openings.set(name, {activation,promise:opening});
   }
-  return openings.get(name);
+  return openings.get(name).promise;
 }
 
 async function remixTrack(generationId) {
@@ -543,11 +548,13 @@ function restorePreparation() {
 
 async function openPublishedRecording(item) {
   const editor = $('libraryEditorContainer');
+  let owner;
   try {
     const preparation = await loadTool('preparation');
     if (activeTool() !== 'library') return;
     editor.append($('preparationView'));
     $('preparationView').hidden = false;
+    owner=ownOpening('preparation');
     await preparation.open({
       published: item.generation_id, master_id: item.master_id, room: item.room,
       artwork_id: item.artwork_id,
@@ -558,9 +565,9 @@ async function openPublishedRecording(item) {
         await tools.library.open();
       },
     });
-    if (activeTool() !== 'library' && state.view !== 'preparation') preparation.close();
+    if (openingOwners.get('preparation')===owner&&activeTool() !== 'library' && state.view !== 'preparation') preparation.close();
   } catch (error) {
-    if (activeTool() === 'library') {
+    if (activeTool() === 'library'&&(!owner||openingOwners.get('preparation')===owner)) {
       restorePreparation();
       $('preparationView').hidden = true;
       await tools.library.open();
@@ -572,9 +579,10 @@ async function openPublishedRecording(item) {
 function showView(view, source) {
   if (view === state.view && source === state.source) return false;
   if ($('preparationView').offsetParent !== null && tools.preparation?.canLeave() === false) {
-    throw Error('Save or reload the lyric and lighting draft before leaving');
+    throw Error('Wait for the current song save to finish before leaving');
   }
   const previous = activeTool();
+  ++workspaceActivation;
   if (previous === 'library') {
     if ($('preparationView').parentElement?.id === 'libraryEditorContainer') tools.preparation?.close();
     restorePreparation();

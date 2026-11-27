@@ -1,7 +1,7 @@
 export function initPublishing({api,toast,onPlay,onListChange}){
  const root=document.getElementById('publishingView'),q=id=>document.getElementById(id);
  root.innerHTML=`<div class="prep-heading"><div><h1>Publish</h1><p>Completed preparations waiting to go live.</p></div><button id="pubRefresh">Refresh</button></div><p id="pubStatus" role="status"></p><p id="pubError" role="alert"></p><div id="publishQueue" class="library-list"></div><details><summary id="pubHistorySummary">Publication history</summary><div id="pubHistory"></div></details>`;
- let timer,busy=false,projects=[],recordings=new Map(),settings=null,actions=Promise.resolve(),pending=0,refreshing=null;
+ let timer,busy=false,projects=[],recordings=new Map(),settings=null,actions=Promise.resolve(),pending=0,refreshing=null,viewVersion=0;
  const requestErrors=new Map(),submitting=new Set();
  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const action=work=>{pending++;busy=true;actions=actions.then(work).catch(error=>{q('pubError').textContent=error.message;if(q('pubConfig')?.open)q('pubConfigMessage').textContent=error.message;}).finally(()=>{pending--;busy=pending>0;});return actions;};
@@ -68,9 +68,47 @@ export function initPublishing({api,toast,onPlay,onListChange}){
      <summary>${alternatives.length} more preparation${alternatives.length===1 ? '' : 's'} of this recording</summary>
      ${alternatives.map(project=>renderCard(project,rooms,title,true)).join('')}
     </details>` : '';
-   return `<div>${renderCard(primary,rooms,title,Boolean(alternatives.length))}${copies}</div>`;
+   return `<div data-recording="${escape(id)}">${renderCard(primary,rooms,title,Boolean(alternatives.length))}${copies}</div>`;
   }).join('');
-  return `<section class="publish-song">${heading}<div class="publish-recordings">${cards}</div></section>`;
+  return `<section class="publish-song" data-song="${escape(songKey(group[0][0]))}">${heading}<div class="publish-recordings">${cards}</div></section>`;
+ }
+
+ function reconcileQueue(markup){
+  const template=document.createElement('template');template.innerHTML=markup;
+  const focused=document.activeElement;
+  const key=node=>{
+   for(const attribute of ['data-song','data-recording','data-pending','data-alternatives','data-room','data-preview','data-publish','data-return','data-retry-archive','data-publication-status','data-publication-error','data-archive-status']){
+    if(node.hasAttribute(attribute))return node.tagName+':'+attribute+':'+node.getAttribute(attribute);
+   }
+   return node.tagName+':'+(node.tagName==='OPTION'?node.value:node.className);
+  };
+  function merge(parent,next){
+   const needed=new Map();
+   for(const child of next.children){const id=key(child);needed.set(id,(needed.get(id)||0)+1);}
+   for(const child of [...parent.children]){const id=key(child);if(needed.get(id)){needed.set(id,needed.get(id)-1);}else child.remove();}
+   const available=new Map();
+   for(const child of parent.children){const id=key(child);if(!available.has(id))available.set(id,[]);available.get(id).push(child);}
+   const retained=new Set();let anchor=parent.firstElementChild;
+   for(const fresh of [...next.children]){
+    const current=available.get(key(fresh))?.shift();
+    const child=current||fresh;retained.add(child);
+    if(current){
+     for(const attribute of [...current.attributes]){
+      if(attribute.name!=='open'&&!fresh.hasAttribute(attribute.name))current.removeAttribute(attribute.name);
+     }
+     for(const attribute of fresh.attributes){
+      if(attribute.name!=='open'&&current.getAttribute(attribute.name)!==attribute.value)current.setAttribute(attribute.name,attribute.value);
+     }
+     if(fresh.childElementCount)merge(current,fresh);
+     else if(current.textContent!==fresh.textContent)current.textContent=fresh.textContent;
+    }
+    if(child!==anchor)parent.insertBefore(child,anchor);
+    anchor=child.nextElementSibling;
+   }
+   for(const child of [...parent.children])if(!retained.has(child))child.remove();
+  }
+  merge(q('publishQueue'),template.content);
+  if(focused?.isConnected&&document.activeElement!==focused)focused.focus({preventScroll:true});
  }
 
  function updateCard(p){
@@ -101,9 +139,16 @@ export function initPublishing({api,toast,onPlay,onListChange}){
   catch(error){requestErrors.set(pid,error.message);if(!card)throw error;}
   finally{submitting.delete(pid);await refresh();const p=projects.find(p=>p.prepared_id===pid);if(p)updateCard(p);}
  }
- function refresh(){if(!refreshing)refreshing=load().finally(()=>{refreshing=null;});return refreshing;}
+ function refresh(){
+  if(!refreshing){const flight=load().finally(()=>{if(refreshing===flight)refreshing=null;});refreshing=flight;}
+  return refreshing;
+ }
  async function load(){
-  const result=await api('/releases/projects');projects=result.projects;
+  const version=viewVersion;
+  if(!settings){const result=await api('/releases/library/settings');if(version!==viewVersion)return;settings=result.settings;}
+  const result=await api('/releases/projects');
+  if(version!==viewVersion)return;
+  projects=result.projects;
   recordings=groupBy(projects,recordingKey);
   const songs=groupBy(recordings.values(),group=>songKey(group[0]));
   const rooms=settings?.rooms.filter(r=>r.enabled)||[{id:'public',name:'Main player'}];
@@ -113,7 +158,7 @@ export function initPublishing({api,toast,onPlay,onListChange}){
   // or resetting a room selection on each poll.
   if(q('publishQueue').dataset.signature!==signature){
    const expanded = new Set([...q('publishQueue').querySelectorAll('[data-alternatives][open]')].map(details=>details.dataset.alternatives));
-   q('publishQueue').innerHTML=[...songs.values()].map(group=>renderSong(group,rooms,expanded)).join('');
+   reconcileQueue([...songs.values()].map(group=>renderSong(group,rooms,expanded)).join(''));
    q('publishQueue').dataset.signature=signature;
    for(const button of q('publishQueue').querySelectorAll('[data-preview]'))button.onclick=()=>{
     const project = projects.find(p=>p.prepared_id===button.dataset.preview);
@@ -178,5 +223,12 @@ export function initPublishing({api,toast,onPlay,onListChange}){
  q('pubUseRclone').onclick=()=>action(async()=>{q('pubConfigMessage').textContent='Reading the saved r2 connection on this PC…';const body={remote:'r2',bucket:q('pubConfig_bucket').value.trim()||null,public_base:q('pubConfig_public_base').value.trim()||null,website_url:q('pubConfig_website_url').value.trim()||null};const config=await api('/releases/settings/rclone',body);showSettings(config);q('pubConfigMessage').textContent='Saved · using rclone r2. Run Check public connection.';});
  q('pubSaveConfig').onclick=()=>action(async()=>{q('pubConfigMessage').textContent='Saving publishing settings…';const body=Object.fromEntries(fields.map(([key])=>[key,q('pubConfig_'+key).value.trim()]));const config=await api('/releases/settings',body);showSettings(config);q('pubConfigMessage').textContent=config.settings.rclone_remote?`Saved · using rclone ${config.settings.rclone_remote}. Run the public connection check.`:'Saved. Run the public connection check.';});
  q('pubCheckConfig').onclick=()=>action(async()=>{q('pubConfigMessage').textContent='Checking upload, public URL and CORS…';const result=await api('/releases/check',{});q('pubConfigMessage').textContent='Ready · '+result.catalogue_url;});
- return {open:async()=>{settings=(await api('/releases/library/settings')).settings;await action(refresh);clearInterval(timer);timer=setInterval(()=>{if(!document.hidden&&!busy&&!root.querySelector('input:focus,select:focus,textarea:focus'))refresh().catch(error=>{q('pubError').textContent=error.message;});},4000);},close:()=>clearInterval(timer)};
+ return {
+  open:async()=>{
+   ++viewVersion;settings=null;refreshing=null;clearInterval(timer);
+   timer=setInterval(()=>{if(!document.hidden&&!root.hidden)refresh().catch(error=>{if(!root.hidden)q('pubError').textContent=error.message;});},4000);
+   await action(refresh);
+  },
+  close(){++viewVersion;clearInterval(timer);}
+ };
 }

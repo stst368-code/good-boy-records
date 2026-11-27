@@ -14,9 +14,10 @@ export function createSongPlayer({getProject,sourceUrl,toast,onTick}){
  async function buffer(url){
   if(decoded.has(url)){const value=decoded.get(url);decoded.delete(url);decoded.set(url,value);return value;}
   if(pending.has(url))return pending.get(url);
+  const audioContext=context;
   const promise=(async()=>{
    const response=await fetch(url);if(!response.ok)throw Error('Audio unavailable. Reload the song or import the clip again.');
-   const result=await context.decodeAudioData(await response.arrayBuffer());
+   const result=await audioContext.decodeAudioData(await response.arrayBuffer());
    decoded.set(url,result);
    while(decoded.size>4)decoded.delete(decoded.keys().next().value);
    return result;
@@ -110,15 +111,24 @@ export function createSongPlayer({getProject,sourceUrl,toast,onTick}){
  }
  async function play(){
   if(active())return;
+  const ticket=++loading;
   document.getElementById('audio')?.pause();
   if(mode==='processed'){
    if(!previewKey)throw Error('Render a processed preview first');
    if(anchor<previewStart||anchor>=previewEnd)anchor=previewStart;
-   processed.currentTime=anchor-previewStart;await processed.play();return;
+   processed.currentTime=anchor-previewStart;
+   try{await processed.play();}catch(error){if(ticket!==loading)return;throw error;}
+   return;
   }
-  context||=new AudioContext();await context.resume();const ticket=++loading;
-  if(sourceKey!==sourceUrl()||!sourceBuffer){
-   sourceKey=sourceUrl();sourceBuffer=null;sourceBuffer=await buffer(sourceKey);
+  const audioContext=context||=new AudioContext();
+  try{await audioContext.resume();}catch(error){if(ticket!==loading||context!==audioContext)return;throw error;}
+  if(ticket!==loading||context!==audioContext)return;
+  const key=sourceUrl();
+  if(sourceKey!==key||!sourceBuffer){
+   let decoded;
+   try{decoded=await buffer(key);}catch(error){if(ticket!==loading)return;throw error;}
+   if(ticket!==loading||key!==sourceUrl())return;
+   sourceKey=key;sourceBuffer=decoded;
   }
   if(ticket!==loading)return;
   if(anchor>=duration(getProject()))anchor=0;
@@ -137,7 +147,7 @@ export function createSongPlayer({getProject,sourceUrl,toast,onTick}){
   setSpeed(value){const resume=active();pause();speed=value;processed.playbackRate=value;if(resume)play().catch(error=>toast(error.message));},
   preview(url,start,seconds){if(mode==='processed')pause();previewKey=url;previewStart=start;previewEnd=start+seconds;processed.src=url;},
   invalidate(stopDraft=true){if(stopDraft||mode==='processed')pause();mode='draft';previewKey='';processed.removeAttribute('src');processed.load();},
-  reset(){pause();anchor=0;stopAt=null;sourceKey='';sourceBuffer=null;decoded.clear();pending.clear();},
-  close(){pause();decoded.clear();pending.clear();sourceBuffer=null;sourceKey='';processed.removeAttribute('src');processed.load();context?.close().catch(()=>{});context=null;}
+  reset(){pause();anchor=0;stopAt=null;loop=null;speed=1;mode='draft';previewKey='';previewStart=previewEnd=0;processed.playbackRate=1;processed.removeAttribute('src');processed.load();sourceKey='';sourceBuffer=null;decoded.clear();pending.clear();},
+  close(){this.reset();context?.close().catch(()=>{});context=null;}
  };
 }

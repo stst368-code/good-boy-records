@@ -103,13 +103,14 @@ export function initPreparation({api,toast}){
  const q=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  q('prepControls').innerHTML=controls.map(([key,label,min,max,step,value])=>`<label>${label}<input type="range" data-mix="${key}" min="${min}" max="${max}" step="${step}" value="${value}"><output data-value="${key}">${value}</output></label>`).join('');
  let projects=[],selected='',timer,lastPreview=null,lastBrief=null,previewStart=0,libraryMode=false,back=null,yamlFor='',yamlSequence=0,identity=null;
- let openSequence=0,refreshSequence=0,polling=false,historySignature='',projectSignature='';
+ let openSequence=0,refreshSequence=0,polling=false,configured=false,historySignature='',projectSignature='';
  const mixInputs = [...root.querySelectorAll('[data-mix]')];
  const effectPresets = new Map();
  const drafts = new Map(), coverChoices = new Map();
  let effects = [], maxEffects = 0, editing = '';
  let requestedPreview = '', requestedMaster = '';
  const submitting = new Set();
+ const completing = new Set();
  const artifactUrl = id => '/api/preparation/artifacts/' + encodeURIComponent(id);
  q('prepFlaggedOnly').checked=localStorage.getItem('gbr-preparation-flagged')!=='false';
  const flaggedOnly=()=>!libraryMode&&q('prepFlaggedOnly').checked;
@@ -318,6 +319,7 @@ export function initPreparation({api,toast}){
    task.recipe.start === Number(q('prepStart').value) && task.recipe.seconds === Math.min(Number(q('prepSeconds').value),(project()?.duration||Infinity)-Number(q('prepStart').value)) && task.recipe.stem_task_id === stem;
  }
  function updateRenders(p) {
+  q('prepComplete').disabled=completing.has(selected);
   const tasks = p?.tasks || [], source = timeline.artifact();
   const previews = tasks.filter(task => task.kind === 'mix_preview' && (task.recipe.input_artifact_id || '') === source);
   const previewJob = previews.find(task => task.id === requestedPreview) || previews[0];
@@ -355,7 +357,7 @@ export function initPreparation({api,toast}){
   const signature=JSON.stringify([p.generation_id,p.tasks,p.artworks]);
   if(signature===historySignature)return;
   historySignature=signature;
-  q('prepHistory').innerHTML=p.tasks.map(t=>`<div class="prep-task"><strong>${esc(t.kind.replaceAll('_',' '))} · ${esc(t.status)}</strong><span>${esc(t.created_at)}${t.telemetry.wall_seconds?' · '+Number(t.telemetry.wall_seconds).toFixed(2)+' sec':''}</span>${t.telemetry.measurements?.device?`<span>${esc(t.telemetry.measurements.device)}${t.telemetry.measurements.resources?.peak_observed_device_bytes!=null?' · peak device memory '+(t.telemetry.measurements.resources.peak_observed_device_bytes/1024**3).toFixed(2)+' GiB (includes other processes)':''}</span>`:''}${t.telemetry.measurements?.sample_peak_dbfs!=null?`<span>Sample peak ${Number(t.telemetry.measurements.sample_peak_dbfs).toFixed(1)} dBFS · RMS ${Number(t.telemetry.measurements.rms_dbfs).toFixed(1)} dBFS</span>`:''}${t.telemetry.cleanup?.in_use||t.telemetry.cleanup?.error?'<p>Preview cleanup pending. Stop playback, then clear previews.</p>':''}${t.error?`<p>${esc(t.error)}</p>`:''}<div>${t.artifacts.filter(a=>a.available).map(a=>`<a href="/api/preparation/artifacts/${encodeURIComponent(a.id)}" target="_blank" rel="noopener">${esc(a.kind)}</a>`).join(' ')}${['failed','interrupted','queued','running'].includes(t.status)?` <button data-retry="${esc(t.id)}" class="secondary">${t.status==='running'||t.status==='queued'?'Recover stopped task':'Retry'}</button>`:''}${t.recipe.mix?` <button data-restore="${esc(t.id)}" class="secondary">Load settings</button>`:''}</div></div>`).join('')||'<p>No processing trials yet.</p>';
+  q('prepHistory').innerHTML=(p.tasks||[]).map(t=>`<div class="prep-task"><strong>${esc(t.kind.replaceAll('_',' '))} · ${esc(t.status)}</strong><span>${esc(t.created_at)}${t.telemetry.wall_seconds?' · '+Number(t.telemetry.wall_seconds).toFixed(2)+' sec':''}</span>${t.telemetry.measurements?.device?`<span>${esc(t.telemetry.measurements.device)}${t.telemetry.measurements.resources?.peak_observed_device_bytes!=null?' · peak device memory '+(t.telemetry.measurements.resources.peak_observed_device_bytes/1024**3).toFixed(2)+' GiB (includes other processes)':''}</span>`:''}${t.telemetry.measurements?.sample_peak_dbfs!=null?`<span>Sample peak ${Number(t.telemetry.measurements.sample_peak_dbfs).toFixed(1)} dBFS · RMS ${Number(t.telemetry.measurements.rms_dbfs).toFixed(1)} dBFS</span>`:''}${t.telemetry.cleanup?.in_use||t.telemetry.cleanup?.error?'<p>Preview cleanup pending. Stop playback, then clear previews.</p>':''}${t.error?`<p>${esc(t.error)}</p>`:''}<div>${t.artifacts.filter(a=>a.available).map(a=>`<a href="/api/preparation/artifacts/${encodeURIComponent(a.id)}" target="_blank" rel="noopener">${esc(a.kind)}</a>`).join(' ')}${['failed','interrupted','queued','running'].includes(t.status)?` <button data-retry="${esc(t.id)}" class="secondary">${t.status==='running'||t.status==='queued'?'Recover stopped task':'Retry'}</button>`:''}${t.recipe.mix?` <button data-restore="${esc(t.id)}" class="secondary">Load settings</button>`:''}</div></div>`).join('')||'<p>No processing trials yet.</p>';
   for(const button of root.querySelectorAll('[data-retry]'))button.onclick=handle(async()=>{await api('/preparation/tasks/'+encodeURIComponent(button.dataset.retry)+'/retry',{});await refresh()});
   for (const button of q('prepHistory').querySelectorAll('[data-restore]')) button.onclick = () => {
    const saved = p.tasks.find(task => task.id === button.dataset.restore).recipe;
@@ -369,7 +371,7 @@ export function initPreparation({api,toast}){
    new Option(art.created_at ? 'Artwork · ' + new Date(art.created_at).toLocaleString() : 'Artwork ' + (index + 1), art.id)));
   picker.value = preferred === '' || artworks.some(item => item.id === preferred) ? preferred : artworks[0]?.id || '';
   showCover();
-  const savedBrief=p.tasks.find(t=>t.kind==='artwork_brief'&&t.status==='done');
+  const savedBrief=(p.tasks||[]).find(t=>t.kind==='artwork_brief'&&t.status==='done');
   if(savedBrief&&savedBrief.id!==lastBrief?.id){lastBrief={id:savedBrief.id,...savedBrief.recipe};q('prepPrompt').value=lastBrief.prompt;q('prepDirection').value=lastBrief.direction||'';q('prepFamily').value='comfyui';for(const input of root.querySelectorAll('[data-reference]'))input.checked=lastBrief.reference_ids.includes(input.dataset.reference);}
  }
  async function processingQueue(){
@@ -382,6 +384,39 @@ export function initPreparation({api,toast}){
   for(const button of q('prepQueueJobs').querySelectorAll('[data-process-retry]'))button.onclick=handle(async()=>{await api(`/preparation/tasks/${button.dataset.processRetry}/retry`,{});await processingQueue();});
  }
  q('prepResumeQueue').onclick=handle(async()=>{await api('/preparation/processing/resume',{});await processingQueue();});
+ function projectChoices(options){
+  const picker=q('prepProject'),existing=new Map([...picker.options].map(option=>[option.value,option]));
+  for(const [index,[id,label]] of options.entries()){
+   const option=existing.get(id)||new Option(label,id);
+   if(option.textContent!==label)option.textContent=label;
+   if(picker.options[index]!==option)picker.insertBefore(option,picker.options[index]||null);
+   existing.delete(id);
+  }
+  for(const option of existing.values())option.remove();
+ }
+ async function yamlDetails(p){
+  const id=p.generation_id,key=id+':'+(p.yaml_sha256||'')+':'+libraryMode;
+  if(yamlFor===key)return;
+  const request=++yamlSequence,value=await api(`/preparation/projects/${encodeURIComponent(id)}/yaml`);
+  if(request!==yamlSequence||id!==selected)return;
+  q('prepYamlSource').textContent=(value.path||'Stored generation YAML')+(value.revision_id?' · saved Preparation revision':' · original metadata')+(value.editable?'. File edits are picked up automatically.':'. Published metadata is edited through Library.');
+  q('prepYamlOriginal').textContent=value.original_yaml||'';
+  q('prepYamlMetadata').innerHTML=Object.entries(value.metadata).filter(([key])=>!['lyrics','caption'].includes(key)).map(([key,value])=>`<div><dt>${esc(key)}</dt><dd>${esc(typeof value==='object'?JSON.stringify(value):value??'—')}</dd></div>`).join('');
+  q('prepYamlCaption').textContent=value.metadata.caption||'No caption stored';
+  q('prepYamlLyrics').textContent=value.metadata.lyrics||'No lyrics stored';
+  q('prepYamlRaw').textContent=value.yaml||'No original YAML stored';
+  q('prepIdentity').hidden=libraryMode;
+  if(!libraryMode){
+   const catalogue=await api(`/preparation/projects/${encodeURIComponent(id)}/identity`);
+   if(request!==yamlSequence||id!==selected)return;
+   identity=catalogue;
+   q('prepIdentitySong').replaceChildren(new Option('Choose master song',''),...identity.songs.map(r=>new Option(r.title+' · '+r.id,r.id)));
+   const sid=identity.song_id||identity.suggested_song_id;
+   if(sid&&!identity.songs.some(r=>r.id===sid))q('prepIdentitySong').append(new Option('Unlisted song ID '+sid,sid));
+   q('prepIdentitySong').value=sid||'';identityVariants();q('prepSaveIdentity').disabled=false;
+  }
+  yamlFor=key;
+ }
  async function refresh(){
   const sequence=++refreshSequence;
   const query=new URLSearchParams({focused:selected,published:String(libraryMode),flagged_only:String(flaggedOnly())});
@@ -391,41 +426,49 @@ export function initPreparation({api,toast}){
   q('prepNotice').textContent=result.enabled?(projects.length?'':'Flag a reviewed recording for distribution to begin.'):'The shared platform database is required for Preparation.';
   const options=projects.map(p=>[p.generation_id,`${p.title} · ${p.style||p.cluster||''} · ${p.audio_id.slice(0,8)}${p.ready?'':' · promoting'}${!libraryMode&&p.status!=='selected'?' · flag cleared':''}`]);
   const signature=JSON.stringify(options);
-  if(signature!==projectSignature){
-   q('prepProject').replaceChildren(...options.map(([id,label])=>new Option(label,id)));
-   projectSignature=signature;
-  }
-  if(projects.some(p=>p.generation_id===selected))q('prepProject').value=selected;else selected=q('prepProject').value;
-  const changedRecording = editing !== selected;
-  if (changedRecording) {
-   editing = selected;
-   const draft = drafts.get(selected);
-   loadMix(draft?.mix || {}, draft?.stems, draft?.start);
+  if(signature!==projectSignature){projectChoices(options);projectSignature=signature;}
+  if(!projects.some(p=>p.generation_id===selected))selected=options[0]?.[0]||'';
+  q('prepProject').value=selected;
+  q('prepProject').disabled=!configured||!projects.length;
+  const changedRecording=editing!==selected;
+  if(changedRecording){
+   timeline.pause();editing=selected;
+   const draft=drafts.get(selected);
+   loadMix(draft?.mix||{},draft?.stems,draft?.start);
    mixUndo=[];mixRedo=[];lastMix=JSON.stringify(readMix());historyButtons();
-   requestedPreview = requestedMaster = '';
-   lastBrief = null;
-   q('prepPrompt').value = q('prepDirection').value = q('prepArtworkFile').value = '';
-   q('prepRaw').pause();
-   q('prepRaw').removeAttribute('src');
-   q('prepRaw').load();
-   setPreview(null);
+   requestedPreview=requestedMaster='';lastBrief=null;
+   yamlFor='';++yamlSequence;identity=null;q('prepSaveIdentity').disabled=true;
+   q('prepYamlSource').textContent='Loading recording details…';
+   q('prepYamlCaption').textContent=q('prepYamlLyrics').textContent=q('prepYamlRaw').textContent='';
+   q('prepWorkspace').inert=true;
+   q('prepPrompt').value=q('prepDirection').value=q('prepArtworkFile').value='';
+   q('prepRaw').pause();q('prepRaw').removeAttribute('src');q('prepRaw').load();setPreview(null);
   }
-  if (project()?.ready && !q('prepComplete').disabled && !q('prepRaw').hasAttribute('src')) {
-   const source = changedRecording ? '' : timeline.artifact();
-   q('prepRaw').src = '/api/preparation/audio/' + encodeURIComponent(selected) +
-    (source ? '?' + new URLSearchParams({artifact: source}) : '');
+  const p=project();
+  if(p?.ready&&!q('prepComplete').disabled&&!q('prepRaw').hasAttribute('src')){
+   const source=changedRecording?'':timeline.artifact();
+   q('prepRaw').src='/api/preparation/audio/'+encodeURIComponent(selected)+(source?'?'+new URLSearchParams({artifact:source}):'');
   }
   history();
-  if (project()?.ready) await timeline.update(project());
-  if (sequence === refreshSequence && project()?.ready) await studio.update(selected,timeline.artifact());
-  if (sequence !== refreshSequence) return;
-  updateRenders(project());
-  const yamlKey=selected+':'+(project()?.yaml_sha256||'')+':'+(project()?.yaml_error||'')+':'+libraryMode;
-  if(project()?.yaml_error){q('prepNotice').textContent=project().yaml_error;q('prepYamlSource').textContent=project().yaml_error;}
-  if(selected&&!project()?.yaml_error&&yamlFor!==yamlKey){const request=++yamlSequence,id=selected;const value=await api(`/preparation/projects/${encodeURIComponent(id)}/yaml`);if(request===yamlSequence&&selected===id){yamlFor=yamlKey;q('prepYamlSource').textContent=(value.path||'Stored generation YAML')+(value.revision_id?' · saved Preparation revision':' · original metadata')+(value.editable?'. File edits are picked up automatically.':'. Published metadata is edited through Library.');q('prepYamlOriginal').textContent=value.original_yaml||'';q('prepYamlMetadata').innerHTML=Object.entries(value.metadata).filter(([key])=>!['lyrics','caption'].includes(key)).map(([key,value])=>`<div><dt>${esc(key)}</dt><dd>${esc(typeof value==='object'?JSON.stringify(value):value??'—')}</dd></div>`).join('');q('prepYamlCaption').textContent=value.metadata.caption||'No caption stored';q('prepYamlLyrics').textContent=value.metadata.lyrics||'No lyrics stored';q('prepYamlRaw').textContent=value.yaml||'No original YAML stored';q('prepIdentity').hidden=libraryMode;if(!libraryMode){identity=await api(`/preparation/projects/${encodeURIComponent(id)}/identity`);if(selected===id){q('prepIdentitySong').replaceChildren(new Option('Choose master song',''),...identity.songs.map(r=>new Option(r.title+' · '+r.id,r.id)));const sid=identity.song_id||identity.suggested_song_id;if(sid&&!identity.songs.some(r=>r.id===sid))q('prepIdentitySong').append(new Option('Unlisted song ID '+sid,sid));q('prepIdentitySong').value=sid||'';identityVariants();}}}}
+  let songError=p?.yaml_error||'';
+  if(p?.ready&&!songError){
+   try{
+    await timeline.update(p);
+    if(sequence!==refreshSequence)return;
+    await studio.update(selected,timeline.artifact());
+    if(sequence!==refreshSequence)return;
+    q('prepWorkspace').inert=!configured;
+   }catch(error){if(sequence!==refreshSequence)return;songError=error.message;}
+  }
   if(sequence!==refreshSequence)return;
-  q('prepWorkspace').hidden=!project()?.ready;
-  if(project()?.ready&&!result.ffmpeg)q('prepNotice').textContent='Install FFmpeg on the host to render previews and master candidates.';
+  updateRenders(p);
+  if(p&&!p.yaml_error){
+   try{await yamlDetails(p);}catch(error){if(sequence!==refreshSequence)return;q('prepYamlSource').textContent=error.message;if(!songError)q('prepNotice').textContent=error.message;}
+  }
+  if(sequence!==refreshSequence)return;
+  q('prepWorkspace').hidden=!p?.ready||Boolean(songError);
+  if(songError){q('prepNotice').textContent=songError;q('prepYamlSource').textContent=songError;}
+  else if(p?.ready&&!result.ffmpeg)q('prepNotice').textContent='Install FFmpeg on the host to render previews and master candidates.';
  }
  async function references(){const result=await api('/preparation/references');q('prepReferences').innerHTML=result.references.length?'<span>Reference images</span>'+result.references.map(r=>`<label><input type="checkbox" data-reference="${esc(r.id)}"> ${esc(r.name)}</label>`).join(''):'<p class="prep-note">Add reference images under _04_preparation/_references/_artwork, then reopen this tab.</p>';for(const input of root.querySelectorAll('[data-reference]'))input.checked=!!lastBrief?.reference_ids.includes(input.dataset.reference);}
  async function start(kind) {
@@ -470,12 +513,31 @@ export function initPreparation({api,toast}){
    q('prepImportArtwork').disabled = false;
   }
  });
- q('prepComplete').onclick=handle(async()=>{if(!timeline.canSwitch())throw Error('Save or reload the song timeline before completing');timeline.releaseReady();timeline.pause();q('prepRaw').pause();q('prepRaw').removeAttribute('src');q('prepRaw').load();q('prepProcessed').pause();q('prepProcessed').removeAttribute('src');q('prepProcessed').load();q('prepComplete').disabled=true;try{const editorial=await api(`/preparation/projects/${encodeURIComponent(selected)}/editorial?`+new URLSearchParams(timeline.artifact()?{artifact:timeline.artifact()}:{}));if(q('prepReleaseLyrics').checked&&(editorial.lyric_task_id||editorial.lyric_revision_missing)&&!editorial.approved)throw Error('Approve the saved lyric timings, or turn off their inclusion before completing');await api(libraryMode?`/releases/library/recordings/${encodeURIComponent(selected)}/prepare`:`/releases/projects/${encodeURIComponent(selected)}/finish`,{master_id:timeline.artifact()||null,artwork_id:q('prepReleaseArtwork').value||null,include_flac:q('prepIncludeFlac').checked,visibility:q('prepReleaseVisibility').value,timed_lyrics:q('prepReleaseLyrics').checked&&editorial.approved});toast(libraryMode?'Updated Library release queued.':'Preparation queued. The completed package will appear in Publish.');if(libraryMode){await back?.();}else document.getElementById('publishingTab').click();}finally{q('prepComplete').disabled=false;}});
+ q('prepComplete').onclick=handle(async()=>{
+  if(!timeline.canSwitch())throw Error('Wait for the current song save to finish');
+  timeline.releaseReady();
+  const id=selected,sequence=openSequence,published=libraryMode,onBack=back;
+  if(completing.has(id))return;
+  const options={master_id:timeline.artifact()||null,artwork_id:q('prepReleaseArtwork').value||null,
+   include_flac:q('prepIncludeFlac').checked,visibility:q('prepReleaseVisibility').value};
+  const includeLyrics=q('prepReleaseLyrics').checked;
+  timeline.pause();q('prepRaw').pause();q('prepRaw').removeAttribute('src');q('prepRaw').load();
+  q('prepProcessed').pause();q('prepProcessed').removeAttribute('src');q('prepProcessed').load();
+  completing.add(id);q('prepComplete').disabled=true;
+  try{
+   const editorial=await api(`/preparation/projects/${encodeURIComponent(id)}/editorial?`+new URLSearchParams(options.master_id?{artifact:options.master_id}:{}));
+   if(includeLyrics&&(editorial.lyric_task_id||editorial.lyric_revision_missing)&&!editorial.approved)throw Error('Approve the saved lyric timings, or turn off their inclusion before completing');
+   await api(published?`/releases/library/recordings/${encodeURIComponent(id)}/prepare`:`/releases/projects/${encodeURIComponent(id)}/finish`,
+    {...options,timed_lyrics:includeLyrics&&editorial.approved});
+   toast(published?'Updated Library release queued.':'Preparation queued. The completed package will appear in Publish.');
+   if(selected===id&&sequence===openSequence){if(published)await onBack?.();else document.getElementById('publishingTab').click();}
+  }finally{completing.delete(id);q('prepComplete').disabled=completing.has(selected);}
+ });
  function identityVariants(){if(!identity)return;const sid=q('prepIdentitySong').value,variants=identity.variants.filter(r=>r.song_id===sid);q('prepIdentityVariant').replaceChildren(new Option('Base variant · 1','1'),...variants.filter(r=>r.id!=='1').map(r=>new Option(r.title+' · '+r.id,r.id)));if(sid===identity.song_id&&identity.variant_id){if(![...q('prepIdentityVariant').options].some(o=>o.value===identity.variant_id))q('prepIdentityVariant').append(new Option('Existing variant · '+identity.variant_id,identity.variant_id));q('prepIdentityVariant').value=identity.variant_id;}else if(sid===(identity.song_id||identity.suggested_song_id)&&identity.suggested_variant_id)q('prepIdentityVariant').value=identity.suggested_variant_id;}
  q('prepIdentitySong').onchange=identityVariants;
  q('prepSaveIdentity').onclick=handle(async()=>{if(!identity||!q('prepIdentitySong').value)throw Error('Choose a master song');await api(`/preparation/projects/${encodeURIComponent(selected)}/identity`,{song_id:Number(q('prepIdentitySong').value),variant_id:Number(q('prepIdentityVariant').value),expected_sha256:identity.sha256});yamlFor='';await refresh();toast('Preparation identity saved. Original generation metadata and reviews were retained.');});
  q('prepRefresh').onclick=handle(async()=>{await api('/preparation/sync',{});await refresh()});
- q('prepProject').onchange=handle(async()=>{if(!timeline.canSwitch()){q('prepProject').value=selected;throw Error('Save or reload the timeline draft before changing recordings');}selected=q('prepProject').value;await refresh()});
+ q('prepProject').onchange=handle(async()=>{if(!timeline.canSwitch()){q('prepProject').value=selected;throw Error('Wait for the current song save to finish before changing recordings');}timeline.pause();selected=q('prepProject').value;await refresh()});
  q('prepPreview').onclick=handle(()=>start('mix_preview'));q('prepMaster').onclick=handle(()=>start('mix_master'));q('prepVisuals').onclick=handle(()=>start('visuals'));
  q('prepClean').onclick = handle(async () => {
   submitting.add('cleanup_previews');
@@ -514,13 +576,13 @@ export function initPreparation({api,toast}){
    await wet.play();
   }
  });
- q('prepBrief').onclick=handle(async()=>{lastBrief=await api(`/preparation/projects/${encodeURIComponent(selected)}/artwork`,{family:q('prepFamily').value,direction:q('prepDirection').value,references:[...root.querySelectorAll('[data-reference]:checked')].map(e=>e.dataset.reference),seed:0});q('prepPrompt').value=lastBrief.prompt;await refresh()});
- q('prepBackLibrary').onclick=handle(async()=>{if(!timeline.canSwitch())throw Error('Save or reload the timeline draft before leaving');await back?.();});
+ q('prepBrief').onclick=handle(async()=>{const id=selected,result=await api(`/preparation/projects/${encodeURIComponent(id)}/artwork`,{family:q('prepFamily').value,direction:q('prepDirection').value,references:[...root.querySelectorAll('[data-reference]:checked')].map(e=>e.dataset.reference),seed:0});if(selected!==id)return;lastBrief=result;q('prepPrompt').value=lastBrief.prompt;await refresh()});
+ q('prepBackLibrary').onclick=handle(async()=>{if(!timeline.canSwitch())throw Error('Wait for the current song save to finish before leaving');await back?.();});
  q('prepFlaggedOnly').onchange=handle(async()=>{
   const input=q('prepFlaggedOnly');
   if(!timeline.canSwitch()){
    input.checked=!input.checked;
-   throw Error('Save or reload the timeline draft before changing the filter');
+   throw Error('Wait for the current song save to finish before changing the filter');
   }
   localStorage.setItem('gbr-preparation-flagged',String(input.checked));
   await Promise.all([refresh(),processingQueue()]);
@@ -528,14 +590,19 @@ export function initPreparation({api,toast}){
  async function pollProcessing() {
   if(polling||root.hidden||document.hidden)return;
   polling=true;
-  try{await Promise.all([refresh(),processingQueue()]);}
+  try{const results=await Promise.allSettled([refresh(),processingQueue()]);for(const result of results)if(result.status==='rejected'&&!root.hidden)toast(result.reason.message);}
   catch(error){if(!root.hidden)toast(error.message);}
   finally{polling=false;}
  }
+ function startPolling(){clearInterval(timer);timer=setInterval(pollProcessing,2000);}
  return {
   canLeave:()=>timeline.canSwitch(),
   async open(options={}){
    const sequence=++openSequence;
+   ++refreshSequence;++yamlSequence;
+   configured=false;
+   q('prepWorkspace').inert=true;q('prepProject').disabled=true;
+   startPolling();
    libraryMode=Boolean(options.published);
    back=options.onBack||null;
    if(options.published)selected=options.published;
@@ -554,13 +621,12 @@ export function initPreparation({api,toast}){
    q('prepReleaseVisibility').value=options.room||config.default_room;
    q('prepIncludeFlac').checked=config.include_flac;
    q('prepReleaseLyrics').checked=config.timed_lyrics;
+   configured=true;
    await Promise.all([refresh(),processingQueue()]);
    if(sequence!==openSequence)return;
    if(options.master_id)await timeline.chooseSource(options.master_id);
    if(projects.length)await references();
    if(sequence!==openSequence)return;
-   clearInterval(timer);
-   timer=setInterval(pollProcessing,2000);
   },
   close(){
    ++openSequence;++refreshSequence;++yamlSequence;

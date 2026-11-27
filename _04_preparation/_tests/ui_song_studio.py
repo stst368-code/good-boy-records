@@ -52,7 +52,9 @@ def main():
                 if args.width<1080:page.locator('#workspaceMenu').click()
                 page.locator('#preparationTab').click()
                 page.wait_for_function("()=>['Original audio','Saved','Unsaved'].some(text=>document.getElementById('songSaveState')?.textContent.startsWith(text))")
+                page.wait_for_function("()=>!document.getElementById('prepWorkspace').inert&&Boolean(document.querySelector('#songSoundList [data-clip]'))")
             open_tab()
+            page.locator('#songSoundList [data-clip]').first.wait_for()
             assert page.locator('#songSoundList [data-clip]').count()==6
             assert not page.locator('#mixWave').is_visible()
             assert not page.locator('#prepRaw').is_visible()
