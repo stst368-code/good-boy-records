@@ -78,11 +78,13 @@ class RemoteProcessing:
                 if not selection or selection['status'] not in {'selected','published'}:continue
                 if selection['status']=='published' and selection['published_at'] and task['created_at']<=selection['published_at']:continue
                 try:
+                    vocal=None
                     metadata=self.prep.metadata.read(task['generation_id'])
                     if recipe.get('lyrics_sha256',metadata['original_lyrics_sha256'])!=metadata['lyrics_sha256']:
                         self.db.execute("UPDATE processing_tasks SET status='cancelled',completed_at=?,error='Superseded by changed lyrics' WHERE id=?",(now(),task['id']));continue
                     row,source=self.prep.source(task['generation_id'],artifact_id=recipe.get('input_artifact_id'))
                     if digest(source)!=task['input_sha256']:raise ValueError('Source bytes changed after this alignment was queued')
+                    if recipe.get('reuse_stem_task_id'):vocal=self.prep.stems(task['generation_id'],recipe['reuse_stem_task_id'],task['input_sha256'])['vocals']
                 except (OSError,ValueError,KeyError) as error:
                     self.db.execute("UPDATE processing_tasks SET status='failed',completed_at=?,error=? WHERE id=?",(now(),str(error),task['id']));continue
                 lease=secrets.token_hex(24)
@@ -93,8 +95,11 @@ class RemoteProcessing:
                         (now(),telemetry,task['id'])).rowcount
                 if claimed:
                     self.workers[worker['id']]['available']=False
-                    return {'task':{'id':task['id'],'lease':lease,'recipe':recipe,'source_sha256':task['input_sha256'],
-                        'duration':row['duration'],'source_bytes':source.stat().st_size}}
+                    payload={'id':task['id'],'lease':lease,'recipe':recipe,'source_sha256':task['input_sha256'],
+                        'duration':row['duration'],'source_bytes':source.stat().st_size}
+                    if vocal:
+                        payload.update(vocal_bytes=Path(vocal['path']).stat().st_size,vocal_sha256=vocal['sha256'])
+                    return {'task':payload}
         return {'task':None}
 
     def task(self,identifier,lease):
@@ -110,6 +115,11 @@ class RemoteProcessing:
         source=self.prep.source(task['generation_id'],artifact_id=recipe.get('input_artifact_id'))[1]
         if digest(source)!=task['input_sha256']:raise ValueError('Source audio changed after the worker claimed it')
         return source
+
+    def vocals(self,identifier,lease):
+        task=self.task(identifier,lease);recipe=json.loads(task['recipe_json'])
+        if not recipe.get('reuse_stem_task_id'):raise ValueError('This task has no reusable vocal stem')
+        return Path(self.prep.stems(task['generation_id'],recipe['reuse_stem_task_id'],task['input_sha256'])['vocals']['path'])
 
     def progress(self,identifier,lease,values):
         from .service import canonical
@@ -179,11 +189,15 @@ class RemoteProcessing:
                         if path.stat().st_size>8*1024**2:raise ValueError('Lyric result is too large')
                         lyrics=json.loads(path.read_text(encoding='utf-8'))
                         if lyrics.get('source_sha256')!=task['input_sha256'] or lyrics.get('language')!=recipe['language']:raise ValueError('Worker lyrics belong to different audio or language')
+                        if not isinstance(lyrics.get('words'),list) or len(lyrics['words'])!=len(recipe['words']):raise ValueError('Worker changed the supplied lyric token count')
                         validate_lyrics(lyrics,recipe['words'],duration)
                         for word,original in zip(lyrics['words'],recipe['words']):
                             if any(word.get(key)!=original.get(key) for key in ['id','text','source_text','section','line']):
                                 raise ValueError('Worker changed the supplied lyric text')
                             if word.get('confidence') is not None:number(word['confidence'],0,1,'word confidence')
+                            if word.get('language')!=original.get('language'):raise ValueError('Worker changed a supplied lyric language')
+                            if original.get('confirmed') and any(word.get(key)!=original.get(key) for key in ['start','end','parts','confirmed']):
+                                raise ValueError('Worker changed a checked lyric anchor')
                         if recipe['words'] and not any(word.get('start') is not None for word in lyrics['words']):raise ValueError('Alignment matched no supplied lyric words')
                     else:
                         info=sf.info(path)

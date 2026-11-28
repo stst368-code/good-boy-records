@@ -1,10 +1,10 @@
 name: GBR preparation
 on:
   pull_request:
-    paths: ['_01_writing/_gbr_writing/**', '_01_writing/_static/**', '_01_writing/_tests/**', '_99_tools/_workers_infdit/_gbr_worker/llama.py', '_gbr_layout.py', '_04_preparation/**', '_02_generation/**', '_99_tools/_workers_processing/**', '_99_tools/_workers_comfyui/**', '_98_database/_gbr_database/**', '_03_review/_generation_review/_review/**', '_03_review/_generation_review/_tests/**', '_99_tools/_yaml_editor/**', '.github/workflows/preparation.yml']
+    paths: ['_01_writing/_gbr_writing/**', '_01_writing/_static/**', '_01_writing/_tests/**', '_99_tools/_workers_infdit/_gbr_worker/llama.py', '_gbr_layout.py', '_gbr_lyrics.py', '_04_preparation/**', '_02_generation/**', '_99_tools/_workers_processing/**', '_99_tools/_workers_comfyui/**', '_98_database/_gbr_database/**', '_03_review/_generation_review/_review/**', '_03_review/_generation_review/_tests/**', '_99_tools/_yaml_editor/**', '.github/workflows/preparation.yml']
   push:
     branches: [main]
-    paths: ['_01_writing/_gbr_writing/**', '_01_writing/_static/**', '_01_writing/_tests/**', '_99_tools/_workers_infdit/_gbr_worker/llama.py', '_gbr_layout.py', '_04_preparation/**', '_02_generation/**', '_99_tools/_workers_processing/**', '_99_tools/_workers_comfyui/**', '_98_database/_gbr_database/**', '_03_review/_generation_review/_review/**', '_03_review/_generation_review/_tests/**', '_99_tools/_yaml_editor/**', '.github/workflows/preparation.yml']
+    paths: ['_01_writing/_gbr_writing/**', '_01_writing/_static/**', '_01_writing/_tests/**', '_99_tools/_workers_infdit/_gbr_worker/llama.py', '_gbr_layout.py', '_gbr_lyrics.py', '_04_preparation/**', '_02_generation/**', '_99_tools/_workers_processing/**', '_99_tools/_workers_comfyui/**', '_98_database/_gbr_database/**', '_03_review/_generation_review/_review/**', '_03_review/_generation_review/_tests/**', '_99_tools/_yaml_editor/**', '.github/workflows/preparation.yml']
 permissions:
   contents: read
 jobs:
@@ -31,6 +31,7 @@ jobs:
       - run: node --input-type=module --check < _04_preparation/_static/song-editor.js
       - run: node --input-type=module --check < _04_preparation/_static/workbench.js
       - run: node --input-type=module --check < _04_preparation/_static/song-model.js
+      - run: node --input-type=module --check < _04_preparation/_static/lyric-tools.js
       - run: node --input-type=module --check < _04_preparation/_static/song-player.js
       - run: node --input-type=module --check < _04_preparation/_static/publishing.js
       - run: node --input-type=module --check < _04_preparation/_static/library.js
@@ -51,3 +52,6 @@ jobs:
           python _04_preparation/_tests/ui_preparation_navigation.py --browser "$GBR_TEST_BROWSER"
           python _04_preparation/_tests/ui_publish_feedback.py --browser "$GBR_TEST_BROWSER" --width 390
           python _04_preparation/_tests/ui_song_studio.py --browser "$GBR_TEST_BROWSER" --width 1440
+          python _04_preparation/_tests/ui_lyric_editing.py --browser "$GBR_TEST_BROWSER" --width 1440
+          python _04_preparation/_tests/ui_lyric_editing.py --browser "$GBR_TEST_BROWSER" --width 390
+          python _96_website/_tests/ui_lyric_parts.py --browser "$GBR_TEST_BROWSER"

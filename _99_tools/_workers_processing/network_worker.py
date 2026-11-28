@@ -130,6 +130,15 @@ def execute(client,task,device='auto',python=None):
             if received!=task['source_bytes'] or checksum.hexdigest()!=task['source_sha256']:raise ValueError('Source audio checksum mismatch')
             request={'kind':'lyric_alignment','source':str(source),'source_sha256':task['source_sha256'],
                 'duration':task['duration'],'recipe':task['recipe'],'output':str(folder/'result'),'progress_file':str(progress)}
+            if task.get('vocal_sha256'):
+                vocal=folder/'vocals.wav';checksum=hashlib.sha256();received=0
+                with client.request('/tasks/'+identifier+'/vocals',lease=lease) as response,vocal.open('wb') as output:
+                    while chunk:=response.read(1024**2):
+                        received+=len(chunk)
+                        if received>min(MAX_BYTES,task['vocal_bytes']):raise ValueError('Vocal download exceeds its expected size')
+                        output.write(chunk);checksum.update(chunk)
+                if received!=task['vocal_bytes'] or checksum.hexdigest()!=task['vocal_sha256']:raise ValueError('Vocal stem checksum mismatch')
+                request['vocal_source']=str(vocal)
             environment=os.environ.copy();environment.update(PYTHONUTF8='1',PYTHONIOENCODING='utf-8',GBR_PROCESSING_DEVICE=device)
             environment.setdefault('HF_HOME',str(ROOT/'_runtime/huggingface'));environment.setdefault('TORCH_HOME',str(ROOT/'_runtime/torch'))
             command=[str(python or sys.executable),str(ROOT/'alignment.py')]

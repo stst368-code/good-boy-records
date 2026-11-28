@@ -77,7 +77,9 @@ def main():
             page.locator('#songLyricText button').first.click()
             assert float(page.locator('#songInspector [data-key=start]').input_value())==.8
             page.locator('#songLoadAlignment').click()
-            page.wait_for_function("()=>document.querySelector('#songInspector [data-key=start]')?.value==='1.25'")
+            page.wait_for_function("()=>document.getElementById('songAlignmentStatus').textContent.includes('loaded')")
+            assert float(page.locator('#songInspector [data-key=start]').input_value())==.8
+            assert page.locator('#songInspector [data-key=confirmed]').is_checked()
             assert page.locator('#songInspector [data-key=text]').input_value()=='Kept'
             page.locator('#songLyricText button').last.click()
             assert page.locator('#songInspector [data-key=omitted]').is_checked()
@@ -86,10 +88,10 @@ def main():
             page.reload();open_tab()
             assert page.locator('#songLyricState').text_content()=='approved'
             doc=prep.song_projects.get(gid)['project']
-            assert doc['words'][0]['text']=='Kept' and doc['words'][0]['start']==1.25
+            assert doc['words'][0]['text']=='Kept' and doc['words'][0]['start']==.8
             assert doc['words'][-1]['omitted'] and doc['lighting']['sensitivity']==1.5
-            # An explicit rerun can replace already approved timings, provided
-            # the user has not edited the words while the worker is running.
+            # Reruns keep checked anchors. Unchecking a word explicitly lets
+            # a later alignment replace that word's timing.
             def rerun(route):
                 body=route.request.post_data_json
                 assert body['kind']=='lyric_alignment' and body['language']=='en' and body['force']
@@ -99,6 +101,10 @@ def main():
             page.locator('#songAlign').click()
             page.wait_for_function("()=>document.getElementById('songAlignmentStatus').textContent.includes('loaded')",timeout=10000)
             page.locator('#songLyricText button').first.click()
+            assert float(page.locator('#songInspector [data-key=start]').input_value())==.8
+            page.locator('#songInspector [data-key=confirmed]').uncheck()
+            page.locator('#songAlign').click()
+            page.wait_for_function("()=>document.querySelector('#songInspector [data-key=start]')?.value==='1.5'",timeout=10000)
             assert float(page.locator('#songInspector [data-key=start]').input_value())==1.5
             assert page.locator('#songInspector [data-key=text]').input_value()=='Kept'
             assert page.locator('#songLyricState').text_content()=='not approved'

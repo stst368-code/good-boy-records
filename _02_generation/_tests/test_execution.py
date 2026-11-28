@@ -114,6 +114,17 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(self.run_plan(path)["attempts"], [])
         self.assertEqual(len(self.calls), 1)
 
+    def test_language_markers_are_frozen_in_yaml_but_removed_at_the_worker_boundary(self):
+        raw=self.original.replace(b'caption: |-',b'language: "en, ro"\r\ncaption: |-')
+        raw=raw.replace(b'  A little light across the room',b'  {en} A little light across the room')
+        raw=raw.replace(b'  A rising note beyond the blue','  {ro} O casă plină de povești'.encode())
+        self.source.write_bytes(raw);path=self.prepare();result=self.run_plan(path)
+        self.assertEqual(result['status'],'succeeded',result)
+        self.assertNotIn('{en}',self.calls[0]['lyrics']);self.assertNotIn('{ro}',self.calls[0]['lyrics'])
+        self.assertIn('O casă plină de povești',self.calls[0]['lyrics'])
+        self.assertEqual(self.source.read_bytes(),raw)
+        self.assertEqual((Path(result['attempts'][0]['output'])/'source.yaml').read_bytes(),raw)
+
     def test_failure_retains_metrics_without_completed_outputs_and_retry_keeps_seeds(self):
         path = self.prepare()
         result = execute(path, worker_python=sys.executable, launcher=lambda *args: self.worker(*args, fail=True))

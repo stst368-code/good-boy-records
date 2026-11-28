@@ -9,13 +9,18 @@ def number(value, low, high, name):
     return float(value)
 
 
-def lyric_words(lyrics):
-    words=[];section='';line=0
+def lyric_words(lyrics, language='en'):
+    from _gbr_lyrics import MARKER,language_codes
+    words=[];section='';line=0;current=language_codes(language,lyrics)[0]
     for text in str(lyrics or '').splitlines():
         if re.fullmatch(r'\s*\[[^\]]+\]\s*',text):section=text.strip()[1:-1];continue
-        for token in text.split():
-            words.append({'id':f'w{len(words):05d}','text':token,'source_text':token,'section':section,'line':line,
-                          'start':None,'end':None,'confidence':None,'confirmed':False,'omitted':False})
+        position=0
+        for marker in [*MARKER.finditer(text),None]:
+            chunk=text[position:marker.start() if marker else len(text)]
+            for token in chunk.split():
+                words.append({'id':f'w{len(words):05d}','text':token,'source_text':token,'section':section,'line':line,
+                              'language':current,'start':None,'end':None,'confidence':None,'confirmed':False,'omitted':False})
+            if marker:current=marker[1].lower();position=marker.end()
         line+=1
     return words
 
@@ -54,11 +59,19 @@ def position_lyrics(words,duration):
 
 def validate_lyrics(data, baseline, duration):
     incoming=data.get('words')
-    if not isinstance(incoming,list) or len(incoming)!=len(baseline):raise ValueError('Keep every supplied lyric token; mark a missing word omitted instead of deleting it')
-    result=[]
-    for word,original in zip(incoming,baseline):
+    if not isinstance(incoming,list) or len(incoming)>20000:raise ValueError('Use up to 20,000 lyric words')
+    originals={word['id']:word for word in baseline};supplied=[];seen=set();result=[]
+    for word in incoming:
         if not isinstance(word,dict):raise ValueError('Invalid lyric token')
-        if word.get('id')!=original['id']:raise ValueError('Lyric token IDs or order changed')
+        identifier=word.get('id')
+        if not isinstance(identifier,str) or identifier in seen:raise ValueError('Lyric token IDs must be unique')
+        seen.add(identifier)
+        if identifier in originals:original=originals[identifier];supplied.append(identifier)
+        else:
+            if not re.fullmatch(r'manual_[a-f0-9]{32}',identifier):raise ValueError('Lyric token IDs or order changed')
+            if type(word.get('line')) not in (int,str) or len(str(word['line']))>100:raise ValueError('Invalid lyric line')
+            original={'id':identifier,'text':word.get('text'),'source_text':word.get('text'),'section':str(word.get('section',''))[:200],
+                      'line':word['line'],'start':None,'end':None,'manual':True,'confirmed':False,'omitted':False}
         text=word.get('text')
         if not isinstance(text,str) or not text.strip() or len(text)>200 or '\n' in text or '\r' in text:raise ValueError('Enter a short lyric token')
         start,end=word.get('start'),word.get('end')
@@ -68,7 +81,29 @@ def validate_lyrics(data, baseline, duration):
             if end<=start:raise ValueError('Word end must follow its start')
         if any(type(word.get(key,original.get(key,False))) is not bool for key in ('confirmed','omitted','estimated')):raise ValueError('Invalid lyric confirmation')
         edited=original.get('edited',False) or text!=original['text'] or start!=original['start'] or end!=original['end']
-        result.append({**original,'edited':edited,'text':text,'start':start,'end':end,'confirmed':word.get('confirmed',False),'omitted':word.get('omitted',False),'estimated':word.get('estimated',original.get('estimated',False))})
+        from _gbr_lyrics import language_codes
+        language=language_codes(word.get('language') or original.get('language') or 'en')
+        if len(language)!=1:raise ValueError('Choose one language per word')
+        current={**original,'edited':edited,'text':text,'start':start,'end':end,'language':language[0],
+                 'confirmed':word.get('confirmed',False),'omitted':word.get('omitted',False),
+                 'estimated':word.get('estimated',original.get('estimated',False))}
+        parts=word.get('parts',original.get('parts'))
+        if parts is not None:
+            if not isinstance(parts,list) or not 1<=len(parts)<=100:raise ValueError('Use 1 to 100 highlight parts')
+            clean=[];previous=0.
+            for part in parts:
+                if not isinstance(part,dict) or set(part)-{'text','start','end'}:raise ValueError('Invalid highlight part')
+                label=part.get('text')
+                if not isinstance(label,str) or not label:raise ValueError('Highlight parts need text')
+                left=number(part.get('start'),0,1,'highlight start');right=number(part.get('end'),left,1,'highlight end')
+                if abs(left-previous)>.00001 or right<=left:raise ValueError('Highlight parts must run end to end')
+                clean.append({'text':label,'start':left,'end':right});previous=right
+            if abs(previous-1)>.00001 or ''.join(p['text'] for p in clean)!=text:raise ValueError('Highlight parts must spell the word and cover its full duration')
+            current['parts']=clean
+        elif 'parts' in current:current.pop('parts')
+        result.append(current)
+    if supplied!=[word['id'] for word in baseline]:
+        raise ValueError('Keep every supplied lyric token in order; mark a missing word omitted instead of deleting it')
     return result
 
 

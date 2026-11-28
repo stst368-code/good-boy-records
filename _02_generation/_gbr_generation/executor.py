@@ -47,10 +47,11 @@ def upgrade_database(conn):
 
 
 def make_job(run, base, attempt_id, directory, revision=None):
+    from _gbr_lyrics import model_lyrics
     document = YamlDocument((base / run["snapshot"]).read_bytes())
     job = {"protocol": PROTOCOL, "run_id": run["id"], "attempt_id": attempt_id,
            "parameters": run["effective"], "execution": run["execution"],
-           "model_revision": revision or run.get("model_revision"), "lyrics": document.values.get("lyrics", ""),
+           "model_revision": revision or run.get("model_revision"), "lyrics": model_lyrics(document.values.get("lyrics", "")),
            "source_sha256": run["source_sha256"], "result_directory": str(directory),
            "cache_root": str(WORKER / "runtime" / "encodings")}
     execution_target(job["execution"])

@@ -99,8 +99,10 @@ class Preparation:
         return {'parsed_json':canonical(data['metadata']),'yaml_sha256':data['sha256'],'yaml_revision_id':data['revision_id']}
 
     def lyric_recipe(self,gid,recipe):
+        from _gbr_lyrics import language_value
         data=self.metadata.read(gid)
-        return {**recipe,'lyrics_sha256':data['lyrics_sha256'],'words':lyric_words(data['metadata'].get('lyrics',''))}
+        text=data['metadata'].get('lyrics','');language=language_value(recipe.get('language') or data['metadata'].get('language'),text)
+        return {**recipe,'language':language,'lyrics_sha256':data['lyrics_sha256'],'words':lyric_words(text,language)}
 
     def close(self):
         self.closed=True
@@ -160,8 +162,7 @@ class Preparation:
                 return previous
             row,source=self.source(gid)
             language=json.loads(row['parsed_json']).get('language') or 'en'
-            if not isinstance(language,str) or not re.fullmatch('[a-z]{2,3}',language):language='en'
-            identifier=self._insert(gid,'lyric_alignment',self.lyric_recipe(gid,{'version':1,'language':language}),digest(source),'waiting')
+            identifier=self._insert(gid,'lyric_alignment',self.lyric_recipe(gid,{'version':2,'language':language,'refine':False}),digest(source),'waiting')
             self.db.execute("UPDATE processing_tasks SET error=? WHERE id=?",('Waiting for a free local GPU and the processing environment',identifier))
             return self.launch_waiting(self.db.one('SELECT * FROM processing_tasks WHERE id=?',(identifier,)))
 
@@ -366,7 +367,7 @@ class Preparation:
         self.require();self.editable(gid);row,source=self.source(gid,artifact_id=data.get('input_artifact_id'))
         if kind not in {'mix_preview','mix_master','visuals','lyric_alignment'}:raise ValueError('This processing adapter is not installed')
         recipe={'mix':mix_recipe(data.get('mix',{}))} if kind.startswith('mix_') else {'version':2,'fps':10,'energy':'channel_rms'}
-        if data.get('song_project_id'):
+        if data.get('song_project_id') and kind!='lyric_alignment':
             if kind not in {'mix_preview','mix_master'}:raise ValueError('Render the song before calculating final-audio features')
             saved=self.song_projects.render_recipe(gid,data['song_project_id'])
             if saved.get('input_artifact_id')!=data.get('input_artifact_id') or saved['source_sha256']!=digest(source):
@@ -381,11 +382,23 @@ class Preparation:
                 if effect.get('range', {}).get('end', 0) > row['duration'] + .001 or any(p['time'] > row['duration'] + .001 for p in effect.get('automation', [])):
                     raise ValueError('Effect ranges and automation must fit inside the working audio')
         if kind=='lyric_alignment':
+            from _gbr_lyrics import language_value
             language=data.get('language') or json.loads(row['parsed_json']).get('language') or 'en'
-            if not isinstance(language,str) or not __import__('re').fullmatch('[a-z]{2,3}',language):raise ValueError('Use an ISO language code, e.g. en or de')
-            recipe={'version':1,'language':language}
+            recipe={'version':2,'language':language_value(language),'refine':bool(data.get('refine'))}
             if data.get('device')=='cpu':recipe['execution_device']='cpu'
             recipe=self.lyric_recipe(gid,recipe)
+            if data.get('song_project_id'):
+                saved=self.song_projects.get(gid,data['song_project_id'])
+                if saved['source_artifact_id']!=data.get('input_artifact_id') or saved['source_sha256']!=digest(source):
+                    raise ValueError('The lyric project belongs to different audio')
+                recipe.update(words=saved['project']['words'],language=language_value(saved['project']['language']),
+                              project_revision_id=saved['revision_id'])
+            if recipe.get('refine'):
+                for previous in self.db.all("SELECT id,recipe_json FROM processing_tasks WHERE generation_id=? AND kind='lyric_alignment' AND status='done' AND input_sha256=? ORDER BY rowid DESC LIMIT 10",(gid,digest(source))):
+                    owner=json.loads(previous['recipe_json']).get('reuse_stem_task_id') or previous['id']
+                    try:self.stems(gid,owner,digest(source))
+                    except (ValueError,FileNotFoundError):continue
+                    recipe['reuse_stem_task_id']=owner;break
             if not self.alignment_python().is_file() and (data.get('device')=='cpu' or not self.remote.configured()):raise ValueError('Install processing on this PC for local alignment, or pair another PC and use automatic alignment.')
         if data.get('input_artifact_id'):recipe['input_artifact_id']=data['input_artifact_id']
         if kind=='mix_preview':
@@ -401,6 +414,9 @@ class Preparation:
         fingerprint=hashlib.sha256(canonical([gid,kind,recipe,source_hash]).encode()).hexdigest()
         with self.lock:
             self.editable(gid)
+            if kind=='lyric_alignment' and data.get('force'):
+                self.db.execute("UPDATE processing_tasks SET status='cancelled',completed_at=?,error='Replaced by a newer explicit alignment request' WHERE generation_id=? AND kind='lyric_alignment' AND status='waiting' AND input_sha256=? AND fingerprint<>?",
+                    (now(),gid,source_hash,fingerprint))
             if kind=='lyric_alignment' and data.get('device')=='cpu' and data.get('force'):
                 self.db.execute("UPDATE processing_tasks SET status='cancelled',completed_at=?,error='Replaced by an explicit CPU alignment' WHERE generation_id=? AND kind='lyric_alignment' AND status='waiting' AND input_sha256=? AND json_extract(recipe_json,'$.language')=? AND COALESCE(json_extract(recipe_json,'$.execution_device'),'auto')<>'cpu'",
                     (now(),gid,source_hash,recipe['language']))
@@ -440,10 +456,10 @@ class Preparation:
                 timeout=600
                 if task['kind']=='lyric_alignment':
                     request['recipe']['words']=recipe.get('words',lyric_words(json.loads(row['parsed_json']).get('lyrics','')))
+                    if recipe.get('reuse_stem_task_id'):request['vocal_source']=self.stems(task['generation_id'],recipe['reuse_stem_task_id'],task['input_sha256'])['vocals']['path']
                     command=[str(self.alignment_python()),str(self.worker.with_name('alignment.py'))];timeout=7200
                 environment=os.environ.copy()
                 environment.update(PYTHONUTF8='1',PYTHONIOENCODING='utf-8')
-                if recipe.get('execution_device')=='cpu':environment['GBR_PROCESSING_DEVICE']='cpu'
                 if recipe.get('execution_device')=='cpu':environment['GBR_PROCESSING_DEVICE']='cpu'
                 environment.setdefault('HF_HOME',str(self.worker.parent/'_runtime/huggingface'))
                 environment.setdefault('TORCH_HOME',str(self.worker.parent/'_runtime/torch'))
@@ -535,7 +551,7 @@ class Preparation:
             if task['kind']=='lyric_alignment':
                 current=self.metadata.read(task['generation_id'])
                 if recipe.get('lyrics_sha256',current['original_lyrics_sha256'])!=current['lyrics_sha256']:recipe['language']=current['metadata'].get('language') or 'en'
-                recipe=self.lyric_recipe(task['generation_id'],recipe)
+                if not recipe.get('project_revision_id'):recipe=self.lyric_recipe(task['generation_id'],recipe)
             new_id=self._insert(task['generation_id'],task['kind'],recipe,task['input_sha256'],'waiting' if task['kind']=='lyric_alignment' else 'queued')
             if task['kind']=='lyric_alignment':
                 result=self.launch_waiting(self.db.one('SELECT * FROM processing_tasks WHERE id=?',(new_id,)))
@@ -613,12 +629,14 @@ class Preparation:
             return verified_json(raw)
         return None
 
-    def editorial(self,gid,artifact_id=None,*,alignment_only=False,alignment_language=None):
+    def editorial(self,gid,artifact_id=None,*,alignment_only=False,alignment_language=None,alignment_task=None):
         self.require();row,source=self.source(gid,artifact_id=artifact_id);sha=digest(source)
         metadata=self.metadata.read(gid)
         fields=metadata['metadata']
-        result={'source_sha256':sha,'lyrics_sha256':metadata['lyrics_sha256'],'duration':row['duration'],'language':fields.get('language') or 'en',
-                'words':lyric_words(fields.get('lyrics','')),'approved':False,'lyric_task_id':None,
+        from _gbr_lyrics import language_value
+        language=language_value(fields.get('language'),fields.get('lyrics',''))
+        result={'source_sha256':sha,'lyrics_sha256':metadata['lyrics_sha256'],'duration':row['duration'],'language':language,
+                'words':lyric_words(fields.get('lyrics',''),language),'approved':False,'lyric_task_id':None,
                 'features':None,'feature_artifact_id':None,'lighting_task_id':None,'sensitivity':1,'sections':[]}
         # Rendered lyric revisions use final-timeline IDs and offsets; they
         # cannot serve as alignment for the original source words.
@@ -631,6 +649,8 @@ class Preparation:
             if alignment_only and alignment_language:
                 extra+=" AND json_extract(recipe_json,'$.language')=?"
                 args+= (alignment_language,)
+            if alignment_only and alignment_task:
+                extra+=" AND id=?";args+=(alignment_task,)
             tasks = self.db.all(f"""SELECT id,kind FROM processing_tasks WHERE generation_id=? AND input_sha256=?
                 AND kind IN ({placeholders}) AND status='done'{extra} ORDER BY rowid DESC LIMIT 25""", args)
             for index, task in enumerate(tasks):
@@ -649,6 +669,7 @@ class Preparation:
                         result['lyric_revision_missing'] = True
                     result.update(language=data.get('language', result['language']), words=data['words'],
                                   approved=index == 0 and data.get('approved', False), lyric_task_id=task['id'],
+                                  alignment_warnings=data.get('refinement',{}).get('warnings',[]),
                                   unmatched_recognition=data.get('unmatched_recognition', []), timing_source=timing,
                                   song_project_id=data.get('song_project_id'),raw_lyrics=data.get('raw_lyrics'))
                 elif key == 'visual':
@@ -711,8 +732,10 @@ class Preparation:
 
 
     def stems(self,gid,task_id,source_hash):
-        task=self.db.one("SELECT id FROM processing_tasks WHERE id=? AND generation_id=? AND kind='lyric_alignment' AND status='done' AND input_sha256=?",(task_id,gid,source_hash))
+        task=self.db.one("SELECT id,recipe_json FROM processing_tasks WHERE id=? AND generation_id=? AND kind='lyric_alignment' AND status='done' AND input_sha256=?",(task_id,gid,source_hash))
         if not task:raise ValueError('Choose completed separation for this working audio')
+        reused=json.loads(task['recipe_json']).get('reuse_stem_task_id')
+        if reused and reused!=task_id:return self.stems(gid,reused,source_hash)
         result={}
         for kind in ['vocals','accompaniment']:
             item=self.db.one("SELECT id,sha256 FROM generation_artifacts WHERE kind=? AND json_extract(metadata_json,'$.processing_task_id')=?",('stem_'+kind,task_id))

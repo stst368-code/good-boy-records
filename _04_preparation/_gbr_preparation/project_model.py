@@ -128,9 +128,9 @@ def validate(project, source_duration, baseline):
     mix=deepcopy(project.get('mix',{}))
     if not isinstance(mix,dict):raise ValueError('Invalid project mix')
     if 'version' in mix and mix.pop('version') not in (1,2):raise ValueError('Unknown project mix version')
+    from _gbr_lyrics import language_value
     result.update(approved=project.get('approved',False),mix=mix_recipe(mix),
-                  artwork_id=project.get('artwork_id'),language=str(project.get('language') or 'en')[:3])
-    if not re.fullmatch('[a-z]{2,3}',result['language']):raise ValueError('Use an ISO language code, e.g. en or de')
+                  artwork_id=project.get('artwork_id'),language=language_value(project.get('language')))
     for effect in result['mix'].get('effects',[]):
         if effect.get('range',{}).get('end',0)>total or any(p['time']>total for p in effect.get('automation',[])):
             raise ValueError('Mastering effects must fit inside the song timeline')

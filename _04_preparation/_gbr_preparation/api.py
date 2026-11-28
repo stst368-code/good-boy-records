@@ -16,6 +16,7 @@ class Job(BaseModel):
     song_project_id: str | None=None
     language: str | None=None
     force:StrictBool=False
+    refine:StrictBool=False
     device:Literal['auto','cpu']='auto'
     mix: dict=Field(default_factory=dict)
     start: float=Field(default=0,ge=0,allow_inf_nan=False)
@@ -148,8 +149,8 @@ def router(root,review,local):
         return plan(service.db)
 
     @routes.get('/projects/{gid}/editorial')
-    def editorial(gid: str,artifact: str | None=None,alignment_only:bool=False,language:str|None=None):
-        return service.editorial(gid,artifact,alignment_only=alignment_only,alignment_language=language)
+    def editorial(gid: str,artifact: str | None=None,alignment_only:bool=False,language:str|None=None,task:str|None=None):
+        return service.editorial(gid,artifact,alignment_only=alignment_only,alignment_language=language,alignment_task=task)
     @routes.get('/projects/{gid}/waveform')
     def waveform(gid: str,artifact: str | None=None):
         from .waveform import waveform as build_waveform

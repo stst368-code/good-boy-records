@@ -101,9 +101,10 @@ def match_words(expected, recognised):
     for block in difflib.SequenceMatcher(None,a,b,autojunk=False).get_matching_blocks():
         for offset in range(block.size):
             index=block.a+offset;found=recognised[block.b+offset];used.add(block.b+offset)
+            if result[index].get('confirmed'):continue
             start,end,score=found.get('start'),found.get('end'),found.get('score')
             if start is not None and end is not None and end>start:
-                result[index].update(start=float(start),end=float(end),confidence=float(score) if score is not None and math.isfinite(float(score)) and 0<=float(score)<=1 else None)
+                result[index].update(start=float(start),end=float(end),estimated=False,confidence=float(score) if score is not None and math.isfinite(float(score)) and 0<=float(score)<=1 else None)
     return result,[word for index,word in enumerate(recognised) if index not in used]
 
 
@@ -118,49 +119,67 @@ def run(request):
     from demucs.audio import AudioFile
     from demucs.pretrained import get_model
     import soundfile as sf
-    language=request['recipe']['language']
-    prepare_model_cache(language)
+    languages=[value.strip().split('-')[0] for value in request['recipe']['language'].split(',')]
+    language=languages[0]
+    for code in languages:prepare_model_cache(code)
     recover_silero_cache(torch)
     device=request.get('_device') or processing_device(torch);out=Path(request['output']).parent
-    report(request,'separation_model','Loading / downloading Demucs model',device=device)
-    model=get_model('htdemucs');model.to(device);model.eval()
-    report(request,'separation','Separating vocals and accompaniment')
-    audio=AudioFile(request['source']).read(streams=0,samplerate=model.samplerate,channels=model.audio_channels)
-    reference=audio.mean(0);mean=reference.mean();std=reference.std()
-    with torch.inference_mode():stems=apply_model(model,((audio-mean)/(std+1e-8))[None].to(device),device=device,shifts=0,split=True,overlap=.25)[0].cpu()*(std+1e-8)+mean
-    vocals=stems[model.sources.index('vocals')];accompaniment=stems.sum(0)-vocals
     artifacts=[]
-    for name,wave in [('vocals',vocals),('accompaniment',accompaniment)]:
-        path=out/(name+'.wav');sf.write(path,wave.T.numpy(),model.samplerate,subtype='FLOAT');artifacts.append({'output':str(path),'artifact_kind':'stem_'+name})
-    del model,stems,audio;gc.collect()
-    if device=='cuda':torch.cuda.empty_cache()
-    speech=whisperx.load_audio(str(out/'vocals.wav'))
-    report(request,'asr_model','Loading / downloading Whisper large-v3')
-    import ctranslate2
-    compute=asr_compute(torch,device,ctranslate2)
-    report(request,'asr_model','Loading / downloading Whisper large-v3 · '+compute,device=device)
-    asr=whisperx.load_model(ASR_MODEL,device,compute_type=compute,language=language,vad_method='silero')
-    report(request,'transcription','Transcribing the separated vocals')
-    batch=1 if device=='cpu' or torch.cuda.get_device_properties(0).total_memory<=8*1024**3 else 4
-    transcript=asr.transcribe(speech,batch_size=batch,language=language)
-    del asr;gc.collect()
-    if device=='cuda':torch.cuda.empty_cache()
-    report(request,'alignment_model','Loading / downloading language alignment model')
-    aligner,metadata=whisperx.load_align_model(language_code=language,device=device)
-    report(request,'alignment','Aligning recognised words to the audio')
-    aligned=whisperx.align(transcript['segments'],aligner,metadata,speech,device,return_char_alignments=False)
-    report(request,'matching','Matching audio timings to the supplied lyrics')
-    words,unmatched=match_words(request['recipe']['words'],aligned.get('word_segments',[]))
-    matched=sum(w['start'] is not None for w in words)
+    if request.get('vocal_source'):
+        report(request,'vocals','Reusing the verified separated vocal stem')
+        speech=whisperx.load_audio(request['vocal_source'])
+    else:
+        report(request,'separation_model','Loading / downloading Demucs model',device=device)
+        model=get_model('htdemucs');model.to(device);model.eval()
+        report(request,'separation','Separating vocals and accompaniment')
+        audio=AudioFile(request['source']).read(streams=0,samplerate=model.samplerate,channels=model.audio_channels)
+        reference=audio.mean(0);mean=reference.mean();std=reference.std()
+        with torch.inference_mode():stems=apply_model(model,((audio-mean)/(std+1e-8))[None].to(device),device=device,shifts=0,split=True,overlap=.25)[0].cpu()*(std+1e-8)+mean
+        vocals=stems[model.sources.index('vocals')];accompaniment=stems.sum(0)-vocals
+        artifacts=[]
+        for name,wave in [('vocals',vocals),('accompaniment',accompaniment)]:
+            path=out/(name+'.wav');sf.write(path,wave.T.numpy(),model.samplerate,subtype='FLOAT');artifacts.append({'output':str(path),'artifact_kind':'stem_'+name})
+        del model,stems,audio;gc.collect()
+        if device=='cuda':torch.cuda.empty_cache()
+        speech=whisperx.load_audio(str(out/'vocals.wav'))
+    from copy import deepcopy
+    sys.path.insert(0,str(Path(__file__).resolve().parent))
+    from alignment_refinement import refine
+    words=deepcopy(request['recipe']['words']);unmatched=[]
+    if not request['recipe'].get('refine'):
+        import ctranslate2
+        compute=asr_compute(torch,device,ctranslate2);asr_language=language if len(languages)==1 else None
+        report(request,'asr_model','Loading / downloading Whisper large-v3 · '+compute,device=device)
+        asr=whisperx.load_model(ASR_MODEL,device,compute_type=compute,language=asr_language,vad_method='silero')
+        report(request,'transcription','Transcribing the separated vocals')
+        batch=1 if device=='cpu' or torch.cuda.get_device_properties(0).total_memory<=8*1024**3 else 4
+        transcript=asr.transcribe(speech,batch_size=batch,language=asr_language)
+        del asr;gc.collect()
+        if device=='cuda':torch.cuda.empty_cache()
+        report(request,'alignment_model','Loading / downloading '+language+' alignment model')
+        try:
+            aligner,metadata=whisperx.load_align_model(language_code=language,device=device)
+            report(request,'alignment','Aligning recognised words to the audio')
+            aligned=whisperx.align(transcript['segments'],aligner,metadata,speech,device,return_char_alignments=False)
+            words,unmatched=match_words(words,aligned.get('word_segments',[]))
+            del aligner;gc.collect()
+            if device=='cuda':torch.cuda.empty_cache()
+        except ValueError as error:
+            print('Initial alignment model unavailable: '+str(error),file=sys.stderr)
+    words,refinement=refine(words,speech,request['duration'],whisperx,torch,device,
+                           lambda phase,message,**values:report(request,phase,message,**values),language,
+                           only_missing=not request['recipe'].get('refine'))
+    matched=sum(w.get('start') is not None and not w.get('estimated') for w in words if not w.get('omitted'))
     if words and not matched:raise RuntimeError('WhisperX matched 0 of '+str(len(words))+' supplied words. Check the language and worker log; the visible word positions remain estimates.')
-    data={'format':'gbr-lyrics-v1','source_sha256':request['source_sha256'],'language':language,'words':words,
-          'unmatched_recognition':unmatched,'method':'WhisperX ASR word alignment matched to supplied YAML tokens; missing tokens stay untimed',
+    data={'format':'gbr-lyrics-v1','source_sha256':request['source_sha256'],'language':request['recipe']['language'],'words':words,
+          'unmatched_recognition':unmatched,'method':'WhisperX with known-text refinement by language and checked timing anchors',
+          'refinement':refinement,
           'approved':False}
     path=out/'lyrics.json';path.write_text(json.dumps(data,ensure_ascii=False,allow_nan=False),encoding='utf-8')
     return {'output':str(path),'artifact_kind':'lyric_alignment','additional_outputs':artifacts,
         'software':{name:importlib.metadata.version(name) for name in ['torch','demucs','whisperx']},
         'hardware':{'gpu_name':torch.cuda.get_device_name() if device=='cuda' else None,'usable_vram_bytes':torch.cuda.get_device_properties(0).total_memory if device=='cuda' else None,'gpu_uuid':str(getattr(torch.cuda.get_device_properties(0),'uuid','')) or None if device=='cuda' else None},
-        'measurements':{'device':device,'matched_words':matched,'total_words':len(words)}}
+        'measurements':{'device':device,'matched_words':matched,'total_words':len(words),**refinement}}
 
 
 if __name__=='__main__':

@@ -35,6 +35,10 @@ def worker_router(prep):
     def source(identifier:str,request:Request):
         return FileResponse(prep.remote.source(identifier,request.headers.get('x-gbr-lease','')),media_type='application/octet-stream')
 
+    @routes.get('/tasks/{identifier}/vocals')
+    def vocals(identifier:str,request:Request):
+        return FileResponse(prep.remote.vocals(identifier,request.headers.get('x-gbr-lease','')),media_type='application/octet-stream')
+
     @routes.post('/tasks/{identifier}/progress')
     async def progress(identifier:str,request:Request):
         return prep.remote.progress(identifier,request.headers.get('x-gbr-lease',''),await request.json())

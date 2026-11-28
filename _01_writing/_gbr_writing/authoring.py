@@ -10,6 +10,7 @@ from _review.reviewers import Conflict
 from _review.util import now
 from .service import packed, patch_fields, sha
 from .lyrics import normalize_lyrics
+from _gbr_lyrics import language_value
 
 
 SECTIONS = [
@@ -108,7 +109,9 @@ class Authoring:
                 if position is not None and not album:raise ValueError('Choose an album before setting its position')
                 metadata={k:normal(request.get(k,'')) for k in ('author','inspiration_author','inspiration_track')}
                 metadata.update(album_bool='t' if album else 'f',album_name=album,album_position=str(position) if position else '')
-                self.draft(request,raw,{'title':title,'lyrics':lyrics},reviewer,source,metadata)
+                languages=request.get('language')
+                if languages is None:languages=YamlDocument(raw).values.get('language') or 'en'
+                self.draft(request,raw,{'title':title,'lyrics':lyrics,'language':language_value(languages,lyrics)},reviewer,source,metadata)
         # publish owns the same cross-process lock. Do not acquire it recursively.
         return self.w.publish(request['request_id'],'keep',0)
 

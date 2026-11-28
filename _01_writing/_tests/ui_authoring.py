@@ -39,9 +39,13 @@ def main():
             assert len(w.review.db.all('SELECT * FROM catalogue_songs'))==1
             page.locator('#baseSource').select_option('_yaml/my-écho-song.yaml')
             page.wait_for_function("()=>document.getElementById('baseSave').textContent==='Save as new variant'")
-            page.locator('#baseLyrics').fill('[VERSE]\nA NEW VERSION');page.locator('#baseSave').click()
+            assert page.locator('#baseLanguage').input_value()=='en'
+            page.locator('#baseLanguage').fill('en, ro')
+            page.locator('#baseLyrics').fill('[VERSE]\n{en} A NEW VERSION\n{ro} BUNĂ ZIUA');page.locator('#baseSave').click()
             page.wait_for_function("()=>document.getElementById('baseStatus').textContent.includes('variant 2')")
             assert (f.built/'_yaml/my-écho-song__v2.yaml').is_file()
+            written=test_authoring.YamlDocument((f.built/'_yaml/my-écho-song__v2.yaml').read_bytes()).values
+            assert written['language']=='en, ro' and '{ro} bună ziua' in written['lyrics']
             page.locator('#writingMode1').click();page.locator('#captionCluster').fill('Rock');page.locator('#captionVersion').fill('Punk')
             pick=page.get_by_label('Vocal Style reference',exact=True);pick.focus()
             page.wait_for_function("()=>document.querySelector('[aria-label=\"Vocal Style reference\"]').options.length>1")
@@ -57,6 +61,8 @@ def main():
                 for index in (0,1,2):
                     page.locator('#writingMode'+str(index)).click()
                     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),(width,index)
+                page.locator('#writeLanguage').fill('en, ro')
+                assert page.locator('#writeLanguage').input_value()=='en, ro'
             assert not errors,errors
             browser.close();print(json.dumps({'base_and_variant':'passed','editable_caption_reference_and_link':'passed','1440_3840_390_layout':'passed','js_errors':errors}))
     finally:

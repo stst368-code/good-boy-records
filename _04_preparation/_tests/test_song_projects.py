@@ -154,6 +154,7 @@ def test_published_package_uses_final_song_clock_and_edited_lyrics(publication):
     prep.worker=ROOT/'_99_tools/_workers_processing/worker.py'
     loaded=prep.song_projects.get(gid);doc=loaded['project'];doc['approved']=True
     doc['words'][0]['text']='Restored'
+    doc['words'][0]['parts']=[{'text':'R','start':0,'end':.1},{'text':'esto','start':.1,'end':.9},{'text':'red','start':.9,'end':1}]
     doc['segments']=[{'id':'first','kind':'audio','start':0,'end':.4,'mode':'normal'},
                      {'id':'gap','kind':'gap','duration':.5},
                      {'id':'last','kind':'audio','start':.4,'end':1,'mode':'normal'}]
@@ -168,6 +169,8 @@ def test_published_package_uses_final_song_clock_and_edited_lyrics(publication):
     lyric_file=next(Path(item['path']) for item in release['files'] if Path(item['path']).name=='lyrics.json')
     public=json.loads(lyric_file.read_text(encoding='utf-8'))
     public_words=[word for line in public['lines'] for word in line['words']]
+    assert public_words[0]['parts']==doc['words'][0]['parts']
+    assert public_words[0]['language']=='en'
     assert public_words[-1]['start']>.5
     assert all(0<=word['start']<word['end']<=1.5 for word in public_words)
 

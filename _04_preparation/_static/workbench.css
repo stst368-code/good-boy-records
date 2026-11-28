@@ -30,6 +30,20 @@
 #preparationView.timeline-workbench .song-tools label{font-size:10px;gap:6px;margin-left:auto}
 #preparationView.timeline-workbench .song-tools select{padding:5px;font-size:11px;min-height:31px}
 .timeline-workbench .song-canvas-wrap{padding:0;background:#0a1117}
+.song-canvas-wrap{position:relative}
+#preparationView #songInlineWords{position:absolute;z-index:4;width:min(280px,90%);min-height:68px;margin:0;padding:9px 11px;font:16px/1.4 system-ui,sans-serif;color:#fff3d7;background:#172733;border:2px solid #e7b866;border-radius:5px;box-shadow:0 4px 22px #0008;resize:vertical}
+#songInlineWords[hidden]{display:none!important}
+.song-word-ribbon{display:flex;align-items:center;gap:4px;min-height:42px;max-height:74px;padding:6px 12px;overflow:auto;border-block:1px solid var(--wb-line);background:#101b24;scrollbar-width:thin}
+#preparationView .song-word-ribbon button{flex:none;font:14px/1.45 system-ui,sans-serif;padding:4px 8px;min-height:30px;white-space:nowrap;border:1px solid transparent;background:transparent;color:#d5e0e7}
+#preparationView .song-word-ribbon button.selected,#preparationView #songLyricText button.selected{border-color:#dfb46b;background:#443923;color:#ffe0a3;box-shadow:inset 0 -2px #dfb46b}
+#preparationView .song-word-ribbon button.playing{color:#f9d991;background:#3c3424}
+.song-word-ribbon>span{font-size:12px;color:#8fa8b9}
+#preparationView #songFollow[aria-pressed=true]{border-color:#ad8b51;background:#403722;color:#f2cc84}
+.song-word-actions{display:flex;gap:7px;flex-wrap:wrap;padding-top:9px;margin-top:9px;border-top:1px solid #354754}
+.song-word-actions label{width:100%}.song-emphasis{margin-top:12px;border-top:1px solid #354754;padding-top:9px}
+.song-emphasis summary{cursor:pointer;color:#e0c38c;font-size:12px}.song-part-lengths{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:7px}
+.song-highlight-part{background:linear-gradient(to right,#f4cc78 var(--part-progress,0%),#c7d3da var(--part-progress,0%));color:transparent;background-clip:text;-webkit-background-clip:text}
+#preparationView.timeline-workbench #songLanguage{width:150px;max-width:100%;font-size:12px}
 .timeline-workbench #songTimeline{display:block;width:100%;height:clamp(250px,33vh,390px);touch-action:none}
 .timeline-workbench .song-view{padding:6px 12px;gap:7px;border-block:1px solid var(--wb-line);background:#121c24}
 #preparationView.timeline-workbench .song-view label{font-size:10px;margin:0;display:flex;align-items:center;gap:6px}

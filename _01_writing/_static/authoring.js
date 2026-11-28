@@ -8,7 +8,7 @@ export function initAuthoring({root,api,toast,onPublished,refreshDrafts}) {
   base.innerHTML=`<div class="writing-heading"><h2>Song base</h2><span class="subtle small">Lyrics and track registration</span></div>
     <label>Start from<select id="baseSource"><option value="">New song</option></select></label>
     <div class="writing-base-grid"><label>Song name<input id="baseTitle" maxlength="500" autocomplete="off"></label><label class="base-lyrics">Lyrics<textarea id="baseLyrics" rows="18" spellcheck="false"></textarea></label>
-    <div class="base-metadata"><label>Writing / author<input id="baseAuthor" value="gbr"></label><label>Inspiration artist<input id="baseInspirationAuthor"></label><label>Song inspiration<input id="baseInspirationTrack"></label><label>Album<input id="baseAlbum" list="writingAlbums" autocomplete="off"><datalist id="writingAlbums"></datalist></label><label>Album position<input id="basePosition" type="number" min="1" step="1"></label></div></div>
+    <div class="base-metadata"><label>Languages<input id="baseLanguage" value="en" placeholder="en, ro, de" maxlength="500"></label><p class="subtle small">Separate codes with commas. In the lyrics, {en} or {ro} changes the language for following words. These markers stay out of music generation.</p><label>Writing / author<input id="baseAuthor" value="gbr"></label><label>Inspiration artist<input id="baseInspirationAuthor"></label><label>Song inspiration<input id="baseInspirationTrack"></label><label>Album<input id="baseAlbum" list="writingAlbums" autocomplete="off"><datalist id="writingAlbums"></datalist></label><label>Album position<input id="basePosition" type="number" min="1" step="1"></label></div></div>
     <div class="writing-heading"><span class="subtle small">Saves lowercase, removes blank lines, normalises section tags and hyphenates the song name.</span><button id="baseSave" class="primary" type="button">Save new song</button></div><p id="baseStatus" role="status" class="small"></p>`;
   const caption=document.createElement('section');caption.id='writingCaptions';caption.hidden=true;
   caption.innerHTML=`<div class="generation-panel"><div class="writing-heading"><h2>Caption builder</h2><button id="captionClear" type="button">Clear caption</button></div>
@@ -101,13 +101,14 @@ export function initAuthoring({root,api,toast,onPublished,refreshDrafts}) {
       if(file){const loaded=await api('/writing/base?file='+encodeURIComponent(file));if($('baseSource').value!==file)return;source=loaded;}
       const metadata=source?.metadata||{},values=source?.values||{};
       $('baseTitle').value=values.title||metadata.song_name||'';$('baseLyrics').value=values.lyrics||'';
+      $('baseLanguage').value=Array.isArray(values.language)?values.language.join(', '):values.language||'en';
       for(const [id,name,fallback] of [['baseAuthor','author','gbr'],['baseInspirationAuthor','inspiration_author',''],['baseInspirationTrack','inspiration_track',''],['baseAlbum','album_name',''],['basePosition','album_position','']])$(id).value=metadata[name]||fallback;
       $('baseSave').textContent=file?'Save as new variant':'Save new song';$('baseStatus').textContent=file?'The selected source is preserved. Saving creates the next variant.':'';
     }catch(error){$('baseStatus').textContent=error.message;toast(error.message);}finally{$('baseSave').disabled=!!file&&!source;}
   };
   $('baseSave').onclick=guard($('baseSave'),$('baseStatus'),async()=>{
     if($('baseSource').value&&!source)throw new Error('Reload the selected track before saving');
-    const request=baseRequest||{request_id:key(),file:$('baseSource').value,source_sha256:source?.sha256||'',title:$('baseTitle').value,lyrics:$('baseLyrics').value,
+    const request=baseRequest||{request_id:key(),file:$('baseSource').value,source_sha256:source?.sha256||'',title:$('baseTitle').value,lyrics:$('baseLyrics').value,language:$('baseLanguage').value,
       author:$('baseAuthor').value,inspiration_author:$('baseInspirationAuthor').value,inspiration_track:$('baseInspirationTrack').value,album_name:$('baseAlbum').value,album_position:$('basePosition').value?Number($('basePosition').value):null};
     baseRequest=request;const result=await api('/writing/base',request);
     $('baseTitle').value=result.values.title;$('baseLyrics').value=result.values.lyrics;

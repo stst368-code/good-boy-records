@@ -1,6 +1,7 @@
 import {uid,clone,size,spans,duration,sounds,words,warp,split,insertGap,gesture,duplicate,remove,move} from './song-model.js';
 import {createSongPlayer} from './song-player.js';
 import {shiftWordTiming} from './timeline.js';
+import {sourceTime,selectedWords,checked,nudgeWords,resizeWords,packWords,pauseWord,wordParts,insertWords,followStart} from './lyric-tools.js';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const stamp=seconds=>`${Math.floor(Math.max(0,seconds)/60)}:${(Math.max(0,seconds)%60).toFixed(2).padStart(5,'0')}`;
 const clamp=(value,low,high)=>Math.max(low,Math.min(high,value));
@@ -11,11 +12,12 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  <header class="song-heading"><div><span class="song-eyebrow">SONG STUDIO</span><h2 id="songTitle">Your song, one timeline</h2></div><div class="song-save"><span id="songSaveState" role="status">Loading…</span><button id="songUndo" class="secondary" title="Undo · Ctrl Z">↶</button><button id="songRedo" class="secondary" title="Redo · Ctrl Shift Z">↷</button><button id="songSave">Save version</button></div></header>
  <div class="song-transport"><button id="songPlay" class="song-play" aria-label="Play song">▶ Play</button><button id="songBack" class="secondary" aria-label="Back two seconds">−2s</button><output id="songClock">0:00 / 0:00</output><label>Listen to<select id="songListen"><option value="draft">Arrangement · edits + clips</option><option value="processed" disabled>Processed preview</option></select></label><label class="prep-checkbox"><input id="songLoop" type="checkbox">Loop range</label><label>Speed<select id="songSpeed"><option value=".5">0.5×</option><option value=".75">0.75×</option><option value="1" selected>1×</option></select></label><div class="song-zoom"><button id="songZoomOut" class="secondary" aria-label="Zoom out">−</button><output id="songZoomLabel">Fit</output><button id="songZoomIn" class="secondary" aria-label="Zoom in">+</button><button id="songFit" class="secondary">Fit</button></div></div>
  <div class="song-tools" role="toolbar" aria-label="Song editing tools"><button id="songSplit" class="secondary">Split at playhead</button><button id="songBreak" class="secondary">＋ Silence</button><button id="songNeedle" class="secondary">Needle break</button><label>Selected range<select id="songGesture"><option value="">Record gesture…</option><option value="scratch">Vinyl scratch</option><option value="stop">Record stop</option><option value="start">Record start</option><option value="stutter">Stutter / repeat</option><option value="reverse">Reverse</option><option value="mute">Mute music</option><option value="normal">Normal playback</option></select></label><button id="songAddLight" class="secondary">＋ Light cue</button></div>
- <div class="song-canvas-wrap"><canvas id="songTimeline" height="390" tabindex="0" role="application" aria-label="Song timeline. Drag empty space to select a range. Drag music sections to reorder, sound clips to move, and lyric words or their edges to adjust timing."></canvas></div>
+ <div class="song-canvas-wrap"><canvas id="songTimeline" height="390" tabindex="0" role="application" aria-label="Song timeline. Drag words or edges to adjust timing. Ctrl-click adds words; Shift-click selects a range. Double-click a word to extend and edit it; double-click empty lyric space to add words."></canvas><textarea id="songInlineWords" rows="2" hidden spellcheck="false" aria-label="Edit timeline lyrics" placeholder="Type lyrics · Enter to save · Escape to cancel"></textarea></div>
+ <div class="song-word-ribbon" id="songWordRibbon" role="group" aria-label="Readable timeline lyrics"></div>
  <div class="song-view"><input id="songScroll" type="range" min="0" max="0" step=".01" value="0" aria-label="Timeline view start"><label>Range<input id="songRangeStart" type="number" step=".01" min="0" value="0" aria-label="Range start in seconds"></label><span>→</span><input id="songRangeEnd" type="number" step=".01" min="0" value="0" aria-label="Range end in seconds"><button id="songSelection" class="secondary">Play range</button></div>
  <p id="songHint" class="song-hint">Drag the ruler to select a range. Music sections carry their lyrics and attached clips when moved.</p>
  <div class="song-bottom"><section class="song-library" aria-label="Reusable sound library"><div class="song-library-heading"><h3>Sound library <span id="songSoundCount"></span></h3><label class="song-import">＋ Import audio<input id="songImport" type="file" accept="audio/*,.wav,.flac,.mp3,.ogg,.m4a,.aiff" multiple></label></div><input id="songSoundSearch" type="search" placeholder="Search your sounds…" aria-label="Search sound library"><p class="song-hint" id="songImportStatus" role="status">Drop clips onto the timeline, or add at the playhead. Imports stay in your library.</p><div id="songSoundList"></div></section><section class="song-inspector" aria-label="Selected timeline object"><h3 id="songInspectorTitle">Selection</h3><select id="songObjectPick" aria-label="Select a timeline object"></select><div id="songInspector"></div></section></div>
- <details class="song-lyrics"><summary>Lyrics · <span id="songLyricState">not approved</span></summary><div class="song-lyric-toolbar"><button id="songAlign" class="secondary">Run lyric alignment</button><button id="songLoadAlignment" class="secondary">Load latest alignment</button><button id="songApprove">Approve lyrics</button><label>Language<input id="songLanguage" maxlength="3" value="en"></label><label>Light sensitivity<input id="songSensitivity" type="number" min=".25" max="3" step=".05" value="1"></label><output id="songAlignmentStatus" role="status"></output></div><div id="songLyricText"></div><p class="song-hint">Word corrections edit the source; every occurrence follows your cuts and repeats.</p></details>
+ <details class="song-lyrics"><summary>Lyrics · <span id="songLyricState">not approved</span></summary><div class="song-lyric-toolbar"><button id="songAlign" class="secondary">Run lyric alignment</button><button id="songRefine" class="secondary">Refine around corrections</button><button id="songLoadAlignment" class="secondary">Load latest alignment</button><button id="songAddWords" class="secondary">＋ Words at playhead</button><button id="songApprove">Approve lyrics</button><label>Languages<input id="songLanguage" maxlength="500" value="en" placeholder="en, ro"></label><label>Light sensitivity<input id="songSensitivity" type="number" min=".25" max="3" step=".05" value="1"></label><output id="songAlignmentStatus" role="status"></output></div><div id="songLyricText"></div><p class="song-hint">Ctrl-click words to add to a selection; Shift-click selects first to last. ← / → nudges, Shift nudges further, Alt resizes. Space pauses and selects a nearby word. Checked timings stay fixed during refinement. Language markers: {en}, {ro}.</p></details>
  <footer class="song-render"><div><strong>Ready to hear the full mix?</strong><p class="song-hint">Draft playback auditions edits and clips. Render to hear mastering effects and automation.</p></div><button id="songPreview">Render range preview</button><button id="songMaster" class="primary">Render master</button><select id="songMasterChoice" aria-label="Release master"><option value="">Choose release master…</option></select><output id="songRenderState" role="status"></output></footer>
  <details class="song-versions"><summary>Saved versions</summary><div class="prep-actions"><select id="songVersions" aria-label="Saved song version"></select><button id="songRestore" class="secondary">Restore as draft</button><button id="songReload" class="secondary">Reload latest saved</button></div></details>`;
  root.querySelector('#prepWorkspace').prepend(host);
@@ -26,11 +28,14 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  let restoreMix=false,knownVersions='',alignmentId='',lyricProjection=[],lastPreview='',masterSignature='';
  let alignmentLoading=false,alignmentSequence=0,alignmentFailure=null,requestedAlignment=null;
  let processingItems=new Map();
+ let wordSelection=new Set(),wordAnchor=null,inlineEdit=null,ribbonSignature='';
  const sessionDrafts=new Map();
  let loadingProject=false,localDraftStored=true;
  const endpoint=(suffix='')=>'/preparation/projects/'+encodeURIComponent(gid)+suffix;
  const sourceUrl=()=>'/api/preparation/audio/'+encodeURIComponent(gid)+(data?.source_artifact_id?'?'+new URLSearchParams({artifact:data.source_artifact_id}):'');
  const player=createSongPlayer({getProject:()=>document,sourceUrl,toast,onTick:()=>clock()});
+ const follow=globalThis.document.createElement('button');follow.id='songFollow';follow.className='secondary';follow.textContent='Follow';follow.setAttribute('aria-pressed','true');follow.title='Keep the playing word in the zoomed timeline';q('songZoomIn').parentElement.append(follow);
+ follow.onclick=()=>{const enabled=follow.getAttribute('aria-pressed')!=='true';follow.setAttribute('aria-pressed',String(enabled));if(enabled&&document){viewStart=followStart(player.time(),viewStart,viewSpan,duration(document));rangeInputs();draw();}};
  const audition=new Audio();audition.preload='none';
  function resetPlayback(close=false){
   if(close)player.close();else player.reset();
@@ -144,7 +149,12 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
   for(const word of lyricProjection){
    if(word.end<viewStart||word.start>viewStart+viewSpan)continue;
    const x=X(word.start),right=X(word.end),index=lyricLanes.findIndex(end=>end<x-2),lane=index<0?0:index;lyricLanes[lane]=right;
-   const y=224+lane*20,width=Math.max(3,right-x);box(x,y,width,18,word.confirmed?'#214536':'#4e4128',selected?.id===word.id?'#f0bd67':'#6b6653',{kind:'word',id:word.id});if(width>18)label(word.text,Math.max(92,x+4),y+13,width-6,'#f0e5ce');
+   const y=224+lane*20,width=Math.max(3,right-x),chosen=wordSelection.has(word.source_id),playing=player.time()>=word.start&&player.time()<word.end;
+   box(x,y,width,18,playing?'#8c6a2c':word.confirmed?'#214536':'#4e4128',chosen?'#ffd079':'#6b6653',{kind:'word',id:word.id});
+   if(width>18){
+    ctx.save();ctx.beginPath();ctx.rect(Math.max(91,x+2),y,Math.max(0,Math.min(right,w-10)-Math.max(91,x+2)-3),18);ctx.clip();
+    ctx.font='13px system-ui,sans-serif';ctx.fillStyle='#f7efdd';ctx.fillText(word.text,Math.max(93,x+4),y+13);ctx.restore();
+   }
   }
   for(const [index,effect] of (document.mix.effects||[]).entries()){
    if(effect.bypassed)continue;const start=effect.range?.start||0,end=effect.range?.end||duration(document),left=X(start),right=X(end),y=299+(index%2)*16;
@@ -154,17 +164,73 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
   const offsets=new Map(spans(document).map(s=>[s.id,s.at]));
   document.lighting.cues.forEach((cue,index)=>{const at=cue.segment_id?(offsets.get(cue.segment_id)||0)+cue.offset:cue.at;box(X(at),349,X(at+cue.duration)-X(at),23,'#3c3924','#9e9255',{kind:'light',id:index});label('✦ '+(cue.label||'Cue'),X(at)+4,365,X(at+cue.duration)-X(at)-8,'#f2d88b');});
   if(range.end>range.start){ctx.fillStyle='#e5b56513';ctx.fillRect(X(range.start),25,X(range.end)-X(range.start),h-25);ctx.strokeStyle='#c79e5b';ctx.strokeRect(X(range.start),25,X(range.end)-X(range.start),h-25);}
-  const playhead=X(player.time());ctx.strokeStyle='#f9ebd1';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(playhead,24);ctx.lineTo(playhead,h);ctx.stroke();ctx.lineWidth=1;ctx.restore();
+  const playhead=X(player.time());ctx.strokeStyle='#f9ebd1';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(playhead,24);ctx.lineTo(playhead,h);ctx.stroke();ctx.lineWidth=1;ctx.restore();ribbon();
  }
  function clock(){q('songClock').value=stamp(player.time())+' / '+stamp(duration(document));q('songPlay').textContent=player.active()?'Ⅱ Pause':'▶ Play';q('songPlay').setAttribute('aria-label',player.active()?'Pause song':'Play song');}
- function tick(time){if(root.hidden){frame=null;player.pause();return;}if(time-lastDraw>45){lastDraw=time;clock();draw();}frame=requestAnimationFrame(tick);}
+ function tick(time){if(root.hidden){frame=null;player.pause();return;}if(time-lastDraw>45){lastDraw=time;if(document&&player.active()&&!drag&&!inlineEdit&&follow.getAttribute('aria-pressed')==='true'){const next=followStart(player.time(),viewStart,viewSpan,duration(document));if(next!==viewStart){viewStart=next;rangeInputs();}}clock();draw();}frame=requestAnimationFrame(tick);}
  function refreshPlaybackLoop(){player.setLoop(q('songLoop').checked&&range.end>range.start?range:null);}
- const input=(label,key,value,min,max,step='.01')=>`<label>${esc(label)}<input data-key="${key}" type="number" step="${step}" min="${min}" max="${max}" value="${value}"></label>`;
+ const input=(label,key,value,min,max,step='.01')=>`<label>${esc(label)}<input data-key="${key}" type="number" step="${step}" min="${min}" max="${max}" value="${Number.isFinite(value)?Math.round(value*1000)/1000:value}"></label>`;
  function wordOccurrence(id){
   const visible=lyricProjection.find(w=>w.id===id);if(visible)return visible;
   const source=id?.startsWith('source_')?document.words.find(w=>w.id===id.slice(7)):null;
-  return source?(lyricProjection.find(w=>w.source_id===source.id)||{...source,source_id:source.id,outside:true}):null;
+  return source?(lyricProjection.find(w=>w.source_id===source.id)||{...source,id:'source_'+source.id,source_id:source.id,outside:true}):null;
  }
+ function wordIds(){
+  if(selected?.kind!=='word')return new Set();
+  if(!wordSelection.size){const word=wordOccurrence(selected.id);if(word)wordSelection.add(word.source_id);}
+  return wordSelection;
+ }
+ function selectWord(occurrence,event={}){
+  if(!occurrence)return;
+  const id=occurrence.source_id;
+  if(event.shiftKey&&wordAnchor){
+   const ordered=[...new Set(lyricProjection.map(w=>w.source_id))],a=ordered.indexOf(wordAnchor),b=ordered.indexOf(id);
+   if(a>=0&&b>=0)wordSelection=new Set(ordered.slice(Math.min(a,b),Math.max(a,b)+1));
+   else wordSelection.add(id);
+  }else if(event.ctrlKey||event.metaKey){
+   if(wordSelection.has(id))wordSelection.delete(id);else wordSelection.add(id);
+   if(!wordAnchor)wordAnchor=id;
+  }else{if(!wordSelection.has(id))wordSelection=new Set([id]);wordAnchor=id;}
+  if(wordSelection.has(id))selected={kind:'word',id:occurrence.id};
+  else if(wordSelection.size)selected={kind:'word',id:'source_'+[...wordSelection][0]};
+  else selected=null;
+  ribbonSignature='';inspect();draw();lyricSelection();
+ }
+ function lyricSelection(){
+  for(const button of q('songLyricText').querySelectorAll('[data-source-word]')){
+   const chosen=wordSelection.has(button.dataset.sourceWord);button.classList.toggle('selected',chosen);button.setAttribute('aria-pressed',String(chosen));
+  }
+ }
+ function ribbon(){
+  const current=lyricProjection.find(w=>player.time()>=w.start&&player.time()<w.end)||lyricProjection.find(w=>w.start>=player.time())||lyricProjection.at(-1);
+  const active=!player.active()&&selected?.kind==='word'?wordOccurrence(selected.id):current;
+  const group=active?.id.includes(':')?active.id.slice(0,active.id.lastIndexOf(':')):null;
+  const items=active?lyricProjection.filter(w=>w.line===active.line&&w.section===active.section&&(!group||w.id.slice(0,w.id.lastIndexOf(':'))===group)):[];
+  const byId=new Map(items.map(w=>[w.id,w]));
+  const signature=JSON.stringify([items.map(w=>[w.id,w.text,w.start,w.end,w.parts]),[...wordSelection]]);
+  if(signature!==ribbonSignature){
+   ribbonSignature=signature;q('songWordRibbon').innerHTML=items.map(w=>`<button type="button" class="secondary ${wordSelection.has(w.source_id)?'selected':''}" data-ribbon-word="${esc(w.id)}" aria-pressed="${wordSelection.has(w.source_id)}" title="${esc(stamp(w.start)+' → '+stamp(w.end)+(w.estimated?' · estimated timing':w.confirmed?' · checked':''))}">${w.parts?.length?w.parts.map((part,i)=>`<span class="song-highlight-part" data-ribbon-part="${i}">${esc(part.text)}</span>`).join(''):esc(w.text)}</button>`).join('')||'<span>Double-click the lyric lane to add words.</span>';
+  }
+  for(const button of q('songWordRibbon').querySelectorAll('[data-ribbon-word]')){
+   const item=byId.get(button.dataset.ribbonWord),playing=item&&player.time()>=item.start&&player.time()<item.end;
+   const newlyPlaying=playing&&!button.classList.contains('playing');
+   button.classList.toggle('playing',Boolean(playing));if(playing)button.setAttribute('aria-current','true');else button.removeAttribute('aria-current');
+   if(newlyPlaying&&player.active()&&follow.getAttribute('aria-pressed')==='true'){const strip=q('songWordRibbon');strip.scrollTo({left:button.offsetLeft-strip.offsetLeft-strip.clientWidth/2+button.offsetWidth/2,behavior:'smooth'});}
+   if(item?.parts?.length)for(const piece of button.querySelectorAll('[data-ribbon-part]')){
+    const part=item.parts[Number(piece.dataset.ribbonPart)],position=(player.time()-item.start)/(item.end-item.start);
+    piece.style.setProperty('--part-progress',(clamp((position-part.start)/(part.end-part.start),0,1)*100).toFixed(1)+'%');
+   }
+  }
+ }
+ function selectTextWord(event,occurrence,seek=true){
+  selectWord(occurrence,event);
+  if(occurrence&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&seek&&!occurrence.outside){
+   player.seek(occurrence.start);viewSpan=Math.min(viewSpan,10);viewStart=clamp(occurrence.start-viewSpan/3,0,Math.max(0,duration(document)-viewSpan));
+   rangeInputs();draw();
+  }
+  canvas.focus();
+ }
+ q('songWordRibbon').onclick=event=>{const id=event.target.closest('[data-ribbon-word]')?.dataset.ribbonWord;if(id)selectTextWord(event,wordOccurrence(id));};
  function inspect(){
   if(!document)return;const panel=q('songInspector');panel.parentElement.dataset.empty=String(!selected);q('songInspectorTitle').textContent='Selection';
   const options=[...spans(document).map(s=>({value:'music|'+s.id,label:stamp(s.at)+' · '+(s.label||(s.kind==='gap'?'Silence':'Music'))})),
@@ -186,8 +252,9 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
    panel.innerHTML=`<label>Name<input data-key="label" value="${esc(object.label)}"></label><div class="song-fields">${input('Timeline start / s','position',absolute,0,duration(document))+input('Clip trim in / s','trim',object.trim,0,clip?.duration||120)+input('Length / s','duration',object.duration,.01,clip?.duration||120)+input('Volume / dB','gain_db',object.gain_db,-60,12,.5)+input('Fade in / s','fade_in',object.fade_in,0,object.duration)+input('Fade out / s','fade_out',object.fade_out,0,object.duration)+input('Duck music / dB','duck_db',object.duck_db,-36,0,.5)+input('Pan · L −1 / R +1','pan',object.pan,-1,1,.1)}</div><label class="prep-checkbox"><input type="checkbox" data-key="anchor" ${object.segment_id?'checked':''}>Follow the music section underneath</label><div class="prep-actions"><button data-object="duplicateSound" class="secondary">Duplicate</button><button data-object="remove" class="secondary">Remove</button></div>`;
   }else if(selected.kind==='word'){
    const occurrence=wordOccurrence(selected.id),word=document.words.find(w=>w.id===occurrence?.source_id);if(!word){selected=null;return inspect();}
-   q('songInspectorTitle').textContent='Lyric · '+word.text;
+   const count=wordIds().size;q('songInspectorTitle').textContent=count>1?count+' words · '+word.text:'Lyric · '+word.text;
    panel.innerHTML=`<label>Word<input data-key="text" value="${esc(word.text)}"></label><p class="song-hint">${occurrence.outside?'Source word · omitted, untimed or outside the arrangement.':'Timeline '+stamp(occurrence.start)+' → '+stamp(occurrence.end)+'.'} Source timing applies to every occurrence.</p><div class="song-fields">${input('Source start / s','start',word.start??0,0,data.source_duration)+input('Source end / s','end',word.end??.1,0,data.source_duration)}</div><label class="prep-checkbox"><input type="checkbox" data-key="confirmed" ${word.confirmed?'checked':''}>Checked by me</label><label class="prep-checkbox"><input type="checkbox" data-key="omitted" ${word.omitted?'checked':''}>Not sung</label><button data-object="listenWord" class="secondary" ${occurrence.outside?'disabled':''}>Play this word</button>`;
+   panel.insertAdjacentHTML('beforeend',`<label>Word language${count>1?' · all selected':''}<input data-key="language" value="${esc(word.language||document.language.split(',')[0].trim())}" maxlength="8" placeholder="en"></label><div class="song-word-actions"><button data-object="packWords" class="secondary">Lay selected end to end</button><label>Length / seconds<input data-word-length type="number" min=".02" step=".01" value="${((word.end??.2)-(word.start??0)).toFixed(2)}"></label><button data-object="sameWordLength" class="secondary">Apply length to selected</button><button data-object="omitWords" class="secondary">Mark selected not sung</button></div><details class="song-emphasis"><summary>Highlight parts / emphasis</summary><p class="song-hint">Split the exact spelling with |, for example b|uil|t. Longer shares hold the highlight on that part.</p><label>Parts<input data-word-parts value="${esc(word.parts?.map(p=>p.text).join('|')||word.text)}" aria-label="Word highlight parts"></label><button data-object="splitParts" class="secondary">Set parts</button><div class="song-part-lengths">${(word.parts||[]).map((part,i)=>`<label>${esc(part.text)} · share<input data-part-weight="${i}" type="number" min=".001" step=".1" value="${((part.end-part.start)*100).toFixed(2)}"></label>`).join('')}</div>${word.parts?.length?'<button data-object="weightParts" class="secondary">Apply part lengths</button><button data-object="clearParts" class="secondary">Use whole word</button>':''}</details>`);
   }else if(selected.kind==='light'){
    const cue=document.lighting.cues[selected.id];if(!cue){selected=null;return inspect();}q('songInspectorTitle').textContent='Light cue';
    const at=cue.segment_id?(spans(document).find(s=>s.id===cue.segment_id)?.at||0)+cue.offset:cue.at;
@@ -221,6 +288,18 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
    if(selected.kind==='light')object=document.lighting.cues[selected.id];if(!object)return;
    const value=field.type==='checkbox'?field.checked:field.type==='number'?Number(field.value):field.value;
    if(field.type==='number'&&(!Number.isFinite(value)||value<Number(field.min)||value>Number(field.max)))throw Error('Enter a value inside the displayed range');
+   if(selected.kind==='word'){
+    selected.id='source_'+object.id;
+    if(key==='start'&&object.start!=null){nudgeWords(document,wordIds(),value-object.start,data.source_duration);return;}
+    if(key==='end'&&object.start!=null){if(value<=object.start)throw Error('Word end must follow its start');resizeWords(document,wordIds(),value-object.start,data.source_duration);return;}
+    if(key==='text'&&value!==object.text)object.parts=null;
+    if(key==='language'){
+     if(!/^[a-z]{2,3}(?:-[a-z]{2,8})?$/.test(value))throw Error('Use one language code, e.g. en or ro');
+     for(const word of document.words)if(wordIds().has(word.id))word.language=value;
+     document.language=[...new Set([...document.language.split(',').map(s=>s.trim()),value])].join(', ');q('songLanguage').value=document.language;document.approved=false;return;
+    }
+    if(key==='confirmed'||key==='omitted'){for(const word of document.words)if(wordIds().has(word.id))word[key]=value;document.approved=false;return;}
+   }
    if(key.startsWith('attached_')){object.effects[Number(key.slice(9))].strength=value;return;}
    if(key==='position'){object.segment_id?anchorAt(object,value):object.at=value;}
    else if(key==='anchor'){const at=sounds(document).find(s=>s.id===object.id).position;if(value)anchorAt(object,at);else{object.at=at;object.segment_id=null;object.offset=0;}}
@@ -244,6 +323,15 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
   if(action==='listenWord'){const word=wordOccurrence(selected.id);if(!word||word.outside)throw Error('This word is outside the song arrangement');player.pause();player.seek(word.start);player.setStop(word.end);await player.play();return;}
   if(action==='revealEffect'){root.querySelector('#prepEffectChain').children[selected.id]?.scrollIntoView({behavior:'smooth',block:'center'});return;}
   mutate(()=>{
+   if(action==='packWords')packWords(document,wordIds(),data.source_duration);
+   if(action==='sameWordLength')resizeWords(document,wordIds(),Number(q('songInspector').querySelector('[data-word-length]').value),data.source_duration);
+   if(action==='omitWords'){for(const word of document.words)if(wordIds().has(word.id))word.omitted=true;document.approved=false;}
+   if(['splitParts','weightParts','clearParts'].includes(action)){
+    const word=document.words.find(w=>w.id===wordOccurrence(selected.id)?.source_id);
+    if(action==='clearParts')word.parts=null;
+    else word.parts=wordParts(word.text,q('songInspector').querySelector('[data-word-parts]').value,action==='weightParts'?[...q('songInspector').querySelectorAll('[data-part-weight]')].map(n=>Number(n.value)):null);
+    document.approved=false;
+   }
    if(action==='duplicate')selected.id=duplicate(document,selected.id);
    if(action==='remove'){remove(document,selected.id);selected=null;}
    if(action==='left'||action==='right')move(document,selected.id,action==='left'?-1:1);
@@ -297,21 +385,31 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  canvas.onpointerdown=event=>{
   if(event.button!==0||!document)return;canvas.focus();const rect=canvas.getBoundingClientRect(),x=event.clientX-rect.left,y=(event.clientY-rect.top)*390/rect.height;
   const hit=y<30?null:[...hits].reverse().find(h=>x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h);
-  selected=hit?{kind:hit.kind,id:hit.id}:null;inspect();
-  drag={x:event.clientX,time:T(x),hit,before:snapshot(),moved:false,original:null,edge:null};
+  if(hit?.kind==='word')selectWord(wordOccurrence(hit.id),event);
+  else{selected=hit?{kind:hit.kind,id:hit.id}:null;wordSelection.clear();wordAnchor=null;inspect();}
+  drag={x:event.clientX,time:T(x),hit,before:snapshot(),moved:false,original:null,edge:null,modifier:hit?.kind==='word'&&(event.ctrlKey||event.metaKey||event.shiftKey)};
   if(hit?.kind==='sound')drag.original=clone(sounds(document).find(s=>s.id===hit.id));
   if(hit?.kind==='word'){
-   const occurrence=lyricProjection.find(w=>w.id===hit.id);drag.wordSegment=spans(document).find(s=>s.id===occurrence.segment_id);drag.original=clone(document.words.find(w=>w.id===occurrence.source_id));drag.edge=x-hit.x<6?'start':hit.x+hit.w-x<6?'end':'move';
+   const occurrence=lyricProjection.find(w=>w.id===hit.id);drag.wordSegment=spans(document).find(s=>s.id===occurrence.segment_id);drag.original=clone(document.words.find(w=>w.id===occurrence.source_id));
+   const left=x-hit.x,right=hit.x+hit.w-x;drag.edge=Math.min(left,right)<6?(left<right?'start':'end'):'move';
   }
   canvas.setPointerCapture(event.pointerId);draw();
  };
  canvas.onpointermove=event=>{
-  if(!drag)return;const delta=(event.clientX-drag.x)/(canvas.clientWidth-100)*viewSpan;
+  if(!drag){
+   const rect=canvas.getBoundingClientRect(),x=event.clientX-rect.left,y=(event.clientY-rect.top)*390/rect.height;
+   const hit=[...hits].reverse().find(h=>h.kind==='word'&&x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h),word=hit&&wordOccurrence(hit.id);
+   canvas.title=word?word.text+' · '+stamp(word.start)+' → '+stamp(word.end):'Double-click empty lyric space to add words';return;
+  }
+  if(drag.modifier)return;const delta=(event.clientX-drag.x)/(canvas.clientWidth-100)*viewSpan;
   if(Math.abs(event.clientX-drag.x)>4)drag.moved=true;if(!drag.moved)return;
   if(drag.hit?.kind==='sound'){
    const object=document.sounds.find(s=>s.id===drag.hit.id),at=clamp(drag.original.position+delta,0,duration(document));object.segment_id?anchorAt(object,at):object.at=at;
   }else if(drag.hit?.kind==='word'&&drag.wordSegment?.mode==='normal'){
-   const object=document.words.find(s=>s.id===drag.original.id);Object.assign(object,shiftWordTiming(drag.original,drag.edge,delta,data.source_duration),{estimated:false,edited:true});document.approved=false;lyricProjection=words(document);
+   document.words=clone(drag.before.words);
+   if(drag.edge==='move')nudgeWords(document,wordIds(),delta,data.source_duration);
+   else{const timing=shiftWordTiming(drag.original,drag.edge,delta,data.source_duration);resizeWords(document,wordIds(),timing.end-timing.start,data.source_duration,drag.original.id,drag.edge==='start'?timing.start:null);}
+   lyricProjection=words(document);
   }else if(!drag.hit||event.shiftKey){
    range={start:Math.min(drag.time,clamp(drag.time+delta,0,duration(document))),end:Math.max(drag.time,clamp(drag.time+delta,0,duration(document)))};rangeInputs();
   }else if(drag.hit.kind==='music')q('songHint').textContent='Release over another music section to move this section there.';draw();
@@ -330,14 +428,23 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  };
  canvas.onpointercancel=()=>{if(drag){document=drag.before;drag=null;lyricProjection=words(document);draw();}};
  canvas.onkeydown=guard(async event=>{
-  if(event.code==='Space'){event.preventDefault();await toggle();return;}
+  if(event.key==='Enter'){event.preventDefault();openWordEntry(selected?.kind==='word'?wordOccurrence(selected.id):null,player.time());return;}
   if(['ArrowLeft','ArrowRight'].includes(event.key)){
    event.preventDefault();
-   if(selected?.kind==='word')mutate(()=>{const source=document.words.find(w=>w.id===wordOccurrence(selected.id)?.source_id);if(source?.start!=null){Object.assign(source,shiftWordTiming(source,event.altKey?'end':'move',(event.key==='ArrowLeft'?-1:1)*(event.shiftKey?.25:.05),data.source_duration),{estimated:false,edited:true});document.approved=false;}});
+   if(selected?.kind==='word')mutate(()=>{const source=document.words.find(w=>w.id===wordOccurrence(selected.id)?.source_id),delta=(event.key==='ArrowLeft'?-1:1)*(event.shiftKey?.25:.05);if(source?.start!=null){if(event.altKey)resizeWords(document,wordIds(),source.end-source.start+delta,data.source_duration);else nudgeWords(document,wordIds(),delta,data.source_duration);}});
    else player.seek(player.time()+(event.key==='ArrowLeft'?-1:1)*(event.shiftKey?1:.1));
   }
   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){event.preventDefault();history(!event.shiftKey);}
  });
+ root.addEventListener('keydown',guard(async event=>{
+  if(event.defaultPrevented||event.repeat||event.ctrlKey||event.metaKey||event.altKey||event.code!=='Space'||!document||loadingProject)return;
+  if(event.target.closest('input,textarea,select,[contenteditable="true"]')||event.target.closest('button')&&!event.target.closest('[data-source-word],[data-ribbon-word]'))return;
+  event.preventDefault();event.stopPropagation();const playing=player.active(),time=player.time();
+  await toggle();
+  if(playing&&(selected?.kind==='word'||q('workbenchTab-lyrics')?.getAttribute('aria-selected')==='true')){
+   const word=pauseWord(lyricProjection,time);if(word){wordSelection.clear();selectWord(word);canvas.focus();}
+  }
+ }));
  async function toggle(){
   audition.pause();if(player.active())player.pause();else{player.setStop(null);q('songHint').textContent='Loading audio…';await player.play();q('songHint').textContent=q('songListen').value==='draft'?'Playing edits and clips · render to hear the complete mastering chain':'Playing processed range preview';}
  }
@@ -348,7 +455,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
   range={start:clamp(Number(q('songRangeStart').value)||0,0,duration(document)),end:clamp(Number(q('songRangeEnd').value)||0,0,duration(document))};
   if(range.start>range.end)[range.start,range.end]=[range.end,range.start];rangeInputs();refreshPlaybackLoop();draw();
  };
- function zoom(factor){const center=viewStart+viewSpan/2;viewSpan=clamp(viewSpan*factor,.25,duration(document));viewStart=clamp(center-viewSpan/2,0,duration(document)-viewSpan);rangeInputs();draw();}
+ function zoom(factor){const center=player.active()?player.time():viewStart+viewSpan/2;viewSpan=clamp(viewSpan*factor,.25,duration(document));viewStart=clamp(center-viewSpan/2,0,duration(document)-viewSpan);rangeInputs();draw();}
  q('songZoomIn').onclick=()=>zoom(.5);q('songZoomOut').onclick=()=>zoom(2);q('songFit').onclick=()=>{viewStart=0;viewSpan=duration(document);rangeInputs();draw();};
  q('songSelection').onclick=guard(async()=>{if(range.end<=range.start)throw Error('Select a range first');player.pause();player.seek(range.start);player.setStop(q('songLoop').checked?null:range.end);refreshPlaybackLoop();await player.play();});
  q('songSplit').onclick=()=>mutate(()=>{const id=split(document,player.time());if(id)selected={kind:'music',id};});
@@ -369,20 +476,71 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  q('songApprove').onclick=guard(async()=>{mutate(()=>{document.approved=true;});await save('Lyric approval');});
  function lyricText(){
   const lines=new Map();for(const word of document.words){if(!lines.has(word.line))lines.set(word.line,[]);lines.get(word.line).push(word);}
-  q('songLyricText').innerHTML=[...lines.values()].map(line=>'<p>'+line.map(word=>`<button data-source-word="${esc(word.id)}" class="secondary ${word.omitted?'omitted':''}">${esc(word.text)}</button>`).join(' ')+'</p>').join('');
+  q('songLyricText').innerHTML=[...lines.values()].map(line=>'<p>'+line.map(word=>`<button data-source-word="${esc(word.id)}" class="secondary ${word.omitted?'omitted':''}">${esc(word.text)}</button>`).join(' ')+'</p>').join('');lyricSelection();
  }
  q('songLyricText').onclick=event=>{
   const id=event.target.closest('[data-source-word]')?.dataset.sourceWord;if(!id)return;const occurrence=lyricProjection.find(w=>w.source_id===id);
-  selected={kind:'word',id:occurrence?.id||'source_'+id};if(occurrence){player.seek(occurrence.start);viewSpan=Math.min(viewSpan,10);viewStart=clamp(occurrence.start-viewSpan/3,0,Math.max(0,duration(document)-viewSpan));}rangeInputs();inspect();draw();
+  selectTextWord(event,occurrence||wordOccurrence('source_'+id));
  };
- async function runAlignment(device='auto'){
-  const request=ticket,language=document.language,words=JSON.stringify(document.words);
-  const result=await api(endpoint('/jobs'),{kind:'lyric_alignment',input_artifact_id:data.source_artifact_id||null,language,force:true,device});
+ function openWordEntry(occurrence=null,time=player.time(),extend=false){
+  if(!document)return;
+  player.pause();
+  const source=occurrence?document.words.find(w=>w.id===occurrence.source_id):null;
+  const at=occurrence?.start??time;
+  let start=source?.start??sourceTime(document,time);
+  if(start==null){toast('Choose a normal music section for source lyric timing.');return;}
+  const next=lyricProjection.find(w=>w.start>at+.001&&w.source_id!==source?.id);
+  const section=spans(document).find(s=>s.kind==='audio'&&s.mode==='normal'&&at>=s.at-.001&&at<=s.until+.001);
+  if(!section){toast('Edit words in a normal music section before applying record gestures.');return;}
+  if(source&&extend&&next){
+   const end=Math.min(section.end,start+next.start-at);
+   if(end>start+.01)mutate(()=>{source.end=end;checked(source);document.approved=false;});
+  }
+  const end=source?.end??Math.min(section.end,start+Math.max(.3,Math.min(2,(next?.start??(at+1))-at)));
+  inlineEdit={id:source?.id||null,start,end,reference:source||document.words.find(w=>w.id===next?.source_id)};
+  const input=q('songInlineWords');input.value=source?.text||'';input.hidden=false;
+  input.style.left=clamp(X(at),5,Math.max(5,canvas.clientWidth-280))+'px';input.style.top=(222/390*canvas.clientHeight)+'px';
+  input.focus();input.select();
+ }
+ function closeWordEntry(){q('songInlineWords').hidden=true;inlineEdit=null;canvas.focus();}
+ q('songInlineWords').onkeydown=event=>{
+  event.stopPropagation();
+  if(event.key==='Escape'){event.preventDefault();closeWordEntry();return;}
+  if(event.key==='Enter'&&!event.shiftKey){
+   event.preventDefault();if(!inlineEdit)return;
+   const before=snapshot();
+   try{
+    const made=insertWords(document,event.target.value,inlineEdit.start,inlineEdit.end,inlineEdit.reference,document.language,inlineEdit.id);
+    q('songLanguage').value=document.language;
+    wordSelection=new Set(made.map(w=>w.id));wordAnchor=made[0].id;selected={kind:'word',id:'source_'+made[0].id};
+    closeWordEntry();changed(before);
+   }catch(error){document=before;toast(error.message);}
+  }
+ };
+ canvas.ondblclick=event=>{
+  if(!document)return;const rect=canvas.getBoundingClientRect(),x=event.clientX-rect.left,y=(event.clientY-rect.top)*390/rect.height;
+  if(y<220||y>288)return;event.preventDefault();
+  const hit=[...hits].reverse().find(h=>h.kind==='word'&&x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h);
+  const occurrence=hit?wordOccurrence(hit.id):null;if(occurrence){wordSelection.clear();selectWord(occurrence);}
+  openWordEntry(occurrence,T(x),true);
+ };
+ q('songWordRibbon').ondblclick=event=>{const id=event.target.closest('[data-ribbon-word]')?.dataset.ribbonWord;if(id)openWordEntry(wordOccurrence(id),player.time(),true);};
+ q('songLyricText').ondblclick=event=>{const id=event.target.closest('[data-source-word]')?.dataset.sourceWord;if(id)openWordEntry(wordOccurrence('source_'+id),player.time(),true);};
+ q('songAddWords').onclick=()=>openWordEntry();
+ async function runAlignment(device='auto',refine=false){
+  const request=ticket;
+  q('songAlignmentStatus').textContent=refine?'Saving lyrics for refinement…':'Saving lyrics for alignment…';
+  if(dirty||!revision)await save(refine?'Before lyric refinement':'Before lyric alignment');
+  if(request!==ticket)return;
+  if(dirty||JSON.stringify(document.words)!==JSON.stringify(data.project.words))throw Error('Lyrics changed while the alignment was being queued. Save and run it again.');
+  const language=document.language,words=JSON.stringify(document.words);
+  const result=await api(endpoint('/jobs'),{kind:'lyric_alignment',input_artifact_id:data.source_artifact_id||null,song_project_id:revision,language,force:true,device,refine});
   if(request!==ticket)return;
   requestedAlignment={id:result.id,language,words};alignmentFailure=null;
-  q('songAlignmentStatus').textContent='Alignment '+result.status+' · timings will load when complete unless you edit the words.';
+  q('songAlignmentStatus').textContent=(refine?'Refinement ':'Alignment ')+result.status+' · checked timings stay fixed; other timings load unless you edit the words.';
  }
  q('songAlign').onclick=guard(()=>runAlignment());
+ q('songRefine').onclick=guard(()=>runAlignment('auto',true));
  const cpuButton=globalThis.document.createElement('button');cpuButton.id='songAlignCpu';cpuButton.className='secondary';
  cpuButton.textContent='Run here on CPU';cpuButton.onclick=guard(()=>runAlignment('cpu'));q('songAlign').after(cpuButton);
  function currentAlignment(){
@@ -404,6 +562,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
   alignmentLoading=true;q('songLoadAlignment').disabled=true;
   try{
    const query=new URLSearchParams({alignment_only:'true',language});
+   const alignment=currentAlignment();if(alignment)query.set('task',alignment.id);
    if(data.source_artifact_id)query.set('artifact',data.source_artifact_id);
    const result=await api(endpoint('/editorial')+'?'+query);
    if(request!==ticket||sequence!==alignmentSequence)return;
@@ -418,12 +577,12 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
     word.id===document.words[index].id&&(word.source_text||word.text)===(document.words[index].source_text||document.words[index].text));
    if(!matches)throw Error('Source lyrics changed. This alignment was not applied to your edited words.');
    mutate(()=>{
-    document.words=document.words.map((word,index)=>{const aligned=result.words[index];return {...word,
+    document.words=document.words.map((word,index)=>{if(word.confirmed)return word;const aligned=result.words[index];return {...word,
      start:aligned.start,end:aligned.end,confidence:aligned.confidence,estimated:Boolean(aligned.estimated),confirmed:false};});
     document.approved=false;
    });
    alignmentId=result.lyric_task_id;alignmentFailure=null;
-   q('songAlignmentStatus').textContent=`${result.timed_words} / ${result.words.length} words aligned · loaded into the timeline`;
+   q('songAlignmentStatus').textContent=`${result.timed_words} / ${result.words.length} words aligned · loaded into the timeline`+(result.alignment_warnings?.length?' · '+result.alignment_warnings.join('; '):'');
   }catch(error){
    if(request!==ticket||sequence!==alignmentSequence)return;
    alignmentFailure={id:currentAlignment()?.id,message:error.message};
@@ -518,7 +677,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
     renders();if(!frame&&!root.hidden)frame=requestAnimationFrame(tick);updateAlignment();return;
    }
    cache();
-   const request=++ticket;loadingProject=true;host.inert=true;resetPlayback();gid=project.generation_id;document=null;data=null;dirty=false;wave=null;canvas.dataset.waveform='loading';selected=null;undo=[];redo=[];releaseMaster='';masterSignature='';knownVersions='';renderPending='';
+   const request=++ticket;loadingProject=true;host.inert=true;resetPlayback();gid=project.generation_id;document=null;data=null;dirty=false;wave=null;canvas.dataset.waveform='loading';selected=null;wordSelection.clear();wordAnchor=null;inlineEdit=null;q('songInlineWords').hidden=true;ribbonSignature='';q('songWordRibbon').replaceChildren();undo=[];redo=[];releaseMaster='';masterSignature='';knownVersions='';renderPending='';
    alignmentLoading=false;alignmentFailure=null;requestedAlignment=null;q('songLoadAlignment').disabled=false;q('songAlignmentStatus').textContent='';
    q('songTitle').textContent=project.title;q('songSaveState').textContent='Loading song…';
    try{
@@ -540,6 +699,6 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
    api(endpoint('/waveform')+(value.source_artifact_id?'?'+new URLSearchParams({artifact:value.source_artifact_id}):'')).then(result=>{if(request===ticket){wave=result;canvas.dataset.waveform='ready';draw();}}).catch(error=>{if(request===ticket){canvas.dataset.waveform='failed';toast(error.message);}});
    }catch(error){if(request!==ticket)return;document=null;data=null;loadingProject=false;q('songSaveState').textContent=error.message;draw();throw error;}
   },
-  close(){cache();++ticket;loadingProject=false;resetPlayback(true);if(frame)cancelAnimationFrame(frame);frame=null;}
+  close(){cache();++ticket;loadingProject=false;inlineEdit=null;q('songInlineWords').hidden=true;resetPlayback(true);if(frame)cancelAnimationFrame(frame);frame=null;}
  };
 }

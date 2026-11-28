@@ -16,6 +16,7 @@ from .planner import json_text, preflight, prepare_batch, verify_plan
 from .connections import connection_key, execution, key_candidates, normalize
 from .review_selection import select_by_rating
 from .yaml_document import YamlDocument
+from _gbr_lyrics import model_lyrics
 from .experiments import expand, MAX_RUNS
 from _gbr_layout import task_paths, relocated_path
 from _gbr_worker.contract import MODEL, SMOKE_MODEL_REVISION, python_environment
@@ -397,7 +398,7 @@ class GenerationService:
                 parameters=dict(record.effective)
                 for key in ('encoder_seed','sampler_seed'):
                     if parameters.get(key,'auto')=='auto':parameters[key]='0'
-                try:Client(data['connection']['address']).prepare({'parameters':parameters,'lyrics':record.document.values.get('lyrics',''),'attempt_id':'preflight'},data['_comfy_inventory'])
+                try:Client(data['connection']['address']).prepare({'parameters':parameters,'lyrics':model_lyrics(record.document.values.get('lyrics','')),'attempt_id':'preflight'},data['_comfy_inventory'])
                 except (ValueError,KeyError) as error:record.issues.append(Issue('comfy_preflight',str(error)))
             record._experiment = {'caption': caption_index, 'combination': combination_index, 'repetition': repeat_index, 'overrides': overrides}
             record._worker_defaults=sorted(k for k,v in record.provenance.items() if k in self.workers.default_fields and (v=='defaults' or k in auto_fields))

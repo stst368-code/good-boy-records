@@ -19,6 +19,7 @@ from .parameters import SEEDS, execution_options, missing_parameters, output_cha
 from .yaml_document import YamlDocument
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from _gbr_layout import manifest_paths, relocated_path
+from _gbr_lyrics import model_lyrics
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_99_tools" / "_workers_infdit"))
 from _gbr_worker.contract import MODEL as NATIVE_MODEL, validate_job
@@ -152,7 +153,7 @@ def preflight(inputs, specification, styles=None, template_root=None, require_pa
                     issues.append(Issue("unresolved_parameters", "Choose values for: " + ", ".join(missing_parameters(values))))
                 if values.get("model") == NATIVE_MODEL and not missing_parameters(values) and values.get("caption"):
                     validate_job({"protocol": 1, "run_id": "preflight", "parameters": values,
-                        "lyrics": document.values.get("lyrics", ""), "execution": execution_options(specification),
+                        "lyrics": model_lyrics(document.values.get("lyrics", "")), "execution": execution_options(specification),
                         "model_revision": specification.get("model_revision")},
                         allow_unfrozen_seeds=True, require_local=False)
                 document.with_generation_values(output_changes(document, {k: v for k, v in values.items() if v != "auto"}))

@@ -47,6 +47,7 @@ class BaseSave(Body):
     source_sha256: str = Field(default='',max_length=64)
     title: str = Field(min_length=1,max_length=500)
     lyrics: str = Field(min_length=1,max_length=200000)
+    language: str | None = Field(default=None,max_length=500)
     author: str = Field(default='gbr',max_length=1000)
     inspiration_author: str = Field(default='',max_length=1000)
     inspiration_track: str = Field(default='',max_length=1000)

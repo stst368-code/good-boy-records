@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en" class="gbr-player">
 <head>
+<style id="lyric-part-highlighting">
+.lyrics .word-part{display:inline-block;background:linear-gradient(to right,rgb(var(--accent-rgb)) var(--part-progress,0%),#b8ab98 var(--part-progress,0%));background-clip:text;-webkit-background-clip:text;color:transparent!important;text-shadow:none!important}
+</style>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Good Boy Records — Sonic Landscape</title>
@@ -5239,7 +5242,14 @@ function updateLyrics(force=false){
   if(force||lineIndex!==lyricState.line){
     const current=document.createElement('span');current.className='karaoke-current';
     if(!words.length)current.textContent=line?.text||'';
-    else words.forEach((w,i)=>{const span=document.createElement('span');span.className='word future';span.dataset.word=String(i);span.textContent=(w.text||'')+(i<words.length-1?' ':'');current.appendChild(span)});
+    else words.forEach((w,i)=>{
+      const span=document.createElement('span');span.className='word future';span.dataset.word=String(i);
+      if(Array.isArray(w.parts)&&w.parts.length&&w.parts.every(p=>typeof p.text==='string')&&w.parts.map(p=>p.text).join('')===w.text){
+        span.dataset.parts='true';w.parts.forEach((part,j)=>{const piece=document.createElement('span');piece.className='word-part';piece.dataset.part=String(j);piece.textContent=part.text;span.append(piece)});
+        if(i<words.length-1)span.append(' ');
+      }else span.textContent=(w.text||'')+(i<words.length-1?' ':'');
+      current.appendChild(span)
+    });
     const next=document.createElement('span');next.className='karaoke-next';
     ui.lyric.replaceChildren(current,next);lyricState={line:lineIndex,word:-2};
   }
@@ -5248,6 +5258,16 @@ function updateLyrics(force=false){
     spans.forEach((span,i)=>{span.className='word '+(i<wordIndex?'past':i===wordIndex?'current':'future')});
     lyricState.word=wordIndex;requestAnimationFrame(fitLyricCurrent)
   }else if(!words.length&&force)requestAnimationFrame(fitLyricCurrent)
+  if(words.length)ui.lyric.querySelectorAll('.karaoke-current .word[data-parts]').forEach(span=>{
+    const word=words[Number(span.dataset.word)],length=Number(word.end)-Number(word.start);
+    if(!(length>0))return;
+    const position=(now-Number(word.start))/length;
+    span.querySelectorAll('.word-part').forEach(piece=>{
+      const part=word.parts[Number(piece.dataset.part)],start=Number(part.start),end=Number(part.end);
+      const fill=end>start?Math.min(1,Math.max(0,(position-start)/(end-start))):0;
+      piece.style.setProperty('--part-progress',(fill*100).toFixed(1)+'%')
+    })
+  })
 }
 async function loadPlaybackVisuals(t){
   const token=++playbackVisualToken;

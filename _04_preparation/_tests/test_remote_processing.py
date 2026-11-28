@@ -128,7 +128,8 @@ def test_legacy_render_without_a_controller_cannot_block_alignment_forever(prepa
     assert prep.db.one('SELECT status FROM processing_tasks WHERE id=?',(legacy,))['status']=='interrupted'
 
 
-def test_network_client_streams_audio_and_returns_an_actual_subprocess_result(prepared,monkeypatch,tmp_path):
+@pytest.mark.parametrize('reuse',[False,True])
+def test_network_client_streams_audio_and_returns_an_actual_subprocess_result(prepared,monkeypatch,tmp_path,reuse):
     import socket
     import uvicorn
     from fastapi import FastAPI
@@ -139,6 +140,10 @@ def test_network_client_streams_audio_and_returns_an_actual_subprocess_result(pr
     remote=tmp_path/'worker';remote.mkdir()
     (remote/'alignment.py').write_text('''import json,sys,time,os\nfrom pathlib import Path\nr=json.loads(sys.stdin.buffer.read())\nif os.environ.get('GBR_PROCESSING_DEVICE')=='auto':\n print('RuntimeError: CUDA out of memory',file=sys.stderr);sys.exit(1)\nPath(r['progress_file']).write_text(json.dumps({'phase':'alignment','message':'Aligning fixture words','device':'cpu'}))\nprint('Processing Unicode lyrics — песня',file=sys.stderr,flush=True)\ntime.sleep(.4)\nwords=r['recipe']['words']\nfor i,w in enumerate(words):w.update(start=i*.5+.1,end=i*.5+.4,confidence=.9)\np=Path(r['output']).with_suffix('.json')\np.write_text(json.dumps({'source_sha256':r['source_sha256'],'language':r['recipe']['language'],'words':words,'approved':False}))\nprint(json.dumps({'output':str(p),'artifact_kind':'lyric_alignment','software':{'whisperx':'fixture'},'measurements':{'matched_words':len(words),'total_words':len(words)}}))\n''',encoding='utf-8')
     monkeypatch.setattr(module,'ROOT',remote)
+    script=(remote/'alignment.py').read_text()
+    script=script.replace("Path(r['progress_file'])","if r['recipe'].get('refine'):\n assert Path(r['vocal_source']).is_file()\nPath(r['progress_file'])")
+    script=script.replace("'matched_words':len(words)","'reused_vocals':bool(r.get('vocal_source')),'matched_words':len(words)")
+    (remote/'alignment.py').write_text(script,encoding='utf-8')
     app=FastAPI();app.include_router(worker_router(prep))
     sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
     server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=port,log_level='error',loop='_review.server_loop:create_loop'))
@@ -148,11 +153,20 @@ def test_network_client_streams_audio_and_returns_an_actual_subprocess_result(pr
     assert server.started
     try:
         client=module.Client('http://127.0.0.1:'+str(port),prep.remote.pair())
+        if reuse:
+            original=prep.remote.claim(worker(2))['task']
+            prep.remote.complete(original['id'],original['lease'],bundle(prep,gid,original,tmp_path))
+            saved=prep.song_projects.get(gid);saved['project']['words'][0]['confirmed']=True
+            saved=prep.song_projects.save(gid,{'parent_revision_id':None,'source_sha256':saved['source_sha256'],'project':saved['project']})
+            prep.submit(gid,'lyric_alignment',{'song_project_id':saved['revision_id'],'refine':True,'force':True})
         task=client.json('/claim',worker())['task'];assert task
+        if reuse:assert task['vocal_sha256']==prep.stems(gid,original['id'],task['source_sha256'])['vocals']['sha256']
         module.execute(client,task,'auto',python=sys.executable)
         assert prep.editorial(gid)['timed_words']==4
         progress=json.loads(prep.db.one('SELECT telemetry_json FROM processing_tasks WHERE id=?',(task['id'],))['telemetry_json'])
         assert progress['measurements']['fallback']=='CPU after GPU runtime error'
+        assert progress['measurements']['reused_vocals']==reuse
+        if reuse:assert prep.stems(gid,task['id'],task['source_sha256'])==prep.stems(gid,original['id'],task['source_sha256'])
         assert prep.db.one('SELECT status FROM processing_tasks WHERE id=?',(task['id'],))['status']=='done'
         assert not list(prep.tracks.rglob('.remote-result-*'))
     finally:server.should_exit=True;thread.join(timeout=5)
