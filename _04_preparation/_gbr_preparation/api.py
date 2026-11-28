@@ -16,6 +16,7 @@ class Job(BaseModel):
     song_project_id: str | None=None
     language: str | None=None
     force:StrictBool=False
+    device:Literal['auto','cpu']='auto'
     mix: dict=Field(default_factory=dict)
     start: float=Field(default=0,ge=0,allow_inf_nan=False)
     seconds: StrictInt=Field(default=30,ge=1,le=60)
@@ -110,6 +111,14 @@ def router(root,review,local):
 
     @routes.post('/processing/resume')
     def resume_processing():return service.processing.resume()
+
+    @routes.post('/processing/pair')
+    def pair_worker():return {'token':service.remote.pair()}
+
+    @routes.post('/processing/unpair')
+    def unpair_worker():
+        service.remote.revoke()
+        return {'removed':True}
 
     @routes.post('/projects/{gid}/jobs')
     def job(gid: str,body: Job):return service.submit(gid,body.kind,body.model_dump(exclude={'kind'}))

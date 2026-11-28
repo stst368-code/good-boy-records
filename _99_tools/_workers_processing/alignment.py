@@ -4,6 +4,7 @@ import gc
 import importlib.metadata
 import json
 import math
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -13,6 +14,33 @@ import uuid
 
 
 ASR_MODEL='Systran/faster-whisper-large-v3'
+
+
+def processing_device(torch,requested=None):
+    requested=requested or os.environ.get('GBR_PROCESSING_DEVICE','auto')
+    if requested=='cpu' or not torch.cuda.is_available():return 'cpu'
+    try:
+        if requested=='auto' and hasattr(torch.cuda,'mem_get_info') and torch.cuda.mem_get_info()[0]<2500*1024**2:
+            print('GPU memory is occupied; using CPU for preparation.',file=sys.stderr)
+            return 'cpu'
+        # is_available alone is true even when a CUDA wheel omitted this GPU's
+        # architecture (for example Pascal with cu128). Probe an actual kernel.
+        (torch.zeros(1,device='cuda')+1).item()
+        return 'cuda'
+    except RuntimeError as error:
+        if requested=='cuda':raise RuntimeError('This CUDA build cannot run on the GPU. For a GTX 1060 install processing with --cuda cu126, or select CPU.') from error
+        print('GPU is not supported by this CUDA build; using CPU for processing.',file=sys.stderr)
+        return 'cpu'
+
+
+def asr_compute(torch,device,ctranslate2):
+    supported=ctranslate2.get_supported_compute_types(device)
+    if device=='cpu':preferred=['int8','int8_float32','float32']
+    else:
+        major,minor=torch.cuda.get_device_capability()
+        small=torch.cuda.get_device_properties(0).total_memory<=8*1024**3
+        preferred=['int8_float32','float32'] if major<7 else ['int8_float16','float16','float32'] if small else ['float16','int8_float16','float32']
+    return next((value for value in preferred if value in supported),'auto')
 
 
 def report(request,phase,message,**values):
@@ -93,7 +121,7 @@ def run(request):
     language=request['recipe']['language']
     prepare_model_cache(language)
     recover_silero_cache(torch)
-    device='cuda' if torch.cuda.is_available() else 'cpu';out=Path(request['output']).parent
+    device=request.get('_device') or processing_device(torch);out=Path(request['output']).parent
     report(request,'separation_model','Loading / downloading Demucs model',device=device)
     model=get_model('htdemucs');model.to(device);model.eval()
     report(request,'separation','Separating vocals and accompaniment')
@@ -108,9 +136,13 @@ def run(request):
     if device=='cuda':torch.cuda.empty_cache()
     speech=whisperx.load_audio(str(out/'vocals.wav'))
     report(request,'asr_model','Loading / downloading Whisper large-v3')
-    asr=whisperx.load_model(ASR_MODEL,device,compute_type='float16' if device=='cuda' else 'int8',language=language,vad_method='silero')
+    import ctranslate2
+    compute=asr_compute(torch,device,ctranslate2)
+    report(request,'asr_model','Loading / downloading Whisper large-v3 · '+compute,device=device)
+    asr=whisperx.load_model(ASR_MODEL,device,compute_type=compute,language=language,vad_method='silero')
     report(request,'transcription','Transcribing the separated vocals')
-    transcript=asr.transcribe(speech,batch_size=4,language=language)
+    batch=1 if device=='cpu' or torch.cuda.get_device_properties(0).total_memory<=8*1024**3 else 4
+    transcript=asr.transcribe(speech,batch_size=batch,language=language)
     del asr;gc.collect()
     if device=='cuda':torch.cuda.empty_cache()
     report(request,'alignment_model','Loading / downloading language alignment model')
@@ -138,7 +170,8 @@ if __name__=='__main__':
     from contextlib import nullcontext
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'_workers_infdit'))
     from _gbr_worker.hardware import discover,gpu_lock
-    hardware=discover(torch,torch.device('cuda:0')) if torch.cuda.is_available() else {}
+    request['_device']=processing_device(torch)
+    hardware=discover(torch,torch.device('cuda:0')) if request['_device']=='cuda' else {}
     report(request,'device','Waiting to acquire the local processing device',device='cuda' if hardware else 'cpu',gpu_name=hardware.get('gpu_name'),vram_bytes=hardware.get('usable_vram_bytes'))
     lock=gpu_lock(hardware['gpu_uuid'] or hardware['address']) if hardware else nullcontext()
     from contextlib import redirect_stdout

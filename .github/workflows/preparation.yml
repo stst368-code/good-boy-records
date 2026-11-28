@@ -29,6 +29,7 @@ jobs:
       - run: node --input-type=module --check < _04_preparation/_static/preparation.js
       - run: node --input-type=module --check < _04_preparation/_static/mastering-studio.js
       - run: node --input-type=module --check < _04_preparation/_static/song-editor.js
+      - run: node --input-type=module --check < _04_preparation/_static/workbench.js
       - run: node --input-type=module --check < _04_preparation/_static/song-model.js
       - run: node --input-type=module --check < _04_preparation/_static/song-player.js
       - run: node --input-type=module --check < _04_preparation/_static/publishing.js

@@ -105,7 +105,7 @@ def main():
             page.locator('#songPlay').click()
             # Switching must keep a draft on its own recording without forcing
             # a database version save or accidentally publishing old audio.
-            page.locator('.song-lyrics summary').click()
+            page.locator('#workbenchTab-lyrics').click()
             page.locator('#songLanguage').fill('de');page.locator('#songLanguage').press('Tab')
             page.wait_for_function("()=>document.getElementById('songSaveState').textContent.startsWith('Unsaved')")
             page.locator('#prepProject').select_option(first);loaded('Recording 13')
@@ -167,6 +167,7 @@ def main():
             tab('listen');tab('preparation');loaded('Recording 13')
             assert page.locator('#songListen').input_value()=='draft'
             # Finish stays bound to the clicked recording across selection.
+            page.locator('#workbenchTab-release').click()
             page.locator('#prepReleaseLyrics').uncheck()
             finishing=[];requests=[]
             page.route(editorial_pattern,lambda route:finishing.append(route))

@@ -51,9 +51,39 @@ def main():
             def open_tab():
                 if args.width<1080:page.locator('#workspaceMenu').click()
                 page.locator('#preparationTab').click()
-                page.wait_for_function("()=>['Original audio','Saved','Unsaved'].some(text=>document.getElementById('songSaveState')?.textContent.startsWith(text))")
+                try:page.wait_for_function("()=>['Original audio','Saved','Unsaved'].some(text=>document.getElementById('songSaveState')?.textContent.startsWith(text))")
+                except Exception:
+                    page.screenshot(path='/tmp/gbr-workbench-failure.png',full_page=True)
+                    print(json.dumps({'errors':errors,'toast':page.locator('#toast').all_text_contents(),'body':page.locator('#preparationView').inner_text()[:1000]}),flush=True)
+                    raise
                 page.wait_for_function("()=>!document.getElementById('prepWorkspace').inert&&Boolean(document.querySelector('#songSoundList [data-clip]'))")
+                page.wait_for_selector('#workspaceLoading',state='hidden')
             open_tab()
+            # Tools share one dock. Changing tools never replaces or moves the
+            # timeline, starts playback, or exposes another competing canvas.
+            initial_bounds=page.locator('#songTimeline').bounding_box()
+            for pane in ['effects','lyrics','release','queue','versions','details','sounds']:
+                page.locator('#workbenchTab-'+pane).click()
+                assert page.locator('#workbenchTab-'+pane).get_attribute('aria-selected')=='true'
+                assert page.locator('#preparationView [role=tabpanel]:visible').count()==1
+                assert page.locator('#preparationView canvas:visible').count()==1
+                assert page.locator('#songTimeline').bounding_box()==initial_bounds
+            page.locator('#workbenchTab-sounds').focus();page.keyboard.press('ArrowRight')
+            assert page.locator('#workbenchTab-effects').get_attribute('aria-selected')=='true'
+            page.keyboard.press('Home')
+            assert page.locator('#workbenchTab-sounds').get_attribute('aria-selected')=='true'
+            # Start/stop change selected music, rather than inserting a stock
+            # noise clip. Both operations remain undoable on the same timeline.
+            page.locator('#songRangeStart').fill('.25');page.locator('#songRangeStart').press('Tab')
+            page.locator('#songRangeEnd').fill('1.25');page.locator('#songRangeEnd').press('Tab')
+            page.get_by_role('button',name='Apply record start to selected music',exact=True).click()
+            draft=page.evaluate("id=>JSON.parse(localStorage.getItem('gbr-song-draft:'+id)).project",gid)
+            assert any(section.get('mode')=='start' for section in draft['segments']) and not draft['sounds']
+            page.locator('#songUndo').click()
+            page.get_by_role('button',name='Apply record stop to selected music',exact=True).click()
+            draft=page.evaluate("id=>JSON.parse(localStorage.getItem('gbr-song-draft:'+id)).project",gid)
+            assert any(section.get('mode')=='stop' for section in draft['segments']) and not draft['sounds']
+            page.locator('#songUndo').click()
             page.locator('#songSoundList [data-clip]').first.wait_for()
             assert page.locator('#songSoundList [data-clip]').count()==6
             assert not page.locator('#mixWave').is_visible()
@@ -83,7 +113,7 @@ def main():
             assert page.locator('#songSaveState').text_content().startswith('Unsaved')
             assert page.locator('#songSoundList [data-clip]').count()==7
             # The source lyric editor keeps drag corrections and omitted-word recovery.
-            page.locator('.song-lyrics summary').click()
+            page.locator('#workbenchTab-lyrics').click()
             page.locator('#songLyricText button').first.click()
             initial=float(page.locator('#songInspector [data-key=start]').input_value())
             page.locator('#songTimeline').focus();page.keyboard.press('ArrowRight')
@@ -96,12 +126,14 @@ def main():
             # Existing preset controls now take their range from this timeline.
             page.locator('#songRangeStart').fill('1');page.locator('#songRangeStart').press('Tab')
             page.locator('#songRangeEnd').fill('5');page.locator('#songRangeEnd').press('Tab')
+            page.locator('#workbenchTab-effects').click()
             page.locator('[data-preset=parametric_eq]').click()
             effect=page.locator('#prepEffectChain li').first
             effect.locator('[data-parameter=frequency]').fill('330');effect.locator('[data-parameter=frequency]').press('Tab')
             effect.locator('[data-parameter=gain_db]').fill('4');effect.locator('[data-parameter=gain_db]').press('Tab')
             effect.locator('[data-scope=selection]').click()
             effect.locator('.studio-automation summary').click();effect.locator('[data-curve=rise]').click()
+            page.locator('#workbenchTab-lyrics').click()
             page.locator('#songSensitivity').fill('1.5');page.locator('#songSensitivity').press('Tab')
             page.locator('#songApprove').click()
             page.wait_for_function("()=>document.getElementById('songSaveState').textContent.startsWith('Saved')")
@@ -141,6 +173,8 @@ def main():
             assert len(prep.song_projects.get(gid)['project']['sounds'])==3
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+2')
             if args.screenshots:
+                page.wait_for_selector('#songTimeline[data-waveform=ready]')
+                page.wait_for_selector('#workspaceLoading',state='hidden')
                 args.screenshots.mkdir(parents=True,exist_ok=True);stage=page.locator('#songTimeline');stage.scroll_into_view_if_needed()
                 page.screenshot(path=str(args.screenshots/f'song-studio-{args.width}.png'),full_page=True)
             assert not errors,errors

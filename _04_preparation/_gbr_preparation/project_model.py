@@ -5,7 +5,7 @@ import re
 
 MAX_SEGMENTS = 128
 MAX_SOUNDS = 128
-MODES = {'normal', 'mute', 'reverse', 'stutter', 'scratch', 'stop'}
+MODES = {'normal', 'mute', 'reverse', 'stutter', 'scratch', 'stop', 'start'}
 
 
 def number(value, low, high, label):
@@ -54,7 +54,7 @@ def warp(segment):
         knots = [(0,0),(.18,.65),(.38,.12),(.57,.78),(.76,.28),(1,1)]
         return [(a*size,b*size,source+c*size,source+d*size)
                 for (a,c),(b,d) in zip(knots,knots[1:])]
-    knots = [(i/32, i/32-(i/32)**2/2) for i in range(33)]
+    knots = [(i/32, (i/32)**2/2 if mode=='start' else i/32-(i/32)**2/2) for i in range(33)]
     return [(a*size,b*size,source+c*size,source+d*size)
             for (a,c),(b,d) in zip(knots,knots[1:])]
 
@@ -88,7 +88,7 @@ def validate(project, source_duration, baseline):
             if end-start < .01: raise ValueError('Music sections must be at least 0.01 seconds')
             mode = segment.get('mode','normal')
             if mode not in MODES: raise ValueError('Unknown music gesture')
-            if mode in {'scratch','stop','stutter'} and end-start > 30:
+            if mode in {'scratch','stop','start','stutter'} and end-start > 30:
                 raise ValueError('Select up to 30 seconds for a record gesture')
             row.update(start=start,end=end,mode=mode,
                        gain_db=number(segment.get('gain_db',0),-60,12,'section gain'),

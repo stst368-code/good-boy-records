@@ -51,7 +51,7 @@ def main():
                 if args.width<1080:page.locator('#workspaceMenu').click()
                 page.locator('#preparationTab').click()
                 page.wait_for_function("()=>document.getElementById('songTitle')?.textContent==='Alignment test'&&!document.getElementById('prepWorkspace').inert")
-                if not page.locator('.song-lyrics').evaluate('(element)=>element.open'):page.locator('.song-lyrics summary').click()
+                page.locator('#workbenchTab-lyrics').click()
             open_tab()
             # The alignment can finish after this song version was saved.
             page.locator('#songSensitivity').fill('1.5');page.locator('#songSensitivity').press('Tab')

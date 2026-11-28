@@ -51,6 +51,7 @@ class Service:
         self.archiver.reconcile()
         if getattr(self, 'preparation', None):
             self.preparation.sync_selection()
+            self.preparation.processing.start()
         self.db.execute("UPDATE audio SET analysis_state='pending' WHERE analysis_state='analysing'")
         self.db.execute("UPDATE audio SET analysis_state='retune_pending' WHERE analysis_state='retuning'")
         for a in self.db.all("SELECT id FROM audio WHERE analysis_state='ready'"):
@@ -74,7 +75,6 @@ class Service:
         next_scan = 0
         while not self.stop_event.is_set():
             try:
-                if getattr(self,'preparation',None):self.preparation.auto_align_sweep()
                 op = self.db.one("SELECT * FROM archive_operations WHERE status='pending' ORDER BY created_at,rowid LIMIT 1")
                 if op:
                     self.worker_state = "archiving"

@@ -11,6 +11,13 @@ import threading
 
 MAX_UPLOAD = 32*1024**2
 MAX_SECONDS = 120
+BUILTIN_VERSION = 2
+BUILTIN_LABELS={'horn':('Air horn','Stabs'),'lift':('Needle lift','Vinyl'),'drop':('Needle drop','Vinyl'),'crackle':('Vinyl surface','Textures'),'impact':('Deep impact','Stabs'),'riser':('Noise riser','Transitions')}
+RECORDED = {
+    'horn': ('guitarguy1985','https://freesound.org/people/guitarguy1985/sounds/68999/'),
+    'lift': ('Stratocube','https://freesound.org/people/Stratocube/sounds/456280/'),
+    'drop': ('HenKonen','https://freesound.org/people/HenKonen/sounds/682161/'),
+}
 
 
 class SoundLibrary:
@@ -51,7 +58,7 @@ class SoundLibrary:
         return self.item(identifier)
 
     def seed(self):
-        """Small original synth/noise samples, generated once without downloads."""
+        """Bundled CC0 horn/needle recordings and three original textures."""
         with self.lock:
             if self.seeded:return
             import numpy as np
@@ -61,17 +68,26 @@ class SoundLibrary:
                 ('horn','Air horn','Stabs',1.4),('lift','Needle lift','Vinyl',.32),
                 ('drop','Needle drop','Vinyl',.38),('crackle','Vinyl surface','Textures',4),
                 ('impact','Deep impact','Stabs',1.8),('riser','Noise riser','Transitions',3)]:
-                existing=self.prep.db.one("SELECT id FROM generation_artifacts WHERE kind='sound_clip' AND json_extract(metadata_json,'$.builtin_key')=?",(key,))
-                if existing:continue
+                existing=self.prep.db.one("SELECT id,uri FROM generation_artifacts WHERE kind='sound_clip' AND json_extract(metadata_json,'$.builtin_key')=? AND json_extract(metadata_json,'$.builtin_version')=?",(key,BUILTIN_VERSION))
+                if existing and Path(existing['uri']).is_file():continue
+                if key in RECORDED:
+                    source=Path(__file__).resolve().parents[1]/'_references/_builtin_sounds'/(key+'.mp3')
+                    wave,rate=sf.read(source,dtype='float32',always_2d=True)
+                    active=np.flatnonzero(np.max(np.abs(wave),axis=1)>10**(-52/20))
+                    if len(active):wave=wave[max(0,active[0]-round(rate*.01)):min(len(wave),active[-1]+round(rate*.03))]
+                    fade=min(len(wave),round(rate*.003));wave[:fade]*=np.linspace(0,1,fade)[:,None]
+                    with tempfile.TemporaryDirectory(prefix='.seed-',dir=self.storage()) as temp:
+                        path=Path(temp)/'clip.wav';sf.write(path,wave,rate,subtype='PCM_24')
+                        item=self.register(path,name,category,True)
+                    metadata=self.item(item['id'])['_metadata']
+                    metadata.update(builtin_key=key,builtin_version=BUILTIN_VERSION,author=RECORDED[key][0],
+                                    source_url=RECORDED[key][1],license='CC0-1.0')
+                    from .service import canonical
+                    self.prep.db.execute('UPDATE generation_artifacts SET metadata_json=? WHERE id=?',(canonical(metadata),item['id']))
+                    continue
                 t=np.arange(round(rate*seconds))/rate
                 rng=np.random.default_rng(218+len(key));noise=rng.standard_normal(len(t))
-                if key=='horn':
-                    wave=sum(np.sin(2*np.pi*f*t)*weight for f,weight in [(220,.5),(277.18,.36),(440,.18),(554.36,.12),(660,.1)])
-                    wave=np.tanh(wave*1.8)*np.minimum(1,t/.012)*np.minimum(1,(seconds-t)/.14)
-                elif key in {'lift','drop'}:
-                    wave=noise*np.exp(-t*(22 if key=='lift' else 33))*.55
-                    wave+=np.sin(2*np.pi*78*t)*np.exp(-t*19)*.35
-                elif key=='crackle':
+                if key=='crackle':
                     wave=noise*.012
                     for index in rng.integers(0,len(t)-128,50):
                         wave[index:index+128]+=rng.uniform(-.6,.6)*np.exp(-np.arange(128)/12)
@@ -87,7 +103,7 @@ class SoundLibrary:
                     path=Path(temp)/'clip.wav'
                     sf.write(path,np.column_stack([wave,wave]),rate,subtype='PCM_24')
                     item=self.register(path,name,category,True)
-                metadata=self.item(item['id'])['_metadata'];metadata['builtin_key']=key
+                metadata=self.item(item['id'])['_metadata'];metadata.update(builtin_key=key,builtin_version=BUILTIN_VERSION)
                 from .service import canonical
                 self.prep.db.execute('UPDATE generation_artifacts SET metadata_json=? WHERE id=?',(canonical(metadata),item['id']))
             self.seeded=True
@@ -106,8 +122,15 @@ class SoundLibrary:
 
     def list(self):
         self.prep.require();self.seed()
-        return {'sounds':[self.public(self.item(row['id'])) for row in self.prep.db.all(
-            "SELECT id FROM generation_artifacts WHERE kind='sound_clip' ORDER BY rowid DESC")],
+        items=[self.item(row['id']) for row in self.prep.db.all("SELECT id FROM generation_artifacts WHERE kind='sound_clip' ORDER BY rowid DESC")]
+        visible=[]
+        for item in items:
+            legacy=item.get('builtin') and item.get('builtin_version')!=BUILTIN_VERSION
+            if legacy and (item['name'],item['category'])==BUILTIN_LABELS.get(item['_metadata'].get('builtin_key')):continue
+            public=self.public(item)
+            if legacy:public['preset']=None
+            visible.append(public)
+        return {'sounds':visible,
             'max_seconds':MAX_SECONDS,'max_upload_bytes':MAX_UPLOAD}
 
     def audio(self,identifier):

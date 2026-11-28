@@ -1,11 +1,13 @@
 """Live local processing status and bounded alignment progress on the shared ledger."""
 import json
+import logging
 from pathlib import Path
 import re
 import socket
 import subprocess
 import sys
 import time
+import threading
 
 
 def worker_error(log):
@@ -21,7 +23,23 @@ def worker_error(log):
 
 
 class ProcessingQueue:
-    def __init__(self,prep):self.prep=prep;self.db=prep.db
+    def __init__(self,prep):
+        self.prep=prep;self.db=prep.db;self.stopped=threading.Event();self.thread=None;self.controller_error=None
+
+    def start(self):
+        if self.thread and self.thread.is_alive():return
+        self.stopped.clear()
+        def schedule():
+            while not self.stopped.is_set():
+                try:self.prep.auto_align_sweep();self.controller_error=None
+                except Exception as error:
+                    self.controller_error=str(error);logging.getLogger(__name__).exception('Preparation queue check failed')
+                self.stopped.wait(1)
+        self.thread=threading.Thread(target=schedule,name='gbr-preparation-queue',daemon=True);self.thread.start()
+
+    def close(self):
+        self.stopped.set()
+        if self.thread and self.thread is not threading.current_thread():self.thread.join(timeout=2)
 
     @staticmethod
     def alive(identity):
@@ -55,12 +73,21 @@ class ProcessingQueue:
         return False
 
     def reason(self,task):
-        if not self.prep.alignment_python().is_file():return 'Processing environment is missing. Run py -3.12 _97_app/run_gbr.py setup-processing on this PC.'
-        if self.prep.local_generation_busy():return 'A live local generation worker is busy; alignment will start after it releases the worker.'
-        active=self.db.one("SELECT id FROM processing_tasks WHERE id<>? AND kind IN ('lyric_alignment','mix_master','mix_preview','visuals') AND status IN ('queued','running') ORDER BY rowid LIMIT 1",(task['id'],))
+        stored=task.get('recipe_json')
+        if stored is None:stored=self.db.one('SELECT recipe_json FROM processing_tasks WHERE id=?',(task['id'],))['recipe_json']
+        cpu=json.loads(stored).get('execution_device')=='cpu'
+        remote=next((worker for worker in self.prep.remote.online() if worker['available']),None)
+        if not self.prep.alignment_python().is_file():
+            if remote and not cpu:return 'Waiting for '+remote['name']+' to collect this recording.'
+            if self.prep.remote.configured() and not cpu:return 'Waiting for a paired preparation PC to connect, or install processing on this PC.'
+            return 'Processing environment is missing. Run py -3.12 _97_app/run_gbr.py setup-processing on this PC.'
+        if not cpu and self.prep.local_generation_busy():
+            if remote:return 'Main PC is generating songs · waiting for '+remote['name']+' to collect this recording.'
+            return 'Main PC is generating songs. Waiting for its GPU, or an available preparation PC. You can also run this alignment here on CPU.'
+        active=self.db.one("SELECT id FROM processing_tasks WHERE id<>? AND kind IN ('lyric_alignment','mix_master','mix_preview','visuals') AND status IN ('queued','running') AND json_extract(telemetry_json,'$.remote.id') IS NULL ORDER BY rowid LIMIT 1",(task['id'],))
         if active:return 'Queued behind another local processing task; songs run one at a time.'
         earlier=self.db.one("SELECT 1 FROM processing_tasks WHERE kind='lyric_alignment' AND status='waiting' AND rowid<(SELECT rowid FROM processing_tasks WHERE id=?) LIMIT 1",(task['id'],))
-        if earlier:return 'Queued behind an earlier alignment; songs run one at a time.'
+        if earlier and not cpu:return 'Queued behind an earlier alignment; songs run one at a time on each worker.'
         telemetry=json.loads(task.get('telemetry_json') or '{}')
         if telemetry.get('retry_after',0)>time.time():return 'The worker reported a GPU lock in use; automatically retrying shortly.'
         return None
@@ -68,12 +95,16 @@ class ProcessingQueue:
     def recover(self):
         import psutil
         from .service import now
-        rows=self.db.all("SELECT id,telemetry_json FROM processing_tasks WHERE kind='lyric_alignment' AND status IN ('queued','running')")
+        self.prep.remote.recover()
+        rows=self.db.all("SELECT id,telemetry_json FROM processing_tasks WHERE kind IN ('lyric_alignment','mix_preview','mix_master','visuals') AND status IN ('queued','running')")
         for row in rows:
             data=json.loads(row['telemetry_json']);owner=data.get('owner',{})
+            if not owner and not data.get('remote') and row['id'] not in self.prep.submitted and not self.alive(data.get('child',{})):
+                self.db.execute("UPDATE processing_tasks SET status='interrupted',completed_at=?,error='Task has no live controller record. Retry it explicitly from Processing.' WHERE id=? AND status IN ('queued','running')",(now(),row['id']))
+                continue
             if owner.get('host')!=socket.gethostname() or not owner.get('created_at'):continue
             if not self.alive(owner) and not self.alive(data.get('child',{})):
-                self.db.execute("UPDATE processing_tasks SET status='interrupted',completed_at=?,error='Previous alignment controller stopped. Retry this task from the processing queue.' WHERE id=? AND status IN ('queued','running')",(now(),row['id']))
+                self.db.execute("UPDATE processing_tasks SET status='interrupted',completed_at=?,error='Previous processing controller stopped. Retry this task from the processing queue.' WHERE id=? AND status IN ('queued','running')",(now(),row['id']))
 
     def status(self, flagged_only=False):
         if not self.prep.enabled:return {'enabled':False,'items':[]}
@@ -97,6 +128,7 @@ class ProcessingQueue:
                 waiting+=1;row['position']=waiting
             if row['status']=='waiting':row['reason']=self.reason({'id':row['id'],'telemetry_json':json.dumps(row['progress'])}) or 'Ready for the next automatic queue check.'
         return {'enabled':True,'environment_ready':self.prep.alignment_python().is_file(),'python':str(self.prep.alignment_python()),
+                'workers':self.prep.remote.online(),'paired':self.prep.remote.configured(),'controller_error':self.controller_error,
                 'items':rows,'running':sum(r['status']=='running' for r in rows),'pending':waiting,
                 'failed':sum(r['status'] in {'failed','interrupted'} for r in rows)}
 

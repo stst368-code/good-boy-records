@@ -89,7 +89,7 @@ def test_sound_import_bounds_rename_and_owned_copy(prepared):
     with pytest.raises(ValueError,match='exceeds'):save(prep,gid,loaded)
 
 
-@pytest.mark.parametrize('mode',['reverse','scratch','stutter','stop','mute'])
+@pytest.mark.parametrize('mode',['reverse','scratch','stutter','stop','start','mute'])
 def test_record_gestures_change_actual_music_and_keep_duration(prepared,mode):
     _,prep,_,_,gid,_=prepared;source=promote(prepared)
     loaded=prep.song_projects.get(gid);loaded['project']['segments'][0]['mode']=mode
@@ -115,6 +115,23 @@ def test_stop_curve_does_not_duplicate_a_word_at_each_interpolation_piece(prepar
     with pytest.raises(ValueError):validate(invalid,4,doc['words'])
     invalid=deepcopy(doc);invalid['lighting']['cues']=[4]
     with pytest.raises(ValueError):validate(invalid,4,doc['words'])
+
+
+def test_record_start_and_stop_actually_ramp_the_music_pitch_in_opposite_directions(prepared):
+    _,prep,_,_,gid,_=prepared;promote(prepared)
+    loaded=prep.song_projects.get(gid);loaded['project']['mix']['limiter_db']=None
+    def dominant(audio,rate,left,right):
+        excerpt=audio[int(left*rate):int(right*rate)].mean(axis=1)
+        power=abs(np.fft.rfft(excerpt*np.hanning(len(excerpt))))
+        return np.fft.rfftfreq(len(excerpt),1/rate)[np.argmax(power[1:])+1]
+    for mode in ['start','stop']:
+        loaded['project']['segments'][0]['mode']=mode
+        loaded=save(prep,gid,loaded)
+        job=prep.submit(gid,'mix_master',{'song_project_id':loaded['revision_id']});wait(prep,job['id'])
+        audio,rate=sf.read(prep.artifact(job['id']+'-output'),always_2d=True)
+        early=dominant(audio,rate,.2,.6);late=dominant(audio,rate,3.4,3.8)
+        if mode=='start':assert late>early*3
+        else:assert early>late*3
 
 
 def test_unchanged_audio_keeps_source_bound_lyrics_and_saved_samples_can_recover(prepared):

@@ -1,5 +1,6 @@
 import {initSongEditor} from './song-editor.js';
 import {initMasteringStudio} from './mastering-studio.js';
+import {initWorkbench} from './workbench.js';
 export function initPreparation({api,toast}){
  const root=document.getElementById('preparationView');
  root.innerHTML=`
@@ -140,6 +141,7 @@ export function initPreparation({api,toast}){
  try{for(const [id,draft] of JSON.parse(localStorage.getItem('gbr-mix-drafts-v2')||'[]'))drafts.set(id,draft);}catch{}
  historyButtons();
  q('prepHistoryHeading').before(q('prepComplete').closest('section'));
+ const workbench=initWorkbench(root,timeline);
  const project=()=>projects.find(p=>p.generation_id===selected);
  timeline.onSourceChange(async artifact => {
   setPreview(null);
@@ -378,12 +380,29 @@ export function initPreparation({api,toast}){
   const onlyFlagged=flaggedOnly();
   const status=await api('/preparation/processing?'+new URLSearchParams({flagged_only:String(onlyFlagged)}));
   if(onlyFlagged!==flaggedOnly())return;
-  q('prepQueueStatus').textContent=`${status.running||0} running · ${status.pending||0} queued · ${status.failed||0} failed / interrupted`+(!status.environment_ready?' · Processing environment missing. Run py -3.12 _97_app/run_gbr.py setup-processing.':' · One local task runs at a time.');
+  q('prepQueueStatus').textContent=(status.running||0)+' running · '+(status.pending||0)+' waiting'+(status.failed?' · '+status.failed+' need attention':'');
+  timeline.processingStatus(status);
+  q('prepWorkerStatus').textContent=status.controller_error||((status.workers||[]).length?'Connected preparation PCs':'No other preparation PCs connected · pair one below, or use the local processing environment.');
+  q('prepWorkers').innerHTML=(status.workers||[]).map(worker=>'<div class="workbench-worker"><strong>'+esc(worker.name)+'</strong><span>'+esc(worker.device)+' · '+(worker.available?'Ready':'Busy / paused')+'</span></div>').join('');
+  q('prepPairWorker').textContent=status.paired?'Replace pairing key':'Pair another PC';q('prepUnpairWorker').hidden=!status.paired;
   const opened=new Set([...q('prepQueueJobs').querySelectorAll('details[open]')].map(e=>e.dataset.log));
   q('prepQueueJobs').innerHTML=status.items.map(job=>{const p=job.progress||{},elapsed=p.wall_seconds==null?'':Math.floor(p.wall_seconds/60)+'m '+Math.floor(p.wall_seconds%60)+'s',stage=p.stage_started_at?Math.max(0,Math.floor(Date.now()/1000-p.stage_started_at)):null;return `<article class="prep-task"><strong>${esc(job.title)} · ${esc(job.kind.replaceAll('_',' '))} · ${esc(job.status)}${job.position?' · queue '+job.position:''}</strong><span>${esc(job.reason||p.message||job.error||(job.status==='running'?'Running local processing':'Waiting for worker'))}${elapsed?' · '+elapsed:''}${stage!=null&&job.status==='running'?' · current stage '+stage+'s':''}</span>${p.device?`<span>${esc(p.device.toUpperCase())}${p.gpu_name?' · '+esc(p.gpu_name):''}${p.vram_bytes?' · '+(p.vram_bytes/1024**3).toFixed(1)+' GiB VRAM':''}</span>`:''}${p.measurements?.matched_words!=null?`<span>${p.measurements.matched_words} / ${p.measurements.total_words} words aligned; remaining positions are estimates.</span>`:''}${job.error&&job.status!=='waiting'?`<p>${esc(job.error)}</p>`:''}${['failed','interrupted'].includes(job.status)?`<button data-process-retry="${esc(job.id)}">Retry task</button>`:''}${p.log_tail?`<details data-log="${esc(job.id)}" ${opened.has(job.id)?'open':''}><summary>Worker log · ${esc(p.last_update||'')}</summary><pre>${esc(p.log_tail)}</pre></details>`:''}</article>`;}).join('')||'<p>No local processing jobs.</p>';
   for(const button of q('prepQueueJobs').querySelectorAll('[data-process-retry]'))button.onclick=handle(async()=>{await api(`/preparation/tasks/${button.dataset.processRetry}/retry`,{});await processingQueue();});
  }
  q('prepResumeQueue').onclick=handle(async()=>{await api('/preparation/processing/resume',{});await processingQueue();});
+ q('prepPairWorker').onclick=handle(async()=>{
+  const result=await api('/preparation/processing/pair',{});
+  q('prepWorkerKey').value=result.token;q('prepPairGuide').hidden=false;
+  q('prepWorkerServer').value=location.origin;workerCommand();await processingQueue();
+ });
+ function workerCommand(){
+  const address=q('prepWorkerServer').value.trim();
+  q('prepWorkerCommand').textContent='py -3.12 _97_app/run_gbr.py processing-worker --server '+address+' --comfy-url http://127.0.0.1:8189';
+  q('prepWorkerCopyStatus').textContent=/localhost|127\.0\.0\.1/.test(address)?'Use this PC’s LAN address from the GBR startup screen.':'';
+ }
+ q('prepWorkerServer').oninput=workerCommand;
+ q('prepCopyWorkerKey').onclick=async()=>{try{await navigator.clipboard.writeText(q('prepWorkerKey').value);q('prepWorkerCopyStatus').textContent='Pairing key copied.';}catch{const field=q('prepWorkerKey');field.type='text';field.focus();field.select();q('prepWorkerCopyStatus').textContent='Press Ctrl+C to copy the selected pairing key.';}};
+ q('prepUnpairWorker').onclick=handle(async()=>{await api('/preparation/processing/unpair',{});q('prepWorkerKey').value='';q('prepPairGuide').hidden=true;await processingQueue();});
  function projectChoices(options){
   const picker=q('prepProject'),existing=new Map([...picker.options].map(option=>[option.value,option]));
   for(const [index,[id,label]] of options.entries()){

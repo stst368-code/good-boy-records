@@ -10,7 +10,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  host.innerHTML=`
  <header class="song-heading"><div><span class="song-eyebrow">SONG STUDIO</span><h2 id="songTitle">Your song, one timeline</h2></div><div class="song-save"><span id="songSaveState" role="status">Loading…</span><button id="songUndo" class="secondary" title="Undo · Ctrl Z">↶</button><button id="songRedo" class="secondary" title="Redo · Ctrl Shift Z">↷</button><button id="songSave">Save version</button></div></header>
  <div class="song-transport"><button id="songPlay" class="song-play" aria-label="Play song">▶ Play</button><button id="songBack" class="secondary" aria-label="Back two seconds">−2s</button><output id="songClock">0:00 / 0:00</output><label>Listen to<select id="songListen"><option value="draft">Arrangement · edits + clips</option><option value="processed" disabled>Processed preview</option></select></label><label class="prep-checkbox"><input id="songLoop" type="checkbox">Loop range</label><label>Speed<select id="songSpeed"><option value=".5">0.5×</option><option value=".75">0.75×</option><option value="1" selected>1×</option></select></label><div class="song-zoom"><button id="songZoomOut" class="secondary" aria-label="Zoom out">−</button><output id="songZoomLabel">Fit</output><button id="songZoomIn" class="secondary" aria-label="Zoom in">+</button><button id="songFit" class="secondary">Fit</button></div></div>
- <div class="song-tools" role="toolbar" aria-label="Song editing tools"><button id="songSplit" class="secondary">Split at playhead</button><button id="songBreak" class="secondary">＋ Silence</button><button id="songNeedle" class="secondary">Needle break</button><label>Selected range<select id="songGesture"><option value="">Record gesture…</option><option value="scratch">Vinyl scratch</option><option value="stop">Record stop</option><option value="stutter">Stutter / repeat</option><option value="reverse">Reverse</option><option value="mute">Mute music</option><option value="normal">Normal playback</option></select></label><button id="songAddLight" class="secondary">＋ Light cue</button></div>
+ <div class="song-tools" role="toolbar" aria-label="Song editing tools"><button id="songSplit" class="secondary">Split at playhead</button><button id="songBreak" class="secondary">＋ Silence</button><button id="songNeedle" class="secondary">Needle break</button><label>Selected range<select id="songGesture"><option value="">Record gesture…</option><option value="scratch">Vinyl scratch</option><option value="stop">Record stop</option><option value="start">Record start</option><option value="stutter">Stutter / repeat</option><option value="reverse">Reverse</option><option value="mute">Mute music</option><option value="normal">Normal playback</option></select></label><button id="songAddLight" class="secondary">＋ Light cue</button></div>
  <div class="song-canvas-wrap"><canvas id="songTimeline" height="390" tabindex="0" role="application" aria-label="Song timeline. Drag empty space to select a range. Drag music sections to reorder, sound clips to move, and lyric words or their edges to adjust timing."></canvas></div>
  <div class="song-view"><input id="songScroll" type="range" min="0" max="0" step=".01" value="0" aria-label="Timeline view start"><label>Range<input id="songRangeStart" type="number" step=".01" min="0" value="0" aria-label="Range start in seconds"></label><span>→</span><input id="songRangeEnd" type="number" step=".01" min="0" value="0" aria-label="Range end in seconds"><button id="songSelection" class="secondary">Play range</button></div>
  <p id="songHint" class="song-hint">Drag the ruler to select a range. Music sections carry their lyrics and attached clips when moved.</p>
@@ -19,12 +19,13 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  <footer class="song-render"><div><strong>Ready to hear the full mix?</strong><p class="song-hint">Draft playback auditions edits and clips. Render to hear mastering effects and automation.</p></div><button id="songPreview">Render range preview</button><button id="songMaster" class="primary">Render master</button><select id="songMasterChoice" aria-label="Release master"><option value="">Choose release master…</option></select><output id="songRenderState" role="status"></output></footer>
  <details class="song-versions"><summary>Saved versions</summary><div class="prep-actions"><select id="songVersions" aria-label="Saved song version"></select><button id="songRestore" class="secondary">Restore as draft</button><button id="songReload" class="secondary">Reload latest saved</button></div></details>`;
  root.querySelector('#prepWorkspace').prepend(host);
- const q=id=>host.querySelector('#'+id),canvas=q('songTimeline'),ctx=canvas.getContext('2d');
+ const q=id=>root.querySelector('#'+id),canvas=q('songTimeline'),ctx=canvas.getContext('2d');
  let gid='',data=null,document=null,row=null,wave=null,library=[],selected=null,revision=null,dirty=false;
  let viewStart=0,viewSpan=1,range={start:0,end:0},undo=[],redo=[],hits=[],drag=null,ticket=0,frame=null,lastDraw=0;
  let sourceChanged=async()=>{},releaseMaster='',renderPending='',renderBusy=false;
  let restoreMix=false,knownVersions='',alignmentId='',lyricProjection=[],lastPreview='',masterSignature='';
  let alignmentLoading=false,alignmentSequence=0,alignmentFailure=null,requestedAlignment=null;
+ let processingItems=new Map();
  const sessionDrafts=new Map();
  let loadingProject=false,localDraftStored=true;
  const endpoint=(suffix='')=>'/preparation/projects/'+encodeURIComponent(gid)+suffix;
@@ -165,7 +166,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
   return source?(lyricProjection.find(w=>w.source_id===source.id)||{...source,source_id:source.id,outside:true}):null;
  }
  function inspect(){
-  if(!document)return;const panel=q('songInspector');q('songInspectorTitle').textContent='Selection';
+  if(!document)return;const panel=q('songInspector');panel.parentElement.dataset.empty=String(!selected);q('songInspectorTitle').textContent='Selection';
   const options=[...spans(document).map(s=>({value:'music|'+s.id,label:stamp(s.at)+' · '+(s.label||(s.kind==='gap'?'Silence':'Music'))})),
    ...sounds(document).map(s=>({value:'sound|'+s.id,label:stamp(s.position)+' · '+s.label})),
    ...(document.mix.effects||[]).map((s,i)=>({value:'effect|'+i,label:'Effect · '+s.preset.replaceAll('_',' ')})),
@@ -177,7 +178,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
   if(selected.kind==='music'){
    const object=document.segments.find(s=>s.id===selected.id);if(!object){selected=null;return inspect();}
    q('songInspectorTitle').textContent=object.kind==='gap'?'Silence / break':'Music section';
-   panel.innerHTML=`<label>Name<input data-key="label" value="${esc(object.label)}"></label><div class="song-fields">${object.kind==='gap'?input('Length / s','duration',object.duration,.01,120):input('Source in / s','start',object.start,0,data.source_duration)+input('Source out / s','end',object.end,0,data.source_duration)+input('Gain / dB','gain_db',object.gain_db||0,-60,12,.5)}</div>${object.kind==='audio'?`<label>Playback<select data-key="mode">${['normal','mute','scratch','stop','stutter','reverse'].map(mode=>`<option ${object.mode===mode?'selected':''}>${mode}</option>`).join('')}</select></label><button data-object="attachEffects" class="secondary">Attach effect rack to this section</button><p class="song-hint">${object.effects?.length||0} attached effects follow this section when moved or repeated.</p>`:''}<div class="prep-actions"><button data-object="left" class="secondary">← Move</button><button data-object="right" class="secondary">Move →</button><button data-object="duplicate" class="secondary">Repeat</button><button data-object="remove" class="secondary">Delete</button></div>`;
+   panel.innerHTML=`<label>Name<input data-key="label" value="${esc(object.label)}"></label><div class="song-fields">${object.kind==='gap'?input('Length / s','duration',object.duration,.01,120):input('Source in / s','start',object.start,0,data.source_duration)+input('Source out / s','end',object.end,0,data.source_duration)+input('Gain / dB','gain_db',object.gain_db||0,-60,12,.5)}</div>${object.kind==='audio'?`<label>Playback<select data-key="mode">${['normal','mute','scratch','stop','start','stutter','reverse'].map(mode=>`<option ${object.mode===mode?'selected':''}>${mode}</option>`).join('')}</select></label><button data-object="attachEffects" class="secondary">Attach effect rack to this section</button><p class="song-hint">${object.effects?.length||0} attached effects follow this section when moved or repeated.</p>`:''}<div class="prep-actions"><button data-object="left" class="secondary">← Move</button><button data-object="right" class="secondary">Move →</button><button data-object="duplicate" class="secondary">Repeat</button><button data-object="remove" class="secondary">Delete</button></div>`;
   }else if(selected.kind==='sound'){
    const object=document.sounds.find(s=>s.id===selected.id);if(!object){selected=null;return inspect();}
    const absolute=sounds(document).find(s=>s.id===object.id).position,clip=library.find(c=>c.id===object.clip_id);
@@ -230,7 +231,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
    if(selected.kind==='word'){if(object.start>=object.end)throw Error('Word end must be after its start');object.estimated=false;document.approved=false;selected.id='source_'+object.id;}
    if(selected.kind==='music'&&object.kind==='audio'){
     if(size(object)<.01)throw Error('Music sections need a start before their end');
-    if(['scratch','stop','stutter'].includes(object.mode)&&size(object)>30)throw Error('Select up to 30 seconds for a record gesture');document.approved=false;
+    if(['scratch','stop','start','stutter'].includes(object.mode)&&size(object)>30)throw Error('Select up to 30 seconds for a record gesture');document.approved=false;
    }
    if(selected.kind==='sound'){
     const clip=library.find(c=>c.id===object.clip_id);if(object.trim+object.duration>(clip?.duration||120)+.001)throw Error('Trim and length must fit inside the clip');
@@ -294,7 +295,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  canvas.ondragover=event=>{if(event.dataTransfer.types.includes('application/x-gbr-sound')){event.preventDefault();event.dataTransfer.dropEffect='copy';}};
  canvas.ondrop=event=>{const clip=library.find(c=>c.id===event.dataTransfer.getData('application/x-gbr-sound'));if(!clip)return;event.preventDefault();mutate(()=>addSound(clip,T(event.clientX-canvas.getBoundingClientRect().left)));};
  canvas.onpointerdown=event=>{
-  if(event.button!==0||!document)return;canvas.focus();const rect=canvas.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
+  if(event.button!==0||!document)return;canvas.focus();const rect=canvas.getBoundingClientRect(),x=event.clientX-rect.left,y=(event.clientY-rect.top)*390/rect.height;
   const hit=y<30?null:[...hits].reverse().find(h=>x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h);
   selected=hit?{kind:hit.kind,id:hit.id}:null;inspect();
   drag={x:event.clientX,time:T(x),hit,before:snapshot(),moved:false,original:null,edge:null};
@@ -374,13 +375,16 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
   const id=event.target.closest('[data-source-word]')?.dataset.sourceWord;if(!id)return;const occurrence=lyricProjection.find(w=>w.source_id===id);
   selected={kind:'word',id:occurrence?.id||'source_'+id};if(occurrence){player.seek(occurrence.start);viewSpan=Math.min(viewSpan,10);viewStart=clamp(occurrence.start-viewSpan/3,0,Math.max(0,duration(document)-viewSpan));}rangeInputs();inspect();draw();
  };
- q('songAlign').onclick=guard(async()=>{
+ async function runAlignment(device='auto'){
   const request=ticket,language=document.language,words=JSON.stringify(document.words);
-  const result=await api(endpoint('/jobs'),{kind:'lyric_alignment',input_artifact_id:data.source_artifact_id||null,language,force:true});
+  const result=await api(endpoint('/jobs'),{kind:'lyric_alignment',input_artifact_id:data.source_artifact_id||null,language,force:true,device});
   if(request!==ticket)return;
   requestedAlignment={id:result.id,language,words};alignmentFailure=null;
   q('songAlignmentStatus').textContent='Alignment '+result.status+' · timings will load when complete unless you edit the words.';
- });
+ }
+ q('songAlign').onclick=guard(()=>runAlignment());
+ const cpuButton=globalThis.document.createElement('button');cpuButton.id='songAlignCpu';cpuButton.className='secondary';
+ cpuButton.textContent='Run here on CPU';cpuButton.onclick=guard(()=>runAlignment('cpu'));q('songAlign').after(cpuButton);
  function currentAlignment(){
   return row?.tasks?.find(task=>task.kind==='lyric_alignment'&&task.input_sha256===data?.source_sha256&&
    (task.recipe.input_artifact_id||null)===(data?.source_artifact_id||null)&&task.recipe.language===document?.language&&
@@ -432,15 +436,17 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  function updateAlignment(){
   const alignment=currentAlignment();
   if(!alignment||alignmentLoading)return;
+  const live=processingItems.get(alignment.id),status=live?.status||alignment.status,progress=live?.progress||alignment.telemetry||{};
   if(alignmentFailure?.id===alignment.id){q('songAlignmentStatus').textContent=alignmentFailure.message;return;}
-  if(alignment.status==='done'){
+  if(status==='done'){
    if(alignment.id!==alignmentId){
     if(canLoadAlignmentAutomatically())loadAlignment(true);
     else q('songAlignmentStatus').textContent='Alignment done · newer alignment available. Load it to replace timings while keeping your lyric text.';
    }else if(!q('songAlignmentStatus').textContent)q('songAlignmentStatus').textContent=document.words.filter(word=>!word.estimated&&word.start!=null).length+' / '+document.words.length+' words aligned';
   }else{
-   const detail=['failed','interrupted'].includes(alignment.status)?' · Open Processing queue for the error and retry':alignment.telemetry?.message?' · '+alignment.telemetry.message:'';
-   q('songAlignmentStatus').textContent='Alignment '+alignment.status+detail;
+   const reason=live?.reason||alignment.error||progress.message;
+   const detail=['failed','interrupted'].includes(status)?' · Open Processing queue for the error and retry':reason?' · '+reason:'';
+   q('songAlignmentStatus').textContent=(progress.remote?.name?'Alignment on '+progress.remote.name+' · ':'Alignment ')+status+detail;
   }
  }
  q('songLoadAlignment').onclick=()=>loadAlignment();
@@ -497,6 +503,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
  });
  const resize=new ResizeObserver(()=>draw());resize.observe(canvas);
  return {
+  processingStatus(status){processingItems=new Map((status.items||[]).map(item=>[item.id,item]));updateAlignment();},
   artifact:()=>releaseMaster,chooseSource:chooseMaster,onSourceChange:fn=>sourceChanged=fn,canSwitch:()=>!renderBusy,
   releaseReady(){if(!document||!data||dirty||renderBusy||loadingProject)throw Error('Save the song timeline before finishing preparation');if(revision&&releaseMaster!==data.reused_master_id&&!row?.tasks.some(t=>t.kind==='mix_master'&&t.status==='done'&&t.recipe.song_project_id===revision&&t.artifacts.some(a=>a.id===releaseMaster&&a.available)))throw Error('Render and select a master of the latest saved song timeline before finishing');},
   time:player.time,play:player.play,pause:()=>{player.pause();audition.pause();},seek:player.seek,isPlaying:player.active,
@@ -511,7 +518,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
     renders();if(!frame&&!root.hidden)frame=requestAnimationFrame(tick);updateAlignment();return;
    }
    cache();
-   const request=++ticket;loadingProject=true;host.inert=true;resetPlayback();gid=project.generation_id;document=null;data=null;dirty=false;wave=null;selected=null;undo=[];redo=[];releaseMaster='';masterSignature='';knownVersions='';renderPending='';
+   const request=++ticket;loadingProject=true;host.inert=true;resetPlayback();gid=project.generation_id;document=null;data=null;dirty=false;wave=null;canvas.dataset.waveform='loading';selected=null;undo=[];redo=[];releaseMaster='';masterSignature='';knownVersions='';renderPending='';
    alignmentLoading=false;alignmentFailure=null;requestedAlignment=null;q('songLoadAlignment').disabled=false;q('songAlignmentStatus').textContent='';
    q('songTitle').textContent=project.title;q('songSaveState').textContent='Loading song…';
    try{
@@ -530,7 +537,7 @@ export function initSongEditor({root,api,toast,getMix,setMix,getArtwork,setArtwo
    if(!frame&&!root.hidden)frame=requestAnimationFrame(tick);
    if(!library.length){try{const result=await api('/preparation/sounds');if(request!==ticket)return;library=result.sounds;libraryList();}catch(error){if(request===ticket)q('songImportStatus').textContent=error.message;}}
    if(request!==ticket)return;
-   api(endpoint('/waveform')+(value.source_artifact_id?'?'+new URLSearchParams({artifact:value.source_artifact_id}):'')).then(result=>{if(request===ticket){wave=result;draw();}}).catch(error=>{if(request===ticket)toast(error.message);});
+   api(endpoint('/waveform')+(value.source_artifact_id?'?'+new URLSearchParams({artifact:value.source_artifact_id}):'')).then(result=>{if(request===ticket){wave=result;canvas.dataset.waveform='ready';draw();}}).catch(error=>{if(request===ticket){canvas.dataset.waveform='failed';toast(error.message);}});
    }catch(error){if(request!==ticket)return;document=null;data=null;loadingProject=false;q('songSaveState').textContent=error.message;draw();throw error;}
   },
   close(){cache();++ticket;loadingProject=false;resetPlayback(true);if(frame)cancelAnimationFrame(frame);frame=null;}

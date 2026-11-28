@@ -85,6 +85,8 @@ class Preparation:
         from .metadata import PreparationMetadata
         self.metadata=PreparationMetadata(self)
         from .processing import ProcessingQueue
+        from .remote_processing import RemoteProcessing
+        self.remote=RemoteProcessing(self)
         self.processing=ProcessingQueue(self)
         from .sounds import SoundLibrary
         from .song_projects import SongProjects
@@ -102,6 +104,7 @@ class Preparation:
 
     def close(self):
         self.closed=True
+        self.processing.close()
         self.pool.shutdown(wait=False,cancel_futures=True)
         for identifier in self.submitted:
             self.db.execute("UPDATE processing_tasks SET status='interrupted',error='Application closed before execution' WHERE id=? AND status='queued'",(identifier,))
@@ -381,8 +384,9 @@ class Preparation:
             language=data.get('language') or json.loads(row['parsed_json']).get('language') or 'en'
             if not isinstance(language,str) or not __import__('re').fullmatch('[a-z]{2,3}',language):raise ValueError('Use an ISO language code, e.g. en or de')
             recipe={'version':1,'language':language}
+            if data.get('device')=='cpu':recipe['execution_device']='cpu'
             recipe=self.lyric_recipe(gid,recipe)
-            if not self.alignment_python().is_file():raise ValueError('Install the isolated processing environment with run_gbr.py setup-processing first')
+            if not self.alignment_python().is_file() and (data.get('device')=='cpu' or not self.remote.configured()):raise ValueError('Install processing on this PC for local alignment, or pair another PC and use automatic alignment.')
         if data.get('input_artifact_id'):recipe['input_artifact_id']=data['input_artifact_id']
         if kind=='mix_preview':
             start=data.get('start',0);seconds=data.get('seconds',30)
@@ -397,6 +401,9 @@ class Preparation:
         fingerprint=hashlib.sha256(canonical([gid,kind,recipe,source_hash]).encode()).hexdigest()
         with self.lock:
             self.editable(gid)
+            if kind=='lyric_alignment' and data.get('device')=='cpu' and data.get('force'):
+                self.db.execute("UPDATE processing_tasks SET status='cancelled',completed_at=?,error='Replaced by an explicit CPU alignment' WHERE generation_id=? AND kind='lyric_alignment' AND status='waiting' AND input_sha256=? AND json_extract(recipe_json,'$.language')=? AND COALESCE(json_extract(recipe_json,'$.execution_device'),'auto')<>'cpu'",
+                    (now(),gid,source_hash,recipe['language']))
             cached=self.db.one("SELECT * FROM processing_tasks WHERE fingerprint=? AND status IN ('waiting','queued','running','done') ORDER BY rowid DESC LIMIT 1",(fingerprint,))
             if cached:
                 if cached['status']=='waiting':return self.launch_waiting(cached)
@@ -436,6 +443,8 @@ class Preparation:
                     command=[str(self.alignment_python()),str(self.worker.with_name('alignment.py'))];timeout=7200
                 environment=os.environ.copy()
                 environment.update(PYTHONUTF8='1',PYTHONIOENCODING='utf-8')
+                if recipe.get('execution_device')=='cpu':environment['GBR_PROCESSING_DEVICE']='cpu'
+                if recipe.get('execution_device')=='cpu':environment['GBR_PROCESSING_DEVICE']='cpu'
                 environment.setdefault('HF_HOME',str(self.worker.parent/'_runtime/huggingface'))
                 environment.setdefault('TORCH_HOME',str(self.worker.parent/'_runtime/torch'))
                 process=self.processing.execute(identifier,command,request,environment,temporary,timeout) if task['kind']=='lyric_alignment' else subprocess.run(command,input=canonical(request).encode('utf-8'),capture_output=True,timeout=timeout,env=environment)

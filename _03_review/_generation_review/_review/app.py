@@ -217,9 +217,11 @@ def create_app(config_path, start_worker=True, database_path=None):
                     limit = 8 * 1024 * 1024
                 elif request.url.path == '/api/preparation/sounds/import':
                     limit = 32 * 1024 * 1024
+                elif request.url.path.startswith('/api/processing-worker/tasks/') and request.url.path.endswith('/result'):
+                    limit = 1024 ** 3
                 if int(request.headers.get("content-length", "0")) > limit:
                     return JSONResponse({"detail": "Request too large"}, status_code=413)
-            if request.url.path not in ("/api/bootstrap", "/api/login") and not authenticated(request):
+            if request.url.path not in ("/api/bootstrap", "/api/login") and not request.url.path.startswith('/api/processing-worker/') and not authenticated(request):
                 return JSONResponse({"detail": "Sign in required"}, status_code=401)
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -712,6 +714,8 @@ def create_app(config_path, start_worker=True, database_path=None):
     from _gbr_preparation.api import router as preparation_router
     preparation_routes, preparation = preparation_router(repo_root, service, local)
     app.include_router(preparation_routes)
+    from _gbr_preparation.worker_api import worker_router
+    app.include_router(worker_router(preparation))
     app.state.preparation = preparation
     from _gbr_preparation.publishing_api import router as publishing_router
     release_routes,publisher=publishing_router(repo_root,service,preparation,local)

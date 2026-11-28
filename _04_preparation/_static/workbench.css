@@ -1,0 +1,140 @@
+/* One continuous work surface: transport, timeline, dock, render strip. */
+#preparationView.timeline-workbench{--wb-line:#2c3a45;--wb-bg:#101820;--wb-muted:#8ea3b2}
+.timeline-workbench .prep-project-bar{margin:0;gap:8px;flex-wrap:nowrap;align-items:center;min-width:0;flex:1}
+.timeline-workbench .prep-project-bar>label:first-child{flex:1;min-width:160px}
+#preparationView.timeline-workbench .prep-project-bar label{margin:0;font-size:10px;gap:2px}
+#preparationView.timeline-workbench #prepProject{padding:6px 8px;font-size:13px;background:transparent;border-color:transparent;min-height:34px}
+#preparationView.timeline-workbench #prepFlagFilter{font-size:10px;max-width:115px;line-height:1.3;min-height:0;flex-wrap:nowrap}
+.workbench-sr{position:absolute!important;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#preparationView.timeline-workbench .song-editor{margin:0;border-radius:10px;border:1px solid var(--wb-line);background:var(--wb-bg);box-shadow:0 12px 45px #0002}
+.timeline-workbench .song-heading{padding:10px 12px;gap:10px;background:#17212a;flex-wrap:nowrap;border-color:var(--wb-line)}
+.timeline-workbench .song-save{gap:5px;flex-wrap:nowrap}
+.timeline-workbench #songSaveState{font-size:10px;max-width:165px;margin:0}
+#preparationView.timeline-workbench .song-save button{min-height:31px;padding:5px 9px;font-size:11px}
+.timeline-workbench .prep-header-actions{flex-wrap:nowrap}
+#preparationView.timeline-workbench .prep-header-actions button{padding:4px 7px;min-height:31px;font-size:10px}
+.workbench-art{width:44px;height:44px;min-height:44px;padding:0!important;flex:0 0 44px;overflow:hidden;display:grid;place-items:center;background:#30281c;color:#ddb66e;border:1px solid #6e593a}
+.workbench-art img{width:100%;height:100%;object-fit:cover}
+.workbench-art span{font-size:11px;font-weight:750;letter-spacing:.05em}
+.timeline-workbench .song-transport{padding:8px 12px;gap:9px;background:#111b23;border-bottom:1px solid var(--wb-line)}
+#preparationView.timeline-workbench .song-transport button,#preparationView.timeline-workbench .song-tools button{min-height:31px;padding:5px 9px;font-size:11px}
+.timeline-workbench #songClock{font-size:13px;min-width:150px}
+#preparationView.timeline-workbench .song-transport label{font-size:10px;gap:5px}
+#preparationView.timeline-workbench .song-transport select{padding:5px;font-size:10px;min-height:29px}
+.timeline-workbench #songListen{max-width:165px}
+.timeline-workbench .song-zoom{gap:4px}
+.timeline-workbench .workbench-queue{margin-left:auto;background:transparent;border:0;color:var(--wb-muted);display:flex;gap:7px;align-items:center}
+.timeline-workbench #prepQueueStatus{font-size:10px;max-width:200px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.timeline-workbench .song-tools{padding:7px 12px;gap:6px;border-bottom:1px solid var(--wb-line)}
+.workbench-gestures{display:flex;gap:4px;align-items:center;border-left:1px solid #42505a;padding-left:9px;margin-left:4px;overflow:auto}
+#preparationView.timeline-workbench .song-tools label{font-size:10px;gap:6px;margin-left:auto}
+#preparationView.timeline-workbench .song-tools select{padding:5px;font-size:11px;min-height:31px}
+.timeline-workbench .song-canvas-wrap{padding:0;background:#0a1117}
+.timeline-workbench #songTimeline{display:block;width:100%;height:clamp(250px,33vh,390px);touch-action:none}
+.timeline-workbench .song-view{padding:6px 12px;gap:7px;border-block:1px solid var(--wb-line);background:#121c24}
+#preparationView.timeline-workbench .song-view label{font-size:10px;margin:0;display:flex;align-items:center;gap:6px}
+#preparationView.timeline-workbench .song-view input[type=number]{width:69px;padding:4px 6px;min-height:28px;font-size:11px}
+.timeline-workbench #songScroll{flex:1;min-width:80px;max-width:220px}
+#preparationView.timeline-workbench .song-view button{min-height:28px;padding:4px 8px;font-size:10px}
+.timeline-workbench #songAlignmentStatus{margin-left:auto;max-width:45%;font-size:11px;color:#d9b879;line-height:1.4;overflow-wrap:anywhere}
+.timeline-workbench #songHint{display:none}
+.workbench-tabs{display:flex;gap:0;border-bottom:1px solid var(--wb-line);background:#15202a;overflow:auto;scrollbar-width:thin}
+#preparationView .workbench-tabs button{position:relative;min-height:39px;padding:8px 17px;border:0;border-radius:0;background:transparent;color:#8fa3b2;white-space:nowrap;font-size:12px}
+#preparationView .workbench-tabs button[aria-selected=true]{color:#f1cd8a;background:#1b2933}
+.workbench-tabs [aria-selected=true]::after{content:"";position:absolute;bottom:0;left:15px;right:15px;height:2px;background:#d7ad64}
+.workbench-body{display:grid;grid-template-columns:minmax(0,1fr) 270px;height:clamp(190px,24vh,280px);min-height:0}
+.workbench-body:has(.workbench-inspector[data-empty=true]){grid-template-columns:minmax(0,1fr)}
+.workbench-inspector[data-empty=true]{display:none}
+.workbench-content{overflow:auto;min-width:0;scrollbar-width:thin}
+.workbench-content>[role=tabpanel]{padding:13px 15px;min-height:100%}
+.workbench-inspector{border-left:1px solid var(--wb-line);overflow:auto;padding:13px 15px!important;min-width:0;background:#121d26;scrollbar-width:thin}
+.timeline-workbench .song-inspector h3{font-size:12px;margin-bottom:8px}
+#preparationView.timeline-workbench .song-inspector p{font-size:11px;line-height:1.5}
+#preparationView.timeline-workbench .song-inspector input,#preparationView.timeline-workbench .song-inspector select{padding:5px 7px;font-size:11px;min-height:30px}
+#preparationView.timeline-workbench .song-inspector label{margin-bottom:8px;font-size:10px;gap:4px}
+#preparationView.timeline-workbench .song-inspector button{font-size:10px;min-height:30px;padding:5px 8px}
+#preparationView.timeline-workbench .workbench-content .prep-card,.timeline-workbench .song-library,.timeline-workbench .song-lyrics,.timeline-workbench .song-versions,.timeline-workbench .prep-yaml,.timeline-workbench .prep-processing{margin:0;padding:0;border:0;border-radius:0;background:none}
+.timeline-workbench .song-library-heading{margin-bottom:8px}
+.timeline-workbench .song-library-heading h3{font-size:12px}
+.timeline-workbench #songSoundSearch{padding:7px 10px;font-size:12px}
+.timeline-workbench #songSoundList{max-height:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px}
+.timeline-workbench .song-sample{padding:7px;border-color:#2d404c;border-radius:4px;background:#192731}
+.timeline-workbench .song-sample strong{font-size:11px}
+.timeline-workbench #songImportStatus{font-size:10px;margin:5px 0}
+.timeline-workbench .song-lyric-toolbar{margin:0 0 10px;gap:7px}
+#preparationView.timeline-workbench .song-lyric-toolbar button{font-size:11px;min-height:31px;padding:5px 10px}
+.timeline-workbench #songLyricText{max-height:none;margin:0;line-height:1.8}
+#preparationView.timeline-workbench #songLyricText button{padding:3px 6px;font-size:12px;border:0;background:transparent;color:#c7d5df}
+#preparationView.timeline-workbench #songLyricText button:hover{color:#f4d18d;background:#3a3225}
+.timeline-workbench .prep-cover-frame{max-width:140px;margin:0 15px 8px 0;float:left;border-radius:5px}
+.timeline-workbench .prep-artwork h2{font-size:12px;margin-bottom:8px}
+#preparationView.timeline-workbench .prep-artwork label{font-size:11px;margin-bottom:8px;gap:4px}
+#preparationView.timeline-workbench .prep-artwork select,#preparationView.timeline-workbench .prep-artwork input{padding:5px 7px;font-size:11px}
+.workbench-release-options{clear:both;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-top:8px;border-top:1px solid var(--wb-line)}
+.workbench-release-options>label{min-width:160px}
+.timeline-workbench .prep-release-options{gap:5px}
+.timeline-workbench .prep-effect-rack h3,.timeline-workbench .prep-card-heading h2{font-size:12px;margin:0 0 7px}
+.timeline-workbench .prep-presets{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0}
+#preparationView.timeline-workbench .prep-presets button{font-size:10px;padding:5px 9px;min-height:29px}
+.timeline-workbench .prep-effect{border-radius:4px;padding:9px}
+.timeline-workbench #prepEffectsEmpty{font-size:11px}
+.timeline-workbench .song-render{padding:9px 12px;background:#182630;border-color:var(--wb-line);gap:8px}
+#preparationView.timeline-workbench .song-render button{min-height:34px;padding:6px 11px;font-size:11px}
+.timeline-workbench #prepComplete{order:5;margin-left:auto}
+.timeline-workbench #songMasterChoice{width:230px;font-size:11px}
+.timeline-workbench #songRenderState{font-size:10px;margin:0;flex-basis:auto;max-width:40%}
+.timeline-workbench #prepNotice{font-size:12px;padding:7px 10px;background:#382c20;margin:0 0 7px;border-left:2px solid #cfa963}
+.timeline-workbench #workbenchPane-queue h3{margin:0 0 9px;font-size:13px}
+.timeline-workbench .prep-task{padding:9px 0}
+.timeline-workbench .prep-task strong{font-size:11px}
+.timeline-workbench .prep-task span{font-size:10px}
+.workbench-workers{padding:0 0 12px;margin-bottom:12px;border-bottom:1px solid var(--wb-line);font-size:11px}
+.workbench-worker-heading,.workbench-worker{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.workbench-worker-heading{margin-bottom:7px}.workbench-worker-heading strong{margin-right:auto}
+.workbench-worker{padding:5px 0;justify-content:space-between;color:#bdccd7}
+#preparationView .workbench-workers button{font-size:10px;min-height:29px;padding:5px 9px}
+#prepPairGuide{font-size:11px;line-height:1.5;padding-top:8px}
+#prepPairGuide label{font-size:11px;margin:8px 0}
+#prepPairGuide input{width:100%;max-width:450px;padding:6px 8px}
+#prepPairGuide code,#prepWorkerCommand{display:block;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.6 ui-monospace,monospace;color:#dac088}
+#prepWorkerCopyStatus{margin-left:8px;color:#d7bc88}
+.workbench-workers{border-bottom:1px solid var(--wb-line);padding-bottom:12px;margin-bottom:12px;font-size:11px}
+.workbench-worker-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#preparationView .workbench-worker-heading button,#preparationView #prepCopyWorkerKey{font-size:10px;min-height:29px;padding:4px 8px}
+.workbench-worker{display:flex;gap:10px;align-items:center;padding:6px 0;color:#a8c7bc}
+.workbench-worker span{color:var(--wb-muted)}
+#prepPairGuide{padding-top:8px;max-width:750px}
+#prepPairGuide p{font-size:11px;color:var(--wb-muted)}
+#prepPairGuide pre,#prepPairGuide code{font:11px/1.6 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:#e6c48b}
+#preparationView #prepPairGuide label{font-size:10px;margin-top:8px}
+#prepPairGuide input{background:#0e171f;border:1px solid var(--wb-line);color:#e7d4af;min-height:30px;padding:6px;max-width:100%}
+@media(max-width:1100px){
+ .timeline-workbench .song-heading{flex-wrap:wrap}
+ .timeline-workbench .song-save{margin-left:auto}
+ .workbench-body{grid-template-columns:minmax(0,1fr) 245px}
+ .timeline-workbench #songAlignmentStatus{max-width:100%;flex:1 1 100%;margin-left:0}
+}
+@media(max-width:650px){
+ #preparationView.timeline-workbench .prep-project-bar>label:first-child{min-width:0}
+ #preparationView.timeline-workbench #prepFlagFilter{max-width:92px;flex:0 0 92px;font-size:9px}
+ .timeline-workbench .song-heading{gap:7px;padding:8px}
+ .timeline-workbench .prep-project-bar{flex-basis:calc(100% - 60px)}
+ .timeline-workbench .song-save{flex:1;min-width:0}
+ .timeline-workbench #songSaveState{max-width:none;flex:1}
+ .timeline-workbench .song-transport{padding:7px 8px;gap:6px}
+ .timeline-workbench .song-transport>label:first-of-type{width:auto}
+ .timeline-workbench .workbench-queue{margin-left:0}
+ .timeline-workbench #prepQueueStatus{max-width:110px}
+ .timeline-workbench #songTimeline{height:280px}
+ .workbench-body{display:block;height:340px;overflow:auto}
+ .workbench-content{overflow:visible}
+ .workbench-inspector{border-left:0;border-top:1px solid var(--wb-line);overflow:visible}
+ #preparationView .workbench-tabs button{padding:8px 12px;font-size:11px}
+ .timeline-workbench .song-tools{padding:6px 8px}
+ .timeline-workbench .song-tools label{margin-left:0}
+ .timeline-workbench #songScroll{flex-basis:100%;max-width:none}
+ .timeline-workbench .song-render{padding:8px}
+ .timeline-workbench #songMasterChoice{width:100%}
+ .timeline-workbench #songRenderState{max-width:100%;flex-basis:100%}
+ .timeline-workbench #prepComplete{margin-left:0}
+}

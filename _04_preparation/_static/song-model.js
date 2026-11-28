@@ -8,7 +8,7 @@ export function warp(segment){
  if(['normal','mute'].includes(mode))return [[0,length,source,source+length]];
  if(mode==='reverse')return [[0,length,source+length,source]];
  if(mode==='stutter'){const step=Math.min(.25,length);return Array.from({length:Math.ceil(length/step)},(_,i)=>[i*step,Math.min(length,(i+1)*step),source,source+Math.min(step,length-i*step)]);}
- const knots=mode==='scratch'?[[0,0],[.18,.65],[.38,.12],[.57,.78],[.76,.28],[1,1]]:Array.from({length:33},(_,i)=>[i/32,i/32-(i/32)**2/2]);
+ const knots=mode==='scratch'?[[0,0],[.18,.65],[.38,.12],[.57,.78],[.76,.28],[1,1]]:Array.from({length:33},(_,i)=>[i/32,mode==='start'?(i/32)**2/2:i/32-(i/32)**2/2]);
  return knots.slice(1).map(([b,d],i)=>{const [a,c]=knots[i];return [a*length,b*length,source+c*length,source+d*length];});
 }
 export function sounds(project){const offsets=new Map(spans(project).map(s=>[s.id,s.at]));return project.sounds.map(s=>({...s,position:s.segment_id?(offsets.get(s.segment_id)||0)+s.offset:s.at}));}
@@ -56,7 +56,7 @@ export function insertGap(project,time,seconds,label='Break'){
 }
 export function gesture(project,start,end,mode){
  if(end-start<.01)throw Error('Drag a range on the ruler or music waveform first');
- if(['scratch','stop','stutter'].includes(mode)&&end-start>30)throw Error('Select up to 30 seconds for a record gesture');
+ if(['scratch','stop','start','stutter'].includes(mode)&&end-start>30)throw Error('Select up to 30 seconds for a record gesture');
  split(project,end);split(project,start);
  for(const span of spans(project))if(span.kind==='audio'&&span.at>=start-.009&&span.until<=end+.009){
   project.segments.find(s=>s.id===span.id).mode=mode;
