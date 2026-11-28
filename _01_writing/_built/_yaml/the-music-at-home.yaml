@@ -1,0 +1,49 @@
+song_id: 106
+variant_id: 1
+title: the-music-at-home
+cluster:
+version:
+explicit:
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |-
+  [intro]
+  we have music at home
+  ...
+  the music at home
+  [verse]
+  we have music at home
+  ...
+  the music at home
+  [pre-chorus]
+  we have music at home
+  ...
+  the music at home
+  [chorus]
+  we have music at home
+  ...
+  the music at home
+  [post-chorus]
+  we have music at home
+  ...
+  the music at home
+  [solo]
+  we have music at home
+  ...
+  the music at home
+  [outro]
+  we have music at home
+  ...
+  the music at home

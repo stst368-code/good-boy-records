@@ -1,0 +1,74 @@
+song_id: 105
+variant_id: 1
+title: parade-of-the-bulls
+cluster:
+version:
+explicit:
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |-
+  [intro]
+  come on, show us what you’re truly capable of.
+  come on, show us what you’re truly capable of.
+  [verse]
+  the microphone explodes, shattering every established boundary.
+  either deliver a masterpiece—in the spirit of de la hoya
+  or get off the toilet (don’t hog the stall if you aren’t planning to take a dump).
+  this precise, initial strike is guaranteed to send your opponent into a deep knockout.
+  bring something genuinely worthwhile to the table;
+  don’t resort to plagiarism—that’s hardly what you’d call "collaboration."
+  a surge, relentless as a torrential downpour,
+  washing away the insatiable greed of these industrial giants.
+  this pentagonal "kulakagon"
+  it’s the reason the festering scars on the body of mother earth keep spreading ever wider.
+  pull the cold trigger—and empty your wallet down to the very last cent.
+  [verse]
+  they gather among their families,
+  their pockets stuffed with ammunition.
+  they gather among their families,
+  their pockets stuffed with ammunition.
+  they gather among their families,
+  their pockets stuffed with ammunition.
+  they gather among their families,
+  their pockets stuffed with ammunition.
+  [verse]
+  what they produce is weaponry—not food, not shelter, not footwear.
+  it is nothing essential for survival; it is merely fuel for war, fodder for a pack of bloodthirsty beasts.
+  turn a corner, and you are confronted by a pile of rubble;
+  where a library once stood, there is now a graveyard of ideas.
+  it is our collective ignorance that keeps the arms contracts in business.
+  there is no need to burn books—it is enough simply to remove them.
+  arms depots fill up rapidly—just as prison cells are packed with human beings.
+  they gather among their families, their pockets stuffed with ammunition.
+  [verse]
+  they gather together with their families,
+  pockets stuffed to the brim with ammunition.
+  they gather together with their families,
+  pockets stuffed to the brim with ammunition.
+  they gather together with their families,
+  pockets stuffed to the brim with ammunition.
+  they gather together with their families,
+  pockets stuffed to the brim with ammunition.
+  parade of the bulls
+  oh…
+  [outro]
+  come on, show what you’re really made of,
+  come on, show what you’re really made of.
+  parade of the bulls
+  parade of the bulls
+  parade of the bulls
+  parade of the bulls
+  parade of the bulls
+  parade of the bulls

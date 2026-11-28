@@ -1,0 +1,33 @@
+song_id: 109
+variant_id: 1
+title: dee-oh-gee
+cluster:
+version:
+explicit:
+language: en
+duration:
+model:
+dit:
+text_encoder:
+encoder_cfg:
+encoder_seed:
+top_k:
+sampler:
+scheduler:
+sampler_cfg:
+sampler_seed:
+sampler_steps:
+caption: |
+lyrics: |-
+  [intro]
+  i'm a dog
+  that's me
+  dee oh gee
+  doggy doggy
+  dog dog me
+  epiphanie when i looked in the mirror
+  i saw god looking back at me
+  gee oh dee
+  i'm a god
+  i'm a dog
+  a godamn dog you see
